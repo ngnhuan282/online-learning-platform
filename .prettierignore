@@ -1,0 +1,11 @@
+**/node_modules/
+**/target/
+**/dist/
+**/*.local/
+.tmp/
+**/package-lock.json
+**/mvnw
+**/mvnw.cmd
+**/.mvn/
+**/assets/
+**/*.sql

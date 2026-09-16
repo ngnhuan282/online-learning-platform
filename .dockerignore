@@ -1,0 +1,10 @@
+.git
+.idea
+.tmp
+**/target
+**/node_modules
+**/qa.local
+**/.env
+**/.env.*
+frontend
+docs

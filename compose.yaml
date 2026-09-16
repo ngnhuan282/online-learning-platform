@@ -1,0 +1,146 @@
+# MySQL alone: docker compose up -d mysql
+# Full backend: docker compose --profile backend up --build -d
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: elearning-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in .env}
+      COURSE_DB_PASSWORD: ${COURSE_DB_PASSWORD:?Set COURSE_DB_PASSWORD in .env}
+      LEARNING_DB_PASSWORD: ${LEARNING_DB_PASSWORD:?Set LEARNING_DB_PASSWORD in .env}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?Set PAYMENT_DB_PASSWORD in .env}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infra/mysql/init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
+      - ./infra/mysql/02-users.sh:/docker-entrypoint-initdb.d/02-users.sh:ro
+      - ./infra/mysql/03-auth-migrations.sql:/docker-entrypoint-initdb.d/03-auth-migrations.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT 1" >/dev/null 2>&1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/docker/service.Dockerfile
+      args:
+        SERVICE: auth-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
+      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
+      AUTH_DB_URL: jdbc:mysql://mysql:3306/auth_db
+      AUTH_DB_USERNAME: auth_app
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      REFRESH_TOKEN_EXPIRATION_SECONDS: ${REFRESH_TOKEN_EXPIRATION_SECONDS:-604800}
+      REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  course-service:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/docker/service.Dockerfile
+      args:
+        SERVICE: course-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
+      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
+      COURSE_DB_URL: jdbc:mysql://mysql:3306/course_db
+      COURSE_DB_USERNAME: course_app
+      COURSE_DB_PASSWORD: ${COURSE_DB_PASSWORD}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  learning-service:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/docker/service.Dockerfile
+      args:
+        SERVICE: learning-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
+      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
+      LEARNING_DB_URL: jdbc:mysql://mysql:3306/learning_db
+      LEARNING_DB_USERNAME: learning_app
+      LEARNING_DB_PASSWORD: ${LEARNING_DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  payment-service:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/docker/service.Dockerfile
+      args:
+        SERVICE: payment-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
+      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
+      PAYMENT_DB_URL: jdbc:mysql://mysql:3306/payment_db
+      PAYMENT_DB_USERNAME: payment_app
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ai-service:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/docker/service.Dockerfile
+      args:
+        SERVICE: ai-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
+      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
+      AI_DB_URL: jdbc:mysql://mysql:3306/ai_db
+      AI_DB_USERNAME: ai_app
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD}
+      AI_API_KEY: ${AI_API_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api-gateway:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/docker/service.Dockerfile
+      args:
+        SERVICE: api-gateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
+      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      COURSE_SERVICE_URL: http://course-service:8082
+      LEARNING_SERVICE_URL: http://learning-service:8083
+      PAYMENT_SERVICE_URL: http://payment-service:8084
+      AI_SERVICE_URL: http://ai-service:8085
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql_data:

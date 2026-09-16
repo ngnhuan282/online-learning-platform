@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+<rect width="640" height="360" fill="#f8fbff"/>
+<rect width="640" height="25" fill="white"/>
+<circle cx="12" cy="12" r="4" fill="#2563eb"/><text x="22" y="15" font-family="Arial" font-size="9" fill="#334155">LearnSphere ? Architecture Studio</text>
+<path d="M0 25H640" stroke="#dce5ef"/>
+<text x="24" y="57" font-family="Arial,sans-serif" font-size="18" fill="#16468c" font-weight="bold">MICROSERVICES</text>
+<text x="24" y="74" font-family="Arial,sans-serif" font-size="8" fill="#64748b" font-weight="normal">Event-driven system architecture</text>
+<rect x="22" y="94" width="90" height="179" rx="7" fill="#eef4ff" stroke="#d9e4f3"/>
+<text x="35" y="114" font-family="Arial,sans-serif" font-size="8" fill="#2563eb" font-weight="bold">CLIENT LAYER</text>
+<rect x="32" y="128" width="70" height="30" rx="4" fill="white" stroke="#d9e3ee"/>
+<text x="43" y="147" font-family="Arial,sans-serif" font-size="9" fill="#475569" font-weight="normal">Web App</text>
+<rect x="32" y="171" width="70" height="30" rx="4" fill="white" stroke="#d9e3ee"/>
+<text x="43" y="190" font-family="Arial,sans-serif" font-size="9" fill="#475569" font-weight="normal">Mobile App</text>
+<rect x="32" y="214" width="70" height="30" rx="4" fill="white" stroke="#d9e3ee"/>
+<text x="43" y="233" font-family="Arial,sans-serif" font-size="9" fill="#475569" font-weight="normal">Admin Portal</text>
+<rect x="146" y="155" width="107" height="56" rx="5" fill="white" stroke="#d9e3ee"/>
+<rect x="153" y="163" width="19" height="19" rx="4" fill="#e8f2ff"/>
+<path d="m158 169 -3 3 3 3 m6 -6 3 3 -3 3" fill="none" stroke="#2563eb" stroke-width="1.4"/>
+<text x="179" y="175" font-family="Arial,sans-serif" font-size="8" fill="#334155" font-weight="bold">API Gateway</text>
+<text x="154" y="203" font-family="Arial,sans-serif" font-size="6" fill="#94a3b8" font-weight="normal">REST API ? Spring Boot</text>
+<path d="M112 183 L146 183" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="146" cy="183" r="2" fill="#9bb4d2"/>
+<path d="M253 183 L277 183" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="277" cy="183" r="2" fill="#9bb4d2"/>
+<path d="M277 106 L277 260" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="277" cy="260" r="2" fill="#9bb4d2"/>
+<path d="M277 106 L299 106" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="299" cy="106" r="2" fill="#9bb4d2"/>
+<rect x="299" y="82" width="126" height="53" rx="5" fill="white" stroke="#d9e3ee"/>
+<rect x="306" y="90" width="19" height="19" rx="4" fill="#f1e8ff"/>
+<path d="m311 96 -3 3 3 3 m6 -6 3 3 -3 3" fill="none" stroke="#a855f7" stroke-width="1.4"/>
+<text x="332" y="102" font-family="Arial,sans-serif" font-size="8" fill="#334155" font-weight="bold">Auth Service</text>
+<text x="307" y="127" font-family="Arial,sans-serif" font-size="6" fill="#94a3b8" font-weight="normal">REST API ? Spring Boot</text>
+<path d="M425 108 L477 108" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="477" cy="108" r="2" fill="#9bb4d2"/>
+<ellipse cx="514" cy="94" rx="32" ry="8" fill="#f1e8ff" stroke="#a855f7"/><path d="M482 94v24c0 11 64 11 64 0v-24" fill="#f1e8ff" stroke="#a855f7"/>
+<text x="496" y="114" font-family="Arial,sans-serif" font-size="8" fill="#a855f7" font-weight="normal">MySQL</text>
+<path d="M277 181 L299 181" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="299" cy="181" r="2" fill="#9bb4d2"/>
+<rect x="299" y="157" width="126" height="53" rx="5" fill="white" stroke="#d9e3ee"/>
+<rect x="306" y="165" width="19" height="19" rx="4" fill="#e5f8ec"/>
+<path d="m311 171 -3 3 3 3 m6 -6 3 3 -3 3" fill="none" stroke="#22c55e" stroke-width="1.4"/>
+<text x="332" y="177" font-family="Arial,sans-serif" font-size="8" fill="#334155" font-weight="bold">Course Service</text>
+<text x="307" y="202" font-family="Arial,sans-serif" font-size="6" fill="#94a3b8" font-weight="normal">REST API ? Spring Boot</text>
+<path d="M425 183 L477 183" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="477" cy="183" r="2" fill="#9bb4d2"/>
+<ellipse cx="514" cy="169" rx="32" ry="8" fill="#e5f8ec" stroke="#22c55e"/><path d="M482 169v24c0 11 64 11 64 0v-24" fill="#e5f8ec" stroke="#22c55e"/>
+<text x="496" y="189" font-family="Arial,sans-serif" font-size="8" fill="#22c55e" font-weight="normal">MySQL</text>
+<path d="M277 256 L299 256" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="299" cy="256" r="2" fill="#9bb4d2"/>
+<rect x="299" y="232" width="126" height="53" rx="5" fill="white" stroke="#d9e3ee"/>
+<rect x="306" y="240" width="19" height="19" rx="4" fill="#e5f5ff"/>
+<path d="m311 246 -3 3 3 3 m6 -6 3 3 -3 3" fill="none" stroke="#0ea5e9" stroke-width="1.4"/>
+<text x="332" y="252" font-family="Arial,sans-serif" font-size="8" fill="#334155" font-weight="bold">Learning Service</text>
+<text x="307" y="277" font-family="Arial,sans-serif" font-size="6" fill="#94a3b8" font-weight="normal">REST API ? Spring Boot</text>
+<path d="M425 258 L477 258" fill="none" stroke="#9bb4d2" stroke-width="1.2"/>
+<circle cx="477" cy="258" r="2" fill="#9bb4d2"/>
+<ellipse cx="514" cy="244" rx="32" ry="8" fill="#e5f5ff" stroke="#0ea5e9"/><path d="M482 244v24c0 11 64 11 64 0v-24" fill="#e5f5ff" stroke="#0ea5e9"/>
+<text x="496" y="264" font-family="Arial,sans-serif" font-size="8" fill="#0ea5e9" font-weight="normal">MySQL</text>
+<rect x="149" y="287" width="391" height="36" rx="6" fill="#fff7e9" stroke="#f4d59b"/>
+<text x="173" y="309" font-family="Arial,sans-serif" font-size="10" fill="#b77c1b" font-weight="bold">Apache Kafka</text>
+<text x="267" y="309" font-family="Arial,sans-serif" font-size="8" fill="#967334" font-weight="normal">Event Bus  ?  Async Messaging  ?  Notifications</text>
+<path d="M200 211 L200 287" fill="none" stroke="#d7b476" stroke-width="1.2"/>
+<circle cx="200" cy="287" r="2" fill="#d7b476"/>
+<path d="M363 285 L363 287" fill="none" stroke="#d7b476" stroke-width="1.2"/>
+<circle cx="363" cy="287" r="2" fill="#d7b476"/>
+<text x="24" y="343" font-family="Arial,sans-serif" font-size="9" fill="#2563eb" font-weight="bold">JAVA 21</text>
+<text x="95" y="343" font-family="Arial,sans-serif" font-size="9" fill="#22a666" font-weight="bold">SPRING BOOT</text>
+<text x="211" y="343" font-family="Arial,sans-serif" font-size="9" fill="#0ea5e9" font-weight="bold">REACT</text>
+<text x="284" y="343" font-family="Arial,sans-serif" font-size="9" fill="#2563eb" font-weight="bold">DOCKER</text>
+<text x="374" y="343" font-family="Arial,sans-serif" font-size="9" fill="#e39b20" font-weight="bold">AWS</text>
+<text x="475" y="343" font-family="Arial,sans-serif" font-size="8" fill="#64748b" font-weight="normal">PRODUCTION READY</text>
+</svg>
