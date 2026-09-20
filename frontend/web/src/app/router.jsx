@@ -9,7 +9,17 @@ import AccountPage from '../features/auth/pages/AccountPage';
 
 const router = createBrowserRouter([
   { path: '/account', element: <UserLayout />, children: [{ index: true, element: <AccountPage /> }] },
-  { path: '/admin', element: <AdminLayout />, children: [{ index: true, element: <AccountPage admin /> }] },
+  {
+    path: '/admin',
+    element: <AdminLayout />,
+    children: [
+      { index: true, element: <AccountPage admin /> },
+      {
+        path: 'courses',
+        lazy: async () => ({ Component: (await import('../features/courses/pages/AdminCoursePage')).default }),
+      },
+    ],
+  },
   {
     path: '/',
     element: <MainLayout />,
