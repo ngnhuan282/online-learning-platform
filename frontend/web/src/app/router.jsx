@@ -5,6 +5,7 @@ import UserLayout from '../layouts/UserLayout';
 import ProtectedRoute from '../routes/ProtectedRoute';
 
 import HomePage from '../pages/HomePage';
+import NotFoundPage from '../pages/NotFoundPage';
 import AdminLayout from '../layouts/AdminLayout';
 import AccountPage from '../features/auth/pages/AccountPage';
 import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
@@ -62,7 +63,6 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { path: 'account', element: <AccountPage /> },
           {
             path: 'dashboard',
             lazy: async () => ({
@@ -95,6 +95,7 @@ const router = createBrowserRouter([
           },
         ],
       },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]);

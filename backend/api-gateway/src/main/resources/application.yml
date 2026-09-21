@@ -21,7 +21,7 @@ spring:
             - id: course-service
               uri: ${COURSE_SERVICE_URL:http://localhost:8082}
               predicates:
-                - Path=/api/v1/courses/**
+                - Path=/api/v1/courses/**,/api/v1/categories,/api/v1/categories/**,/api/v1/admin/courses,/api/v1/admin/courses/**,/api/v1/admin/categories,/api/v1/admin/categories/**
             - id: learning-service
               uri: ${LEARNING_SERVICE_URL:http://localhost:8083}
               predicates:

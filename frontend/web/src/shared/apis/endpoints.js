@@ -8,6 +8,8 @@ export const ENDPOINTS = Object.freeze({
   },
   users: { me: `${API_PREFIX}/users/me` },
   courses: `${API_PREFIX}/courses`,
+  adminCourses: `${API_PREFIX}/admin/courses`,
+  categories: `${API_PREFIX}/categories`,
   learning: {
     dashboard: `${API_PREFIX}/learning/dashboard`,
     enrollments: `${API_PREFIX}/learning/enrollments/me`,

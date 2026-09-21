@@ -2,9 +2,10 @@ import axiosClient from '../../../shared/apis/axiosClient';
 import { ENDPOINTS } from '../../../shared/apis/endpoints';
 
 export const courseApi = {
-  list: (params = {}) => axiosClient.get(ENDPOINTS.courses, { params }),
+  list: (params = {}, options = {}) => axiosClient.get(ENDPOINTS.courses, { ...options, params }),
+  categories: (options = {}) => axiosClient.get(ENDPOINTS.categories, options),
   getById: id => axiosClient.get(`${ENDPOINTS.courses}/${id}`),
-  create: payload => axiosClient.post(`${ENDPOINTS.courses}/admin/courses`, payload),
-  update: (id, payload) => axiosClient.put(`${ENDPOINTS.courses}/admin/courses/${id}`, payload),
-  delete: id => axiosClient.delete(`${ENDPOINTS.courses}/admin/courses/${id}`),
+  create: payload => axiosClient.post(ENDPOINTS.adminCourses, payload),
+  update: (id, payload) => axiosClient.put(`${ENDPOINTS.adminCourses}/${id}`, payload),
+  delete: id => axiosClient.delete(`${ENDPOINTS.adminCourses}/${id}`),
 };
