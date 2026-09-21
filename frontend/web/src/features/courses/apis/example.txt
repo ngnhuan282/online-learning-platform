@@ -1,0 +1,2 @@
+This directory is reserved for future course API modules.
+Current course API: ../api/courseApi.js

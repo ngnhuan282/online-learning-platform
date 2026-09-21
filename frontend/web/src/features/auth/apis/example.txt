@@ -1,0 +1,2 @@
+This directory is reserved for future auth API modules.
+Current auth API: ../api/authApi.js
