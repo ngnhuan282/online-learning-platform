@@ -3,4 +3,9 @@ export const ROUTES = Object.freeze({
   LOGIN: '/login',
   REGISTER: '/register',
   COURSES: '/courses',
+  DASHBOARD: '/dashboard',
+  MY_COURSES: '/my-courses',
+  LEARNING: '/learning',
+  QUIZ_RESULTS: '/quizzes',
+  NOTIFICATIONS: '/notifications',
 });

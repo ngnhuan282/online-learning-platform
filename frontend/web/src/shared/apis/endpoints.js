@@ -8,7 +8,16 @@ export const ENDPOINTS = Object.freeze({
   },
   users: { me: `${API_PREFIX}/users/me` },
   courses: `${API_PREFIX}/courses`,
-  learning: `${API_PREFIX}/learning`,
+  learning: {
+    dashboard: `${API_PREFIX}/learning/dashboard`,
+    enrollments: `${API_PREFIX}/learning/enrollments/me`,
+    enroll: `${API_PREFIX}/learning/enrollments`,
+    progress: courseId => `${API_PREFIX}/learning/progress/courses/${courseId}`,
+    quiz: quizId => `${API_PREFIX}/learning/quizzes/${quizId}`,
+    quizResult: quizId => `${API_PREFIX}/learning/quizzes/${quizId}/result`,
+    notifications: `${API_PREFIX}/learning/notifications`,
+    notificationRead: notificationId => `${API_PREFIX}/learning/notifications/${notificationId}/read`,
+  },
   payments: `${API_PREFIX}/payments`,
   ai: `${API_PREFIX}/ai`,
 });
