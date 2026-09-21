@@ -1,4 +1,5 @@
 import { API_PREFIX } from '../constants/appConstants';
+
 export const ENDPOINTS = Object.freeze({
   auth: {
     login: `${API_PREFIX}/auth/login`,
@@ -6,7 +7,11 @@ export const ENDPOINTS = Object.freeze({
     refresh: `${API_PREFIX}/auth/refresh`,
     logout: `${API_PREFIX}/auth/logout`,
   },
-  users: { me: `${API_PREFIX}/users/me` },
+  users: {
+    me: `${API_PREFIX}/users/me`,
+    changePassword: `${API_PREFIX}/users/change-password`,
+  },
+  adminUsers: `${API_PREFIX}/admin/users`,
   courses: `${API_PREFIX}/courses`,
   adminCourses: `${API_PREFIX}/admin/courses`,
   categories: `${API_PREFIX}/categories`,

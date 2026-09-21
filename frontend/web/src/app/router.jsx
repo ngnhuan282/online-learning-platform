@@ -34,6 +34,18 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <AccountPage admin /> },
       { path: 'analytics', element: <AdminAnalyticsPage /> },
+      {
+        path: 'courses',
+        lazy: async () => ({
+          Component: (await import('../features/courses/pages/AdminCoursePage')).default,
+        }),
+      },
+      {
+        path: 'users',
+        lazy: async () => ({
+          Component: (await import('../features/auth/pages/AdminUsersPage')).default,
+        }),
+      },
     ],
   },
   {

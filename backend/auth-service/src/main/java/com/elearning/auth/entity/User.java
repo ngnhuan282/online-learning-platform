@@ -56,6 +56,22 @@ public class User {
         this.roles.add(role);
     }
 
+    public void updateProfile(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public void updatePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void updateStatus(UserStatus status) {
+        this.status = status;
+    }
+
+    public void setRoles(Set<Role> roles) {
+        this.roles = roles != null ? roles : new HashSet<>();
+    }
+
     @PrePersist
     void created() {
         createdAt = updatedAt = Instant.now();
