@@ -54,7 +54,7 @@ function CourseListPage() {
         const list = payload?.content ?? payload?.data?.content ?? payload?.items ?? [];
         const normalized = Array.isArray(list) ? list.map(coerceCourse) : demoCourses;
         if (isMounted) setCourses(normalized.length ? normalized : demoCourses);
-      } catch (error) {
+      } catch {
         if (isMounted) setCourses(demoCourses);
       } finally {
         if (isMounted) setLoading(false);
