@@ -11,9 +11,9 @@ export function validateAuth(values, mode) {
   else if (mode === 'register' && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(values.password)) {
     errors.password = 'Dùng ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.';
   }
+  if (new TextEncoder().encode(values.password).length > 72)
+    errors.password = 'Mật khẩu tối đa 72 byte UTF-8.';
   if (mode === 'register') {
-    if (new TextEncoder().encode(values.password).length > 72)
-      errors.password = 'Mật khẩu tối đa 72 byte UTF-8.';
     if (!values.confirmPassword) errors.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
     else if (values.confirmPassword !== values.password)
       errors.confirmPassword = 'Mật khẩu xác nhận chưa khớp.';

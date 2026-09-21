@@ -30,6 +30,19 @@ async function api(path, data, token, cookie) {
   });
   return { status: response.status, body: await response.json() };
 }
+for (const invalidPassword of ['lowercase9', 'UPPERCASE9', 'NoDigitsHere', 'Aa1' + '界'.repeat(24)]) {
+  const invalid = await api('/auth/register', {
+    fullName: 'Validation Smoke User',
+    email: `invalid-${randomUUID()}@example.com`,
+    password: invalidPassword,
+  });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.body.code, 'VALIDATION_ERROR');
+  assert.ok(invalid.body.errors.password?.length);
+  assert.equal(JSON.stringify(invalid.body).includes(invalidPassword), false);
+}
+report.checks.push('Gateway registration enforces password strength and UTF-8 byte limit');
+
 const registered = await api('/auth/register', {
   fullName: 'API Smoke User',
   email: report.apiEmail,

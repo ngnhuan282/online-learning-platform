@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router-dom';
 
 import MainLayout from '../layouts/MainLayout';
+import UserLayout from '../layouts/UserLayout';
+import ProtectedRoute from '../routes/ProtectedRoute';
 
 import HomePage from '../pages/HomePage';
 import AdminLayout from '../layouts/AdminLayout';
@@ -63,23 +65,33 @@ const router = createBrowserRouter([
           { path: 'account', element: <AccountPage /> },
           {
             path: 'dashboard',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/UserDashboardPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/UserDashboardPage')).default,
+            }),
           },
           {
             path: 'my-courses',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/MyCoursesPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/MyCoursesPage')).default,
+            }),
           },
           {
             path: 'learning/:courseId',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/LearningPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/LearningPage')).default,
+            }),
           },
           {
             path: 'quizzes/:quizId/result',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/QuizResultPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/QuizResultPage')).default,
+            }),
           },
           {
             path: 'notifications',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/NotificationsPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/NotificationsPage')).default,
+            }),
           },
         ],
       },

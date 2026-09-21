@@ -114,6 +114,12 @@ Auth domain errors: EMAIL_ALREADY_EXISTS (409), INVALID_CREDENTIALS (401, same f
 
 Issued JWTs use the immutable user ID as subject and include `roles` plus legacy `role` (ADMIN when present, otherwise USER). Auth maps all roles to authorities; other foundation services continue validating the legacy role. Restore errors 401/403/404 clear the local session; network/5xx errors retain the token but leave the user unauthenticated with a retry action on protected routes.
 
+## Registration validation
+
+Registration requires a nonblank full name (maximum 100 characters), a valid email (maximum 254 characters), and a password of at least 8 characters containing an ASCII uppercase letter, lowercase letter, and digit. Passwords must not exceed 72 UTF-8 bytes, including multibyte characters. The backend enforces these requirements even when the caller bypasses the form. Password validation failures return HTTP 400 with `code: VALIDATION_ERROR` and messages under `errors.password`; rejected password values are never returned.
+
+The login form also checks the 72-byte limit. Login continues to verify existing BCrypt hashes without reapplying registration strength requirements, so existing accounts with older passwords can still sign in. Confirmation and terms acceptance are checked by the registration form and are not part of the API request DTO.
+
 ## Refresh-token contract
 
 Refresh tokens contain 32 SecureRandom bytes encoded as unpadded Base64url. Only the SHA-256 hex hash is stored in `auth_db.refresh_tokens`. Every refresh transaction locks the old token row, verifies expiration/revocation and account status, revokes the old token and inserts a new hash. Multiple sessions are independent. Concurrent use of the same token has one winner; the old token cannot refresh again.
