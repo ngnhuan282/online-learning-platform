@@ -33,6 +33,11 @@ export default function SiteHeader() {
           <Link className={hash === '#benefits' ? 'active' : ''} to="/#benefits">
             Lợi ích
           </Link>
+          {user && (
+            <Link className={pathname === '/my-courses' ? 'active' : ''} to="/my-courses">
+              Khóa của tôi
+            </Link>
+          )}
         </nav>
         <form className="header-search" onSubmit={submitSearch} role="search">
           <Icon name="search" size={17} />
@@ -70,6 +75,9 @@ export default function SiteHeader() {
             <>
               <Link className="button button-outline login-link" to="/account">
                 Tài khoản
+              </Link>
+              <Link className="button button-soft signup-link" to="/dashboard">
+                Dashboard
               </Link>
               <button
                 className="button button-primary signup-link"
