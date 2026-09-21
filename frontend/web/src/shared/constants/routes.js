@@ -3,9 +3,7 @@ export const ROUTES = Object.freeze({
   LOGIN: '/login',
   REGISTER: '/register',
   COURSES: '/courses',
-  DASHBOARD: '/dashboard',
-  MY_COURSES: '/my-courses',
-  LEARNING: '/learning',
-  QUIZ_RESULTS: '/quizzes',
-  NOTIFICATIONS: '/notifications',
+  CHECKOUT: '/checkout',
+  PAYMENT_RESULT: '/payment/result',
+  ADMIN_ANALYTICS: '/admin/analytics',
 });

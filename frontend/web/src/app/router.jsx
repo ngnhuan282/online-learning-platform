@@ -5,19 +5,32 @@ import MainLayout from '../layouts/MainLayout';
 import HomePage from '../pages/HomePage';
 import AdminLayout from '../layouts/AdminLayout';
 import AccountPage from '../features/auth/pages/AccountPage';
-import ProtectedRoute from '../routes/ProtectedRoute';
+import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
+import PaymentResultPage from '../features/payment/pages/PaymentResultPage';
+import AdminAnalyticsPage from '../features/payment/pages/AdminAnalyticsPage';
 
 const router = createBrowserRouter([
-  { path: '/account', element: <UserLayout />, children: [{ index: true, element: <AccountPage /> }] },
+  {
+    path: '/account',
+    element: <UserLayout />,
+    children: [{ index: true, element: <AccountPage /> }],
+  },
+  {
+    path: '/checkout',
+    element: <UserLayout />,
+    children: [{ index: true, element: <PaymentCheckoutPage /> }],
+  },
+  {
+    path: '/payment/result',
+    element: <UserLayout />,
+    children: [{ index: true, element: <PaymentResultPage /> }],
+  },
   {
     path: '/admin',
     element: <AdminLayout />,
     children: [
       { index: true, element: <AccountPage admin /> },
-      {
-        path: 'courses',
-        lazy: async () => ({ Component: (await import('../features/courses/pages/AdminCoursePage')).default }),
-      },
+      { path: 'analytics', element: <AdminAnalyticsPage /> },
     ],
   },
   {
