@@ -139,6 +139,39 @@ class PaymentServiceApplicationTests {
     }
 
     @Test
+    void exposesPaymentContractSkeletonWithoutTrustingGuestOrUserAdminAccess() throws Exception {
+        error(
+            request("/api/v1/payments/history", null, null),
+            401,
+            "UNAUTHORIZED",
+            "/api/v1/payments/history"
+        );
+
+        var invalidCheckout = request("/api/v1/payments/checkout", token("USER", 60), "{}");
+        error(invalidCheckout, 400, "VALIDATION_ERROR", "/api/v1/payments/checkout");
+        assertThat(mapper.readTree(invalidCheckout.body()).get("errors").get("courseId").isArray()).isTrue();
+
+        error(
+            request("/api/v1/payments/checkout", token("USER", 60), "{\"courseId\":101}"),
+            501,
+            "FEATURE_NOT_IMPLEMENTED",
+            "/api/v1/payments/checkout"
+        );
+        error(
+            request("/api/v1/payments/admin/analytics", token("USER", 60), null),
+            403,
+            "FORBIDDEN",
+            "/api/v1/payments/admin/analytics"
+        );
+        error(
+            request("/api/v1/payments/admin/analytics", token("ADMIN", 60), null),
+            501,
+            "FEATURE_NOT_IMPLEMENTED",
+            "/api/v1/payments/admin/analytics"
+        );
+    }
+
+    @Test
     void preservesPaginationMetadata() {
         var page = PageResponse.from(new PageImpl<>(List.of("item"), PageRequest.of(1, 2), 3));
         assertThat(page.page()).isEqualTo(1);

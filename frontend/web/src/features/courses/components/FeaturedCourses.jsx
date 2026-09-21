@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 import Icon from '../../../shared/components/Icon';
+import { ROUTES } from '../../../shared/constants/routes';
 import CourseCard from './CourseCard';
 import { categories, demoCourses, formatPrice, normalizeSearch } from '../data/demoCourses';
 
@@ -123,8 +124,15 @@ export default function FeaturedCourses() {
               </ul>
               <div className="detail-enroll">
                 <strong>{selected.price ? formatPrice(selected.price) : 'Miễn phí'}</strong>
-                <Link className="button button-primary" to="/register">
-                  Đăng ký học <Icon name="arrow" size={17} />
+                <Link
+                  className="button button-primary"
+                  to={
+                    selected.price
+                      ? `${ROUTES.CHECKOUT}?course=${encodeURIComponent(selected.id)}`
+                      : ROUTES.REGISTER
+                  }
+                >
+                  {selected.price ? 'Thanh toán' : 'Đăng ký học'} <Icon name="arrow" size={17} />
                 </Link>
               </div>
               <p className="demo-note">
