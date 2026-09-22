@@ -19,8 +19,11 @@ services:
       - ./infra/mysql/init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
       - ./infra/mysql/02-users.sh:/docker-entrypoint-initdb.d/02-users.sh:ro
       - ./infra/mysql/03-auth-migrations.sql:/docker-entrypoint-initdb.d/03-auth-migrations.sql:ro
+      - ./infra/mysql/04-course-migrations.sql:/docker-entrypoint-initdb.d/04-course-migrations.sql:ro
+      - ./infra/mysql/04-learning-migrations.sql:/docker-entrypoint-initdb.d/04-learning-migrations.sql:ro
       - ./infra/mysql/04-payment-migrations.sql:/docker-entrypoint-initdb.d/04-payment-migrations.sql:ro
-      - ./infra/mysql/05-seed-data.sql:/docker-entrypoint-initdb.d/05-seed-data.sql:ro
+      # Run explicitly after service migrations; demo accounts are opt-in.
+      - ./infra/mysql/05-seed-data.sql:/seed/05-seed-data.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT 1" >/dev/null 2>&1']
       interval: 10s

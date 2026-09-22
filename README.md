@@ -863,6 +863,16 @@ docker compose --profile backend down
 
 ---
 
+## Dữ liệu mẫu cho toàn hệ thống
+
+Sau khi backend đã tạo schema bằng Flyway, chạy tại root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\infra\mysql\seed.ps1
+```
+
+File `infra/mysql/05-seed-data.sql` bổ sung 5 bản ghi mẫu mỗi bảng nghiệp vụ, riêng `roles` giữ 2 role hợp lệ `USER`/`ADMIN`. Hướng dẫn, tài khoản demo và lưu ý với database cũ: [infra/mysql/README.md](infra/mysql/README.md).
+
 ## SGSphere
 
 **Learn without limits. Build skills for your future.**
