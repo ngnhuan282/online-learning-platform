@@ -1,10 +1,10 @@
 # Bàn giao Auth tuần 2–3
 
-Ngày kiểm tra: 21/09/2026.
+Ngày kiểm tra: 22/09/2026.
 
 ## Kết quả theo yêu cầu
 
-Các thành phần Auth đã tồn tại trong dự án được sử dụng lại. Lần thực hiện này bổ sung validation, sửa lỗi khởi tạo router và chạy lại kiểm thử trên mã nguồn hiện tại.
+Các thành phần A2/A3 đã có trong dự án được sử dụng lại và kiểm tra trên mã nguồn hiện tại. Lần này hoàn thiện Global Exception Handler cho tham số sai kiểu và giữ trang đích xuyên suốt đăng ký/đăng nhập; bổ sung kiểm thử tái hiện cả hai lỗi trước khi sửa.
 
 | Yêu cầu | Thành phần triển khai | Kết quả xác minh |
 | --- | --- | --- |
@@ -21,37 +21,34 @@ Các thành phần Auth đã tồn tại trong dự án được sử dụng l�
 
 ## Code bổ sung và sửa
 
-- Thêm `validation/Utf8Size.java` và `Utf8SizeValidator.java`: kiểm tra số byte UTF-8 ngay trên trường mật khẩu. Thay kiểm tra dạng thuộc tính `passwordWithinByteLimit`, để Global Exception Handler trả đúng tên trường `password` cho frontend.
-- Cập nhật `RegisterRequest`: mật khẩu đăng ký tối thiểu 8 ký tự, có chữ hoa ASCII, chữ thường ASCII và số, tối đa 72 byte UTF-8; đồng bộ với yêu cầu đã hiển thị trên form.
-- Cập nhật `authValidation.js`: form login cũng phát hiện mật khẩu quá 72 byte. Quy tắc độ mạnh chỉ áp dụng khi đăng ký; tài khoản cũ vẫn đăng nhập bằng BCrypt hash hiện có.
-- Sửa `app/router.jsx`: bổ sung import `UserLayout` và `ProtectedRoute` bị thiếu, tránh lỗi khi khởi tạo ứng dụng.
-- Thêm 4 test frontend trong `tests/auth-validation.test.js`; bổ sung test backend cho mật khẩu yếu, giới hạn byte ASCII/Unicode, tên trường lỗi, không lưu đăng ký không hợp lệ và đăng nhập tài khoản cũ.
-- Mở rộng `scripts/auth-e2e.mjs` để kiểm tra validation trực tiếp qua Gateway, kể cả khi bỏ qua form.
-- Cập nhật hợp đồng validation trong [API_CONVENTIONS.md](../architecture/API_CONVENTIONS.md).
+- `GlobalExceptionHandler`: bắt `MethodArgumentTypeMismatchException`, trả HTTP 400 / `VALIDATION_ERROR` với tên tham số trong `errors`, không trả giá trị bị từ chối hoặc chi tiết chuyển kiểu Java. Trước bản sửa, các request này trả HTTP 500.
+- `AuthServiceApplicationTests`: thêm kiểm thử HTTP cho `id`, `page`, `size` và `status` sai kiểu hoặc vượt miền số nguyên. Kiểm tra status, response envelope và không lộ chi tiết nội bộ.
+- `AuthForm`: giữ `location.state.from` khi chuyển giữa login/register và sau đăng ký thành công. Luồng `/account?tab=profile#details` → login → register → login nay quay về đúng URL ban đầu. Kiểm tra URL nội bộ hiện có vẫn được áp dụng trước điều hướng.
+- `scripts/auth-e2e.mjs`: bổ sung luồng trang được bảo vệ → login/register qua lại → đăng ký → đăng nhập; xác nhận cả pathname, query và hash. Kiểm thử đã thất bại với code cũ và đạt sau bản sửa.
+- Cập nhật [API_CONVENTIONS.md](../architecture/API_CONVENTIONS.md). Không tạo infrastructure Auth, Axios hoặc migration trùng lặp.
 
 ## Kiểm thử đã chạy
 
 | Kiểm tra | Kết quả |
 | --- | --- |
-| `mvn -f backend/pom.xml verify -B -ntp` | BUILD SUCCESS cho toàn bộ backend; 66 test đạt tại thời điểm chạy |
-| `mvn -f backend/auth-service/pom.xml verify -B -ntp` | BUILD SUCCESS; 31 test đạt sau khi thêm test tương thích tài khoản cũ |
+| `mvn -f backend/pom.xml verify -B -ntp` | BUILD SUCCESS cho toàn bộ backend; 74 test đạt, gồm 38 test Auth |
+| `mvn -f backend/auth-service/pom.xml verify -B -ntp` | BUILD SUCCESS; 38 test đạt |
 | `npm test` tại `frontend/web` | 29 test đạt |
-| `npm run build` | Đạt sau khi sửa router |
-| ESLint cho router, Auth, guards, Axios và các test/script thay đổi | Đạt |
-| `npm run lint` toàn frontend | Còn 5 lỗi có sẵn trong module Course, chi tiết bên dưới |
+| `npm run build` | Đạt |
+| `npm run lint` toàn frontend | Đạt |
 | Build và khởi động lại container `auth-service` | Thành công, sử dụng MySQL hiện có |
-| `node scripts/auth-e2e.mjs` | 15 mục kiểm tra đạt trên Chrome headless, React, Gateway và Auth/MySQL thật |
+| `node scripts/auth-e2e.mjs` | 16 mục kiểm tra đạt trên Chrome headless, React, Gateway và Auth/MySQL thật |
 | `git diff --check` | Đạt |
 
-E2E hoàn tất lúc `2026-09-21T15:00:19.610Z`. Bao gồm đăng ký/đăng nhập, mặc định USER, token thiếu/sai, email trùng, khôi phục phiên qua `/me`, logout, route guard, giao diện mobile và không có exception JavaScript trong trình duyệt.
+E2E hoàn tất lúc `2026-09-22T13:55:08.747Z`. Bao gồm đăng ký/đăng nhập, giữ trang đích, mặc định USER, token thiếu/sai, email trùng, khôi phục phiên qua `/me`, logout, route guard, giao diện mobile và không có exception JavaScript trong trình duyệt.
 
 Backend integration tests dùng H2. E2E riêng dùng MySQL thông qua Auth Service; hai loại bằng chứng được ghi riêng. Không tạo tài khoản ADMIN trong database thật; trường hợp ADMIN được kiểm tra bằng test backend và test component frontend.
 
-Bằng chứng cục bộ (file ignored): `.tmp/week23-backend-verify.log`, `.tmp/week23-auth-verify.log`, `.tmp/week23-docker-build.log`, `.tmp/week23-e2e.log`, `.tmp/week23-lint.log`, `.tmp/auth-e2e/results.json` và ảnh trong `.tmp/auth-e2e/`.
+Bằng chứng cục bộ (file ignored): `.tmp/backend-final-verify.log`, `.tmp/week23-auth-verify.log`, `.tmp/week23-current-docker.log`, `.tmp/week23-e2e.log`, `.tmp/auth-e2e/results.json` và ảnh trong `.tmp/auth-e2e/`. Log tái hiện lỗi trước bản sửa: `.tmp/week23-parameter-before.log`, `.tmp/week23-redirect-before.log`.
 
 ## Giới hạn còn lại
 
-Lint toàn frontend còn 4 lỗi ở `AdminCoursePage.jsx` (3 biến `error` không dùng và `payload` ngoài phạm vi) và 1 biến `error` không dùng ở `CourseListPage.jsx`. Các lỗi này thuộc module Course; lint phần Auth và router đã đạt.
+Các lỗi lint được ghi nhận ngày 21/09 không còn xuất hiện trên mã nguồn hiện tại. Một số lần chạy trong sandbox bị chặn tạo tiến trình hoặc đọc migration; chạy lại ngoài sandbox đã kiểm tra được đầy đủ. Lần E2E ngay sau khi cập nhật container nhận 503 trong lúc Auth khởi động; lần chạy sau khi service sẵn sàng đạt đủ 16 mục.
 
 Refresh token/rotation/logout phía server đã có và được giữ tương thích. Social login, quên mật khẩu và chức năng ghi nhớ đăng nhập dài hạn chưa được triển khai trong phạm vi tuần 2–3 này.
 

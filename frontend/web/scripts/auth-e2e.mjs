@@ -204,7 +204,15 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await navigate('/register');
+  const returnTo = '/account?tab=profile#details';
+  await navigate(returnTo);
+  await waitFor('location.pathname === "/login" && document.querySelector(".auth-switch a") !== null');
+  await click('.auth-switch a');
+  await waitFor('location.pathname === "/register" && document.querySelector("[name=fullName]") !== null');
+  // Switching back and forth must retain the protected destination as well.
+  await click('.auth-switch a');
+  await waitFor('location.pathname === "/login" && document.querySelector("[name=fullName]") === null');
+  await click('.auth-switch a');
   await waitFor('document.querySelector("[name=fullName]") !== null');
   await setField('fullName', 'Nguyễn Auth E2E');
   await setField('email', report.uiEmail);
@@ -222,6 +230,10 @@ try {
   await setField('password', password);
   await click('button[type=submit].auth-submit');
   await waitFor('location.pathname === "/account" && document.body.textContent.includes("Nguyễn Auth E2E")');
+  assert.equal(await run('location.pathname + location.search + location.hash'), returnTo);
+  report.checks.push(
+    'Protected destination survives login/register switches and registration, including query/hash',
+  );
   assert.equal(await run('sessionStorage.length'), 1);
   assert.equal(await run('localStorage.length'), 0);
   assert.equal(

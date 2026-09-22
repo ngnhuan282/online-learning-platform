@@ -18,6 +18,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -62,6 +63,19 @@ public class GlobalExceptionHandler {
                 .add(error.getMessage())
         );
         return respond(ErrorCode.VALIDATION_ERROR, errors, request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> handleArgumentTypeMismatch(
+        MethodArgumentTypeMismatchException ex,
+        HttpServletRequest request
+    ) {
+        // Do not echo rejected values or Java conversion details to the caller.
+        return respond(
+            ErrorCode.VALIDATION_ERROR,
+            Map.of(ex.getName(), List.of("Invalid parameter value")),
+            request
+        );
     }
 
     @ExceptionHandler(AccessDeniedException.class)
