@@ -99,6 +99,12 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.MALFORMED_REQUEST, null, request);
     }
 
+    @ExceptionHandler({org.springframework.dao.DataIntegrityViolationException.class,
+        org.springframework.dao.OptimisticLockingFailureException.class})
+    ResponseEntity<ApiError> handleConflict(Exception ex, HttpServletRequest request) {
+        return respond(ErrorCode.CONFLICT, null, request);
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> handleUnexpectedException(Exception ex, HttpServletRequest request) {
         // Preserve framework statuses (404/405/415/etc.) without returning internal exception details.

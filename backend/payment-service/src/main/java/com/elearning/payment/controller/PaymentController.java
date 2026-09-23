@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
+    private final com.elearning.payment.service.PaymentAnalyticsService analytics;
+    public PaymentController(com.elearning.payment.service.PaymentAnalyticsService analytics) { this.analytics = analytics; }
 
     @PostMapping("/checkout")
     ApiResponse<CheckoutResponse> createCheckout(@Valid @RequestBody CheckoutRequest request) {
@@ -42,9 +44,9 @@ public class PaymentController {
     }
 
     @GetMapping("/admin/analytics")
-    @PreAuthorize("hasRole('ADMIN')")
-    ApiResponse<PaymentAnalyticsResponse> getAnalytics() {
-        return unavailable();
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PAYMENT_REPORT_VIEW')")
+    ApiResponse<?> getAnalytics() {
+        return ApiResponse.success(analytics.overview());
     }
 
     private <T> ApiResponse<T> unavailable() {

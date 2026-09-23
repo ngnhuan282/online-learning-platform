@@ -116,6 +116,17 @@ test('establishSession rejects malformed, expired and mismatched user responses'
   assert.equal(tokens.getAccessToken(), null);
 });
 
+test('custom role sessions preserve server permissions and restore successfully', async () => {
+  const custom = { ...user, roles: ['CONTENT_MANAGER'], permissions: ['ADMIN_ACCESS', 'COURSE_VIEW'] };
+  tokens.setAccessToken(makeToken({ roles: custom.roles }));
+  client.defaults.adapter = config => Promise.resolve(reply(config, custom));
+  await mount();
+  await flush();
+  assert.equal(auth.isAuthenticated, true);
+  assert.deepEqual(auth.user.roles, custom.roles);
+  assert.deepEqual(auth.user.permissions, custom.permissions);
+});
+
 test('session restore waits for me and uses server roles instead of JWT roles', async () => {
   tokens.setAccessToken(makeToken({ role: 'ADMIN', roles: ['ADMIN'] }));
   let resolve;

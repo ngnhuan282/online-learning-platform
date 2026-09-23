@@ -30,19 +30,19 @@ public class CategoryController {
     }
 
     @PostMapping("/admin/categories")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CATEGORY_CREATE')")
     public ApiResponse<CategoryResponse> create(@Valid @RequestBody CategoryRequest request) {
         return ApiResponse.success(categories.create(request));
     }
 
     @PutMapping("/admin/categories/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CATEGORY_UPDATE')")
     public ApiResponse<CategoryResponse> update(@PathVariable Long id, @Valid @RequestBody CategoryRequest request) {
         return ApiResponse.success(categories.update(id, request));
     }
 
     @DeleteMapping("/admin/categories/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CATEGORY_DELETE')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         categories.delete(id);
         return ApiResponse.success(null);

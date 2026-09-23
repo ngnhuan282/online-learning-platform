@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { courseApi } from '../api/courseApi';
 import { formatPrice } from '../data/demoCourses';
+import useAuth from '../../auth/hooks/useAuth';
+import { can } from '../../admin/utils/adminUtils';
 import ErrorState from '../../../shared/components/ErrorState';
 
 const emptyForm = {
@@ -28,6 +30,7 @@ const coerceCourse = course => ({
 });
 
 export default function AdminCoursePage() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadError, setLoadError] = useState(null);
@@ -48,7 +51,7 @@ export default function AdminCoursePage() {
       setLoadError(null);
       try {
         const [response, categoryResponse] = await Promise.all([
-          courseApi.list({ page: 0, size: 20 }, { signal: controller.signal }),
+          courseApi.adminList({ page: 0, size: 20 }, { signal: controller.signal }),
           courseApi.categories({ signal: controller.signal }),
         ]);
         if (!Array.isArray(response.data?.content) || !Array.isArray(categoryResponse.data))
@@ -152,7 +155,7 @@ export default function AdminCoursePage() {
         </div>
 
         <div className="course-grid" style={{ gridTemplateColumns: '0.9fr 1.1fr' }}>
-          <form className="course-card" onSubmit={handleSubmit} style={{ padding: 20, display: 'grid', gap: 14 }}>
+          {can(user, 'COURSE_CREATE') && <form className="course-card" onSubmit={handleSubmit} style={{ padding: 20, display: 'grid', gap: 14 }}>
             <h3>Thêm khóa học mới</h3>
 
             <input
@@ -223,7 +226,7 @@ export default function AdminCoursePage() {
             <button className="button button-primary" type="submit" disabled={submitting || deletingId !== null || loading || Boolean(loadError) || !form.categoryId}>
               {submitting ? 'Đang lưu...' : 'Lưu khóa học'}
             </button>
-          </form>
+          </form>}
 
           <div className="course-card" style={{ padding: 20 }}>
             <h3>Danh sách khóa học</h3>
@@ -249,9 +252,9 @@ export default function AdminCoursePage() {
                       <div style={{ color: '#64748b', fontSize: 13 }}>{course.categoryName}</div>
                       <div style={{ color: '#64748b', fontSize: 13 }}>{formatPrice(Number(course.price || 0))}</div>
                     </div>
-                    <button className="button button-soft" type="button" disabled={submitting || deletingId !== null || Boolean(loadError)} onClick={() => handleDelete(course.id)}>
+                    {can(user, 'COURSE_DELETE') && <button className="button button-soft" type="button" disabled={submitting || deletingId !== null || Boolean(loadError)} onClick={() => handleDelete(course.id)}>
                       {deletingId === course.id ? 'Đang xóa...' : 'Xóa'}
-                    </button>
+                    </button>}
                   </div>
                 ))}
               </div>

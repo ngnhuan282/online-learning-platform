@@ -38,6 +38,11 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    public void recordLogin() { this.lastLoginAt = Instant.now(); }
+
     @ManyToMany
     @JoinTable(
         name = "user_roles",

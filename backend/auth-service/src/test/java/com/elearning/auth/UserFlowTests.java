@@ -78,7 +78,7 @@ class UserFlowTests {
     }
 
     private String tokenFor(User user) {
-        List<String> roleNames = user.getRoles().stream().map(r -> r.getName().name()).toList();
+        List<String> roleNames = user.getRoles().stream().map(r -> r.getName()).toList();
         return tokens.createAccessToken(user.getId().toString(), roleNames);
     }
 
@@ -233,7 +233,7 @@ class UserFlowTests {
         HttpResponse<String> promoteResponse = client.send(promoteRequest, HttpResponse.BodyHandlers.ofString());
         assertThat(promoteResponse.statusCode()).isEqualTo(200);
         User promoted = users.findById(target.getId()).orElseThrow();
-        assertThat(promoted.getRoles()).extracting(r -> r.getName().name()).contains("ADMIN");
+        assertThat(promoted.getRoles()).extracting(r -> r.getName()).contains("ADMIN");
 
         // 2. Demote self -> fails with CANNOT_DEMOTE_SELF
         String demoteBody = mapper.writeValueAsString(java.util.Map.of("roles", List.of("USER")));

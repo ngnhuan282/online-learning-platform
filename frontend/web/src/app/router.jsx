@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import MainLayout from '../layouts/MainLayout';
 import UserLayout from '../layouts/UserLayout';
@@ -10,7 +10,11 @@ import AdminLayout from '../layouts/AdminLayout';
 import AccountPage from '../features/auth/pages/AccountPage';
 import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
 import PaymentResultPage from '../features/payment/pages/PaymentResultPage';
-import AdminAnalyticsPage from '../features/payment/pages/AdminAnalyticsPage';
+import PermissionRoute from '../routes/PermissionRoute';
+import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
+import AdminAccountsPage from '../features/admin/pages/AdminAccountsPage';
+import AdminRolesPage from '../features/admin/pages/AdminRolesPage';
+import AdminAuditPage from '../features/admin/pages/AdminAuditPage';
 
 const router = createBrowserRouter([
   {
@@ -32,19 +36,18 @@ const router = createBrowserRouter([
     path: '/admin',
     element: <AdminLayout />,
     children: [
-      { index: true, element: <AccountPage admin /> },
-      { path: 'analytics', element: <AdminAnalyticsPage /> },
+      { index: true, element: <AdminDashboardPage /> },
+      { path: 'analytics', element: <Navigate to="/admin" replace /> },
+      { path: 'roles', element: <PermissionRoute permission="ROLE_VIEW"><AdminRolesPage /></PermissionRoute> },
+      { path: 'audit', element: <PermissionRoute permission="AUDIT_VIEW"><AdminAuditPage /></PermissionRoute> },
       {
         path: 'courses',
-        lazy: async () => ({
-          Component: (await import('../features/courses/pages/AdminCoursePage')).default,
-        }),
+        element: <PermissionRoute permission="COURSE_VIEW" />,
+        children: [{ index: true, lazy: async () => ({ Component: (await import('../features/courses/pages/AdminCoursePage')).default }) }],
       },
       {
         path: 'users',
-        lazy: async () => ({
-          Component: (await import('../features/auth/pages/AdminUsersPage')).default,
-        }),
+        element: <PermissionRoute permission="USER_VIEW"><AdminAccountsPage /></PermissionRoute>,
       },
     ],
   },

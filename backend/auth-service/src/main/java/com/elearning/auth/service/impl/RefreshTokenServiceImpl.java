@@ -78,7 +78,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         old.revoke();
         String next = issue(old.getUser());
         var response = new AuthResponse(
-            jwt.createAccessToken(user.id().toString(), user.roles()),
+            jwt.createAccessToken(user.id().toString(), user.roles(), user.permissions()),
             "Bearer",
             jwt.getAccessTokenSeconds(),
             user

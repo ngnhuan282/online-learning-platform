@@ -57,6 +57,11 @@ public class CourseService {
         return new PageImpl<>(paged, pageable, filtered.size());
     }
 
+    public Page<CourseResponse> adminList(int page, int size) {
+        return courses.findAll(PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)),
+            Sort.by(Sort.Direction.DESC, "createdAt", "id"))).map(CourseResponse::from);
+    }
+
     public CourseResponse get(Long id) {
         return CourseResponse.from(findCourse(id));
     }

@@ -30,7 +30,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 user
                     .getRoles()
                     .stream()
-                    .map(role -> role.getName().name())
+                    .map(role -> role.getName())
                     .toArray(String[]::new)
             )
             .disabled(user.getStatus() == UserStatus.DISABLED)

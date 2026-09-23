@@ -90,7 +90,7 @@ export default function AuthForm({ mode }) {
           !from.includes('\\') &&
           !/^\/(login|register)([/?#]|$)/.test(from)
             ? from
-            : user.roles.includes('ADMIN')
+            : user.roles.includes('ADMIN') || user.permissions?.includes('ADMIN_ACCESS')
               ? '/admin'
               : '/account';
         showToast('Đăng nhập thành công.');

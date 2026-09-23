@@ -36,19 +36,28 @@ public class CourseController {
     }
 
     @PostMapping("/admin/courses")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_CREATE')")
     public ApiResponse<CourseResponse> create(@Valid @RequestBody CourseRequest request) {
         return ApiResponse.success(courses.create(request));
     }
 
+    @GetMapping("/admin/courses")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_VIEW')")
+    public ApiResponse<PageResponse<CourseResponse>> adminList(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(PageResponse.from(courses.adminList(page, size)));
+    }
+
     @PutMapping("/admin/courses/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_UPDATE')")
     public ApiResponse<CourseResponse> update(@PathVariable Long id, @Valid @RequestBody CourseRequest request) {
         return ApiResponse.success(courses.update(id, request));
     }
 
     @DeleteMapping("/admin/courses/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_DELETE')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         courses.delete(id);
         return ApiResponse.success(null);

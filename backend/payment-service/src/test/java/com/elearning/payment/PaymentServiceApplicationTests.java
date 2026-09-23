@@ -97,6 +97,24 @@ class PaymentServiceApplicationTests {
     }
 
     @Test
+    void granularReportPermissionIsRequiredAndSignedClaimsAreValidated() throws Exception {
+        String path = "/api/v1/payments/admin/analytics";
+        assertThat(request(path, token("USER", 60), null).statusCode()).isEqualTo(403);
+        for (Object claim : List.of(List.of("PAYMENT_REPORT_VIEW"), List.of("USER_VIEW"), "PAYMENT_REPORT_VIEW")) {
+            String access = Jwts.builder().subject("123").issuer("learnsphere")
+                .claim("role", "USER").claim("permissions", claim).claim("tokenType", "access")
+                .issuedAt(Date.from(Instant.now().minusSeconds(1)))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256).compact();
+            var result = request(path, access, null);
+            if (claim.equals(List.of("PAYMENT_REPORT_VIEW"))) {
+                assertThat(result.statusCode()).withFailMessage(result.body()).isEqualTo(200);
+                assertThat(mapper.readTree(result.body()).get("data").get("grossRevenue").isNumber()).isTrue();
+            } else assertThat(result.statusCode()).isEqualTo(claim instanceof String ? 401 : 403);
+        }
+    }
+
+    @Test
     void startsIndependentlyAndExposesHealth() throws Exception {
         assertThat(request("/actuator/health", null, null).statusCode()).isEqualTo(200);
     }
@@ -163,12 +181,9 @@ class PaymentServiceApplicationTests {
             "FORBIDDEN",
             "/api/v1/payments/admin/analytics"
         );
-        error(
-            request("/api/v1/payments/admin/analytics", token("ADMIN", 60), null),
-            501,
-            "FEATURE_NOT_IMPLEMENTED",
-            "/api/v1/payments/admin/analytics"
-        );
+        var analytics = request("/api/v1/payments/admin/analytics", token("ADMIN", 60), null);
+        assertThat(analytics.statusCode()).isEqualTo(200);
+        assertThat(mapper.readTree(analytics.body()).get("data").get("monthly").size()).isEqualTo(6);
     }
 
     @Test
