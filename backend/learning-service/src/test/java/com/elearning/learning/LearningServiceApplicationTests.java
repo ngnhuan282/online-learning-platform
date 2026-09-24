@@ -100,16 +100,27 @@ class LearningServiceApplicationTests {
     void granularReportPermissionIsRequiredAndSignedClaimsAreValidated() throws Exception {
         String path = "/api/v1/learning/admin/overview";
         assertThat(request(path, token("USER", 60), null).statusCode()).isEqualTo(403);
-        for (Object claim : List.of(List.of("LEARNING_REPORT_VIEW"), List.of("USER_VIEW"), "LEARNING_REPORT_VIEW")) {
-            String access = Jwts.builder().subject("123").issuer("learnsphere")
-                .claim("role", "USER").claim("permissions", claim).claim("tokenType", "access")
+        for (Object claim : List.of(
+            List.of("LEARNING_REPORT_VIEW"),
+            List.of("USER_VIEW"),
+            "LEARNING_REPORT_VIEW"
+        )) {
+            String access = Jwts.builder()
+                .subject("123")
+                .issuer("learnsphere")
+                .claim("role", "USER")
+                .claim("permissions", claim)
+                .claim("tokenType", "access")
                 .issuedAt(Date.from(Instant.now().minusSeconds(1)))
                 .expiration(Date.from(Instant.now().plusSeconds(60)))
-                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256).compact();
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+                .compact();
             var result = request(path, access, null);
             if (claim.equals(List.of("LEARNING_REPORT_VIEW"))) {
                 assertThat(result.statusCode()).withFailMessage(result.body()).isEqualTo(200);
-                assertThat(mapper.readTree(result.body()).get("data").get("completionRate").isNumber()).isTrue();
+                assertThat(
+                    mapper.readTree(result.body()).get("data").get("completionRate").isNumber()
+                ).isTrue();
             } else assertThat(result.statusCode()).isEqualTo(claim instanceof String ? 401 : 403);
         }
     }

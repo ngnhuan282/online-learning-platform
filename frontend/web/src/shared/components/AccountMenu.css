@@ -1,0 +1,73 @@
+.account-menu-trigger.MuiButtonBase-root {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px;
+  border-radius: 12px;
+  color: #23324b;
+  flex-shrink: 0;
+}
+.account-menu-trigger:hover {
+  background: #f1f5fc;
+}
+.account-menu-trigger.Mui-focusVisible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+.account-menu-trigger .account-menu-avatar {
+  width: 38px;
+  height: 38px;
+  background: #e3edff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+.account-menu-details {
+  text-align: left;
+  max-width: 200px;
+}
+.account-menu-details strong,
+.account-menu-details small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-menu-details strong {
+  font-size: 13px;
+}
+.account-menu-details small {
+  margin-top: 4px;
+  color: #7b8ba5;
+  font-size: 11px;
+}
+.account-menu-chevron {
+  color: #7b8ba5;
+}
+.account-menu-paper.MuiPaper-root {
+  min-width: 215px;
+  margin-top: 8px;
+  border: 1px solid #e2eaf4;
+  border-radius: 12px;
+  box-shadow: 0 10px 35px #1722381c;
+}
+.account-menu-paper .MuiMenuItem-root {
+  min-height: 44px;
+  font-size: 14px;
+}
+.account-menu-paper .account-menu-logout,
+.account-menu-paper .account-menu-logout .MuiListItemIcon-root {
+  color: #dc3545;
+}
+@media (max-width: 700px) {
+  .account-menu-details {
+    display: none;
+  }
+  .account-menu-trigger.MuiButtonBase-root {
+    gap: 3px;
+  }
+  .account-menu-trigger .account-menu-avatar {
+    width: 34px;
+    height: 34px;
+  }
+}

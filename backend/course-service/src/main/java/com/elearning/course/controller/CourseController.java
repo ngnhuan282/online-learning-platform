@@ -52,7 +52,10 @@ public class CourseController {
 
     @PutMapping("/admin/courses/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_UPDATE')")
-    public ApiResponse<CourseResponse> update(@PathVariable Long id, @Valid @RequestBody CourseRequest request) {
+    public ApiResponse<CourseResponse> update(
+        @PathVariable Long id,
+        @Valid @RequestBody CourseRequest request
+    ) {
         return ApiResponse.success(courses.update(id, request));
     }
 

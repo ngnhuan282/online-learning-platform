@@ -13,19 +13,46 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/admin")
 public class AdminManagementController {
+
     private final AdminManagementService service;
-    public AdminManagementController(AdminManagementService service) { this.service = service; }
+
+    public AdminManagementController(AdminManagementService service) {
+        this.service = service;
+    }
 
     @GetMapping("/roles")
-    @PreAuthorize("@adminAccess.allowed(authentication, 'ROLE_VIEW') or @adminAccess.allowed(authentication, 'USER_VIEW')")
-    public ApiResponse<?> roles() { return ApiResponse.success(service.roles()); }
+    @PreAuthorize(
+        "@adminAccess.allowed(authentication, 'ROLE_VIEW') or @adminAccess.allowed(authentication, 'USER_VIEW')"
+    )
+    public ApiResponse<?> roles() {
+        return ApiResponse.success(service.roles());
+    }
 
     @GetMapping("/permissions")
     @PreAuthorize("@adminAccess.allowed(authentication, 'ROLE_VIEW')")
     public ApiResponse<?> permissions() {
-        return ApiResponse.success(Arrays.stream(AdminPermission.values()).map(p -> Map.of(
-            "code", p.name(), "group", p.group, "resource", p.resource, "action", p.action,
-            "label", p.label, "adminOnly", p.adminOnly, "dependencies", p.dependencies())).toList());
+        return ApiResponse.success(
+            Arrays.stream(AdminPermission.values())
+                .map(p ->
+                    Map.of(
+                        "code",
+                        p.name(),
+                        "group",
+                        p.group,
+                        "resource",
+                        p.resource,
+                        "action",
+                        p.action,
+                        "label",
+                        p.label,
+                        "adminOnly",
+                        p.adminOnly,
+                        "dependencies",
+                        p.dependencies()
+                    )
+                )
+                .toList()
+        );
     }
 
     @PostMapping("/roles")
@@ -36,7 +63,11 @@ public class AdminManagementController {
 
     @PutMapping("/roles/{id}")
     @PreAuthorize("@adminAccess.allowed(authentication, 'ROLE_MANAGE')")
-    public ApiResponse<?> update(@PathVariable Long id, @Valid @RequestBody SaveRoleRequest request, Authentication auth) {
+    public ApiResponse<?> update(
+        @PathVariable Long id,
+        @Valid @RequestBody SaveRoleRequest request,
+        Authentication auth
+    ) {
         return ApiResponse.success(service.saveRole(id, request, Long.valueOf(auth.getName())));
     }
 
@@ -48,10 +79,16 @@ public class AdminManagementController {
     }
 
     @GetMapping("/overview")
-    @PreAuthorize("@adminAccess.allowed(authentication, 'DASHBOARD_VIEW') or @adminAccess.allowed(authentication, 'USER_VIEW')")
-    public ApiResponse<?> overview() { return ApiResponse.success(service.overview()); }
+    @PreAuthorize(
+        "@adminAccess.allowed(authentication, 'DASHBOARD_VIEW') or @adminAccess.allowed(authentication, 'USER_VIEW')"
+    )
+    public ApiResponse<?> overview() {
+        return ApiResponse.success(service.overview());
+    }
 
     @GetMapping("/audit")
     @PreAuthorize("@adminAccess.allowed(authentication, 'AUDIT_VIEW')")
-    public ApiResponse<?> audit() { return ApiResponse.success(service.audit()); }
+    public ApiResponse<?> audit() {
+        return ApiResponse.success(service.audit());
+    }
 }

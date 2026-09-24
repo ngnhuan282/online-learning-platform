@@ -3,7 +3,14 @@ package com.elearning.auth.dto;
 import com.elearning.auth.entity.User;
 import java.util.List;
 
-public record UserResponse(Long id, String fullName, String email, List<String> roles, String status, List<String> permissions) {
+public record UserResponse(
+    Long id,
+    String fullName,
+    String email,
+    List<String> roles,
+    String status,
+    List<String> permissions
+) {
     public UserResponse(Long id, String fullName, String email, List<String> roles) {
         this(id, fullName, email, roles, "ACTIVE", List.of());
     }

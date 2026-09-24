@@ -11,25 +11,41 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component("adminAccess")
 public class AdminAccess {
+
     private final UserRepository users;
 
-    public AdminAccess(UserRepository users) { this.users = users; }
+    public AdminAccess(UserRepository users) {
+        this.users = users;
+    }
 
     // Auth administration checks the current database state, not stale JWT role claims.
     @Transactional(readOnly = true)
     public boolean allowed(Authentication authentication, String permission) {
         if (authentication == null) return false;
         try {
-            return users.findById(Long.parseLong(authentication.getName()))
+            return users
+                .findById(Long.parseLong(authentication.getName()))
                 .filter(user -> user.getStatus() == UserStatus.ACTIVE)
-                .map(user -> permissions(user).contains(permission)).orElse(false);
-        } catch (NumberFormatException ex) { return false; }
+                .map(user -> permissions(user).contains(permission))
+                .orElse(false);
+        } catch (NumberFormatException ex) {
+            return false;
+        }
     }
 
     public static Set<String> permissions(User user) {
-        if (user.getRoles().stream().anyMatch(role -> "ADMIN".equals(role.getName()))) {
+        if (
+            user
+                .getRoles()
+                .stream()
+                .anyMatch(role -> "ADMIN".equals(role.getName()))
+        ) {
             return AdminPermission.allCodes();
         }
-        return user.getRoles().stream().flatMap(role -> role.getPermissions().stream()).collect(Collectors.toSet());
+        return user
+            .getRoles()
+            .stream()
+            .flatMap(role -> role.getPermissions().stream())
+            .collect(Collectors.toSet());
     }
 }

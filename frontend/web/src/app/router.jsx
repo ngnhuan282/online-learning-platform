@@ -37,17 +37,43 @@ const router = createBrowserRouter([
     element: <AdminLayout />,
     children: [
       { index: true, element: <AdminDashboardPage /> },
+      { path: 'profile', element: <AccountPage admin /> },
       { path: 'analytics', element: <Navigate to="/admin" replace /> },
-      { path: 'roles', element: <PermissionRoute permission="ROLE_VIEW"><AdminRolesPage /></PermissionRoute> },
-      { path: 'audit', element: <PermissionRoute permission="AUDIT_VIEW"><AdminAuditPage /></PermissionRoute> },
+      {
+        path: 'roles',
+        element: (
+          <PermissionRoute permission="ROLE_VIEW">
+            <AdminRolesPage />
+          </PermissionRoute>
+        ),
+      },
+      {
+        path: 'audit',
+        element: (
+          <PermissionRoute permission="AUDIT_VIEW">
+            <AdminAuditPage />
+          </PermissionRoute>
+        ),
+      },
       {
         path: 'courses',
         element: <PermissionRoute permission="COURSE_VIEW" />,
-        children: [{ index: true, lazy: async () => ({ Component: (await import('../features/courses/pages/AdminCoursePage')).default }) }],
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/courses/pages/AdminCoursePage')).default,
+            }),
+          },
+        ],
       },
       {
         path: 'users',
-        element: <PermissionRoute permission="USER_VIEW"><AdminAccountsPage /></PermissionRoute>,
+        element: (
+          <PermissionRoute permission="USER_VIEW">
+            <AdminAccountsPage />
+          </PermissionRoute>
+        ),
       },
     ],
   },

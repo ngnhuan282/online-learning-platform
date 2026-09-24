@@ -7,10 +7,10 @@ import com.elearning.auth.common.response.PageResponse;
 import com.elearning.auth.dto.AdminUserResponse;
 import com.elearning.auth.dto.RegisterRequest;
 import com.elearning.auth.dto.UpdateProfileRequest;
-import com.elearning.auth.service.AdminManagementService;
 import com.elearning.auth.dto.UpdateUserRolesRequest;
 import com.elearning.auth.dto.UpdateUserStatusRequest;
 import com.elearning.auth.entity.enums.UserStatus;
+import com.elearning.auth.service.AdminManagementService;
 import com.elearning.auth.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/admin/users")
-
 public class AdminUserController {
 
     private final UserService userService;
@@ -75,13 +74,20 @@ public class AdminUserController {
 
     @PostMapping
     @PreAuthorize("@adminAccess.allowed(authentication, 'USER_CREATE')")
-    public ApiResponse<AdminUserResponse> create(@Valid @RequestBody RegisterRequest request, Authentication auth) {
+    public ApiResponse<AdminUserResponse> create(
+        @Valid @RequestBody RegisterRequest request,
+        Authentication auth
+    ) {
         return ApiResponse.success(admin.createUser(request, getUserId(auth)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("@adminAccess.allowed(authentication, 'USER_UPDATE')")
-    public ApiResponse<AdminUserResponse> update(@PathVariable Long id, @Valid @RequestBody UpdateProfileRequest request, Authentication auth) {
+    public ApiResponse<AdminUserResponse> update(
+        @PathVariable Long id,
+        @Valid @RequestBody UpdateProfileRequest request,
+        Authentication auth
+    ) {
         return ApiResponse.success(admin.updateUser(id, request, getUserId(auth)));
     }
 

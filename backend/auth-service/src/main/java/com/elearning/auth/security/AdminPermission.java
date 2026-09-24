@@ -44,8 +44,14 @@ public enum AdminPermission {
     public List<String> dependencies() {
         if (this == ADMIN_ACCESS) return List.of();
         if (name().startsWith("USER_") && this != USER_VIEW) return List.of("ADMIN_ACCESS", "USER_VIEW");
-        if (name().startsWith("COURSE_") && this != COURSE_VIEW) return List.of("ADMIN_ACCESS", "COURSE_VIEW");
-        if (name().startsWith("CATEGORY_") && this != CATEGORY_VIEW) return List.of("ADMIN_ACCESS", "CATEGORY_VIEW");
+        if (name().startsWith("COURSE_") && this != COURSE_VIEW) return List.of(
+            "ADMIN_ACCESS",
+            "COURSE_VIEW"
+        );
+        if (name().startsWith("CATEGORY_") && this != CATEGORY_VIEW) return List.of(
+            "ADMIN_ACCESS",
+            "CATEGORY_VIEW"
+        );
         if (this == ROLE_MANAGE) return List.of("ADMIN_ACCESS", "ROLE_VIEW");
         return List.of("ADMIN_ACCESS");
     }

@@ -1,8 +1,21 @@
-export const can = (user, permission) => Boolean(user?.roles?.includes('ADMIN') || user?.permissions?.includes(permission));
-export const number = value => value == null ? '—' : new Intl.NumberFormat('vi-VN').format(value);
-export const money = value => value == null ? '—' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
-export const date = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa đăng nhập';
-export const initials = name => name?.trim().split(/\s+/).slice(-2).map(word => word[0]).join('').toUpperCase() || '?';
+export const can = (user, permission) =>
+  Boolean(user?.roles?.includes('ADMIN') || user?.permissions?.includes(permission));
+export const number = value => (value == null ? '—' : new Intl.NumberFormat('vi-VN').format(value));
+export const money = value =>
+  value == null
+    ? '—'
+    : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(
+        value,
+      );
+export const date = value => (value ? new Date(value).toLocaleString('vi-VN') : 'Chưa đăng nhập');
+export const initials = name =>
+  name
+    ?.trim()
+    .split(/\s+/)
+    .slice(-2)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase() || '?';
 
 export function download(filename, content, type = 'text/csv;charset=utf-8') {
   const url = URL.createObjectURL(new Blob(['\ufeff', content], { type }));

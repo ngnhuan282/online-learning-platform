@@ -103,8 +103,10 @@ export default async function refreshScenarios({
 
   const lastCookie = await cookie();
   await run(
-    '[...document.querySelectorAll("button")].find(button => button.textContent === "Đăng xuất").click()',
+    'document.querySelector(".account-menu-trigger").click()',
   );
+  await waitFor('document.querySelector(".account-menu-logout") !== null');
+  await run('document.querySelector(".account-menu-logout").click()');
   await waitFor('location.pathname === "/login" && document.querySelector("[name=email]") !== null');
   assert.equal(await run('sessionStorage.length'), 0);
   assert.equal(await cookie(), undefined);

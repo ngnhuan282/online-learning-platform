@@ -41,7 +41,9 @@ public class User {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
-    public void recordLogin() { this.lastLoginAt = Instant.now(); }
+    public void recordLogin() {
+        this.lastLoginAt = Instant.now();
+    }
 
     @ManyToMany
     @JoinTable(

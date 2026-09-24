@@ -37,7 +37,10 @@ public class CategoryController {
 
     @PutMapping("/admin/categories/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('CATEGORY_UPDATE')")
-    public ApiResponse<CategoryResponse> update(@PathVariable Long id, @Valid @RequestBody CategoryRequest request) {
+    public ApiResponse<CategoryResponse> update(
+        @PathVariable Long id,
+        @Valid @RequestBody CategoryRequest request
+    ) {
         return ApiResponse.success(categories.update(id, request));
     }
 

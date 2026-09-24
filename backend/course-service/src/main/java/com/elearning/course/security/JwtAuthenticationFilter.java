@@ -42,9 +42,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authorities.add(new SimpleGrantedAuthority("ROLE_" + claims.get("role", String.class)));
                 Object permissions = claims.get("permissions");
                 if (permissions != null) {
-                    if (!(permissions instanceof List<?> list) || list.size() > 100) throw new JwtException("Invalid permissions");
+                    if (!(permissions instanceof List<?> list) || list.size() > 100) throw new JwtException(
+                        "Invalid permissions"
+                    );
                     for (Object value : (List<?>) permissions) {
-                        if (!(value instanceof String code) || !code.matches("[A-Z][A-Z0-9_]{1,63}")) throw new JwtException("Invalid permission");
+                        if (
+                            !(value instanceof String code) || !code.matches("[A-Z][A-Z0-9_]{1,63}")
+                        ) throw new JwtException("Invalid permission");
                         authorities.add(new SimpleGrantedAuthority(code));
                     }
                 }

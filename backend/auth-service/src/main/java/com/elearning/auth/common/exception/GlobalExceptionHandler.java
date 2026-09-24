@@ -99,8 +99,10 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.MALFORMED_REQUEST, null, request);
     }
 
-    @ExceptionHandler({org.springframework.dao.DataIntegrityViolationException.class,
-        org.springframework.dao.OptimisticLockingFailureException.class})
+    @ExceptionHandler({
+        org.springframework.dao.DataIntegrityViolationException.class,
+        org.springframework.dao.OptimisticLockingFailureException.class,
+    })
     ResponseEntity<ApiError> handleConflict(Exception ex, HttpServletRequest request) {
         return respond(ErrorCode.CONFLICT, null, request);
     }
