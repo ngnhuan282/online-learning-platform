@@ -25,7 +25,7 @@ export default function AccountPage({ admin = false }) {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const isAdmin = admin || user?.roles?.includes('ADMIN');
+  const isAdmin = user?.roles?.includes('ADMIN');
 
   async function handleProfileSubmit(e) {
     e.preventDefault();
@@ -107,9 +107,7 @@ export default function AccountPage({ admin = false }) {
         >
           <div>
             <span className="eyebrow">{isAdmin ? 'QUẢN TRỊ VIÊN' : 'THÔNG TIN CÁ NHÂN'}</span>
-            <h1 style={{ marginTop: 8, fontSize: '1.875rem' }}>
-              {isAdmin ? 'Hồ sơ & Quản trị' : 'Tài khoản của bạn'}
-            </h1>
+            <h1 style={{ marginTop: 8, fontSize: '1.875rem' }}>Hồ sơ cá nhân</h1>
             <p style={{ color: 'var(--muted)', marginTop: 4 }}>
               Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.
             </p>

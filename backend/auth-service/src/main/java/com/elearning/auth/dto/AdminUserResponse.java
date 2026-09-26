@@ -11,7 +11,8 @@ public record AdminUserResponse(
     String status,
     List<String> roles,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    Instant lastLoginAt
 ) {
     public static AdminUserResponse from(User user) {
         return new AdminUserResponse(
@@ -22,11 +23,12 @@ public record AdminUserResponse(
             user
                 .getRoles()
                 .stream()
-                .map(role -> role.getName().name())
+                .map(role -> role.getName())
                 .sorted()
                 .toList(),
             user.getCreatedAt(),
-            user.getUpdatedAt()
+            user.getUpdatedAt(),
+            user.getLastLoginAt()
         );
     }
 }

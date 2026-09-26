@@ -4,7 +4,10 @@ import com.elearning.learning.common.exception.AppException;
 import com.elearning.learning.common.exception.ErrorCode;
 import com.elearning.learning.dto.*;
 import com.elearning.learning.entity.Enrollment;
+import com.elearning.learning.entity.LessonProgress;
+import com.elearning.learning.entity.Notification;
 import com.elearning.learning.entity.enums.EnrollmentStatus;
+import com.elearning.learning.entity.enums.NotificationType;
 import com.elearning.learning.entity.enums.ProgressStatus;
 import com.elearning.learning.repository.*;
 import com.elearning.learning.service.LearningService;
@@ -61,25 +64,59 @@ public class LearningServiceImpl implements LearningService {
     @Override
     @Transactional
     public EnrollmentResponse enroll(Long userId, EnrollRequest request) {
-        Enrollment enrollment = enrollments
-            .findByUserIdAndCourseId(userId, request.courseId())
-            .orElseGet(() -> {
-                var created = new Enrollment();
-                created.setUserId(userId);
-                created.setCourseId(request.courseId());
-                created.setStatus(EnrollmentStatus.ACTIVE);
-                return created;
-            });
+        var existing = enrollments.findByUserIdAndCourseId(userId, request.courseId());
+        if (existing.isPresent()) {
+            Enrollment enrollment = existing.get();
+            enrollment.setLastAccessedAt(Instant.now());
+            return EnrollmentResponse.from(enrollments.save(enrollment));
+        }
+
+        var enrollment = new Enrollment();
+        enrollment.setUserId(userId);
+        enrollment.setCourseId(request.courseId());
+        enrollment.setStatus(EnrollmentStatus.ACTIVE);
         enrollment.setLastAccessedAt(Instant.now());
-        return EnrollmentResponse.from(enrollments.save(enrollment));
+        Enrollment saved = enrollments.save(enrollment);
+        createEnrollmentNotification(userId, request.courseId());
+        return EnrollmentResponse.from(saved);
     }
 
     @Override
     public List<LessonProgressResponse> getCourseProgress(Long userId, Long courseId) {
-        return progress.findByUserIdAndCourseIdOrderByUpdatedAtDesc(userId, courseId)
+        ensureCourseAccess(userId, courseId);
+        return progress.findByUserIdAndCourseIdOrderByLessonIdAsc(userId, courseId)
             .stream()
             .map(LessonProgressResponse::from)
             .toList();
+    }
+
+    @Override
+    @Transactional
+    public LessonProgressResponse accessLesson(Long userId, Long courseId, Long lessonId) {
+        ensureCourseAccess(userId, courseId);
+        LessonProgress item = progress
+            .findByUserIdAndCourseIdAndLessonId(userId, courseId, lessonId)
+            .orElseGet(() -> createLessonProgress(userId, courseId, lessonId));
+        if (item.getStatus() == ProgressStatus.NOT_STARTED) {
+            item.setStatus(ProgressStatus.IN_PROGRESS);
+        }
+        if (item.getProgressPercent() < 10) {
+            item.setProgressPercent(10);
+        }
+        return LessonProgressResponse.from(progress.save(item));
+    }
+
+    @Override
+    @Transactional
+    public LessonProgressResponse markLessonComplete(Long userId, Long courseId, Long lessonId) {
+        ensureCourseAccess(userId, courseId);
+        LessonProgress item = progress
+            .findByUserIdAndCourseIdAndLessonId(userId, courseId, lessonId)
+            .orElseGet(() -> createLessonProgress(userId, courseId, lessonId));
+        item.setStatus(ProgressStatus.COMPLETED);
+        item.setProgressPercent(100);
+        item.setCompletedAt(Instant.now());
+        return LessonProgressResponse.from(progress.save(item));
     }
 
     @Override
@@ -117,5 +154,36 @@ public class LearningServiceImpl implements LearningService {
             notification.setReadAt(Instant.now());
         }
         return NotificationResponse.from(notification);
+    }
+
+    private void createEnrollmentNotification(Long userId, Long courseId) {
+        var notification = new Notification();
+        notification.setUserId(userId);
+        notification.setType(NotificationType.ENROLLMENT);
+        notification.setTitle("Ghi danh thành công");
+        notification.setBody("Khóa học #" + courseId + " đã được thêm vào My Courses.");
+        notification.setActionUrl("/learning/" + courseId);
+        notifications.save(notification);
+    }
+
+    private void ensureCourseAccess(Long userId, Long courseId) {
+        boolean enrolled = enrollments
+            .findByUserIdAndCourseId(userId, courseId)
+            .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
+            .isPresent();
+        if (!enrolled) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+    }
+
+    private LessonProgress createLessonProgress(Long userId, Long courseId, Long lessonId) {
+        var item = new LessonProgress();
+        item.setUserId(userId);
+        item.setCourseId(courseId);
+        item.setLessonId(lessonId);
+        item.setStatus(ProgressStatus.NOT_STARTED);
+        item.setProgressPercent(0);
+        item.setTimeSpentSeconds(0L);
+        return item;
     }
 }

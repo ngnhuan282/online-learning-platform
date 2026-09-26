@@ -78,17 +78,28 @@ class UserFlowTests {
     }
 
     private String tokenFor(User user) {
-        List<String> roleNames = user.getRoles().stream().map(r -> r.getName().name()).toList();
+        List<String> roleNames = user
+            .getRoles()
+            .stream()
+            .map(r -> r.getName())
+            .toList();
         return tokens.createAccessToken(user.getId().toString(), roleNames);
     }
 
     @Test
     void userCanUpdateProfile() throws Exception {
-        User user = createUser("updateprofile_" + UUID.randomUUID() + "@test.com", "Password123!", "Old Name", false);
+        User user = createUser(
+            "updateprofile_" + UUID.randomUUID() + "@test.com",
+            "Password123!",
+            "Old Name",
+            false
+        );
         String token = tokenFor(user);
 
         String body = mapper.writeValueAsString(java.util.Map.of("fullName", "New Beautiful Name"));
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/users/me"))
+        HttpRequest request = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/users/me")
+        )
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(body))
@@ -113,11 +124,12 @@ class UserFlowTests {
         String token = tokenFor(user);
 
         // 1. Wrong old password
-        String wrongBody = mapper.writeValueAsString(java.util.Map.of(
-            "currentPassword", "WrongCurrentPass1!",
-            "newPassword", newPass
-        ));
-        HttpRequest badRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/users/change-password"))
+        String wrongBody = mapper.writeValueAsString(
+            java.util.Map.of("currentPassword", "WrongCurrentPass1!", "newPassword", newPass)
+        );
+        HttpRequest badRequest = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/users/change-password")
+        )
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(wrongBody))
@@ -129,11 +141,12 @@ class UserFlowTests {
         assertThat(badJson.get("code").asText()).isEqualTo("OLD_PASSWORD_INCORRECT");
 
         // 2. Correct old password
-        String correctBody = mapper.writeValueAsString(java.util.Map.of(
-            "currentPassword", oldPass,
-            "newPassword", newPass
-        ));
-        HttpRequest goodRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/users/change-password"))
+        String correctBody = mapper.writeValueAsString(
+            java.util.Map.of("currentPassword", oldPass, "newPassword", newPass)
+        );
+        HttpRequest goodRequest = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/users/change-password")
+        )
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(correctBody))
@@ -148,12 +161,24 @@ class UserFlowTests {
 
     @Test
     void adminCanListUsersAndSearch() throws Exception {
-        User admin = createUser("admin_" + UUID.randomUUID() + "@test.com", "AdminPass123!", "Admin Person", true);
-        User student = createUser("student_unique_keyword_" + UUID.randomUUID() + "@test.com", "StudentPass123!", "Unique Student", false);
+        User admin = createUser(
+            "admin_" + UUID.randomUUID() + "@test.com",
+            "AdminPass123!",
+            "Admin Person",
+            true
+        );
+        User student = createUser(
+            "student_unique_keyword_" + UUID.randomUUID() + "@test.com",
+            "StudentPass123!",
+            "Unique Student",
+            false
+        );
 
         String adminToken = tokenFor(admin);
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/users?keyword=Unique"))
+        HttpRequest request = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/admin/users?keyword=Unique")
+        )
             .header("Authorization", "Bearer " + adminToken)
             .GET()
             .build();
@@ -170,10 +195,17 @@ class UserFlowTests {
 
     @Test
     void regularUserCannotAccessAdminUsers() throws Exception {
-        User regular = createUser("regular_" + UUID.randomUUID() + "@test.com", "RegularPass123!", "Regular User", false);
+        User regular = createUser(
+            "regular_" + UUID.randomUUID() + "@test.com",
+            "RegularPass123!",
+            "Regular User",
+            false
+        );
         String regularToken = tokenFor(regular);
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/users"))
+        HttpRequest request = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/admin/users")
+        )
             .header("Authorization", "Bearer " + regularToken)
             .GET()
             .build();
@@ -184,14 +216,26 @@ class UserFlowTests {
 
     @Test
     void adminCanLockOtherUserAndCannotLockSelf() throws Exception {
-        User admin = createUser("admin2_" + UUID.randomUUID() + "@test.com", "AdminPass123!", "Admin Two", true);
-        User victim = createUser("victim_" + UUID.randomUUID() + "@test.com", "VictimPass123!", "Victim User", false);
+        User admin = createUser(
+            "admin2_" + UUID.randomUUID() + "@test.com",
+            "AdminPass123!",
+            "Admin Two",
+            true
+        );
+        User victim = createUser(
+            "victim_" + UUID.randomUUID() + "@test.com",
+            "VictimPass123!",
+            "Victim User",
+            false
+        );
 
         String adminToken = tokenFor(admin);
 
         // 1. Lock victim
         String lockBody = mapper.writeValueAsString(java.util.Map.of("status", "LOCKED"));
-        HttpRequest lockRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/users/" + victim.getId() + "/status"))
+        HttpRequest lockRequest = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/admin/users/" + victim.getId() + "/status")
+        )
             .header("Authorization", "Bearer " + adminToken)
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(lockBody))
@@ -203,13 +247,18 @@ class UserFlowTests {
         assertThat(lockedUser.getStatus()).isEqualTo(UserStatus.LOCKED);
 
         // 2. Lock self -> fails with CANNOT_LOCK_SELF
-        HttpRequest selfLockRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/users/" + admin.getId() + "/status"))
+        HttpRequest selfLockRequest = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/admin/users/" + admin.getId() + "/status")
+        )
             .header("Authorization", "Bearer " + adminToken)
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(lockBody))
             .build();
 
-        HttpResponse<String> selfResponse = client.send(selfLockRequest, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> selfResponse = client.send(
+            selfLockRequest,
+            HttpResponse.BodyHandlers.ofString()
+        );
         assertThat(selfResponse.statusCode()).isEqualTo(400);
         JsonNode selfJson = mapper.readTree(selfResponse.body());
         assertThat(selfJson.get("code").asText()).isEqualTo("CANNOT_LOCK_SELF");
@@ -217,33 +266,55 @@ class UserFlowTests {
 
     @Test
     void adminCanUpdateRolesAndCannotDemoteSelf() throws Exception {
-        User admin = createUser("admin3_" + UUID.randomUUID() + "@test.com", "AdminPass123!", "Admin Three", true);
-        User target = createUser("target_" + UUID.randomUUID() + "@test.com", "TargetPass123!", "Target User", false);
+        User admin = createUser(
+            "admin3_" + UUID.randomUUID() + "@test.com",
+            "AdminPass123!",
+            "Admin Three",
+            true
+        );
+        User target = createUser(
+            "target_" + UUID.randomUUID() + "@test.com",
+            "TargetPass123!",
+            "Target User",
+            false
+        );
 
         String adminToken = tokenFor(admin);
 
         // 1. Promote target to ADMIN
         String promoteBody = mapper.writeValueAsString(java.util.Map.of("roles", List.of("USER", "ADMIN")));
-        HttpRequest promoteRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/users/" + target.getId() + "/roles"))
+        HttpRequest promoteRequest = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/admin/users/" + target.getId() + "/roles")
+        )
             .header("Authorization", "Bearer " + adminToken)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(promoteBody))
             .build();
 
-        HttpResponse<String> promoteResponse = client.send(promoteRequest, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> promoteResponse = client.send(
+            promoteRequest,
+            HttpResponse.BodyHandlers.ofString()
+        );
         assertThat(promoteResponse.statusCode()).isEqualTo(200);
         User promoted = users.findById(target.getId()).orElseThrow();
-        assertThat(promoted.getRoles()).extracting(r -> r.getName().name()).contains("ADMIN");
+        assertThat(promoted.getRoles())
+            .extracting(r -> r.getName())
+            .contains("ADMIN");
 
         // 2. Demote self -> fails with CANNOT_DEMOTE_SELF
         String demoteBody = mapper.writeValueAsString(java.util.Map.of("roles", List.of("USER")));
-        HttpRequest demoteRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/users/" + admin.getId() + "/roles"))
+        HttpRequest demoteRequest = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/admin/users/" + admin.getId() + "/roles")
+        )
             .header("Authorization", "Bearer " + adminToken)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(demoteBody))
             .build();
 
-        HttpResponse<String> demoteResponse = client.send(demoteRequest, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> demoteResponse = client.send(
+            demoteRequest,
+            HttpResponse.BodyHandlers.ofString()
+        );
         assertThat(demoteResponse.statusCode()).isEqualTo(400);
         JsonNode demoteJson = mapper.readTree(demoteResponse.body());
         assertThat(demoteJson.get("code").asText()).isEqualTo("CANNOT_DEMOTE_SELF");

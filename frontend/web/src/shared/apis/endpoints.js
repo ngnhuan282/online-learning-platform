@@ -20,6 +20,10 @@ export const ENDPOINTS = Object.freeze({
     enrollments: `${API_PREFIX}/learning/enrollments/me`,
     enroll: `${API_PREFIX}/learning/enrollments`,
     progress: courseId => `${API_PREFIX}/learning/progress/courses/${courseId}`,
+    lessonAccess: (courseId, lessonId) =>
+      `${API_PREFIX}/learning/progress/courses/${courseId}/lessons/${lessonId}/access`,
+    lessonComplete: (courseId, lessonId) =>
+      `${API_PREFIX}/learning/progress/courses/${courseId}/lessons/${lessonId}/complete`,
     quiz: quizId => `${API_PREFIX}/learning/quizzes/${quizId}`,
     quizResult: quizId => `${API_PREFIX}/learning/quizzes/${quizId}/result`,
     notifications: `${API_PREFIX}/learning/notifications`,

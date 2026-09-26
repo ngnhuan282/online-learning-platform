@@ -24,6 +24,8 @@ const load = path => server.ssrLoadModule(`/src/${path}`);
 const { AuthContext, AuthProvider } = await load('features/auth/context/AuthContext.jsx');
 const { default: ProtectedRoute } = await load('routes/ProtectedRoute.jsx');
 const { default: RoleRoute } = await load('routes/RoleRoute.jsx');
+const { default: AdminRolesPage } = await load('features/admin/pages/AdminRolesPage.jsx');
+const { ToastContext } = await load('shared/context/ToastContext.jsx');
 const { default: client } = await load('shared/apis/axiosClient.js');
 const { authApi } = await load('features/auth/api/authApi.js');
 const tokens = await load('shared/utils/tokenUtils.js');
@@ -114,6 +116,108 @@ test('establishSession rejects malformed, expired and mismatched user responses'
     assert.throws(() => auth.establishSession({ accessToken, user }));
   }
   assert.equal(tokens.getAccessToken(), null);
+});
+
+test('custom role sessions preserve server permissions and restore successfully', async () => {
+  const custom = { ...user, roles: ['CONTENT_MANAGER'], permissions: ['ADMIN_ACCESS', 'COURSE_VIEW'] };
+  tokens.setAccessToken(makeToken({ roles: custom.roles }));
+  client.defaults.adapter = config => Promise.resolve(reply(config, custom));
+  await mount();
+  await flush();
+  assert.equal(auth.isAuthenticated, true);
+  assert.deepEqual(auth.user.roles, custom.roles);
+  assert.deepEqual(auth.user.permissions, custom.permissions);
+});
+
+test('admin can edit and save USER permissions while system-role deletion and ADMIN edits stay protected', async () => {
+  let role = {
+    id: 1,
+    name: 'USER',
+    label: 'Học viên',
+    description: '',
+    systemRole: true,
+    version: 0,
+    permissions: [],
+    userCount: 5,
+  };
+  const adminRole = {
+    ...role,
+    id: 2,
+    name: 'ADMIN',
+    label: 'Quản trị viên',
+    permissions: ['ADMIN_ACCESS', 'DASHBOARD_VIEW', 'ROLE_MANAGE'],
+  };
+  const catalog = [
+    {
+      code: 'ADMIN_ACCESS',
+      group: 'Hệ thống',
+      resource: 'Admin',
+      action: 'VIEW',
+      label: 'Truy cập',
+      dependencies: [],
+      adminOnly: false,
+    },
+    {
+      code: 'DASHBOARD_VIEW',
+      group: 'Hệ thống',
+      resource: 'Tổng quan',
+      action: 'VIEW',
+      label: 'Xem tổng quan',
+      dependencies: ['ADMIN_ACCESS'],
+      adminOnly: false,
+    },
+    {
+      code: 'ROLE_MANAGE',
+      group: 'Hệ thống',
+      resource: 'Vai trò',
+      action: 'SPECIAL',
+      label: 'Quản lý vai trò',
+      dependencies: ['ADMIN_ACCESS'],
+      adminOnly: true,
+    },
+  ];
+  let saved = false;
+  tokens.setAccessToken(makeToken({ role: 'ADMIN', roles: ['ADMIN'] }));
+  client.defaults.adapter = async config => {
+    if (config.url.endsWith('/users/me')) return reply(config, { ...user, roles: ['ADMIN'] });
+    if (config.url.endsWith('/admin/roles/1') && config.method === 'put') {
+      const payload = JSON.parse(config.data);
+      assert.equal(payload.name, 'USER');
+      assert.equal(payload.version, 0);
+      assert.deepEqual(new Set(payload.permissions), new Set(['DASHBOARD_VIEW', 'ADMIN_ACCESS']));
+      role = { ...role, ...payload, version: 1 };
+      saved = true;
+      return reply(config, role);
+    }
+    if (config.url.endsWith('/admin/roles')) return reply(config, [role, adminRole]);
+    if (config.url.endsWith('/admin/permissions')) return reply(config, catalog);
+    throw Error(`Unexpected request: ${config.method} ${config.url}`);
+  };
+  await mount(h(ToastContext.Provider, { value: () => {} }, h(AdminRolesPage)));
+  await flush();
+  const checkbox = code => document.querySelector(`input[aria-label="${code}"]`);
+  assert.equal(checkbox('DASHBOARD_VIEW').disabled, false);
+  assert.equal(checkbox('ROLE_MANAGE').disabled, true);
+  assert.ok(document.body.textContent.includes('tài khoản đang mang vai trò USER'));
+  assert.equal(document.body.textContent.includes('Xóa vai trò'), false);
+  await act(async () => checkbox('DASHBOARD_VIEW').click());
+  assert.equal(checkbox('ADMIN_ACCESS').checked, true);
+  const save = [...document.querySelectorAll('button')].find(
+    button => button.textContent.trim() === 'Lưu thay đổi',
+  );
+  assert.equal(save.disabled, false);
+  await act(async () => save.click());
+  await flush();
+  assert.equal(saved, true);
+  assert.equal(checkbox('DASHBOARD_VIEW').checked, true);
+  assert.equal(document.body.textContent.includes('Có thay đổi chưa được lưu'), false);
+  await act(async () =>
+    [...document.querySelectorAll('.admin-role-option')]
+      .find(button => button.textContent.startsWith('ADMIN'))
+      .click(),
+  );
+  assert.equal(checkbox('DASHBOARD_VIEW').disabled, true);
+  assert.equal(document.body.textContent.includes('Xóa vai trò'), false);
 });
 
 test('session restore waits for me and uses server roles instead of JWT roles', async () => {

@@ -6,6 +6,7 @@ import com.elearning.learning.common.exception.AppException;
 import com.elearning.learning.common.exception.ErrorCode;
 import com.elearning.learning.common.response.ApiResponse;
 import com.elearning.learning.common.response.PageResponse;
+import com.elearning.learning.repository.EnrollmentRepository;
 import com.elearning.learning.security.JwtTokenProvider;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -61,6 +62,9 @@ class LearningServiceApplicationTests {
     @Autowired
     JwtTokenProvider tokens;
 
+    @Autowired
+    EnrollmentRepository enrollments;
+
     final HttpClient client = HttpClient.newHttpClient();
 
     String token(String role, long seconds) {
@@ -84,6 +88,14 @@ class LearningServiceApplicationTests {
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    HttpResponse<String> patch(String path, String token) throws Exception {
+        var builder = HttpRequest
+            .newBuilder(URI.create("http://localhost:" + port + path))
+            .method("PATCH", HttpRequest.BodyPublishers.noBody());
+        if (token != null) builder.header("Authorization", "Bearer " + token);
+        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     void error(HttpResponse<String> response, int status, String code, String path) throws Exception {
         assertThat(response.statusCode()).isEqualTo(status);
         JsonNode json = mapper.readTree(response.body());
@@ -94,6 +106,35 @@ class LearningServiceApplicationTests {
         assertThat(json.has("timestamp")).isTrue();
         assertThat(json.has("trace")).isFalse();
         assertThat(response.body()).doesNotContain("sensitive-test-detail");
+    }
+
+    @Test
+    void granularReportPermissionIsRequiredAndSignedClaimsAreValidated() throws Exception {
+        String path = "/api/v1/learning/admin/overview";
+        assertThat(request(path, token("USER", 60), null).statusCode()).isEqualTo(403);
+        for (Object claim : List.of(
+            List.of("LEARNING_REPORT_VIEW"),
+            List.of("USER_VIEW"),
+            "LEARNING_REPORT_VIEW"
+        )) {
+            String access = Jwts.builder()
+                .subject("123")
+                .issuer("learnsphere")
+                .claim("role", "USER")
+                .claim("permissions", claim)
+                .claim("tokenType", "access")
+                .issuedAt(Date.from(Instant.now().minusSeconds(1)))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+                .compact();
+            var result = request(path, access, null);
+            if (claim.equals(List.of("LEARNING_REPORT_VIEW"))) {
+                assertThat(result.statusCode()).withFailMessage(result.body()).isEqualTo(200);
+                assertThat(
+                    mapper.readTree(result.body()).get("data").get("completionRate").isNumber()
+                ).isTrue();
+            } else assertThat(result.statusCode()).isEqualTo(claim instanceof String ? 401 : 403);
+        }
     }
 
     @Test
@@ -136,6 +177,89 @@ class LearningServiceApplicationTests {
         error(request(BASE + "/conflict", token("USER", 60), null), 409, "CONFLICT", BASE + "/conflict");
         error(request(BASE + "/failure", token("USER", 60), null), 500, "INTERNAL_ERROR", BASE + "/failure");
         error(request(BASE + "/missing", token("USER", 60), null), 404, "NOT_FOUND", BASE + "/missing");
+    }
+
+    @Test
+    void freeEnrollmentIsIdempotentForMyCourses() throws Exception {
+        String access = Jwts.builder()
+            .subject("123")
+            .issuer("learnsphere")
+            .claim("role", "USER")
+            .claim("tokenType", "access")
+            .issuedAt(Date.from(Instant.now().minusSeconds(1)))
+            .expiration(Date.from(Instant.now().plusSeconds(60)))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+            .compact();
+
+        var first = request("/api/v1/learning/enrollments", access, "{\"courseId\":777}");
+        var second = request("/api/v1/learning/enrollments", access, "{\"courseId\":777}");
+
+        assertThat(first.statusCode()).withFailMessage(first.body()).isEqualTo(200);
+        assertThat(second.statusCode()).withFailMessage(second.body()).isEqualTo(200);
+        JsonNode firstData = mapper.readTree(first.body()).get("data");
+        JsonNode secondData = mapper.readTree(second.body()).get("data");
+        assertThat(secondData.get("id").asLong()).isEqualTo(firstData.get("id").asLong());
+        assertThat(enrollments.findByUserIdAndCourseId(123L, 777L)).isPresent();
+        assertThat(enrollments.findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(123L)).hasSize(1);
+    }
+
+    @Test
+    void lessonAccessAndCompletionUpdateCourseProgressForEnrolledUser() throws Exception {
+        String access = Jwts.builder()
+            .subject("124")
+            .issuer("learnsphere")
+            .claim("role", "USER")
+            .claim("tokenType", "access")
+            .issuedAt(Date.from(Instant.now().minusSeconds(1)))
+            .expiration(Date.from(Instant.now().plusSeconds(60)))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+            .compact();
+
+        assertThat(
+            request("/api/v1/learning/enrollments", access, "{\"courseId\":888}").statusCode()
+        ).isEqualTo(200);
+
+        var accessLesson = request(
+            "/api/v1/learning/progress/courses/888/lessons/10001/access",
+            access,
+            "{}"
+        );
+        assertThat(accessLesson.statusCode()).withFailMessage(accessLesson.body()).isEqualTo(200);
+        JsonNode accessed = mapper.readTree(accessLesson.body()).get("data");
+        assertThat(accessed.get("status").asString()).isEqualTo("IN_PROGRESS");
+        assertThat(accessed.get("progressPercent").asInt()).isEqualTo(10);
+
+        var completeLesson = patch(
+            "/api/v1/learning/progress/courses/888/lessons/10001/complete",
+            access
+        );
+        assertThat(completeLesson.statusCode()).withFailMessage(completeLesson.body()).isEqualTo(200);
+        JsonNode completed = mapper.readTree(completeLesson.body()).get("data");
+        assertThat(completed.get("status").asString()).isEqualTo("COMPLETED");
+        assertThat(completed.get("progressPercent").asInt()).isEqualTo(100);
+        assertThat(completed.get("completedAt").isNull()).isFalse();
+
+        var progress = request("/api/v1/learning/progress/courses/888", access, null);
+        assertThat(progress.statusCode()).withFailMessage(progress.body()).isEqualTo(200);
+        JsonNode progressItems = mapper.readTree(progress.body()).get("data");
+        assertThat(progressItems).hasSize(1);
+        assertThat(progressItems.get(0).get("lessonId").asLong()).isEqualTo(10001L);
+
+        String otherUser = Jwts.builder()
+            .subject("125")
+            .issuer("learnsphere")
+            .claim("role", "USER")
+            .claim("tokenType", "access")
+            .issuedAt(Date.from(Instant.now().minusSeconds(1)))
+            .expiration(Date.from(Instant.now().plusSeconds(60)))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+            .compact();
+        error(
+            request("/api/v1/learning/progress/courses/888/lessons/10001/access", otherUser, "{}"),
+            403,
+            "FORBIDDEN",
+            "/api/v1/learning/progress/courses/888/lessons/10001/access"
+        );
     }
 
     @Test

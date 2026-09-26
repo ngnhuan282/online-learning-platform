@@ -72,12 +72,16 @@ public class JwtTokenProvider {
     }
 
     public String createAccessToken(String subject, List<String> roles) {
+        return createAccessToken(subject, roles, List.of());
+    }
+
+    public String createAccessToken(String subject, List<String> roles, List<String> permissions) {
         if (
             subject == null ||
             subject.isBlank() ||
             roles == null ||
             roles.isEmpty() ||
-            roles.stream().anyMatch(role -> !Set.of("USER", "ADMIN").contains(role))
+            roles.stream().anyMatch(role -> role == null || !role.matches("[A-Z][A-Z0-9_]{1,63}"))
         ) {
             throw new IllegalArgumentException("A subject and a supported role are required");
         }
@@ -89,6 +93,7 @@ public class JwtTokenProvider {
             .issuer(issuer)
             .claim("role", primaryRole)
             .claim("roles", roles.stream().distinct().sorted().toList())
+            .claim("permissions", permissions.stream().distinct().sorted().toList())
             .claim("tokenType", "access")
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plusSeconds(accessTokenSeconds)))
@@ -104,8 +109,8 @@ public class JwtTokenProvider {
             list.isEmpty() ||
             list
                 .stream()
-                .anyMatch(role -> !(role instanceof String) || !Set.of("USER", "ADMIN").contains(role)) ||
-            !list.contains(claims.get("role", String.class))
+                .anyMatch(role -> !(role instanceof String name) || !name.matches("[A-Z][A-Z0-9_]{1,63}")) ||
+            ("ADMIN".equals(claims.get("role", String.class)) && !list.contains("ADMIN"))
         ) throw new JwtException("Invalid access token roles");
         return ((List<?>) value).stream().map(String.class::cast).toList();
     }

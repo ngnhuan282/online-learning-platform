@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -83,6 +84,14 @@ public class GlobalExceptionHandler {
         HttpServletRequest request
     ) {
         return respond(ErrorCode.MALFORMED_REQUEST, null, request);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ApiError> handleDataIntegrityViolation(
+        DataIntegrityViolationException ex,
+        HttpServletRequest request
+    ) {
+        return respond(ErrorCode.CONFLICT, null, request);
     }
 
     @ExceptionHandler(Exception.class)

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { courseApi } from '../api/courseApi';
 import { formatPrice } from '../data/demoCourses';
+import useAuth from '../../auth/hooks/useAuth';
+import { can } from '../../admin/utils/adminUtils';
 import ErrorState from '../../../shared/components/ErrorState';
 
 const emptyForm = {
@@ -28,6 +30,7 @@ const coerceCourse = course => ({
 });
 
 export default function AdminCoursePage() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadError, setLoadError] = useState(null);
@@ -48,7 +51,7 @@ export default function AdminCoursePage() {
       setLoadError(null);
       try {
         const [response, categoryResponse] = await Promise.all([
-          courseApi.list({ page: 0, size: 20 }, { signal: controller.signal }),
+          courseApi.adminList({ page: 0, size: 20 }, { signal: controller.signal }),
           courseApi.categories({ signal: controller.signal }),
         ]);
         if (!Array.isArray(response.data?.content) || !Array.isArray(categoryResponse.data))
@@ -147,83 +150,106 @@ export default function AdminCoursePage() {
           </div>
           <div className="course-card" style={{ padding: 20 }}>
             <small>Trạng thái</small>
-            <h3 style={{ fontSize: 28, margin: '8px 0' }}>{loading ? 'Đang tải' : loadError ? 'Lỗi kết nối' : 'Đã tải'}</h3>
+            <h3 style={{ fontSize: 28, margin: '8px 0' }}>
+              {loading ? 'Đang tải' : loadError ? 'Lỗi kết nối' : 'Đã tải'}
+            </h3>
           </div>
         </div>
 
         <div className="course-grid" style={{ gridTemplateColumns: '0.9fr 1.1fr' }}>
-          <form className="course-card" onSubmit={handleSubmit} style={{ padding: 20, display: 'grid', gap: 14 }}>
-            <h3>Thêm khóa học mới</h3>
-
-            <input
-              aria-label="Tên khóa học"
-              required
-              maxLength={200}
-              value={form.title}
-              onChange={event => setForm({ ...form, title: event.target.value })}
-              placeholder="Tên khóa học"
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
-            />
-
-            <textarea
-              aria-label="Mô tả khóa học"
-              required
-              maxLength={2000}
-              value={form.description}
-              onChange={event => setForm({ ...form, description: event.target.value })}
-              placeholder="Mô tả khóa học"
-              rows={4}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea', resize: 'vertical' }}
-            />
-
-            <select
-              aria-label="Danh mục"
-              required
-              value={form.categoryId}
-              onChange={event => setForm({ ...form, categoryId: event.target.value })}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+          {can(user, 'COURSE_CREATE') && (
+            <form
+              className="course-card"
+              onSubmit={handleSubmit}
+              style={{ padding: 20, display: 'grid', gap: 14 }}
             >
-              <option value="">Chọn danh mục</option>
-              {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </select>
-            {!loading && !loadError && categories.length === 0 && <p>Chưa có danh mục để tạo khóa học.</p>}
+              <h3>Thêm khóa học mới</h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <input
-                type="number"
-                aria-label="Giá"
-                min={0}
-                value={form.price}
-                onChange={event => setForm({ ...form, price: Number(event.target.value) })}
-                placeholder="Giá"
+                aria-label="Tên khóa học"
+                required
+                maxLength={200}
+                value={form.title}
+                onChange={event => setForm({ ...form, title: event.target.value })}
+                placeholder="Tên khóa học"
                 style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
               />
-              <input
-                type="number"
-                aria-label="Giá gốc"
-                min={0}
-                value={form.originalPrice}
-                onChange={event => setForm({ ...form, originalPrice: Number(event.target.value) })}
-                placeholder="Giá gốc"
-                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+
+              <textarea
+                aria-label="Mô tả khóa học"
+                required
+                maxLength={2000}
+                value={form.description}
+                onChange={event => setForm({ ...form, description: event.target.value })}
+                placeholder="Mô tả khóa học"
+                rows={4}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #dfe3ea',
+                  resize: 'vertical',
+                }}
               />
-            </div>
 
-            <select
-              aria-label="Trình độ"
-              value={form.level}
-              onChange={event => setForm({ ...form, level: event.target.value })}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
-            >
-              <option value="BEGINNER">Beginner</option>
-              <option value="INTERMEDIATE">Intermediate</option>
-              <option value="ADVANCED">Advanced</option>
-            </select>
+              <select
+                aria-label="Danh mục"
+                required
+                value={form.categoryId}
+                onChange={event => setForm({ ...form, categoryId: event.target.value })}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+              >
+                <option value="">Chọn danh mục</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              {!loading && !loadError && categories.length === 0 && <p>Chưa có danh mục để tạo khóa học.</p>}
 
-            <button className="button button-primary" type="submit" disabled={submitting || deletingId !== null || loading || Boolean(loadError) || !form.categoryId}>
-              {submitting ? 'Đang lưu...' : 'Lưu khóa học'}
-            </button>
-          </form>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <input
+                  type="number"
+                  aria-label="Giá"
+                  min={0}
+                  value={form.price}
+                  onChange={event => setForm({ ...form, price: Number(event.target.value) })}
+                  placeholder="Giá"
+                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+                />
+                <input
+                  type="number"
+                  aria-label="Giá gốc"
+                  min={0}
+                  value={form.originalPrice}
+                  onChange={event => setForm({ ...form, originalPrice: Number(event.target.value) })}
+                  placeholder="Giá gốc"
+                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+                />
+              </div>
+
+              <select
+                aria-label="Trình độ"
+                value={form.level}
+                onChange={event => setForm({ ...form, level: event.target.value })}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+              >
+                <option value="BEGINNER">Beginner</option>
+                <option value="INTERMEDIATE">Intermediate</option>
+                <option value="ADVANCED">Advanced</option>
+              </select>
+
+              <button
+                className="button button-primary"
+                type="submit"
+                disabled={
+                  submitting || deletingId !== null || loading || Boolean(loadError) || !form.categoryId
+                }
+              >
+                {submitting ? 'Đang lưu...' : 'Lưu khóa học'}
+              </button>
+            </form>
+          )}
 
           <div className="course-card" style={{ padding: 20 }}>
             <h3>Danh sách khóa học</h3>
@@ -247,11 +273,20 @@ export default function AdminCoursePage() {
                     <div>
                       <strong>{course.title}</strong>
                       <div style={{ color: '#64748b', fontSize: 13 }}>{course.categoryName}</div>
-                      <div style={{ color: '#64748b', fontSize: 13 }}>{formatPrice(Number(course.price || 0))}</div>
+                      <div style={{ color: '#64748b', fontSize: 13 }}>
+                        {formatPrice(Number(course.price || 0))}
+                      </div>
                     </div>
-                    <button className="button button-soft" type="button" disabled={submitting || deletingId !== null || Boolean(loadError)} onClick={() => handleDelete(course.id)}>
-                      {deletingId === course.id ? 'Đang xóa...' : 'Xóa'}
-                    </button>
+                    {can(user, 'COURSE_DELETE') && (
+                      <button
+                        className="button button-soft"
+                        type="button"
+                        disabled={submitting || deletingId !== null || Boolean(loadError)}
+                        onClick={() => handleDelete(course.id)}
+                      >
+                        {deletingId === course.id ? 'Đang xóa...' : 'Xóa'}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
