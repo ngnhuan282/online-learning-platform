@@ -42,6 +42,24 @@ public class LearningController {
         return ApiResponse.success(learning.getCourseProgress(userId(principal), courseId));
     }
 
+    @PostMapping("/progress/courses/{courseId}/lessons/{lessonId}/access")
+    ApiResponse<LessonProgressResponse> accessLesson(
+        Principal principal,
+        @PathVariable Long courseId,
+        @PathVariable Long lessonId
+    ) {
+        return ApiResponse.success(learning.accessLesson(userId(principal), courseId, lessonId));
+    }
+
+    @PatchMapping("/progress/courses/{courseId}/lessons/{lessonId}/complete")
+    ApiResponse<LessonProgressResponse> markLessonComplete(
+        Principal principal,
+        @PathVariable Long courseId,
+        @PathVariable Long lessonId
+    ) {
+        return ApiResponse.success(learning.markLessonComplete(userId(principal), courseId, lessonId));
+    }
+
     @GetMapping("/quizzes/{quizId}")
     ApiResponse<QuizResponse> quiz(@PathVariable Long quizId) {
         return ApiResponse.success(learning.getQuiz(quizId));

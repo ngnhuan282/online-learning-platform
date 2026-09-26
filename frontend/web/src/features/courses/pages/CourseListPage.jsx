@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 
 import Icon from '../../../shared/components/Icon';
+import useAuth from '../../auth/hooks/useAuth';
+import useToast from '../../../shared/hooks/useToast';
 import CourseCard from '../components/CourseCard';
 import { courseApi } from '../api/courseApi';
 import { categories, demoCourses, formatPrice, normalizeSearch } from '../data/demoCourses';
+import { learningApi } from '../../learning/api/learningApi';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
@@ -37,11 +40,27 @@ const coerceCourse = course => ({
   lessons: [course.description],
 });
 
+const numericCourseId = course => {
+  const courseId = Number(course.id);
+  return Number.isSafeInteger(courseId) && courseId > 0 ? courseId : null;
+};
+
 function CourseListPage() {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
   const [courses, setCourses] = useState(demoCourses);
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState(() => new Set());
+  const [enrollingCourseId, setEnrollingCourseId] = useState(null);
+  const [enrollError, setEnrollError] = useState('');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [params, setParams] = useSearchParams();
+
+  function selectCourse(course) {
+    setEnrollError('');
+    setSelected(course);
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -67,9 +86,42 @@ function CourseListPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    if (!isAuthenticated) {
+      Promise.resolve().then(() => {
+        if (isMounted) setEnrolledCourseIds(new Set());
+      });
+      return undefined;
+    }
+
+    learningApi
+      .getMyEnrollments()
+      .then(response => {
+        const enrollments = response?.data ?? [];
+        if (isMounted) setEnrolledCourseIds(new Set(enrollments.map(item => Number(item.courseId))));
+      })
+      .catch(() => {
+        if (isMounted) setEnrolledCourseIds(new Set());
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
   const query = params.get('q') || '';
   const category = params.get('category') || '';
   const filter = params.get('filter') || 'all';
+  const selectedCourseId = selected ? numericCourseId(selected) : null;
+  const selectedIsEnrolled = selectedCourseId ? enrolledCourseIds.has(selectedCourseId) : false;
+  const selectedEnrollLabel = !selectedCourseId
+    ? 'Chưa thể ghi danh'
+    : selectedIsEnrolled
+      ? 'Đã ghi danh'
+      : enrollingCourseId === selected?.id
+        ? 'Đang ghi danh...'
+        : 'Ghi danh miễn phí';
 
   const filteredCourses = useMemo(() => {
     const next = courses.filter(course => {
@@ -97,6 +149,37 @@ function CourseListPage() {
       else paramsObj.set(key, value);
     });
     setParams(paramsObj);
+  }
+
+  async function enrollFreeCourse(course) {
+    const courseId = numericCourseId(course);
+    if (!courseId) {
+      setEnrollError(
+        'Khóa học này đang dùng dữ liệu demo nên chưa có mã khóa học từ Course Service để ghi danh.',
+      );
+      setSelected(course);
+      return;
+    }
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/courses?${params.toString()}` } });
+      return;
+    }
+    if (course.price !== 0 || enrolledCourseIds.has(courseId)) return;
+
+    setEnrollError('');
+    setEnrollingCourseId(course.id);
+    try {
+      const response = await learningApi.enroll(courseId);
+      const enrollment = response?.data;
+      setEnrolledCourseIds(previous => new Set(previous).add(Number(enrollment?.courseId ?? courseId)));
+      toast('Đã thêm khóa học vào My Courses.');
+      setSelected(null);
+      navigate('/my-courses');
+    } catch (error) {
+      setEnrollError(error.message || 'Không thể ghi danh khóa học.');
+    } finally {
+      setEnrollingCourseId(null);
+    }
   }
 
   return (
@@ -149,9 +232,20 @@ function CourseListPage() {
         </div>
       ) : filteredCourses.length ? (
         <div className="course-grid">
-          {filteredCourses.map(course => (
-            <CourseCard key={course.id} course={course} onSelect={setSelected} />
-          ))}
+          {filteredCourses.map(course => {
+            const courseId = numericCourseId(course);
+            return (
+              <CourseCard
+                key={course.id}
+                course={course}
+                canEnroll={Boolean(courseId)}
+                enrolled={enrolledCourseIds.has(courseId)}
+                enrolling={enrollingCourseId === course.id}
+                onEnroll={enrollFreeCourse}
+                onSelect={selectCourse}
+              />
+            );
+          })}
         </div>
       ) : (
         <div className="empty-courses" role="status">
@@ -180,7 +274,27 @@ function CourseListPage() {
             </div>
             <div className="detail-enroll">
               <strong>{selected.price ? formatPrice(selected.price) : 'Miễn phí'}</strong>
+              {selected.price === 0 ? (
+                <button
+                  className="button button-success"
+                  disabled={!selectedCourseId || enrollingCourseId === selected.id || selectedIsEnrolled}
+                  onClick={() => enrollFreeCourse(selected)}
+                >
+                  {selectedEnrollLabel}
+                </button>
+              ) : (
+                <button className="button button-primary" onClick={() => navigate('/checkout')}>
+                  Thanh toán
+                </button>
+              )}
             </div>
+            {selected.price === 0 && !selectedCourseId && (
+              <p className="form-error">
+                Khóa học này đang dùng dữ liệu demo nên chưa thể ghi danh. Hãy kiểm tra Course
+                Service/API Gateway để tải khóa học có id số từ backend.
+              </p>
+            )}
+            {enrollError && <p className="form-error">{enrollError}</p>}
           </DialogContent>
         )}
       </Dialog>
