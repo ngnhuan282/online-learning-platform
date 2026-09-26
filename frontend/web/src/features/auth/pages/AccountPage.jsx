@@ -112,10 +112,13 @@ export default function AccountPage({ admin = false }) {
               Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link className="button button-outline" to={admin ? '/admin' : '/'}>
-              <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)', marginRight: 6 }} />
-              {admin ? 'Về tổng quan' : 'Về trang chủ'}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            <Link className="button button-soft" to="/payment/history">
+              <Icon name="assignment" size={15} /> Lịch sử thanh toán
+            </Link>
+            <Link className="button button-outline" to="/">
+              <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)', marginRight: 6 }} /> Về trang
+              chủ
             </Link>
           </div>
         </div>

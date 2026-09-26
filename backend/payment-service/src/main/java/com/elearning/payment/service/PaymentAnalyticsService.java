@@ -1,65 +1,105 @@
 package com.elearning.payment.service;
 
+import com.elearning.payment.dto.PaymentAnalyticsResponse;
+import com.elearning.payment.entity.OrderItem;
+import com.elearning.payment.entity.Payment;
+import com.elearning.payment.entity.enums.PaymentStatus;
+import com.elearning.payment.repository.CourseOrderRepository;
+import com.elearning.payment.repository.PaymentRepository;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.time.*;
-import java.util.*;
-import org.springframework.jdbc.core.JdbcTemplate;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PaymentAnalyticsService {
 
-    private final JdbcTemplate jdbc;
+    private static final DateTimeFormatter CHART_LABEL = DateTimeFormatter.ofPattern("dd/MM");
 
-    public PaymentAnalyticsService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    private final CourseOrderRepository orders;
+    private final PaymentRepository payments;
+
+    public PaymentAnalyticsService(CourseOrderRepository orders, PaymentRepository payments) {
+        this.orders = orders;
+        this.payments = payments;
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> overview() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("totalOrders", jdbc.queryForObject("SELECT COUNT(*) FROM orders", Long.class));
-        result.put(
-            "grossRevenue",
-            jdbc.queryForObject(
-                "SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'PAID' AND currency = 'VND'",
-                BigDecimal.class
-            )
+    public PaymentAnalyticsResponse getAnalytics() {
+        long successfulPayments = payments.countByStatus(PaymentStatus.SUCCESS);
+        return new PaymentAnalyticsResponse(
+            orders.count(),
+            payments.countByStatus(PaymentStatus.PENDING),
+            successfulPayments,
+            payments.countByStatusIn(List.of(PaymentStatus.FAILED, PaymentStatus.CANCELLED)),
+            sum(PaymentStatus.SUCCESS),
+            sum(PaymentStatus.PENDING),
+            sum(PaymentStatus.REFUNDED),
+            new PaymentAnalyticsResponse.CrossServiceStats(
+                orders.countDistinctUsers(),
+                orders.countDistinctCourses(),
+                successfulPayments
+            ),
+            revenueSeries(),
+            recentTransactions(),
+            Instant.now()
         );
-        result.put(
-            "successfulPayments",
-            jdbc.queryForObject("SELECT COUNT(*) FROM orders WHERE status = 'PAID'", Long.class)
-        );
-        List<Map<String, Object>> monthly = new ArrayList<>();
-        YearMonth current = YearMonth.now(ZoneOffset.UTC);
-        for (int i = 5; i >= 0; i--) {
-            YearMonth month = current.minusMonths(i);
-            BigDecimal revenue = jdbc.queryForObject(
-                "SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'PAID' AND currency = 'VND' AND created_at >= ? AND created_at < ?",
-                BigDecimal.class,
-                Timestamp.valueOf(month.atDay(1).atStartOfDay()),
-                Timestamp.valueOf(month.plusMonths(1).atDay(1).atStartOfDay())
-            );
-            monthly.add(Map.of("month", month.toString(), "revenue", revenue));
-        }
-        result.put("monthly", monthly);
-        var recent = jdbc.queryForList(
-            "SELECT id, order_code AS orderCode, user_id AS userId, status, total_amount AS amount, currency, created_at AS createdAt FROM orders ORDER BY created_at DESC, id DESC LIMIT 5"
-        );
-        recent.forEach(order ->
-            order.put(
-                "courses",
-                jdbc.queryForList(
-                    "SELECT course_title FROM order_items WHERE order_id = ? ORDER BY id",
-                    String.class,
-                    order.get("id")
-                )
-            )
-        );
-        result.put("recent", recent);
-        result.put("generatedAt", Instant.now());
-        return result;
+    }
+
+    private BigDecimal sum(PaymentStatus status) {
+        BigDecimal value = payments.sumAmountByStatus(status);
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private List<PaymentAnalyticsResponse.RevenuePoint> revenueSeries() {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        return java.util.stream.IntStream.rangeClosed(0, 5)
+            .mapToObj(today::minusDays)
+            .sorted()
+            .map(day -> {
+                Instant start = day.atStartOfDay().toInstant(ZoneOffset.UTC);
+                Instant end = day.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+                List<Payment> dayPayments = payments.findByCreatedAtBetween(start, end);
+                BigDecimal amount = dayPayments
+                    .stream()
+                    .filter(payment -> payment.getStatus() == PaymentStatus.SUCCESS)
+                    .map(Payment::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                return new PaymentAnalyticsResponse.RevenuePoint(
+                    CHART_LABEL.format(day),
+                    amount,
+                    dayPayments.size()
+                );
+            })
+            .toList();
+    }
+
+    private List<PaymentAnalyticsResponse.RecentTransaction> recentTransactions() {
+        return payments
+            .findTop10ByOrderByCreatedAtDesc()
+            .stream()
+            .map(payment -> {
+                OrderItem item = payment
+                    .getOrder()
+                    .getItems()
+                    .stream()
+                    .min(Comparator.comparing(OrderItem::getId))
+                    .orElse(null);
+                return new PaymentAnalyticsResponse.RecentTransaction(
+                    payment.getOrder().getOrderCode(),
+                    payment.getOrder().getUserId(),
+                    item == null ? "Course" : item.getCourseTitle(),
+                    payment.getAmount(),
+                    payment.getCurrency(),
+                    payment.getStatus(),
+                    payment.getCreatedAt()
+                );
+            })
+            .toList();
     }
 }

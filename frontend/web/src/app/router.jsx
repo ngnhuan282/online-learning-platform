@@ -9,6 +9,7 @@ import NotFoundPage from '../pages/NotFoundPage';
 import AdminLayout from '../layouts/AdminLayout';
 import AccountPage from '../features/auth/pages/AccountPage';
 import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
+import PaymentHistoryPage from '../features/payment/pages/PaymentHistoryPage';
 import PaymentResultPage from '../features/payment/pages/PaymentResultPage';
 import PermissionRoute from '../routes/PermissionRoute';
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
@@ -31,6 +32,11 @@ const router = createBrowserRouter([
     path: '/payment/result',
     element: <UserLayout />,
     children: [{ index: true, element: <PaymentResultPage /> }],
+  },
+  {
+    path: '/payment/history',
+    element: <UserLayout />,
+    children: [{ index: true, element: <PaymentHistoryPage /> }],
   },
   {
     path: '/admin',
