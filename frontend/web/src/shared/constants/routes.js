@@ -5,5 +5,6 @@ export const ROUTES = Object.freeze({
   COURSES: '/courses',
   CHECKOUT: '/checkout',
   PAYMENT_RESULT: '/payment/result',
+  PAYMENT_HISTORY: '/payment/history',
   ADMIN_ANALYTICS: '/admin/analytics',
 });

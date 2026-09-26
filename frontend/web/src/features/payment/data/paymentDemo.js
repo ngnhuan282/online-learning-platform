@@ -1,9 +1,18 @@
 import { demoCourses, formatPrice } from '../../courses/data/demoCourses';
 
 const paidCourses = demoCourses.filter(course => course.price > 0);
+const paymentCourseIds = {
+  'ielts-intensive': 101,
+  'english-for-tech': 102,
+  'toeic-850': 103,
+};
 
 export function getCheckoutCourse(courseId) {
   return paidCourses.find(course => course.id === courseId) || paidCourses[0];
+}
+
+export function getPaymentCourseId(course) {
+  return paymentCourseIds[course.id] || 101;
 }
 
 export function buildOrderSnapshot(course) {

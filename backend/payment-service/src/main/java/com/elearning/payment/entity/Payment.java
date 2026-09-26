@@ -69,6 +69,10 @@ public class Payment {
         this.status = PaymentStatus.PENDING;
     }
 
+    public void assignCheckoutUrl(String checkoutUrl) {
+        this.checkoutUrl = checkoutUrl;
+    }
+
     @PrePersist
     void created() {
         createdAt = updatedAt = Instant.now();

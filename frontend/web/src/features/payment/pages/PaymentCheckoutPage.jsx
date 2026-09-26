@@ -1,7 +1,15 @@
+import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
-import { buildOrderSnapshot, formatDemoPrice, getCheckoutCourse } from '../data/paymentDemo';
+import { getErrorMessage } from '../../../shared/utils/errorUtils';
+import { paymentApi } from '../api/paymentApi';
+import {
+  buildOrderSnapshot,
+  formatDemoPrice,
+  getCheckoutCourse,
+  getPaymentCourseId,
+} from '../data/paymentDemo';
 import '../styles/payment.css';
 
 export default function PaymentCheckoutPage() {
@@ -9,14 +17,33 @@ export default function PaymentCheckoutPage() {
   const navigate = useNavigate();
   const course = getCheckoutCourse(params.get('course'));
   const order = buildOrderSnapshot(course);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleCheckout = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await paymentApi.createCheckout({
+        courseId: getPaymentCourseId(course),
+        provider: 'MOCK',
+        returnUrl: `${window.location.origin}${ROUTES.PAYMENT_RESULT}`,
+      });
+      navigate(`${ROUTES.PAYMENT_RESULT}?orderCode=${encodeURIComponent(response.data.orderCode)}`);
+    } catch (checkoutError) {
+      setError(checkoutError);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <section className="payment-page payment-checkout-page">
       <div className="container">
         <div className="payment-page-heading">
-          <span className="eyebrow">PAYMENT FOUNDATION</span>
+          <span className="eyebrow">PAYMENT CORE</span>
           <h1>Thanh toán khóa học</h1>
-          <p>Hợp đồng checkout tuần 1, dùng dữ liệu khóa học hiện có và chưa gọi provider thật.</p>
+          <p>Tạo order/payment nội bộ, lưu trạng thái PENDING và ghi lịch sử thanh toán.</p>
         </div>
 
         <div className="checkout-grid">
@@ -54,7 +81,7 @@ export default function PaymentCheckoutPage() {
               <ul className="payment-check-list">
                 <li>
                   <Icon name="check" size={18} />
-                  Backend sẽ xác minh giá với Course Service ở D6.
+                  Backend tạo amount từ catalog nội bộ, frontend không gửi giá tiền.
                 </li>
                 <li>
                   <Icon name="check" size={18} />
@@ -62,7 +89,7 @@ export default function PaymentCheckoutPage() {
                 </li>
                 <li>
                   <Icon name="check" size={18} />
-                  VNPay Sandbox được tách sang D9.
+                  Provider thật vẫn tách sang VNPay Sandbox ở D9.
                 </li>
               </ul>
             </div>
@@ -75,7 +102,7 @@ export default function PaymentCheckoutPage() {
               </span>
               <div>
                 <h2>Tóm tắt thanh toán</h2>
-                <p>Mã đơn dự kiến {order.orderCode}</p>
+                <p>Mã đơn sẽ được tạo khi xác nhận thanh toán</p>
               </div>
             </div>
 
@@ -116,19 +143,26 @@ export default function PaymentCheckoutPage() {
               </label>
             </div>
 
+            {error && <p className="checkout-error">{getErrorMessage(error)}</p>}
+
             <button
               className="button button-primary checkout-submit"
-              onClick={() => navigate(`${ROUTES.PAYMENT_RESULT}?status=success&course=${course.id}`)}
+              onClick={handleCheckout}
+              disabled={submitting}
             >
-              Thanh toán skeleton <Icon name="arrow" size={17} />
+              {submitting ? 'Đang tạo thanh toán...' : 'Tạo thanh toán nội bộ'}{' '}
+              <Icon name="arrow" size={17} />
             </button>
+            <Link className="button button-outline checkout-secondary" to={ROUTES.PAYMENT_HISTORY}>
+              Xem lịch sử thanh toán
+            </Link>
             <Link className="button button-outline checkout-secondary" to="/#courses">
               Chọn khóa học khác
             </Link>
 
             <p className="payment-safe-note">
               <Icon name="shield" size={16} />
-              FE không gửi amount/status. Giá trị này chỉ là UI skeleton cho hợp đồng D1.
+              Payment sẽ ở trạng thái PENDING cho đến khi mock provider ở D5 xử lý kết quả.
             </p>
           </aside>
         </div>

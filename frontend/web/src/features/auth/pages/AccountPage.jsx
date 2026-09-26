@@ -96,7 +96,15 @@ export default function AccountPage({ admin = false }) {
     <section className="container section" style={{ padding: '32px 0 80px' }}>
       <div style={{ maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
         {/* Header Section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: 16,
+          }}
+        >
           <div>
             <span className="eyebrow">{isAdmin ? 'QUẢN TRỊ VIÊN' : 'THÔNG TIN CÁ NHÂN'}</span>
             <h1 style={{ marginTop: 8, fontSize: '1.875rem' }}>
@@ -106,9 +114,13 @@ export default function AccountPage({ admin = false }) {
               Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            <Link className="button button-soft" to="/payment/history">
+              <Icon name="assignment" size={15} /> Lịch sử thanh toán
+            </Link>
             <Link className="button button-outline" to="/">
-              <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)', marginRight: 6 }} /> Về trang chủ
+              <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)', marginRight: 6 }} /> Về trang
+              chủ
             </Link>
           </div>
         </div>
@@ -138,10 +150,18 @@ export default function AccountPage({ admin = false }) {
               <Link className="button button-primary" to="/admin/users" style={{ background: '#3b82f6' }}>
                 👥 Quản lý người dùng
               </Link>
-              <Link className="button button-outline" to="/admin/courses" style={{ color: '#fff', borderColor: '#475569' }}>
+              <Link
+                className="button button-outline"
+                to="/admin/courses"
+                style={{ color: '#fff', borderColor: '#475569' }}
+              >
                 📚 Quản lý khóa học
               </Link>
-              <Link className="button button-outline" to="/admin/analytics" style={{ color: '#fff', borderColor: '#475569' }}>
+              <Link
+                className="button button-outline"
+                to="/admin/analytics"
+                style={{ color: '#fff', borderColor: '#475569' }}
+              >
                 📊 Thống kê thanh toán
               </Link>
             </div>
@@ -182,7 +202,10 @@ export default function AccountPage({ admin = false }) {
             <h2 style={{ fontSize: 20, margin: 0, fontWeight: 700 }}>{user?.fullName || 'Người dùng'}</h2>
             <p style={{ color: 'var(--muted)', margin: '4px 0 8px', fontSize: 14 }}>{user?.email}</p>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <StatusChip status={user?.status || 'ACTIVE'} label={user?.status === 'LOCKED' ? 'Bị khóa' : 'Đang hoạt động'} />
+              <StatusChip
+                status={user?.status || 'ACTIVE'}
+                label={user?.status === 'LOCKED' ? 'Bị khóa' : 'Đang hoạt động'}
+              />
               {user?.roles?.map(role => (
                 <span
                   key={role}
@@ -203,7 +226,9 @@ export default function AccountPage({ admin = false }) {
         </div>
 
         {/* Grid 2 Forms: Profile & Change Password */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24 }}>
+        <div
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24 }}
+        >
           {/* Card 1: Cập nhật thông tin */}
           <div
             style={{
@@ -225,17 +250,36 @@ export default function AccountPage({ admin = false }) {
             </div>
 
             {profileSuccess && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ecfdf5', color: '#065f46', fontSize: 13 }}>
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  fontSize: 13,
+                }}
+              >
                 ✓ {profileSuccess}
               </div>
             )}
             {profileError && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13 }}>
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: '#fef2f2',
+                  color: '#991b1b',
+                  fontSize: 13,
+                }}
+              >
                 ✕ {profileError}
               </div>
             )}
 
-            <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form
+              onSubmit={handleProfileSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            >
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Email đăng ký (Read-only)
@@ -309,17 +353,36 @@ export default function AccountPage({ admin = false }) {
             </div>
 
             {passwordSuccess && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ecfdf5', color: '#065f46', fontSize: 13 }}>
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  fontSize: 13,
+                }}
+              >
                 ✓ {passwordSuccess}
               </div>
             )}
             {passwordError && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13 }}>
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: '#fef2f2',
+                  color: '#991b1b',
+                  fontSize: 13,
+                }}
+              >
                 ✕ {passwordError}
               </div>
             )}
 
-            <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form
+              onSubmit={handlePasswordSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            >
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                   Mật khẩu hiện tại

@@ -34,9 +34,14 @@ export default function SiteHeader() {
             Lợi ích
           </Link>
           {user && (
-            <Link className={pathname === '/my-courses' ? 'active' : ''} to="/my-courses">
-              Khóa của tôi
-            </Link>
+            <>
+              <Link className={pathname === '/my-courses' ? 'active' : ''} to="/my-courses">
+                Khóa của tôi
+              </Link>
+              <Link className={pathname === '/payment/history' ? 'active' : ''} to="/payment/history">
+                Thanh toán
+              </Link>
+            </>
           )}
         </nav>
         <form className="header-search" onSubmit={submitSearch} role="search">
