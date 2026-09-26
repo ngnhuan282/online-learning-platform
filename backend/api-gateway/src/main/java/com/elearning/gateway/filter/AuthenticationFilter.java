@@ -46,7 +46,10 @@ public class AuthenticationFilter implements WebFilter, Ordered {
             path.startsWith("/actuator/health/") ||
             publicAuth ||
             (method == HttpMethod.GET &&
-                (path.equals("/api/v1/courses") || path.matches("/api/v1/courses/[^/]+")));
+                (path.equals("/api/v1/courses") ||
+                    path.matches("/api/v1/courses/[^/]+") ||
+                    path.equals("/api/v1/categories") ||
+                    path.matches("/api/v1/categories/[^/]+")));
         if (authorization != null && !publicAuth) {
             try {
                 if (!authorization.regionMatches(true, 0, "Bearer ", 0, 7)) throw new JwtException(

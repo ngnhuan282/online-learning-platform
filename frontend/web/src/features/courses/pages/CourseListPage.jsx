@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 
 import Icon from '../../../shared/components/Icon';
 import CourseCard from '../components/CourseCard';
+import { categoryApi } from '../api/categoryApi';
 import { courseApi } from '../api/courseApi';
-import { categories, demoCourses, formatPrice, normalizeSearch } from '../data/demoCourses';
+import { formatPrice, normalizeSearch } from '../data/demoCourses';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
@@ -18,6 +19,7 @@ const coerceCourse = course => ({
   id: course.id,
   title: course.title,
   description: course.description,
+  categoryId: course.categoryId ?? course.category_id ?? null,
   category: course.categoryName || course.category || 'general',
   categories: [course.categoryName || course.category || 'general'],
   group: course.categoryName ? 'communication' : 'certificates',
@@ -28,7 +30,7 @@ const coerceCourse = course => ({
   reviews: '0',
   students: 0,
   hours: 8,
-  level: course.level ? course.level.toLowerCase() : 'beginner',
+  level: course.level ? String(course.level).toLowerCase() : 'beginner',
   price: Number(course.price ?? 0),
   originalPrice: Number(course.originalPrice ?? course.price ?? 0),
   discount: course.originalPrice && course.price ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100) : 0,
@@ -37,31 +39,59 @@ const coerceCourse = course => ({
   lessons: [course.description],
 });
 
+const normalizeCourseList = response => {
+  const payload = response?.data ?? response;
+
+  if (Array.isArray(payload)) return payload.map(coerceCourse);
+  if (Array.isArray(payload?.content)) return payload.content.map(coerceCourse);
+  if (Array.isArray(payload?.data?.content)) return payload.data.content.map(coerceCourse);
+  if (Array.isArray(payload?.items)) return payload.items.map(coerceCourse);
+  if (Array.isArray(payload?.data)) return payload.data.map(coerceCourse);
+  return [];
+};
+
+const normalizeCategoryList = response => {
+  const payload = response?.data ?? response;
+
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
 function CourseListPage() {
-  const [courses, setCourses] = useState(demoCourses);
+  const [courses, setCourses] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
 
-    const loadCourses = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
-        const response = await courseApi.list({ page: 0, size: 20 });
-        const payload = response?.data ?? response;
-        const list = payload?.content ?? payload?.data?.content ?? payload?.items ?? [];
-        const normalized = Array.isArray(list) ? list.map(coerceCourse) : demoCourses;
-        if (isMounted) setCourses(normalized.length ? normalized : demoCourses);
+        const [coursesResponse, categoriesResponse] = await Promise.all([
+          courseApi.list({ page: 0, size: 20 }),
+          categoryApi.list(),
+        ]);
+
+        if (isMounted) {
+          setCourses(normalizeCourseList(coursesResponse));
+          setCategories(normalizeCategoryList(categoriesResponse));
+        }
       } catch (error) {
-        if (isMounted) setCourses(demoCourses);
+        if (isMounted) {
+          setCourses([]);
+          setCategories([]);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
-    loadCourses();
+    loadData();
     return () => {
       isMounted = false;
     };
@@ -72,8 +102,9 @@ function CourseListPage() {
   const filter = params.get('filter') || 'all';
 
   const filteredCourses = useMemo(() => {
+    const selectedCategoryName = categories.find(item => String(item.id) === String(category))?.name;
     const next = courses.filter(course => {
-      const matchesCategory = !category || course.categories.includes(category);
+      const matchesCategory = !category || String(course.categoryId) === String(category) || course.category === selectedCategoryName;
       const matchesQuery =
         !query ||
         normalizeSearch(`${course.title} ${course.description} ${course.keywords}`).includes(
@@ -178,9 +209,17 @@ function CourseListPage() {
               <span>{selected.hours} giờ học</span>
               <span>{selected.level}</span>
             </div>
-            <div className="detail-enroll">
+            <div className="detail-enroll" style={{ marginBottom: 12 }}>
               <strong>{selected.price ? formatPrice(selected.price) : 'Miễn phí'}</strong>
             </div>
+            <Link
+              className="button button-primary"
+              to={`/courses/${selected.id}`}
+              onClick={() => setSelected(null)}
+              style={{ display: 'inline-flex', textDecoration: 'none' }}
+            >
+              Xem chi tiết khóa học
+            </Link>
           </DialogContent>
         )}
       </Dialog>

@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 import Icon from '../../../shared/components/Icon';
 import CourseCard from './CourseCard';
-import { categories, demoCourses, formatPrice, normalizeSearch } from '../data/demoCourses';
+import { formatPrice, normalizeSearch } from '../data/demoCourses';
+import { categoryApi } from '../api/categoryApi';
+import { courseApi } from '../api/courseApi';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
@@ -12,31 +14,107 @@ const filters = [
   { id: 'free', label: 'Miễn phí' },
 ];
 
+const coerceCourse = course => ({
+  id: course.id,
+  title: course.title,
+  description: course.description,
+  categoryId: course.categoryId ?? course.category_id ?? null,
+  category: course.categoryName || course.category || 'general',
+  categories: [course.categoryName || course.category || 'general'],
+  group: course.categoryName ? 'communication' : 'certificates',
+  tag: course.status || 'Khóa học',
+  image: course.thumbnailUrl || '/images/english-ielts.jpg',
+  imageAlt: `${course.title} thumbnail`,
+  rating: '4.8',
+  reviews: '0',
+  students: 0,
+  hours: 8,
+  level: course.level ? String(course.level).toLowerCase() : 'beginner',
+  price: Number(course.price ?? 0),
+  originalPrice: Number(course.originalPrice ?? course.price ?? 0),
+  discount: course.originalPrice && course.price ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100) : 0,
+  date: course.createdAt || '2026-09-01',
+  keywords: `${course.title} ${course.description}`,
+  lessons: [course.description],
+});
+
+const normalizeCourseList = response => {
+  const payload = response?.data ?? response;
+
+  if (Array.isArray(payload)) return payload.map(coerceCourse);
+  if (Array.isArray(payload?.content)) return payload.content.map(coerceCourse);
+  if (Array.isArray(payload?.data?.content)) return payload.data.content.map(coerceCourse);
+  if (Array.isArray(payload?.items)) return payload.items.map(coerceCourse);
+  if (Array.isArray(payload?.data)) return payload.data.map(coerceCourse);
+  return [];
+};
+
+const normalizeCategoryList = response => {
+  const payload = response?.data ?? response;
+
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
 export default function FeaturedCourses() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const [courses, setCourses] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [coursesResponse, categoriesResponse] = await Promise.all([
+          courseApi.list({ page: 0, size: 20 }),
+          categoryApi.list(),
+        ]);
+
+        if (isMounted) {
+          setCourses(normalizeCourseList(coursesResponse));
+          setCategories(normalizeCategoryList(categoriesResponse));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setCourses([]);
+          setCategories([]);
+        }
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function setParams(next) {
     navigate(
       { pathname: '/', search: new URLSearchParams(next).toString(), hash: '#courses' },
       { preventScrollReset: true },
     );
   }
-  const [selected, setSelected] = useState(null);
   const query = params.get('q') || '';
   const category = params.get('category') || '';
   const filter = params.get('filter') || 'all';
-  let courses = demoCourses.filter(
-    course =>
-      (!category || course.categories.includes(category)) &&
+  let filteredCourses = courses.filter(course => {
+    const selectedCategoryName = categories.find(item => String(item.id) === String(category))?.name;
+    return (
+      (!category || String(course.categoryId) === String(category) || course.category === selectedCategoryName) &&
       (!query ||
         normalizeSearch(`${course.title} ${course.description} ${course.keywords}`).includes(
           normalizeSearch(query),
         )) &&
       (filter !== 'free' || course.price === 0) &&
-      (!['certificates', 'communication'].includes(filter) || course.group === filter),
-  );
-  if (filter === 'popular') courses = [...courses].sort((a, b) => b.students - a.students);
-  if (filter === 'newest') courses = [...courses].sort((a, b) => b.date.localeCompare(a.date));
+      (!['certificates', 'communication'].includes(filter) || course.group === filter)
+    );
+  });
+  if (filter === 'popular') filteredCourses = [...filteredCourses].sort((a, b) => b.students - a.students);
+  if (filter === 'newest') filteredCourses = [...filteredCourses].sort((a, b) => b.date.localeCompare(a.date));
   function setFilter(value) {
     const next = new URLSearchParams(params);
     if (value === 'all') next.delete('filter');
@@ -68,17 +146,17 @@ export default function FeaturedCourses() {
         {(query || category) && (
           <div className="search-results-summary" role="status">
             <span>
-              {courses.length} khóa học {query && <>cho “{query}”</>}
-              {category && <> thuộc {categories.find(item => item.id === category)?.name || category}</>}
+              {filteredCourses.length} khóa học {query && <>cho “{query}”</>}
+              {category && <> thuộc {categories.find(item => String(item.id) === String(category))?.name || category}</>}
             </span>
             <button className="text-link" onClick={() => setParams({}, { preventScrollReset: true })}>
               Xóa bộ lọc <Icon name="close" size={16} />
             </button>
           </div>
         )}
-        {courses.length ? (
+        {filteredCourses.length ? (
           <div className="course-grid">
-            {courses.map(course => (
+            {filteredCourses.map(course => (
               <CourseCard key={course.id} course={course} onSelect={setSelected} />
             ))}
           </div>

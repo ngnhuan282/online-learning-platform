@@ -40,7 +40,13 @@ public class SecurityConfig {
                 auth
                     .requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/courses", "/api/v1/courses/{id}")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/courses",
+                        "/api/v1/courses/{id}",
+                        "/api/v1/categories",
+                        "/api/v1/categories/{id}"
+                    )
                     .permitAll()
                     .anyRequest()
                     .authenticated()
