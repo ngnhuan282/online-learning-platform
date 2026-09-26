@@ -14,7 +14,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update # <--- ĐÃ SỬA THÀNH UPDATE
 security:
   jwt:
     secret: ${JWT_SECRET}

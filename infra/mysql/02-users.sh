@@ -11,7 +11,7 @@ for service in auth course learning payment ai; do
   fi
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=socket -uroot <<EOSQL
 CREATE USER IF NOT EXISTS '${service}_app'@'%' IDENTIFIED BY '${password}';
-GRANT SELECT, INSERT, UPDATE, DELETE ON ${service}_db.* TO '${service}_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON ${service}_db.* TO '${service}_app'@'%';
 EOSQL
 done
 unset password variable service

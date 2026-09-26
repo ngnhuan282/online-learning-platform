@@ -1,11 +1,15 @@
 package com.elearning.course.controller;
 
+import com.elearning.course.common.exception.AppException;
+import com.elearning.course.common.exception.ErrorCode;
 import com.elearning.course.common.response.ApiResponse;
 import com.elearning.course.common.response.PageResponse;
 import com.elearning.course.dto.CourseRequest;
 import com.elearning.course.dto.CourseResponse;
+import com.elearning.course.entity.CourseLevel;
 import com.elearning.course.service.CourseService;
 import jakarta.validation.Valid;
+import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -24,9 +28,13 @@ public class CourseController {
     public ApiResponse<PageResponse<CourseResponse>> list(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "10") int size,
-        @RequestParam(required = false) String keyword
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) String level,
+        @RequestParam(defaultValue = "newest") String sort
     ) {
-        Page<CourseResponse> result = courses.list(page, size, keyword);
+        CourseLevel parsedLevel = parseLevel(level);
+        Page<CourseResponse> result = courses.list(page, size, keyword, categoryId, parsedLevel, sort);
         return ApiResponse.success(PageResponse.from(result));
     }
 
@@ -64,5 +72,16 @@ public class CourseController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         courses.delete(id);
         return ApiResponse.success(null);
+    }
+
+    private CourseLevel parseLevel(String level) {
+        if (level == null || level.isBlank()) {
+            return null;
+        }
+        try {
+            return CourseLevel.valueOf(level.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new AppException(ErrorCode.BAD_REQUEST);
+        }
     }
 }

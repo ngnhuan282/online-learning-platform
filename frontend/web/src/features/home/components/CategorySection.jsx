@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
-import { categories } from '../../courses/data/demoCourses';
+import { categoryApi } from '../../courses/api/categoryApi';
 
 const keywords = [
   'IELTS 7.0+',
@@ -12,9 +12,37 @@ const keywords = [
   'Tiếng Anh Thương mại',
 ];
 
+const normalizeCategoryList = response => {
+  const payload = response?.data ?? response;
+
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
 export default function CategorySection() {
   const [query, setQuery] = useState('');
+  const [categories, setCategories] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCategories = async () => {
+      try {
+        const response = await categoryApi.list();
+        if (isMounted) setCategories(normalizeCategoryList(response));
+      } catch (error) {
+        if (isMounted) setCategories([]);
+      }
+    };
+
+    loadCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function search(value, category) {
     const params = new URLSearchParams();
     if (value) params.set('q', value);
