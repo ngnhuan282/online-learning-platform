@@ -133,6 +133,29 @@ class AuthServiceApplicationTests {
     }
 
     @Test
+    void normalizesInvalidRouteAndQueryParameters() throws Exception {
+        String base = "/api/v1/admin/users";
+        for (var input : Map.of(
+            "/not-a-number",
+            "id",
+            "?page=not-a-number",
+            "page",
+            "?size=99999999999999999999",
+            "size",
+            "?status=unsupported",
+            "status"
+        ).entrySet()) {
+            String path = base + input.getKey();
+            var response = request(path, token("ADMIN", 60), null);
+            error(response, 400, "VALIDATION_ERROR", path.split("\\?")[0]);
+            assertThat(
+                mapper.readTree(response.body()).get("errors").get(input.getValue()).isArray()
+            ).isTrue();
+            assertThat(response.body()).doesNotContain("java.lang", "NumberFormatException", "unsupported");
+        }
+    }
+
+    @Test
     void normalizesDomainFallbackAndNotFound() throws Exception {
         error(request(BASE + "/conflict", token("USER", 60), null), 409, "CONFLICT", BASE + "/conflict");
         error(request(BASE + "/failure", token("USER", 60), null), 500, "INTERNAL_ERROR", BASE + "/failure");

@@ -1,0 +1,82 @@
+package com.elearning.payment.controller;
+
+import com.elearning.payment.common.exception.AppException;
+import com.elearning.payment.common.exception.ErrorCode;
+import com.elearning.payment.common.response.ApiResponse;
+import com.elearning.payment.common.response.PageResponse;
+import com.elearning.payment.dto.*;
+import com.elearning.payment.entity.enums.PaymentStatus;
+import com.elearning.payment.security.AuthenticatedUser;
+import com.elearning.payment.service.PaymentAnalyticsService;
+import com.elearning.payment.service.PaymentCoreService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+@Validated
+@RestController
+@RequestMapping("/api/v1/payments")
+public class PaymentController {
+
+    private final PaymentCoreService payments;
+    private final PaymentAnalyticsService analytics;
+    private final AuthenticatedUser user;
+
+    public PaymentController(
+        PaymentCoreService payments,
+        PaymentAnalyticsService analytics,
+        AuthenticatedUser user
+    ) {
+        this.payments = payments;
+        this.analytics = analytics;
+        this.user = user;
+    }
+
+    @PostMapping("/checkout")
+    ApiResponse<CheckoutResponse> createCheckout(@Valid @RequestBody CheckoutRequest request) {
+        return ApiResponse.success(payments.createCheckout(request, user.userId()));
+    }
+
+    @GetMapping("/orders/{orderCode}")
+    ApiResponse<OrderResponse> getOrder(@PathVariable String orderCode) {
+        return ApiResponse.success(payments.getOrder(orderCode, user.userId(), user.hasRole("ADMIN")));
+    }
+
+    @GetMapping("/history")
+    ApiResponse<PageResponse<PaymentHistoryItemResponse>> getHistory(
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+        @RequestParam(required = false) PaymentStatus status,
+        @RequestParam(required = false) String keyword
+    ) {
+        return ApiResponse.success(
+            payments.getHistory(
+                user.userId(),
+                status,
+                keyword,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+            )
+        );
+    }
+
+    @GetMapping("/admin/orders/{orderCode}")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<AdminPaymentDetailResponse> getAdminOrder(@PathVariable String orderCode) {
+        return unavailable();
+    }
+
+    @GetMapping("/admin/analytics")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<PaymentAnalyticsResponse> getAnalytics() {
+        return ApiResponse.success(analytics.getAnalytics());
+    }
+
+    private <T> ApiResponse<T> unavailable() {
+        throw new AppException(ErrorCode.FEATURE_NOT_IMPLEMENTED);
+    }
+}

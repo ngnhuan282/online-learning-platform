@@ -12,6 +12,10 @@ public interface LearningService {
 
     List<LessonProgressResponse> getCourseProgress(Long userId, Long courseId);
 
+    LessonProgressResponse accessLesson(Long userId, Long courseId, Long lessonId);
+
+    LessonProgressResponse markLessonComplete(Long userId, Long courseId, Long lessonId);
+
     QuizResponse getQuiz(Long quizId);
 
     QuizResultResponse getLatestQuizResult(Long userId, Long quizId);

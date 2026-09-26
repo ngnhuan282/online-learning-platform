@@ -1,7 +1,17 @@
 import Icon from '../../../shared/components/Icon';
 import { formatPrice } from '../data/demoCourses';
 
-export default function CourseCard({ course, onSelect }) {
+export default function CourseCard({
+  course,
+  canEnroll = false,
+  enrolled = false,
+  enrolling = false,
+  onEnroll,
+  onSelect,
+}) {
+  const isFree = course.price === 0;
+  const actionLabel = enrolled ? 'Đã ghi danh' : isFree && canEnroll ? 'Học ngay' : 'Xem khóa học';
+
   return (
     <article className="course-card">
       <button
@@ -51,11 +61,12 @@ export default function CourseCard({ course, onSelect }) {
           </div>
         </div>
         <button
-          className={`button course-action ${course.price === 0 ? 'button-success' : 'button-soft'}`}
-          onClick={() => onSelect(course)}
+          className={`button course-action ${isFree && canEnroll ? 'button-success' : 'button-soft'}`}
+          disabled={enrolling || enrolled}
+          onClick={() => (isFree && canEnroll ? onEnroll(course) : onSelect(course))}
         >
-          {course.price === 0 ? 'Học ngay' : 'Xem khóa học'}
-          <Icon name={course.price === 0 ? 'cap' : 'arrow'} size={16} />
+          {enrolling ? 'Đang ghi danh...' : actionLabel}
+          <Icon name={isFree && canEnroll ? 'cap' : 'arrow'} size={16} />
         </button>
       </div>
     </article>

@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { categoryApi } from '../api/categoryApi';
 import { courseApi } from '../api/courseApi';
-import { demoCourses, formatPrice } from '../data/demoCourses';
+import { formatPrice } from '../data/demoCourses';
+import useAuth from '../../auth/hooks/useAuth';
+import { can } from '../../admin/utils/adminUtils';
+import ErrorState from '../../../shared/components/ErrorState';
 
 const emptyForm = {
   title: '',
@@ -90,6 +93,7 @@ export default function AdminCoursePage() {
 
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
 
     const loadAll = async () => {
       await Promise.all([loadCategories(), loadCourses()]);
@@ -99,8 +103,9 @@ export default function AdminCoursePage() {
     loadAll();
     return () => {
       isMounted = false;
+      controller.abort();
     };
-  }, []);
+  }, [retry]);
 
   const totalRevenue = useMemo(
     () => courses.reduce((sum, item) => sum + Number(item.price || 0), 0),
@@ -114,7 +119,10 @@ export default function AdminCoursePage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (pending.current || loading || loadError) return;
+    pending.current = true;
     setSubmitting(true);
+    setMutationError(null);
 
     const selectedCategory = categories.find(item => String(item.id) === String(form.categoryId));
     const categoryId = Number(selectedCategory?.id ?? form.categoryId ?? categories[0]?.id);
@@ -151,6 +159,7 @@ export default function AdminCoursePage() {
     } catch (error) {
       resetForm();
     } finally {
+      pending.current = false;
       setSubmitting(false);
     }
   }
@@ -171,8 +180,13 @@ export default function AdminCoursePage() {
   }
 
   async function handleDelete(id) {
+    if (pending.current) return;
+    pending.current = true;
+    setDeletingId(id);
+    setMutationError(null);
     try {
       await courseApi.delete(id);
+      setCourses(prev => prev.filter(item => String(item.id) !== String(id)));
     } catch (error) {
       // Ignore delete failure and refresh from the server to keep the UI honest.
     }
@@ -187,18 +201,23 @@ export default function AdminCoursePage() {
           <h1 style={{ marginTop: 8 }}>Quản lý khóa học</h1>
         </div>
 
+        {loadError && <ErrorState error={loadError} onRetry={() => setRetry(value => value + 1)} />}
+        {mutationError && <ErrorState title="Không thể lưu thay đổi" error={mutationError} />}
+
         <div className="course-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
           <div className="course-card" style={{ padding: 20 }}>
             <small>Tổng khóa học</small>
             <h3 style={{ fontSize: 28, margin: '8px 0' }}>{courses.length}</h3>
           </div>
           <div className="course-card" style={{ padding: 20 }}>
-            <small>Doanh thu ước tính</small>
+            <small>Tổng giá niêm yết đang hiển thị</small>
             <h3 style={{ fontSize: 28, margin: '8px 0' }}>{formatPrice(totalRevenue)}</h3>
           </div>
           <div className="course-card" style={{ padding: 20 }}>
             <small>Trạng thái</small>
-            <h3 style={{ fontSize: 28, margin: '8px 0' }}>Online</h3>
+            <h3 style={{ fontSize: 28, margin: '8px 0' }}>
+              {loading ? 'Đang tải' : loadError ? 'Lỗi kết nối' : 'Đã tải'}
+            </h3>
           </div>
         </div>
 
@@ -243,30 +262,78 @@ export default function AdminCoursePage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <input
-                type="number"
-                value={form.price}
-                onChange={event => setForm({ ...form, price: Number(event.target.value) })}
-                placeholder="Giá"
+                aria-label="Tên khóa học"
+                required
+                maxLength={200}
+                value={form.title}
+                onChange={event => setForm({ ...form, title: event.target.value })}
+                placeholder="Tên khóa học"
                 style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
               />
-              <input
-                type="number"
-                value={form.originalPrice}
-                onChange={event => setForm({ ...form, originalPrice: Number(event.target.value) })}
-                placeholder="Giá gốc"
-                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
-              />
-            </div>
 
-            <select
-              value={form.level}
-              onChange={event => setForm({ ...form, level: event.target.value })}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
+              <textarea
+                aria-label="Mô tả khóa học"
+                required
+                maxLength={2000}
+                value={form.description}
+                onChange={event => setForm({ ...form, description: event.target.value })}
+                placeholder="Mô tả khóa học"
+                rows={4}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #dfe3ea',
+                  resize: 'vertical',
+                }}
+              />
+
+              <select
+                aria-label="Danh mục"
+                required
+                value={form.categoryId}
+                onChange={event => setForm({ ...form, categoryId: event.target.value })}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+              >
+                <option value="">Chọn danh mục</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              {!loading && !loadError && categories.length === 0 && <p>Chưa có danh mục để tạo khóa học.</p>}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <input
+                  type="number"
+                  aria-label="Giá"
+                  min={0}
+                  value={form.price}
+                  onChange={event => setForm({ ...form, price: Number(event.target.value) })}
+                  placeholder="Giá"
+                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+                />
+                <input
+                  type="number"
+                  aria-label="Giá gốc"
+                  min={0}
+                  value={form.originalPrice}
+                  onChange={event => setForm({ ...form, originalPrice: Number(event.target.value) })}
+                  placeholder="Giá gốc"
+                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+                />
+              </div>
+
+              <select
+                aria-label="Trình độ"
+                value={form.level}
+                onChange={event => setForm({ ...form, level: event.target.value })}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+              >
+                <option value="BEGINNER">Beginner</option>
+                <option value="INTERMEDIATE">Intermediate</option>
+                <option value="ADVANCED">Advanced</option>
+              </select>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <button className="button button-primary" type="submit" disabled={submitting || !form.title.trim() || !form.description.trim() || !form.categoryId}>
@@ -286,6 +353,7 @@ export default function AdminCoursePage() {
               <p>Đang tải khóa học...</p>
             ) : (
               <div style={{ display: 'grid', gap: 12 }}>
+                {!loadError && courses.length === 0 && <p>Chưa có khóa học được xuất bản.</p>}
                 {courses.map(course => (
                   <div
                     key={course.id}
@@ -301,7 +369,9 @@ export default function AdminCoursePage() {
                     <div>
                       <strong>{course.title}</strong>
                       <div style={{ color: '#64748b', fontSize: 13 }}>{course.categoryName}</div>
-                      <div style={{ color: '#64748b', fontSize: 13 }}>{formatPrice(Number(course.price || 0))}</div>
+                      <div style={{ color: '#64748b', fontSize: 13 }}>
+                        {formatPrice(Number(course.price || 0))}
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button className="button button-soft" type="button" onClick={() => handleEdit(course)}>

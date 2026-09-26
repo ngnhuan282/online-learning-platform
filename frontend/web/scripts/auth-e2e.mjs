@@ -30,6 +30,19 @@ async function api(path, data, token, cookie) {
   });
   return { status: response.status, body: await response.json() };
 }
+for (const invalidPassword of ['lowercase9', 'UPPERCASE9', 'NoDigitsHere', 'Aa1' + '界'.repeat(24)]) {
+  const invalid = await api('/auth/register', {
+    fullName: 'Validation Smoke User',
+    email: `invalid-${randomUUID()}@example.com`,
+    password: invalidPassword,
+  });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.body.code, 'VALIDATION_ERROR');
+  assert.ok(invalid.body.errors.password?.length);
+  assert.equal(JSON.stringify(invalid.body).includes(invalidPassword), false);
+}
+report.checks.push('Gateway registration enforces password strength and UTF-8 byte limit');
+
 const registered = await api('/auth/register', {
   fullName: 'API Smoke User',
   email: report.apiEmail,
@@ -167,13 +180,14 @@ try {
       if (await run(expression)) return;
       await pause(100);
     }
-    throw Error(`Timed out: ${expression}`);
+    await writeFile(resolve(output, 'failure.png'), Buffer.from((await send('Page.captureScreenshot')).data, 'base64'));
+    throw Error(`Timed out: ${expression}; ${await run('location.pathname + " " + document.body.innerText.slice(0, 1500)')}`);
   };
   const navigate = async path => {
     await send('Page.navigate', { url: origin + path });
     await waitFor(
       path === '/admin'
-        ? 'document.body.textContent.includes("Không có quyền truy cập")'
+        ? 'document.body.textContent.includes("Bạn không có quyền truy cập chức năng này.")'
         : 'document.querySelector(".site-header") !== null',
     );
   };
@@ -191,7 +205,15 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await navigate('/register');
+  const returnTo = '/account?tab=profile#details';
+  await navigate(returnTo);
+  await waitFor('location.pathname === "/login" && document.querySelector(".auth-switch a") !== null');
+  await click('.auth-switch a');
+  await waitFor('location.pathname === "/register" && document.querySelector("[name=fullName]") !== null');
+  // Switching back and forth must retain the protected destination as well.
+  await click('.auth-switch a');
+  await waitFor('location.pathname === "/login" && document.querySelector("[name=fullName]") === null');
+  await click('.auth-switch a');
   await waitFor('document.querySelector("[name=fullName]") !== null');
   await setField('fullName', 'Nguyễn Auth E2E');
   await setField('email', report.uiEmail);
@@ -200,7 +222,7 @@ try {
   await click('[name=terms]');
   await click('button[type=submit].auth-submit');
   await waitFor(
-    'location.pathname === "/login" && document.body.textContent.includes("Tạo tài khoản thành công")',
+    'location.pathname === "/login" && document.querySelector("[name=fullName]") === null && document.body.textContent.includes("Tạo tài khoản thành công")',
   );
   assert.equal(await run('sessionStorage.length'), 0);
   report.checks.push('React registration and success notice');
@@ -209,6 +231,10 @@ try {
   await setField('password', password);
   await click('button[type=submit].auth-submit');
   await waitFor('location.pathname === "/account" && document.body.textContent.includes("Nguyễn Auth E2E")');
+  assert.equal(await run('location.pathname + location.search + location.hash'), returnTo);
+  report.checks.push(
+    'Protected destination survives login/register switches and registration, including query/hash',
+  );
   assert.equal(await run('sessionStorage.length'), 1);
   assert.equal(await run('localStorage.length'), 0);
   assert.equal(
@@ -216,6 +242,39 @@ try {
     false,
   );
   report.checks.push('React login, AuthContext user, token-only session storage');
+  assert.equal(
+    await run('document.querySelector(".header-actions").textContent.includes("Dashboard")'),
+    false,
+  );
+  assert.equal(
+    await run('document.querySelector(".header-actions").textContent.includes("Đăng xuất")'),
+    false,
+  );
+  await click('.account-menu-trigger');
+  await waitFor('document.querySelector("[role=menu]") !== null');
+  assert.deepEqual(
+    await run('[...document.querySelectorAll("[role=menuitem]")].map(item => item.textContent.trim())'),
+    ['Hồ sơ cá nhân', 'Đăng xuất'],
+  );
+  await send('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key: 'Escape',
+    code: 'Escape',
+    windowsVirtualKeyCode: 27,
+  });
+  await send('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key: 'Escape',
+    code: 'Escape',
+    windowsVirtualKeyCode: 27,
+  });
+  await waitFor('document.querySelector(".account-menu-trigger").getAttribute("aria-expanded") === "false"');
+  await click('.account-menu-trigger');
+  await click('[role=menuitem][href="/account"]');
+  await waitFor(
+    'location.pathname === "/account" && document.querySelector(".account-menu-trigger").getAttribute("aria-expanded") === "false"',
+  );
+  report.checks.push('User avatar replaces text actions; profile navigation and Escape close work');
   await writeFile(
     resolve(output, 'account-desktop.png'),
     Buffer.from((await send('Page.captureScreenshot')).data, 'base64'),
@@ -235,14 +294,14 @@ try {
     );
     report.checks.push('Reload restores session using real /me');
     await navigate('/admin');
-    await waitFor('document.body.textContent.includes("Không có quyền truy cập")');
+    await waitFor('document.body.textContent.includes("Bạn không có quyền truy cập chức năng này.")');
     assert.equal(await run('document.body.textContent.includes("Tài khoản quản trị")'), false);
     report.checks.push('USER denied admin route');
     await navigate('/account');
     await waitFor('document.body.textContent.includes("Nguyễn Auth E2E")');
-    await run(
-      '[...document.querySelectorAll("button")].find(button => button.textContent === "Đăng xuất").click()',
-    );
+    await run('document.querySelector(".account-menu-trigger").click()');
+    await waitFor('document.querySelector(".account-menu-logout") !== null');
+    await click('.account-menu-logout');
     await waitFor('location.pathname === "/login" && document.querySelector("[name=email]") !== null');
     assert.equal(await run('sessionStorage.length'), 0);
     await navigate('/account');

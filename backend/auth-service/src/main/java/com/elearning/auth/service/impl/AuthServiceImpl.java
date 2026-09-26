@@ -67,6 +67,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         var user = users.findByEmailIgnoreCase(request.email()).orElse(null);
         boolean matches =
@@ -75,10 +76,11 @@ public class AuthServiceImpl implements AuthService {
         // Wrong credentials always have the same error, including inactive accounts.
         if (user == null || !matches) throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         checkStatus(user);
+        user.recordLogin();
         var response = UserResponse.from(user);
         if (response.roles().isEmpty()) throw new AppException(ErrorCode.ROLE_NOT_FOUND);
         return new AuthResponse(
-            tokens.createAccessToken(user.getId().toString(), response.roles()),
+            tokens.createAccessToken(user.getId().toString(), response.roles(), response.permissions()),
             "Bearer",
             tokens.getAccessTokenSeconds(),
             response

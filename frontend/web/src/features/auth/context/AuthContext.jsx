@@ -8,7 +8,6 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
-import { ROLES } from '../../../shared/constants/roles';
 import {
   allowSessionRestore,
   clearTokens,
@@ -33,7 +32,7 @@ const validUser = user =>
   user?.id != null &&
   Array.isArray(user.roles) &&
   user.roles.length > 0 &&
-  user.roles.every(role => Object.values(ROLES).includes(role));
+  user.roles.every(role => typeof role === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(role));
 
 export function AuthProvider({ children }) {
   const token = useSyncExternalStore(subscribe, getAccessToken, () => null);

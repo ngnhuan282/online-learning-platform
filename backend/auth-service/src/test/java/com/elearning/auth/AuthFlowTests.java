@@ -167,8 +167,56 @@ class AuthFlowTests {
             assertThat(mapper.readTree(response.body()).get("errors").has(field.getKey())).isTrue();
         }
         var input = new HashMap<>(registration(email()));
-        input.put("password", "界".repeat(25));
-        error(request(REGISTER, input, null), 400, "VALIDATION_ERROR");
+        input.put("password", "Aa1" + "界".repeat(24));
+        var response = request(REGISTER, input, null);
+        error(response, 400, "VALIDATION_ERROR");
+        var fieldErrors = mapper.readTree(response.body()).get("errors");
+        assertThat(fieldErrors.has("password")).isTrue();
+        assertThat(fieldErrors.has("passwordWithinByteLimit")).isFalse();
+        assertThat(response.body()).doesNotContain(input.get("password").toString());
+    }
+
+    @Test
+    void registrationEnforcesPasswordRulesWithoutPersistingInvalidUsers() throws Exception {
+        for (String password : List.of("lowercase9", "UPPERCASE9", "NoDigitsHere", "Aa1short".repeat(10))) {
+            String email = email();
+            var input = new HashMap<>(registration(email));
+            input.put("password", password);
+            var response = request(REGISTER, input, null);
+            error(response, 400, "VALIDATION_ERROR");
+            assertThat(mapper.readTree(response.body()).get("errors").has("password")).isTrue();
+            assertThat(response.body()).doesNotContain(password);
+            assertThat(users.existsByEmailIgnoreCase(email)).isFalse();
+        }
+    }
+
+    @Test
+    void acceptsAsciiAndUnicodePasswordsAtBcryptByteLimit() throws Exception {
+        for (String password : List.of("Aa1" + "x".repeat(69), "Aa1" + "界".repeat(23))) {
+            String email = email();
+            var input = new HashMap<>(registration(email));
+            input.put("password", password);
+            assertThat(request(REGISTER, input, null).statusCode()).isEqualTo(201);
+            assertThat(login(email, password).statusCode()).isEqualTo(200);
+            assertThat(
+                passwords.matches(
+                    password,
+                    users.findByEmailIgnoreCase(email).orElseThrow().getPasswordHash()
+                )
+            ).isTrue();
+        }
+    }
+
+    @Test
+    void existingUsersCanLoginWithoutReapplyingRegistrationStrengthRules() throws Exception {
+        String email = registerUser();
+        String legacyPassword = "oldpassword";
+        jdbc.update(
+            "UPDATE users SET password_hash = ? WHERE email = ?",
+            passwords.encode(legacyPassword),
+            email
+        );
+        assertThat(login(email, legacyPassword).statusCode()).isEqualTo(200);
     }
 
     @Test
@@ -271,7 +319,7 @@ class AuthFlowTests {
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
             )
-        ).isEqualTo(3);
+        ).isEqualTo(4);
         assertThat(jdbc.queryForList("SELECT name FROM roles", String.class)).containsExactlyInAnyOrder(
             "USER",
             "ADMIN"

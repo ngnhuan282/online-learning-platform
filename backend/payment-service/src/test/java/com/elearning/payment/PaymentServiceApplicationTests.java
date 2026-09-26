@@ -65,7 +65,7 @@ class PaymentServiceApplicationTests {
 
     String token(String role, long seconds) {
         return Jwts.builder()
-            .subject("test-user")
+            .subject("1")
             .issuer("learnsphere")
             .claim("role", role)
             .claim("tokenType", "access")
@@ -94,6 +94,35 @@ class PaymentServiceApplicationTests {
         assertThat(json.has("timestamp")).isTrue();
         assertThat(json.has("trace")).isFalse();
         assertThat(response.body()).doesNotContain("sensitive-test-detail");
+    }
+
+    @Test
+    void granularReportPermissionIsRequiredAndSignedClaimsAreValidated() throws Exception {
+        String path = "/api/v1/payments/admin/analytics";
+        assertThat(request(path, token("USER", 60), null).statusCode()).isEqualTo(403);
+        for (Object claim : List.of(
+            List.of("PAYMENT_REPORT_VIEW"),
+            List.of("USER_VIEW"),
+            "PAYMENT_REPORT_VIEW"
+        )) {
+            String access = Jwts.builder()
+                .subject("123")
+                .issuer("learnsphere")
+                .claim("role", "USER")
+                .claim("permissions", claim)
+                .claim("tokenType", "access")
+                .issuedAt(Date.from(Instant.now().minusSeconds(1)))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+                .compact();
+            var result = request(path, access, null);
+            if (claim.equals(List.of("PAYMENT_REPORT_VIEW"))) {
+                assertThat(result.statusCode()).withFailMessage(result.body()).isEqualTo(200);
+                assertThat(
+                    mapper.readTree(result.body()).get("data").get("grossRevenue").isNumber()
+                ).isTrue();
+            } else assertThat(result.statusCode()).isEqualTo(claim instanceof String ? 401 : 403);
+        }
     }
 
     @Test
@@ -136,6 +165,101 @@ class PaymentServiceApplicationTests {
         error(request(BASE + "/conflict", token("USER", 60), null), 409, "CONFLICT", BASE + "/conflict");
         error(request(BASE + "/failure", token("USER", 60), null), 500, "INTERNAL_ERROR", BASE + "/failure");
         error(request(BASE + "/missing", token("USER", 60), null), 404, "NOT_FOUND", BASE + "/missing");
+    }
+
+    @Test
+    void createsInternalCheckoutAndExposesUserHistory() throws Exception {
+        error(
+            request("/api/v1/payments/history", null, null),
+            401,
+            "UNAUTHORIZED",
+            "/api/v1/payments/history"
+        );
+
+        var invalidCheckout = request("/api/v1/payments/checkout", token("USER", 60), "{}");
+        error(invalidCheckout, 400, "VALIDATION_ERROR", "/api/v1/payments/checkout");
+        assertThat(mapper.readTree(invalidCheckout.body()).get("errors").get("courseId").isArray()).isTrue();
+
+        error(
+            request("/api/v1/payments/checkout", token("USER", 60), "{\"courseId\":999}"),
+            404,
+            "NOT_FOUND",
+            "/api/v1/payments/checkout"
+        );
+
+        var checkout = request(
+            "/api/v1/payments/checkout",
+            token("USER", 60),
+            "{\"courseId\":101,\"provider\":\"MOCK\",\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+        );
+        assertThat(checkout.statusCode()).isEqualTo(200);
+        JsonNode checkoutJson = mapper.readTree(checkout.body());
+        JsonNode checkoutData = checkoutJson.get("data");
+        assertThat(checkoutJson.get("success").asBoolean()).isTrue();
+        assertThat(checkoutData.get("orderCode").asString()).startsWith("LS-PAY-");
+        assertThat(checkoutData.get("payment").get("provider").asString()).isEqualTo("MOCK");
+        assertThat(checkoutData.get("payment").get("status").asString()).isEqualTo("PENDING");
+        assertThat(checkoutData.get("order").get("items").get(0).get("courseId").asLong()).isEqualTo(101L);
+        assertThat(checkoutData.get("checkoutUrl").asString()).contains("orderCode=");
+
+        String orderCode = checkoutData.get("orderCode").asString();
+        var order = request("/api/v1/payments/orders/" + orderCode, token("USER", 60), null);
+        assertThat(order.statusCode()).isEqualTo(200);
+        assertThat(mapper.readTree(order.body()).get("data").get("orderCode").asString()).isEqualTo(
+            orderCode
+        );
+
+        var history = request("/api/v1/payments/history", token("USER", 60), null);
+        assertThat(history.statusCode()).isEqualTo(200);
+        JsonNode historyData = mapper.readTree(history.body()).get("data");
+        assertThat(historyData.get("content").size()).isEqualTo(1);
+        assertThat(historyData.get("content").get(0).get("orderCode").asString()).isEqualTo(orderCode);
+        assertThat(historyData.get("content").get(0).get("paymentStatus").asString()).isEqualTo("PENDING");
+
+        var pendingHistory = request(
+            "/api/v1/payments/history?status=PENDING&keyword=IELTS&page=0&size=1",
+            token("USER", 60),
+            null
+        );
+        assertThat(pendingHistory.statusCode()).isEqualTo(200);
+        JsonNode pendingHistoryData = mapper.readTree(pendingHistory.body()).get("data");
+        assertThat(pendingHistoryData.get("content").size()).isEqualTo(1);
+        assertThat(pendingHistoryData.get("totalElements").asLong()).isGreaterThanOrEqualTo(1);
+
+        var unmatchedHistory = request(
+            "/api/v1/payments/history?status=SUCCESS&keyword=missing-course",
+            token("USER", 60),
+            null
+        );
+        assertThat(unmatchedHistory.statusCode()).isEqualTo(200);
+        JsonNode unmatchedHistoryData = mapper.readTree(unmatchedHistory.body()).get("data");
+        assertThat(unmatchedHistoryData.get("content").size()).isZero();
+        assertThat(unmatchedHistoryData.get("totalElements").asLong()).isZero();
+
+        error(
+            request("/api/v1/payments/admin/analytics", token("USER", 60), null),
+            403,
+            "FORBIDDEN",
+            "/api/v1/payments/admin/analytics"
+        );
+
+        var analytics = request("/api/v1/payments/admin/analytics", token("ADMIN", 60), null);
+        assertThat(analytics.statusCode()).isEqualTo(200);
+        JsonNode analyticsData = mapper.readTree(analytics.body()).get("data");
+        assertThat(analyticsData.get("totalOrders").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(analyticsData.get("pendingPayments").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(analyticsData.get("successfulPayments").asLong()).isEqualTo(0);
+        assertThat(analyticsData.get("pendingAmount").asDouble()).isGreaterThan(0);
+        assertThat(analyticsData.get("crossService").get("activeLearners").asLong()).isGreaterThanOrEqualTo(
+            1
+        );
+        assertThat(analyticsData.get("crossService").get("paidCourses").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(analyticsData.get("revenueSeries").size()).isEqualTo(6);
+        boolean containsCreatedOrder = false;
+        for (JsonNode transaction : analyticsData.get("recentTransactions")) {
+            if (orderCode.equals(transaction.get("orderCode").asString())) containsCreatedOrder = true;
+        }
+        assertThat(containsCreatedOrder).isTrue();
     }
 
     @Test

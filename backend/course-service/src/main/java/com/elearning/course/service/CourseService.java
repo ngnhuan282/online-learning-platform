@@ -67,13 +67,27 @@ public class CourseService {
         return new PageImpl<>(pageContent.stream().map(CourseResponse::from).toList(), pageable, filtered.size());
     }
 
+    public Page<CourseResponse> adminList(int page, int size) {
+        return courses
+            .findAll(
+                PageRequest.of(
+                    Math.max(0, page),
+                    Math.max(1, Math.min(size, 100)),
+                    Sort.by(Sort.Direction.DESC, "createdAt", "id")
+                )
+            )
+            .map(CourseResponse::from);
+    }
+
     public CourseResponse get(Long id) {
         return CourseResponse.from(findCourse(id));
     }
 
     @Transactional
     public CourseResponse create(CourseRequest request) {
-        Category category = categories.findById(request.categoryId()).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        Category category = categories
+            .findById(request.categoryId())
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         String slug = slugify(request.title());
         if (courses.existsBySlug(slug)) {
             throw new AppException(ErrorCode.CONFLICT);
@@ -85,7 +99,9 @@ public class CourseService {
         course.setCategory(category);
         course.setPrice(request.price() == null ? BigDecimal.ZERO : request.price());
         course.setOriginalPrice(request.originalPrice());
-        course.setLevel(request.level() == null ? com.elearning.course.entity.CourseLevel.BEGINNER : request.level());
+        course.setLevel(
+            request.level() == null ? com.elearning.course.entity.CourseLevel.BEGINNER : request.level()
+        );
         course.setStatus(request.status() == null ? CourseStatus.DRAFT : request.status());
         course.setThumbnailUrl(request.thumbnailUrl());
         return CourseResponse.from(courses.save(course));
@@ -94,7 +110,9 @@ public class CourseService {
     @Transactional
     public CourseResponse update(Long id, CourseRequest request) {
         Course course = findCourse(id);
-        Category category = categories.findById(request.categoryId()).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        Category category = categories
+            .findById(request.categoryId())
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         String slug = slugify(request.title());
         if (!course.getSlug().equals(slug) && courses.existsBySlug(slug)) {
             throw new AppException(ErrorCode.CONFLICT);
@@ -105,7 +123,9 @@ public class CourseService {
         course.setCategory(category);
         course.setPrice(request.price() == null ? BigDecimal.ZERO : request.price());
         course.setOriginalPrice(request.originalPrice());
-        course.setLevel(request.level() == null ? com.elearning.course.entity.CourseLevel.BEGINNER : request.level());
+        course.setLevel(
+            request.level() == null ? com.elearning.course.entity.CourseLevel.BEGINNER : request.level()
+        );
         course.setStatus(request.status() == null ? CourseStatus.DRAFT : request.status());
         course.setThumbnailUrl(request.thumbnailUrl());
         return CourseResponse.from(courses.save(course));
@@ -168,6 +188,8 @@ public class CourseService {
     }
 
     private String slugify(String input) {
-        return input == null ? "" : input.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+        return input == null
+            ? ""
+            : input.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
     }
 }

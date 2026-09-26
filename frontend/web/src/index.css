@@ -2525,6 +2525,25 @@ p {
   padding: 24px;
 }
 
+.course-progress-summary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.course-progress-summary span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.course-progress-summary strong {
+  color: #0f172a;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 28px;
+  line-height: 36px;
+}
+
 .learning-panel-heading {
   align-items: center;
   display: flex;
@@ -2606,6 +2625,14 @@ p {
   padding: 20px;
 }
 
+.my-course-meta {
+  color: #64748b;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12px;
+}
+
 .learning-chip {
   align-items: center;
   background: #f1f5f9;
@@ -2661,6 +2688,21 @@ p {
   align-items: center;
   display: flex;
   justify-content: space-between;
+}
+
+.lesson-progress-item {
+  background: #ffffff;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lesson-progress-item:hover,
+.lesson-progress-item.is-selected {
+  border-color: #93c5fd;
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.08),
+    0 2px 4px rgba(15, 23, 42, 0.03);
 }
 
 .quiz-result-shell {

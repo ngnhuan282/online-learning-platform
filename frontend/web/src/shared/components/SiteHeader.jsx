@@ -3,13 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Brand from './Brand';
 import Icon from './Icon';
 import useAuth from '../../features/auth/hooks/useAuth';
+import AccountMenu from './AccountMenu';
 
 export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
-  const { user, logout, isLoggingOut } = useAuth();
+  const { user } = useAuth();
   const { pathname, hash } = useLocation();
   function submitSearch(event) {
     event.preventDefault();
@@ -34,9 +35,14 @@ export default function SiteHeader() {
             Lợi ích
           </Link>
           {user && (
-            <Link className={pathname === '/my-courses' ? 'active' : ''} to="/my-courses">
-              Khóa của tôi
-            </Link>
+            <>
+              <Link className={pathname === '/my-courses' ? 'active' : ''} to="/my-courses">
+                Khóa của tôi
+              </Link>
+              <Link className={pathname === '/payment/history' ? 'active' : ''} to="/payment/history">
+                Thanh toán
+              </Link>
+            </>
           )}
         </nav>
         <form className="header-search" onSubmit={submitSearch} role="search">
@@ -72,24 +78,7 @@ export default function SiteHeader() {
           </div>
           <span className="header-divider" />
           {user ? (
-            <>
-              <Link className="button button-outline login-link" to="/account">
-                Tài khoản
-              </Link>
-              <Link className="button button-soft signup-link" to="/dashboard">
-                Dashboard
-              </Link>
-              <button
-                className="button button-primary signup-link"
-                disabled={isLoggingOut}
-                onClick={async () => {
-                  const { error } = await logout();
-                  navigate('/login', { replace: true, state: { logoutFailed: Boolean(error) } });
-                }}
-              >
-                Đăng xuất
-              </button>
-            </>
+            <AccountMenu />
           ) : (
             <>
               <Link

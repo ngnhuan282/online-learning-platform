@@ -5,7 +5,7 @@ import { createServer } from 'vite';
 // Vite loads the actual JS/JSX modules and import.meta.env, including modules not yet used by pages.
 process.env.VITE_API_URL = 'http://gateway.test';
 const server = await createServer({
-  server: { middlewareMode: true },
+  server: { middlewareMode: true, hmr: false, ws: false },
   appType: 'custom',
   optimizeDeps: { noDiscovery: true, include: [] },
 });

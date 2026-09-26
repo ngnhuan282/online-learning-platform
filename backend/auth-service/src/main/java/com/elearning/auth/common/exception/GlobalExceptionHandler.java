@@ -18,6 +18,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -64,6 +65,19 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.VALIDATION_ERROR, errors, request);
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> handleArgumentTypeMismatch(
+        MethodArgumentTypeMismatchException ex,
+        HttpServletRequest request
+    ) {
+        // Do not echo rejected values or Java conversion details to the caller.
+        return respond(
+            ErrorCode.VALIDATION_ERROR,
+            Map.of(ex.getName(), List.of("Invalid parameter value")),
+            request
+        );
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return respond(ErrorCode.FORBIDDEN, null, request);
@@ -83,6 +97,14 @@ public class GlobalExceptionHandler {
         HttpServletRequest request
     ) {
         return respond(ErrorCode.MALFORMED_REQUEST, null, request);
+    }
+
+    @ExceptionHandler({
+        org.springframework.dao.DataIntegrityViolationException.class,
+        org.springframework.dao.OptimisticLockingFailureException.class,
+    })
+    ResponseEntity<ApiError> handleConflict(Exception ex, HttpServletRequest request) {
+        return respond(ErrorCode.CONFLICT, null, request);
     }
 
     @ExceptionHandler(Exception.class)

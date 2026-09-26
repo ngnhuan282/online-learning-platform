@@ -90,6 +90,8 @@ Gateway removes incoming `X-User-Id`, `X-User-Role` and `X-User-Roles`; services
 
 ## Frontend session contract
 
+Protected routes retain the requested pathname, query string and hash through login/register navigation and successful registration. After login, the form returns to that internal destination; without one it uses the role-based default. External URLs and login/register destinations are rejected by the existing redirect check.
+
 Successful login data includes `{ accessToken, tokenType, expiresIn, user }`; `useAuth().login(values)` calls the existing authApi and establishes the session. `establishSession(response.data)` remains available. User contains `{ id, fullName, email, roles }`. AuthProvider restores persisted sessions using `/api/v1/users/me`; guards consume the returned user roles, not decoded JWT roles. Session storage keeps only the access token, with an in-memory fallback when storage is blocked. Passwords and backend secrets are never persisted. Decoding claims in the browser does not verify the signature.
 
 Protected requests returning 401 share one cookie refresh operation, save the new access token through the existing storage abstraction, and retry once. Login/register/refresh/logout never trigger automatic refresh. A failed refresh or a second 401 clears the matching local session. Late responses cannot replace or clear a newer login. Startup with a missing/expired access token tries refresh, then loads the authoritative profile from `/users/me`.
@@ -113,6 +115,14 @@ UserResponse: `{ id, fullName, email, roles: ["USER"] }`. `expiresIn` is seconds
 Auth domain errors: EMAIL_ALREADY_EXISTS (409), INVALID_CREDENTIALS (401, same for unknown email/wrong password), ACCOUNT_DISABLED/ACCOUNT_LOCKED (403), USER_NOT_FOUND (404), ROLE_NOT_FOUND (500). UNAUTHENTICATED/ACCESS_DENIED are also defined; existing filters retain UNAUTHORIZED/FORBIDDEN for compatibility. Inactive account status is disclosed only after password verification. `/me` also rejects inactive accounts.
 
 Issued JWTs use the immutable user ID as subject and include `roles` plus legacy `role` (ADMIN when present, otherwise USER). Auth maps all roles to authorities; other foundation services continue validating the legacy role. Restore errors 401/403/404 clear the local session; network/5xx errors retain the token but leave the user unauthenticated with a retry action on protected routes.
+
+## Registration validation
+
+Auth Service also returns HTTP 400 with `code: VALIDATION_ERROR` for path/query parameters that cannot be converted to their declared type (for example an invalid user ID, page, size or status). The `errors` map identifies the parameter; rejected values and internal conversion details are not returned.
+
+Registration requires a nonblank full name (maximum 100 characters), a valid email (maximum 254 characters), and a password of at least 8 characters containing an ASCII uppercase letter, lowercase letter, and digit. Passwords must not exceed 72 UTF-8 bytes, including multibyte characters. The backend enforces these requirements even when the caller bypasses the form. Password validation failures return HTTP 400 with `code: VALIDATION_ERROR` and messages under `errors.password`; rejected password values are never returned.
+
+The login form also checks the 72-byte limit. Login continues to verify existing BCrypt hashes without reapplying registration strength requirements, so existing accounts with older passwords can still sign in. Confirmation and terms acceptance are checked by the registration form and are not part of the API request DTO.
 
 ## Refresh-token contract
 

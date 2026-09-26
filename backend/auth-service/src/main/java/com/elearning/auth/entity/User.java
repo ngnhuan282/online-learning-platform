@@ -38,6 +38,13 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    public void recordLogin() {
+        this.lastLoginAt = Instant.now();
+    }
+
     @ManyToMany
     @JoinTable(
         name = "user_roles",
@@ -54,6 +61,22 @@ public class User {
         this.fullName = fullName;
         this.status = UserStatus.ACTIVE;
         this.roles.add(role);
+    }
+
+    public void updateProfile(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public void updatePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void updateStatus(UserStatus status) {
+        this.status = status;
+    }
+
+    public void setRoles(Set<Role> roles) {
+        this.roles = roles != null ? roles : new HashSet<>();
     }
 
     @PrePersist

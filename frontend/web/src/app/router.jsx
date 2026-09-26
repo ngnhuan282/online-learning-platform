@@ -6,7 +6,14 @@ import UserLayout from '../layouts/UserLayout'; // Thêm import UserLayout
 
 import HomePage from '../pages/HomePage';
 import AccountPage from '../features/auth/pages/AccountPage';
-import ProtectedRoute from '../routes/ProtectedRoute';
+import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
+import PaymentHistoryPage from '../features/payment/pages/PaymentHistoryPage';
+import PaymentResultPage from '../features/payment/pages/PaymentResultPage';
+import PermissionRoute from '../routes/PermissionRoute';
+import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
+import AdminAccountsPage from '../features/admin/pages/AdminAccountsPage';
+import AdminRolesPage from '../features/admin/pages/AdminRolesPage';
+import AdminAuditPage from '../features/admin/pages/AdminAuditPage';
 
 const router = createBrowserRouter([
   { 
@@ -22,7 +29,23 @@ const router = createBrowserRouter([
       { path: 'course', element: <Navigate to="/admin/courses" replace /> },
       {
         path: 'courses',
-        lazy: async () => ({ Component: (await import('../features/courses/pages/AdminCoursePage')).default }),
+        element: <PermissionRoute permission="COURSE_VIEW" />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/courses/pages/AdminCoursePage')).default,
+            }),
+          },
+        ],
+      },
+      {
+        path: 'users',
+        element: (
+          <PermissionRoute permission="USER_VIEW">
+            <AdminAccountsPage />
+          </PermissionRoute>
+        ),
       },
       { path: 'category', element: <Navigate to="/admin/categories" replace /> },
       {
@@ -58,29 +81,39 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { path: 'account', element: <AccountPage /> },
           {
             path: 'dashboard',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/UserDashboardPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/UserDashboardPage')).default,
+            }),
           },
           {
             path: 'my-courses',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/MyCoursesPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/MyCoursesPage')).default,
+            }),
           },
           {
             path: 'learning/:courseId',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/LearningPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/LearningPage')).default,
+            }),
           },
           {
             path: 'quizzes/:quizId/result',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/QuizResultPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/QuizResultPage')).default,
+            }),
           },
           {
             path: 'notifications',
-            lazy: async () => ({ Component: (await import('../features/learning/pages/NotificationsPage')).default }),
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/NotificationsPage')).default,
+            }),
           },
         ],
       },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]);

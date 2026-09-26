@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"tests/**/*.js\" \"scripts/**/*.mjs\" eslint.config.js vite.config.js",
     "format:check": "prettier --check \"src/**/*.{js,jsx,css}\" \"tests/**/*.js\" \"scripts/**/*.mjs\" eslint.config.js vite.config.js",
     "format:backend": "prettier --write \"../../backend/*/src/**/*.java\" \"../../backend/*/pom.xml\" ../../backend/pom.xml",
