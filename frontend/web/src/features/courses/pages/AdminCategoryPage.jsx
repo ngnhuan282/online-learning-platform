@@ -24,7 +24,7 @@ export default function AdminCategoryPage() {
           ? payload
           : [];
       setCategories(list);
-    } catch (error) {
+    } catch {
       setCategories([]);
     } finally {
       setLoading(false);
@@ -32,7 +32,7 @@ export default function AdminCategoryPage() {
   };
 
   useEffect(() => {
-    loadCategories();
+    void Promise.resolve().then(loadCategories);
   }, []);
 
   function resetForm() {
@@ -88,7 +88,7 @@ export default function AdminCategoryPage() {
       await categoryApi.delete(id);
       setCategories(prev => prev.filter(item => String(item.id) !== String(id)));
       await loadCategories();
-    } catch (error) {
+    } catch {
       // no-op for demo flow
     }
   }

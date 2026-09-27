@@ -44,9 +44,11 @@ export default function AdminDashboardPage() {
     };
   }, [user, retry]);
   const { overview, courses, learning, payments } = state.data;
-  const months = overview?.monthly ?? payments?.monthly ?? [];
+  const months = overview?.monthly ?? [];
+  const revenueSeries = payments?.revenueSeries ?? [];
+  const recentTransactions = payments?.recentTransactions ?? [];
   const maxUsers = Math.max(1, ...months.map(m => m.count ?? 0));
-  const maxRevenue = Math.max(1, ...(payments?.monthly ?? []).map(m => m.revenue));
+  const maxRevenue = Math.max(1, ...revenueSeries.map(point => Number(point.amount ?? 0)));
   const categories = courses?.categories ?? [];
   const total = categories.reduce((sum, c) => sum + c.count, 0);
   let cursor = 0;
@@ -129,53 +131,62 @@ export default function AdminDashboardPage() {
           <div className="admin-card-heading">
             <div>
               <h2>Doanh thu & tăng trưởng tài khoản</h2>
-              <p>6 tháng gần nhất · mỗi chuỗi có thang đo riêng</p>
+              <p>Doanh thu 6 ngày gần nhất · tài khoản mới 6 tháng gần nhất</p>
             </div>
           </div>
-          <div className="admin-chart-legend">
-            <span>
-              <i />
-              Doanh thu (triệu ₫)
-            </span>
-            <span>
-              <i className="cyan" />
-              Tài khoản mới
-            </span>
-          </div>
-          {months.length ? (
-            <div className="admin-bar-chart" role="img" aria-label="Doanh thu và số tài khoản mới theo tháng">
-              {months.map((m, i) => {
-                const revenue = payments?.monthly.find(p => p.month === m.month)?.revenue;
+          <h3>Doanh thu theo ngày (triệu ₫)</h3>
+          {revenueSeries.length ? (
+            <div
+              className="admin-bar-chart"
+              role="img"
+              aria-label="Doanh thu theo ngày trong 6 ngày gần nhất"
+            >
+              {revenueSeries.map((point, i) => {
+                const amount = Number(point.amount ?? 0);
                 return (
-                  <div className="admin-bar-column" key={m.month}>
+                  <div className="admin-bar-column" key={point.label}>
                     <div className="admin-bars">
                       <div
                         className="admin-bar"
-                        style={{ height: `${((revenue ?? 0) / maxRevenue) * 85}%` }}
-                        title={money(revenue)}
+                        style={{ height: `${(amount / maxRevenue) * 85}%` }}
+                        title={money(amount)}
                       >
-                        <span>{revenue == null ? '—' : number(Math.round(revenue / 100000) / 10)}</span>
-                      </div>
-                      <div
-                        className="admin-bar cyan"
-                        style={{ height: `${((m.count ?? 0) / maxUsers) * 85}%` }}
-                        title={`${number(m.count)} tài khoản`}
-                      >
-                        <span>{number(m.count)}</span>
+                        <span>{number(Math.round(amount / 100000) / 10)}</span>
                       </div>
                     </div>
-                    <small className={i === months.length - 1 ? 'current' : ''}>
-                      {m.month.slice(5)}/{m.month.slice(0, 4)}
-                    </small>
+                    <small className={i === revenueSeries.length - 1 ? 'current' : ''}>{point.label}</small>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="admin-empty">Chưa có dữ liệu biểu đồ.</div>
+            <div className="admin-empty">Chưa có dữ liệu doanh thu.</div>
+          )}
+          <h3>Tài khoản mới theo tháng</h3>
+          {months.length ? (
+            <div className="admin-bar-chart" role="img" aria-label="Số tài khoản mới theo tháng">
+              {months.map((m, i) => (
+                <div className="admin-bar-column" key={m.month}>
+                  <div className="admin-bars">
+                    <div
+                      className="admin-bar cyan"
+                      style={{ height: `${((m.count ?? 0) / maxUsers) * 85}%` }}
+                      title={`${number(m.count)} tài khoản`}
+                    >
+                      <span>{number(m.count)}</span>
+                    </div>
+                  </div>
+                  <small className={i === months.length - 1 ? 'current' : ''}>
+                    {m.month.slice(5)}/{m.month.slice(0, 4)}
+                  </small>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="admin-empty">Chưa có dữ liệu tài khoản.</div>
           )}
           <p className="admin-card-note">
-            Doanh thu được nhóm theo tháng tạo đơn đã thanh toán. Tài khoản được nhóm theo ngày đăng ký (UTC).
+            Doanh thu từ thanh toán thành công theo ngày. Tài khoản được nhóm theo tháng đăng ký (UTC).
           </p>
         </section>
         {can(user, 'COURSE_VIEW') && (
@@ -227,20 +238,20 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {payments?.recent?.map(order => (
-                  <tr key={order.id}>
+                {recentTransactions.slice(0, 5).map(order => (
+                  <tr key={order.orderCode}>
                     <td>
                       <strong>{order.orderCode}</strong>
                     </td>
                     <td>#{order.userId}</td>
-                    <td>{order.courses.join(', ') || '—'}</td>
+                    <td>{order.courseTitle || '—'}</td>
                     <td className="admin-nowrap">
                       {order.currency === 'VND'
                         ? money(order.amount)
                         : `${number(order.amount)} ${order.currency}`}
                     </td>
                     <td>
-                      <span className={`admin-pill ${order.status === 'PAID' ? 'green' : 'amber'}`}>
+                      <span className={`admin-pill ${order.status === 'SUCCESS' ? 'green' : 'amber'}`}>
                         {order.status}
                       </span>
                     </td>
@@ -249,7 +260,7 @@ export default function AdminDashboardPage() {
                 ))}
               </tbody>
             </table>
-            {!payments?.recent?.length && (
+            {!recentTransactions.length && (
               <div className="admin-empty">
                 {payments ? 'Chưa có đơn hàng.' : 'Chưa tải được dữ liệu thanh toán.'}
               </div>

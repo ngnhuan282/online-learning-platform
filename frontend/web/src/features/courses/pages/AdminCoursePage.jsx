@@ -12,7 +12,7 @@ const emptyForm = {
   description: '',
   categoryId: '',
   categoryName: '',
-  level: 'beginner',
+  level: 'BEGINNER',
   price: 0,
   originalPrice: 0,
   thumbnailUrl: '/images/english-ielts.jpg',
@@ -32,7 +32,7 @@ const coerceCourse = course => ({
   createdAt: course.createdAt ?? new Date().toISOString(),
 });
 
-export const normalizeCourseList = response => {
+const normalizeCourseList = response => {
   const payload = response?.data ?? response;
 
   if (Array.isArray(payload)) return payload.map(coerceCourse);
@@ -43,7 +43,7 @@ export const normalizeCourseList = response => {
   return [];
 };
 
-export const normalizeCoursePayload = payload => ({
+const normalizeCoursePayload = payload => ({
   ...payload,
   level: payload.level ? String(payload.level).toUpperCase() : undefined,
   status: payload.status ? String(payload.status).toUpperCase() : 'PUBLISHED',
@@ -54,8 +54,14 @@ export const normalizeCoursePayload = payload => ({
 });
 
 export default function AdminCoursePage() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [loadError, setLoadError] = useState(null);
+  const [mutationError, setMutationError] = useState(null);
+  const [retry, setRetry] = useState(0);
+  const [deletingId, setDeletingId] = useState(null);
+  const pending = useRef(false);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -65,11 +71,7 @@ export default function AdminCoursePage() {
     try {
       const response = await categoryApi.list();
       const payload = response?.data ?? response;
-      const list = Array.isArray(payload?.data)
-        ? payload.data
-        : Array.isArray(payload)
-          ? payload
-          : [];
+      const list = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
       setCategories(list);
       if (!list.length) return;
       setForm(prev => ({
@@ -78,16 +80,16 @@ export default function AdminCoursePage() {
         categoryName: prev.categoryName || list[0].name,
       }));
     } catch (error) {
-      setCategories([]);
+      setLoadError(error);
     }
   };
 
   const loadCourses = async () => {
     try {
-      const response = await courseApi.list({ page: 0, size: 20 });
+      const response = await courseApi.adminList({ page: 0, size: 20 });
       setCourses(normalizeCourseList(response));
     } catch (error) {
-      setCourses([]);
+      setLoadError(error);
     }
   };
 
@@ -96,6 +98,8 @@ export default function AdminCoursePage() {
     const controller = new AbortController();
 
     const loadAll = async () => {
+      setLoading(true);
+      setLoadError(null);
       await Promise.all([loadCategories(), loadCourses()]);
       if (isMounted) setLoading(false);
     };
@@ -113,7 +117,11 @@ export default function AdminCoursePage() {
   );
 
   function resetForm() {
-    setForm({ ...emptyForm, categoryId: categories[0] ? String(categories[0].id) : '', categoryName: categories[0] ? categories[0].name : '' });
+    setForm({
+      ...emptyForm,
+      categoryId: categories[0] ? String(categories[0].id) : '',
+      categoryName: categories[0] ? categories[0].name : '',
+    });
     setEditingId(null);
   }
 
@@ -127,8 +135,10 @@ export default function AdminCoursePage() {
     const selectedCategory = categories.find(item => String(item.id) === String(form.categoryId));
     const categoryId = Number(selectedCategory?.id ?? form.categoryId ?? categories[0]?.id);
 
-    if (!categoryId && !categories.length) {
+    if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
+      pending.current = false;
       setSubmitting(false);
+      setMutationError(new Error('Vui lòng chọn danh mục hợp lệ.'));
       return;
     }
 
@@ -144,20 +154,17 @@ export default function AdminCoursePage() {
     });
 
     try {
-      let savedCourse;
       if (editingId) {
-        const response = await courseApi.update(editingId, payload);
-        savedCourse = response?.data?.data ?? response?.data ?? response ?? { ...payload, id: editingId };
+        await courseApi.update(editingId, payload);
       } else {
-        const response = await courseApi.create(payload);
-        savedCourse = response?.data?.data ?? response?.data ?? response ?? { ...payload, id: Date.now() };
+        await courseApi.create(payload);
       }
 
       resetForm();
       await loadCategories();
       await loadCourses();
     } catch (error) {
-      resetForm();
+      setMutationError(error);
     } finally {
       pending.current = false;
       setSubmitting(false);
@@ -165,14 +172,16 @@ export default function AdminCoursePage() {
   }
 
   function handleEdit(course) {
-    const selectedCategory = categories.find(item => String(item.id) === String(course.categoryId) || item.name === course.categoryName);
+    const selectedCategory = categories.find(
+      item => String(item.id) === String(course.categoryId) || item.name === course.categoryName,
+    );
     setEditingId(course.id);
     setForm({
       title: course.title,
       description: course.description,
       categoryId: selectedCategory ? String(selectedCategory.id) : String(categories[0]?.id ?? ''),
       categoryName: course.categoryName || selectedCategory?.name || categories[0]?.name || '',
-      level: course.level || 'beginner',
+      level: String(course.level || 'BEGINNER').toUpperCase(),
       price: Number(course.price || 0),
       originalPrice: Number(course.originalPrice || course.price || 0),
       thumbnailUrl: course.thumbnailUrl || '/images/english-ielts.jpg',
@@ -188,9 +197,11 @@ export default function AdminCoursePage() {
       await courseApi.delete(id);
       setCourses(prev => prev.filter(item => String(item.id) !== String(id)));
     } catch (error) {
-      // Ignore delete failure and refresh from the server to keep the UI honest.
+      setMutationError(error);
+    } finally {
+      pending.current = false;
+      setDeletingId(null);
     }
-    await loadCourses();
   }
 
   return (
@@ -222,45 +233,13 @@ export default function AdminCoursePage() {
         </div>
 
         <div className="course-grid" style={{ gridTemplateColumns: '0.9fr 1.1fr' }}>
-          <form className="course-card" onSubmit={handleSubmit} style={{ padding: 20, display: 'grid', gap: 14 }}>
-            <h3>Thêm khóa học mới</h3>
-
-            <input
-              value={form.title}
-              onChange={event => setForm({ ...form, title: event.target.value })}
-              placeholder="Tên khóa học"
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
-            />
-
-            <textarea
-              value={form.description}
-              onChange={event => setForm({ ...form, description: event.target.value })}
-              placeholder="Mô tả khóa học"
-              rows={4}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea', resize: 'vertical' }}
-            />
-
-            <select
-              value={form.categoryId}
-              onChange={event => {
-                const nextCategory = categories.find(item => String(item.id) === String(event.target.value));
-                setForm({
-                  ...form,
-                  categoryId: event.target.value,
-                  categoryName: nextCategory?.name ?? form.categoryName,
-                });
-              }}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+          {can(user, editingId ? 'COURSE_UPDATE' : 'COURSE_CREATE') && (
+            <form
+              className="course-card"
+              onSubmit={handleSubmit}
+              style={{ padding: 20, display: 'grid', gap: 14 }}
             >
-              {!form.categoryId && <option value="">Chọn danh mục</option>}
-              {categories.map(category => (
-                <option key={category.id} value={String(category.id)}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <h3>{editingId ? 'Chỉnh sửa khóa học' : 'Thêm khóa học mới'}</h3>
               <input
                 aria-label="Tên khóa học"
                 required
@@ -335,17 +314,36 @@ export default function AdminCoursePage() {
                 <option value="ADVANCED">Advanced</option>
               </select>
 
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <button className="button button-primary" type="submit" disabled={submitting || !form.title.trim() || !form.description.trim() || !form.categoryId}>
-                {submitting ? (editingId ? 'Đang cập nhật...' : 'Đang lưu...') : (editingId ? 'Cập nhật khóa học' : 'Lưu khóa học')}
-              </button>
-              {editingId && (
-                <button className="button button-soft" type="button" onClick={resetForm}>
-                  Hủy chỉnh sửa
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={
+                    submitting ||
+                    deletingId !== null ||
+                    loading ||
+                    Boolean(loadError) ||
+                    !form.title.trim() ||
+                    !form.description.trim() ||
+                    !form.categoryId
+                  }
+                >
+                  {submitting
+                    ? editingId
+                      ? 'Đang cập nhật...'
+                      : 'Đang lưu...'
+                    : editingId
+                      ? 'Cập nhật khóa học'
+                      : 'Lưu khóa học'}
                 </button>
-              )}
-            </div>
-          </form>
+                {editingId && (
+                  <button className="button button-soft" type="button" onClick={resetForm}>
+                    Hủy chỉnh sửa
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
 
           <div className="course-card" style={{ padding: 20 }}>
             <h3>Danh sách khóa học</h3>
@@ -374,12 +372,25 @@ export default function AdminCoursePage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button className="button button-soft" type="button" onClick={() => handleEdit(course)}>
-                        Sửa
-                      </button>
-                      <button className="button button-soft" type="button" onClick={() => handleDelete(course.id)}>
-                        Xóa
-                      </button>
+                      {can(user, 'COURSE_UPDATE') && (
+                        <button
+                          className="button button-soft"
+                          type="button"
+                          onClick={() => handleEdit(course)}
+                        >
+                          Sửa
+                        </button>
+                      )}
+                      {can(user, 'COURSE_DELETE') && (
+                        <button
+                          className="button button-soft"
+                          type="button"
+                          disabled={submitting || deletingId !== null || Boolean(loadError)}
+                          onClick={() => handleDelete(course.id)}
+                        >
+                          {deletingId === course.id ? 'Đang xóa...' : 'Xóa'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

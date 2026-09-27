@@ -6,7 +6,7 @@ import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
 import Icon from '../../../shared/components/Icon';
 import StatusChip from '../../../shared/components/StatusChip';
 
-export default function AccountPage({ admin = false }) {
+export default function AccountPage() {
   const { user } = useAuth();
 
   // Profile Form State

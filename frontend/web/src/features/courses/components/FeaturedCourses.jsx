@@ -79,7 +79,7 @@ export default function FeaturedCourses() {
           setCourses(normalizeCourseList(coursesResponse));
           setCategories(normalizeCategoryList(categoriesResponse));
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           setCourses([]);
           setCategories([]);

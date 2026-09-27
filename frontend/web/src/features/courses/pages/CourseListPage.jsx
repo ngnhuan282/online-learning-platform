@@ -8,6 +8,7 @@ import useToast from '../../../shared/hooks/useToast';
 import CourseCard from '../components/CourseCard';
 import { categoryApi } from '../api/categoryApi';
 import { courseApi } from '../api/courseApi';
+import { learningApi } from '../../learning/api/learningApi';
 import { formatPrice, normalizeSearch } from '../data/demoCourses';
 
 const filters = [
@@ -35,7 +36,10 @@ const coerceCourse = course => ({
   level: course.level ? String(course.level).toLowerCase() : 'beginner',
   price: Number(course.price ?? 0),
   originalPrice: Number(course.originalPrice ?? course.price ?? 0),
-  discount: course.originalPrice && course.price ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100) : 0,
+  discount:
+    course.originalPrice && course.price
+      ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100)
+      : 0,
   date: course.createdAt || '2026-09-01',
   keywords: `${course.title} ${course.description}`,
   lessons: [course.description],
@@ -60,11 +64,21 @@ const normalizeCategoryList = response => {
   return [];
 };
 
+const numericCourseId = course => {
+  const id = Number(course?.id);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+};
+
 function CourseListPage() {
+  const { isAuthenticated } = useAuth();
+  const toast = useToast();
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState(new Set());
+  const [enrollingCourseId, setEnrollingCourseId] = useState(null);
+  const [enrollError, setEnrollError] = useState('');
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -88,7 +102,7 @@ function CourseListPage() {
           setCourses(normalizeCourseList(coursesResponse));
           setCategories(normalizeCategoryList(categoriesResponse));
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           setCourses([]);
           setCategories([]);
@@ -144,22 +158,24 @@ function CourseListPage() {
   const filteredCourses = useMemo(() => {
     const selectedCategoryName = categories.find(item => String(item.id) === String(category))?.name;
     const next = courses.filter(course => {
-      const matchesCategory = !category || String(course.categoryId) === String(category) || course.category === selectedCategoryName;
+      const matchesCategory =
+        !category ||
+        String(course.categoryId) === String(category) ||
+        course.category === selectedCategoryName;
       const matchesQuery =
         !query ||
         normalizeSearch(`${course.title} ${course.description} ${course.keywords}`).includes(
           normalizeSearch(query),
         );
       const matchesFree = filter !== 'free' || course.price === 0;
-      const matchesGroup =
-        !['certificates', 'communication'].includes(filter) || course.group === filter;
+      const matchesGroup = !['certificates', 'communication'].includes(filter) || course.group === filter;
       return matchesCategory && matchesQuery && matchesFree && matchesGroup;
     });
 
     if (filter === 'popular') return [...next].sort((a, b) => b.students - a.students);
     if (filter === 'newest') return [...next].sort((a, b) => b.date.localeCompare(a.date));
     return next;
-  }, [category, courses, filter, query]);
+  }, [categories, category, courses, filter, query]);
 
   function updateFilters(next) {
     const paramsObj = new URLSearchParams(params);
@@ -196,6 +212,7 @@ function CourseListPage() {
       navigate('/my-courses');
     } catch (error) {
       setEnrollError(error.message || 'Không thể ghi danh khóa học.');
+      setSelected(course);
     } finally {
       setEnrollingCourseId(null);
     }
@@ -228,7 +245,13 @@ function CourseListPage() {
           value={query}
           onChange={event => updateFilters({ q: event.target.value.trim() })}
           placeholder="Tìm khóa học theo tên, kỹ năng, nhãn..."
-          style={{ flex: 1, minWidth: 240, padding: '12px 16px', borderRadius: 10, border: '1px solid #dfe3ea' }}
+          style={{
+            flex: 1,
+            minWidth: 240,
+            padding: '12px 16px',
+            borderRadius: 10,
+            border: '1px solid #dfe3ea',
+          }}
         />
         <select
           value={category}
@@ -283,6 +306,7 @@ function CourseListPage() {
         </DialogTitle>
         {selected && (
           <DialogContent>
+            {enrollError && <p role="alert">{enrollError}</p>}
             <img className="detail-image" src={selected.image} alt={selected.title} />
             <h2 className="detail-title">{selected.title}</h2>
             <p>{selected.description}</p>

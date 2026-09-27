@@ -59,7 +59,7 @@ function CourseDetailPage() {
         const payload = response?.data ?? response;
         const item = payload?.data ?? payload?.course ?? payload;
         if (isMounted) setCourse(normalizeCourse(item));
-      } catch (error) {
+      } catch {
         if (isMounted) setCourse(fallbackCourse);
       } finally {
         if (isMounted) setLoading(false);

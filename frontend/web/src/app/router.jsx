@@ -3,8 +3,10 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import UserLayout from '../layouts/UserLayout'; // Thêm import UserLayout
+import ProtectedRoute from '../routes/ProtectedRoute';
 
 import HomePage from '../pages/HomePage';
+import NotFoundPage from '../pages/NotFoundPage';
 import AccountPage from '../features/auth/pages/AccountPage';
 import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
 import PaymentHistoryPage from '../features/payment/pages/PaymentHistoryPage';
@@ -16,16 +18,49 @@ import AdminRolesPage from '../features/admin/pages/AdminRolesPage';
 import AdminAuditPage from '../features/admin/pages/AdminAuditPage';
 
 const router = createBrowserRouter([
-  { 
-    path: '/account', 
-    element: <UserLayout />, 
-    children: [{ index: true, element: <AccountPage /> }] 
+  {
+    path: '/account',
+    element: <UserLayout />,
+    children: [{ index: true, element: <AccountPage /> }],
+  },
+  {
+    path: '/checkout',
+    element: <UserLayout />,
+    children: [{ index: true, element: <PaymentCheckoutPage /> }],
+  },
+  {
+    path: '/payment/result',
+    element: <UserLayout />,
+    children: [{ index: true, element: <PaymentResultPage /> }],
+  },
+  {
+    path: '/payment/history',
+    element: <UserLayout />,
+    children: [{ index: true, element: <PaymentHistoryPage /> }],
   },
   {
     path: '/admin',
     element: <AdminLayout />,
     children: [
-      { index: true, element: <AccountPage admin /> },
+      { index: true, element: <AdminDashboardPage /> },
+      { path: 'profile', element: <AccountPage /> },
+      { path: 'analytics', element: <Navigate to="/admin" replace /> },
+      {
+        path: 'roles',
+        element: (
+          <PermissionRoute permission="ROLE_VIEW">
+            <AdminRolesPage />
+          </PermissionRoute>
+        ),
+      },
+      {
+        path: 'audit',
+        element: (
+          <PermissionRoute permission="AUDIT_VIEW">
+            <AdminAuditPage />
+          </PermissionRoute>
+        ),
+      },
       { path: 'course', element: <Navigate to="/admin/courses" replace /> },
       {
         path: 'courses',
@@ -50,7 +85,9 @@ const router = createBrowserRouter([
       { path: 'category', element: <Navigate to="/admin/categories" replace /> },
       {
         path: 'categories',
-        lazy: async () => ({ Component: (await import('../features/courses/pages/AdminCategoryPage')).default }),
+        lazy: async () => ({
+          Component: (await import('../features/courses/pages/AdminCategoryPage')).default,
+        }),
       },
     ],
   },
@@ -76,7 +113,9 @@ const router = createBrowserRouter([
       },
       {
         path: 'courses/:id',
-        lazy: async () => ({ Component: (await import('../features/courses/pages/CourseDetailPage')).default }),
+        lazy: async () => ({
+          Component: (await import('../features/courses/pages/CourseDetailPage')).default,
+        }),
       },
       {
         element: <ProtectedRoute />,

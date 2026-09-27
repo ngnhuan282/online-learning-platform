@@ -71,7 +71,7 @@ public class PaymentController {
     }
 
     @GetMapping("/admin/analytics")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PAYMENT_REPORT_VIEW')")
     ApiResponse<PaymentAnalyticsResponse> getAnalytics() {
         return ApiResponse.success(analytics.getAnalytics());
     }

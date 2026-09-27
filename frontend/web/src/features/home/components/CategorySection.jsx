@@ -32,7 +32,7 @@ export default function CategorySection() {
       try {
         const response = await categoryApi.list();
         if (isMounted) setCategories(normalizeCategoryList(response));
-      } catch (error) {
+      } catch {
         if (isMounted) setCategories([]);
       }
     };
