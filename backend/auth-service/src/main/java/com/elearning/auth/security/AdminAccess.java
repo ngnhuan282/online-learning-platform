@@ -25,7 +25,7 @@ public class AdminAccess {
         try {
             return users
                 .findById(Long.parseLong(authentication.getName()))
-                .filter(user -> user.getStatus() == UserStatus.ACTIVE)
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE && user.getDeletedAt() == null)
                 .map(user -> permissions(user).contains(permission))
                 .orElse(false);
         } catch (NumberFormatException ex) {

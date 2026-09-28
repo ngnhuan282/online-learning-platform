@@ -74,6 +74,22 @@ test('only one retry is allowed and a second 401 clears the session', async () =
   assert.equal(tokens.getAccessToken(), null);
 });
 
+test('locked account response clears local session without attempting refresh', async () => {
+  tokens.setAccessToken(old);
+  let calls = 0;
+  await assert.rejects(
+    client.get('/api/v1/users/me', {
+      adapter: config => {
+        calls++;
+        return Promise.reject({ config, response: { status: 403, data: { code: 'ACCOUNT_LOCKED' } } });
+      },
+    }),
+    { code: 'ACCOUNT_LOCKED' },
+  );
+  assert.equal(calls, 1);
+  assert.equal(tokens.getAccessToken(), null);
+});
+
 test('Auth endpoints never recursively trigger refresh', async () => {
   let calls = 0;
   const adapter = config => {

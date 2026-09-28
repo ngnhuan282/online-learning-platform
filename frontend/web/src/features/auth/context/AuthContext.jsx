@@ -124,6 +124,12 @@ export function AuthProvider({ children }) {
     [establishSession],
   );
   const register = useCallback(async values => (await authApi.register(values)).data, []);
+  const updateCurrentUser = useCallback(nextUser => {
+    const currentToken = getAccessToken();
+    if (validUser(nextUser) && String(nextUser.id) === decodeToken(currentToken)?.sub) {
+      setSession({ token: currentToken, user: nextUser });
+    }
+  }, []);
   const logout = useCallback(() => {
     if (pendingLogout.current) return pendingLogout.current;
     generation.current++;
@@ -174,6 +180,7 @@ export function AuthProvider({ children }) {
       establishSession,
       login,
       register,
+      updateCurrentUser,
       logout,
     }),
     [
@@ -187,6 +194,7 @@ export function AuthProvider({ children }) {
       establishSession,
       login,
       register,
+      updateCurrentUser,
       logout,
     ],
   );

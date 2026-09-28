@@ -81,6 +81,12 @@ axiosClient.interceptors.response.use(
   async error => {
     const config = error.config;
     if (
+      error.response?.status === 403 &&
+      ['ACCOUNT_LOCKED', 'ACCOUNT_DISABLED'].includes(error.response?.data?.code)
+    ) {
+      clearTokens();
+    }
+    if (
       error.response?.status === 401 &&
       config &&
       !config.skipAuth &&

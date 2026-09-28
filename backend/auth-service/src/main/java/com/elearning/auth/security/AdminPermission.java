@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 /** Only permissions backed by implemented API operations belong in this catalog. */
 public enum AdminPermission {
+    USER_DELETE("Người dùng & tài khoản", "Tài khoản", "DELETE", "Xóa mềm tài khoản", true),
     ADMIN_ACCESS("Hệ thống", "Không gian quản trị", "VIEW", "Truy cập quản trị", false),
     DASHBOARD_VIEW("Hệ thống", "Tổng quan tài khoản", "VIEW", "Xem tổng quan", false),
     USER_VIEW("Người dùng & tài khoản", "Tài khoản", "VIEW", "Xem tài khoản", false),

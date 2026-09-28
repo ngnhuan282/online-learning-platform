@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../../shared/apis/endpoints';
 export const userApi = {
   adminCreateUser: payload => axiosClient.post(ENDPOINTS.adminUsers, payload),
   adminUpdateUser: (id, payload) => axiosClient.put(`${ENDPOINTS.adminUsers}/${id}`, payload),
+  adminDeleteUser: id => axiosClient.delete(`${ENDPOINTS.adminUsers}/${id}`),
   updateProfile: (payload, options = {}) => axiosClient.put(ENDPOINTS.users.me, payload, options),
 
   changePassword: (payload, options = {}) =>

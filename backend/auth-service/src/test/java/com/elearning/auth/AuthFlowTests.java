@@ -319,7 +319,7 @@ class AuthFlowTests {
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
             )
-        ).isEqualTo(4);
+        ).isEqualTo(5);
         assertThat(jdbc.queryForList("SELECT name FROM roles", String.class)).containsExactlyInAnyOrder(
             "USER",
             "ADMIN"

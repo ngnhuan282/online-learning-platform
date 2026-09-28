@@ -150,9 +150,9 @@ class ApiGatewayApplicationTests {
 
     @Test
     void handlesPreflightAndUnknownRoutes() throws Exception {
-        assertThat(
-            request("/api/v1/users/me", null, "OPTIONS", "http://localhost:5173").statusCode()
-        ).isEqualTo(200);
+        var preflight = request("/api/v1/users/me", null, "OPTIONS", "http://localhost:5173");
+        assertThat(preflight.statusCode()).isEqualTo(200);
+        assertThat(preflight.headers().firstValue("X-Request-ID")).isPresent();
         var rejected = request("/api/v1/users/me", null, "OPTIONS", "https://untrusted.example");
         assertThat(rejected.statusCode()).isEqualTo(403);
         assertThat(mapper.readTree(rejected.body()).get("code").asString()).isEqualTo("FORBIDDEN");

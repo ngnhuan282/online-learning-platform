@@ -41,6 +41,9 @@ public class User {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     public void recordLogin() {
         this.lastLoginAt = Instant.now();
     }
@@ -73,6 +76,12 @@ public class User {
 
     public void updateStatus(UserStatus status) {
         this.status = status;
+    }
+
+    public void softDelete() {
+        this.status = UserStatus.DISABLED;
+        this.deletedAt = Instant.now();
+        this.roles.clear();
     }
 
     public void setRoles(Set<Role> roles) {

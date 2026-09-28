@@ -51,6 +51,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository
             .findById(userId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        requireActive(user);
         user.updateProfile(request.fullName().trim());
         return UserResponse.from(user);
     }
@@ -60,6 +61,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository
             .findById(userId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        requireActive(user);
 
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new AppException(ErrorCode.OLD_PASSWORD_INCORRECT);
@@ -94,6 +96,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public AdminUserResponse getUserById(Long id) {
         User user = userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (user.getDeletedAt() != null) throw new AppException(ErrorCode.USER_NOT_FOUND);
         return AdminUserResponse.from(user);
     }
 
@@ -107,10 +110,15 @@ public class UserServiceImpl implements UserService {
         User user = userRepository
             .findById(targetUserId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (user.getDeletedAt() != null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 
         admin.protectAdmin(user, currentUserId);
         guardLastAdmin(user, status != UserStatus.ACTIVE);
         user.updateStatus(status);
+        if (status != UserStatus.ACTIVE) jdbc.update(
+            "UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND revoked_at IS NULL",
+            targetUserId
+        );
         admin.audit(currentUserId, "USER_STATUS_UPDATE", targetUserId.toString(), status.name());
         return AdminUserResponse.from(user);
     }
@@ -121,6 +129,8 @@ public class UserServiceImpl implements UserService {
         User user = userRepository
             .findById(targetUserId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (user.getDeletedAt() != null) throw new AppException(ErrorCode.USER_NOT_FOUND);
+        admin.protectAdmin(user, currentUserId);
 
         Set<Role> roles = new HashSet<>();
         boolean hasAdmin = false;
@@ -158,9 +168,14 @@ public class UserServiceImpl implements UserService {
                 .noneMatch(r -> r.getName().equals("ADMIN"))
         ) return;
         Long count = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name = 'ADMIN' AND u.status = 'ACTIVE'",
+            "SELECT COUNT(*) FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name = 'ADMIN' AND u.status = 'ACTIVE' AND u.deleted_at IS NULL",
             Long.class
         );
         if (count == null || count <= 1) throw new AppException(ErrorCode.CONFLICT);
+    }
+
+    private void requireActive(User user) {
+        if (user.getStatus() == UserStatus.LOCKED) throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+        if (user.getStatus() != UserStatus.ACTIVE) throw new AppException(ErrorCode.ACCOUNT_DISABLED);
     }
 }

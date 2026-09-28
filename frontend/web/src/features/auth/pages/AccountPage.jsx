@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import { userApi } from '../api/userApi';
-import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
 import Icon from '../../../shared/components/Icon';
 import StatusChip from '../../../shared/components/StatusChip';
 
 export default function AccountPage() {
-  const { user } = useAuth();
+  const { user, updateCurrentUser } = useAuth();
 
   // Profile Form State
   const [fullName, setFullName] = useState(user?.fullName || '');
@@ -37,9 +36,9 @@ export default function AccountPage() {
     }
     setProfileLoading(true);
     try {
-      await userApi.updateProfile({ fullName: fullName.trim() });
+      const result = await userApi.updateProfile({ fullName: fullName.trim() });
+      updateCurrentUser(result.data);
       setProfileSuccess('Cập nhật thông tin tài khoản thành công!');
-      window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Không thể cập nhật hồ sơ.';
       setProfileError(msg);

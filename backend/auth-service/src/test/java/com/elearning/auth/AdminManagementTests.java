@@ -89,6 +89,121 @@ class AdminManagementTests {
     }
 
     @Test
+    void accountLifecycleKeepsLearningIdentityAndBlocksDeletedAccount() throws Exception {
+        User administrator = user("ADMIN");
+        String admin = token(administrator, "ADMIN");
+        String email = UUID.randomUUID() + "@test.com";
+        JsonNode created = data(
+            request(
+                "POST",
+                "/admin/users",
+                admin,
+                Map.of(
+                    "fullName",
+                    "New Learner",
+                    "email",
+                    email,
+                    "password",
+                    "Password123!",
+                    "roles",
+                    List.of("USER", "ADMIN"),
+                    "status",
+                    "ACTIVE"
+                )
+            )
+        );
+        long id = created.get("id").asLong();
+        assertThat(created.get("roles").toString()).contains("USER", "ADMIN");
+        assertThat(created.toString()).doesNotContain("Password123!");
+        assertThat(
+            request(
+                "POST",
+                "/admin/users",
+                admin,
+                Map.of("fullName", "Duplicate", "email", email, "password", "Password123!")
+            ).statusCode()
+        ).isEqualTo(409);
+        JsonNode changed = data(
+            request(
+                "PUT",
+                "/admin/users/" + id,
+                admin,
+                Map.of("fullName", "Updated Learner", "roles", List.of("USER"))
+            )
+        );
+        assertThat(changed.get("fullName").asText()).isEqualTo("Updated Learner");
+        assertThat(changed.get("roles").toString()).contains("USER").doesNotContain("ADMIN");
+        data(request("PATCH", "/admin/users/" + id + "/status", admin, Map.of("status", "LOCKED")));
+        assertThat(users.findById(id).orElseThrow().getStatus().name()).isEqualTo("LOCKED");
+        data(request("PATCH", "/admin/users/" + id + "/status", admin, Map.of("status", "ACTIVE")));
+        assertThat(
+            request("DELETE", "/admin/users/" + administrator.getId(), admin, null).statusCode()
+        ).isEqualTo(400);
+        data(request("DELETE", "/admin/users/" + id, admin, null));
+        assertThat(users.findById(id).orElseThrow().getDeletedAt()).isNotNull();
+        assertThat(users.findById(id).orElseThrow().getStatus().name()).isEqualTo("DISABLED");
+        assertThat(
+            data(request("GET", "/admin/users?keyword=" + email, admin, null))
+                .get("totalElements")
+                .asLong()
+        ).isZero();
+        assertThat(request("GET", "/admin/users/" + id, admin, null).statusCode()).isEqualTo(404);
+        assertThat(
+            request("GET", "/users/me", token(users.findById(id).orElseThrow(), "USER"), null).statusCode()
+        ).isEqualTo(403);
+    }
+
+    @Test
+    void softDeleteReleasesCustomRoleWithoutDeletingUserRecord() throws Exception {
+        String admin = token(user("ADMIN"), "ADMIN");
+        String roleName = "ARCHIVE_" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
+        long roleId = data(
+            request(
+                "POST",
+                "/admin/roles",
+                admin,
+                Map.of(
+                    "name",
+                    roleName,
+                    "label",
+                    "Archive test",
+                    "description",
+                    "Temporary",
+                    "permissions",
+                    List.of("ADMIN_ACCESS"),
+                    "version",
+                    0
+                )
+            )
+        )
+            .get("id")
+            .asLong();
+        long userId = data(
+            request(
+                "POST",
+                "/admin/users",
+                admin,
+                Map.of(
+                    "fullName",
+                    "Archive User",
+                    "email",
+                    UUID.randomUUID() + "@test.com",
+                    "password",
+                    "Password123!",
+                    "roles",
+                    List.of(roleName)
+                )
+            )
+        )
+            .get("id")
+            .asLong();
+        data(request("DELETE", "/admin/users/" + userId, admin, null));
+        assertThat(users.findById(userId).orElseThrow().getRoles()).isEmpty();
+        assertThat(request("DELETE", "/admin/roles/" + roleId, admin, null).statusCode()).isEqualTo(200);
+        assertThat(users.findById(userId)).isPresent();
+    }
+
+    @Test
     void customRoleLifecycleEnforcesDependenciesReservedPermissionsAndStaleVersion() throws Exception {
         String admin = token(user("ADMIN"), "ADMIN");
         String name = "SUPPORT_" + UUID.randomUUID().toString().replace("-", "").toUpperCase();

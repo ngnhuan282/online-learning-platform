@@ -101,7 +101,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void checkStatus(User user) {
-        if (user.getStatus() == UserStatus.DISABLED) throw new AppException(ErrorCode.ACCOUNT_DISABLED);
+        if (user.getStatus() == UserStatus.DISABLED || user.getDeletedAt() != null) throw new AppException(
+            ErrorCode.ACCOUNT_DISABLED
+        );
         if (user.getStatus() == UserStatus.LOCKED) throw new AppException(ErrorCode.ACCOUNT_LOCKED);
     }
 }

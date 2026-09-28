@@ -21,7 +21,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findById(Long id);
 
     @Query(
-        "SELECT u FROM User u WHERE " +
+        "SELECT u FROM User u WHERE u.deletedAt IS NULL AND " +
             "(:status IS NULL OR u.status = :status) AND " +
             "(:role IS NULL OR EXISTS (SELECT r.id FROM u.roles r WHERE r.name = :role)) AND " +
             "(:keyword IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))"

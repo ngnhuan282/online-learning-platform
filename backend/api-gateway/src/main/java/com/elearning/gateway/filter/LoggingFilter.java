@@ -17,7 +17,7 @@ public class LoggingFilter implements WebFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return -200;
+        return -400;
     }
 
     @Override

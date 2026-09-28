@@ -16,11 +16,18 @@ const adminPassword = process.env.E2E_ADMIN_PASSWORD || 'Admin123';
 const marker = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
 const email = `admin-e2e-${marker.toLowerCase()}@example.com`;
 const fullName = `Kiểm thử Admin ${marker}`;
+const updatedName = `${fullName} đã sửa`;
 const roleName = `QA_${marker}`;
 const password = `Test9!${randomUUID()}`;
 const report = { checks: [], testAccount: email };
 const pause = ms => new Promise(done => setTimeout(done, ms));
-let adminToken, accountId, roleId, server, chrome, socket;
+let adminToken,
+  accountId,
+  roleId,
+  accountDeleted = false,
+  server,
+  chrome,
+  socket;
 
 async function api(method, path, body, token = adminToken) {
   const response = await fetch(`${gateway}/api/v1${path}`, {
@@ -193,7 +200,7 @@ try {
     ['Hồ sơ cá nhân', 'Đăng xuất'],
   );
   await screenshot('admin-account-menu');
-  await run('document.querySelector("[role=menuitem][href=\"/admin/profile\"]").click()');
+  await run('document.querySelector(\'[role=menuitem][href="/admin/profile"]\').click()');
   await wait(
     'location.pathname === "/admin/profile" && document.querySelector(".admin-main h1")?.textContent.trim() === "Hồ sơ cá nhân"',
   );
@@ -209,7 +216,7 @@ try {
   }
   report.checks.push('Repeated unchanged account search finishes without a stuck loading state');
   await screenshot('accounts-desktop');
-  await clickText('Thêm người dùng mới');
+  await clickText('Thêm tài khoản');
   await wait('document.querySelector("[role=dialog]")');
   await field('Họ và tên', fullName);
   await field('Email', email);
@@ -291,21 +298,27 @@ try {
   report.checks.push('React creates custom role, auto-selects dependencies and saves permissions');
   await navigate(`/admin/users?q=${encodeURIComponent(email)}`);
   await wait(`document.querySelector('.admin-users-table')?.textContent.includes(${JSON.stringify(email)})`);
-  await run(`document.querySelector('[aria-label="Gán vai trò ${fullName}"]').click()`);
+  await run(`document.querySelector('[aria-label="Sửa ${fullName}"]').click()`);
   await wait('document.querySelector("[role=dialog]")');
+  await field('Họ và tên', updatedName);
   await run(
     `(() => { const label = [...document.querySelectorAll('[role=dialog] label')].find(e => e.textContent.includes('${roleName}')); label.querySelector('input').click(); })()`,
   );
   await run('document.querySelector("[role=dialog] button[type=submit]").click()');
   await wait('!document.querySelector("[role=dialog]")');
+  assert.equal((await api('GET', `/admin/users/${accountId}`)).data.fullName, updatedName);
   const custom = await api('POST', '/auth/login', { email, password }, null);
   assert.ok(custom.data.user.roles.includes(roleName));
+  assert.deepEqual([...custom.data.user.roles].sort(), ['USER', roleName].sort());
+  assert.equal(custom.data.user.permissions.includes('ROLE_MANAGE'), false);
   assert.equal((await api('GET', '/admin/users', null, custom.data.accessToken)).status, 200);
-  assert.equal((await api('GET', '/admin/audit', null, custom.data.accessToken)).status, 403);
-  report.checks.push('Assigned custom role grants only authorized backend operations');
+  assert.equal((await api('DELETE', `/admin/roles/${roleId}`, null, custom.data.accessToken)).status, 403);
+  report.checks.push(
+    'One edit modal updates name and custom role; backend grants only authorized operations',
+  );
   await navigate('/admin/audit');
   await wait('document.querySelector(".admin-table tbody tr")');
-  assert.equal(await run('document.body.textContent.includes("USER_ROLES_ASSIGN")'), true);
+  assert.equal(await run('document.body.textContent.includes("USER_UPDATE")'), true);
   await send('Emulation.setDeviceMetricsOverride', {
     width: 390,
     height: 844,
@@ -323,6 +336,20 @@ try {
     assert.equal(await run('document.documentElement.scrollWidth <= innerWidth'), true, name);
   }
   assert.deepEqual(errors, []);
+  assert.equal((await api('PUT', `/admin/users/${accountId}/roles`, { roles: ['USER'] })).status, 200);
+  await navigate(`/admin/users?q=${encodeURIComponent(email)}`);
+  await wait(`document.querySelector('.admin-users-table')?.textContent.includes(${JSON.stringify(email)})`);
+  await run(`document.querySelector('[aria-label="Xóa ${updatedName}"]').click()`);
+  await wait('document.querySelector("[role=dialog]")');
+  assert.equal(
+    await run('document.querySelector("[role=dialog]").textContent.includes(' + JSON.stringify(email) + ')'),
+    true,
+  );
+  await run('document.querySelector("[role=dialog] button[type=submit]").click()');
+  await wait('!document.querySelector("[role=dialog]")');
+  assert.equal((await api('GET', `/admin/users?keyword=${encodeURIComponent(email)}`)).data.totalElements, 0);
+  accountDeleted = true;
+  report.checks.push('Delete confirmation soft deletes account and removes it from the list');
   await run('document.querySelector(".account-menu-trigger").click()');
   await wait('document.querySelector(".account-menu-logout")');
   await run('document.querySelector(".account-menu-logout").click()');
@@ -333,9 +360,9 @@ try {
   await writeFile(resolve(output, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  if (accountId) {
+  if (accountId && !accountDeleted) {
     await api('PUT', `/admin/users/${accountId}/roles`, { roles: ['USER'] });
-    await api('PATCH', `/admin/users/${accountId}/status`, { status: 'DISABLED' });
+    await api('DELETE', `/admin/users/${accountId}`);
   }
   if (roleId) await api('DELETE', `/admin/roles/${roleId}`);
   socket?.close();

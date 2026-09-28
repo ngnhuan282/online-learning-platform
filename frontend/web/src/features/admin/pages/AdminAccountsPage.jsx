@@ -18,13 +18,14 @@ import {
 } from '@mui/material';
 import {
   Add,
+  EditOutlined,
+  DeleteOutlineOutlined,
   Download,
   PeopleOutlined,
   PersonAddAlt,
   LockOutlined,
   LockOpenOutlined,
   VisibilityOutlined,
-  VpnKeyOutlined,
   Search,
   RestartAlt,
   VerifiedUserOutlined,
@@ -37,7 +38,7 @@ import { can, csvCell, date, download, initials, number } from '../utils/adminUt
 import { PageHeading, StatCard, LoadState } from '../components/AdminUi';
 
 const statuses = { ACTIVE: 'Hoạt động', LOCKED: 'Đã khóa', DISABLED: 'Vô hiệu hóa' };
-const emptyForm = { fullName: '', email: '', password: '' };
+const emptyForm = { fullName: '', email: '', password: '', status: 'ACTIVE' };
 
 export default function AdminAccountsPage() {
   const { user } = useAuth();
@@ -55,9 +56,10 @@ export default function AdminAccountsPage() {
   const [retry, setRetry] = useState(0);
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [selectedRoles, setSelectedRoles] = useState([]);
+  const [selectedRoles, setSelectedRoles] = useState(['USER']);
   const [busy, setBusy] = useState(false);
   const [mutationError, setMutationError] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -94,8 +96,25 @@ export default function AdminAccountsPage() {
   function open(type, target) {
     setMutationError(null);
     setModal({ type, target });
-    setForm(target ? { ...emptyForm, fullName: target.fullName } : emptyForm);
-    setSelectedRoles(target?.roles || []);
+    setForm(target ? { ...emptyForm, fullName: target.fullName, email: target.email } : emptyForm);
+    setSelectedRoles(
+      target?.roles ||
+        [state.roles.find(r => r.name === 'USER')?.name || state.roles[0]?.name].filter(Boolean),
+    );
+    if (type === 'detail') {
+      setDetailLoading(true);
+      userApi
+        .adminGetUser(target.id)
+        .then(result =>
+          setModal(current =>
+            current?.type === 'detail' && current.target.id === target.id
+              ? { ...current, target: result.data }
+              : current,
+          ),
+        )
+        .catch(setMutationError)
+        .finally(() => setDetailLoading(false));
+    }
   }
   const showCreate = modal?.type === 'create' || (params.get('create') === '1' && can(user, 'USER_CREATE'));
   function close() {
@@ -115,15 +134,20 @@ export default function AdminAccountsPage() {
     setBusy(true);
     setMutationError(null);
     try {
-      if (showCreate) await userApi.adminCreateUser(form);
-      else if (modal.type === 'roles') await userApi.adminUpdateRoles(modal.target.id, selectedRoles);
+      if (showCreate) await userApi.adminCreateUser({ ...form, roles: selectedRoles });
+      else if (modal.type === 'edit')
+        await userApi.adminUpdateUser(modal.target.id, {
+          fullName: form.fullName.trim(),
+          roles: selectedRoles,
+        });
+      else if (modal.type === 'delete') await userApi.adminDeleteUser(modal.target.id);
       else if (modal.type === 'status')
         await userApi.adminUpdateStatus(
           modal.target.id,
           modal.target.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE',
         );
-      else await userApi.adminUpdateUser(modal.target.id, { fullName: form.fullName });
-      toast('Đã lưu thay đổi tài khoản.');
+      else return;
+      toast(modal?.type === 'delete' ? 'Đã xóa mềm tài khoản.' : 'Đã lưu thay đổi tài khoản.');
       setModal(null);
       setForm(emptyForm);
       if (params.has('create')) {
@@ -133,7 +157,9 @@ export default function AdminAccountsPage() {
       }
       setRetry(r => r + 1);
     } catch (error) {
-      setMutationError(error);
+      setMutationError(
+        error.code === 'EMAIL_ALREADY_EXISTS' ? new Error('Email đã tồn tại trong hệ thống.') : error,
+      );
     } finally {
       setBusy(false);
     }
@@ -169,8 +195,13 @@ export default function AdminAccountsPage() {
           Xuất CSV trang này
         </Button>
         {can(user, 'USER_CREATE') && (
-          <Button variant="contained" startIcon={<Add />} onClick={() => open('create')}>
-            Thêm người dùng mới
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            disabled={state.loading || Boolean(state.error)}
+            onClick={() => open('create')}
+          >
+            Thêm tài khoản
           </Button>
         )}
       </PageHeading>
@@ -341,14 +372,25 @@ export default function AdminAccountsPage() {
                             </span>
                           </Tooltip>
                         )}
-                        {can(user, 'USER_ROLES_ASSIGN') && (
-                          <Tooltip title="Gán vai trò">
-                            <IconButton
-                              aria-label={`Gán vai trò ${row.fullName}`}
-                              onClick={() => open('roles', row)}
-                            >
-                              <VpnKeyOutlined fontSize="small" />
+                        {can(user, 'USER_UPDATE') && (
+                          <Tooltip title="Sửa tài khoản">
+                            <IconButton aria-label={`Sửa ${row.fullName}`} onClick={() => open('edit', row)}>
+                              <EditOutlined fontSize="small" />
                             </IconButton>
+                          </Tooltip>
+                        )}
+                        {can(user, 'USER_DELETE') && (
+                          <Tooltip title="Xóa tài khoản">
+                            <span>
+                              <IconButton
+                                color="error"
+                                disabled={row.id === user.id}
+                                aria-label={`Xóa ${row.fullName}`}
+                                onClick={() => open('delete', row)}
+                              >
+                                <DeleteOutlineOutlined fontSize="small" />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         )}
                       </div>
@@ -408,16 +450,18 @@ export default function AdminAccountsPage() {
         <form onSubmit={save}>
           <DialogTitle>
             {showCreate
-              ? 'Thêm người dùng mới'
-              : modal?.type === 'roles'
-                ? 'Gán vai trò tài khoản'
-                : modal?.type === 'status'
-                  ? 'Xác nhận thay đổi trạng thái'
-                  : 'Thông tin tài khoản'}
+              ? 'Thêm tài khoản'
+              : modal?.type === 'edit'
+                ? 'Sửa tài khoản và vai trò'
+                : modal?.type === 'delete'
+                  ? 'Xác nhận xóa tài khoản'
+                  : modal?.type === 'status'
+                    ? 'Xác nhận thay đổi trạng thái'
+                    : 'Thông tin tài khoản'}
           </DialogTitle>
           <DialogContent className="admin-dialog-content">
             <LoadState error={mutationError} />
-            {showCreate ? (
+            {showCreate || modal?.type === 'edit' ? (
               <>
                 <TextField
                   autoFocus
@@ -425,7 +469,7 @@ export default function AdminAccountsPage() {
                   label="Họ và tên"
                   value={form.fullName}
                   onChange={e => setForm({ ...form, fullName: e.target.value })}
-                  slotProps={{ htmlInput: { maxLength: 100 } }}
+                  slotProps={{ htmlInput: { minLength: 2, maxLength: 100 } }}
                 />
                 <TextField
                   required
@@ -433,48 +477,77 @@ export default function AdminAccountsPage() {
                   type="email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
+                  disabled={!showCreate}
+                  helperText={
+                    !showCreate ? 'Email là định danh tài khoản và hiện không hỗ trợ thay đổi.' : undefined
+                  }
                   slotProps={{ htmlInput: { maxLength: 254 } }}
                 />
-                <TextField
-                  required
-                  label="Mật khẩu khởi tạo"
-                  type="password"
-                  autoComplete="new-password"
-                  helperText="8–72 ký tự, có chữ hoa, chữ thường và số."
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  slotProps={{ htmlInput: { minLength: 8, maxLength: 72 } }}
-                />
-                <Alert severity="info">
-                  Tài khoản mới có vai trò USER. Bạn có thể gán thêm vai trò sau khi tạo.
-                </Alert>
-              </>
-            ) : modal?.type === 'roles' ? (
-              <>
-                <p>
-                  {modal.target.fullName} · {modal.target.email}
-                </p>
-                {state.roles.map(r => (
-                  <FormControlLabel
-                    key={r.id}
-                    control={
-                      <Checkbox
-                        checked={selectedRoles.includes(r.name)}
-                        disabled={busy || (modal.target.id === user.id && r.name === 'ADMIN')}
-                        onChange={e =>
-                          setSelectedRoles(current =>
-                            e.target.checked ? [...current, r.name] : current.filter(code => code !== r.name),
-                          )
-                        }
-                      />
-                    }
-                    label={`${r.label} (${r.name})`}
+                {showCreate && (
+                  <TextField
+                    required
+                    label="Mật khẩu khởi tạo"
+                    type="password"
+                    autoComplete="new-password"
+                    helperText="8–72 ký tự, có chữ hoa, chữ thường và số."
+                    value={form.password}
+                    onChange={e => setForm({ ...form, password: e.target.value })}
+                    slotProps={{
+                      htmlInput: {
+                        minLength: 8,
+                        maxLength: 72,
+                        pattern: '(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).*',
+                      },
+                    }}
                   />
-                ))}
-                <Alert severity="info">
-                  Quyền ở các service khóa học, học tập và thanh toán cập nhật khi cấp access token mới.
-                </Alert>
+                )}
+                {showCreate && can(user, 'USER_STATUS_UPDATE') && (
+                  <TextField
+                    select
+                    label="Trạng thái"
+                    value={form.status}
+                    onChange={e => setForm({ ...form, status: e.target.value })}
+                  >
+                    {Object.entries(statuses).map(([code, label]) => (
+                      <MenuItem key={code} value={code}>
+                        {label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+                <strong>Vai trò</strong>
+                {state.roles
+                  .filter(r => can(user, 'USER_ROLES_ASSIGN') || selectedRoles.includes(r.name))
+                  .map(r => (
+                    <FormControlLabel
+                      key={r.id}
+                      control={
+                        <Checkbox
+                          checked={selectedRoles.includes(r.name)}
+                          disabled={
+                            busy ||
+                            !can(user, 'USER_ROLES_ASSIGN') ||
+                            (modal?.target?.id === user.id && r.name === 'ADMIN')
+                          }
+                          onChange={e =>
+                            setSelectedRoles(current =>
+                              e.target.checked
+                                ? [...current, r.name]
+                                : current.filter(code => code !== r.name),
+                            )
+                          }
+                        />
+                      }
+                      label={`${r.label} (${r.name})`}
+                    />
+                  ))}
+                {!selectedRoles.length && <Alert severity="error">Chọn ít nhất một vai trò.</Alert>}
               </>
+            ) : modal?.type === 'delete' ? (
+              <Alert severity="warning">
+                Xóa mềm tài khoản <strong>{modal.target.fullName}</strong> ({modal.target.email})? Tài khoản
+                sẽ không còn đăng nhập được. Dữ liệu học tập và thanh toán được giữ lại.
+              </Alert>
             ) : modal?.type === 'status' ? (
               <p>
                 Bạn muốn {modal.target.status === 'ACTIVE' ? 'khóa' : 'mở lại'} tài khoản{' '}
@@ -483,15 +556,13 @@ export default function AdminAccountsPage() {
             ) : (
               modal && (
                 <>
-                  <TextField
-                    label="Họ tên"
-                    required
-                    value={form.fullName}
-                    onChange={e => setForm({ ...form, fullName: e.target.value })}
-                    disabled={!can(user, 'USER_UPDATE')}
-                    slotProps={{ htmlInput: { maxLength: 100 } }}
-                  />
+                  {detailLoading && <div role="status">Đang tải chi tiết tài khoản...</div>}
+                  <TextField label="Họ tên" value={modal.target.fullName} disabled />
                   <TextField label="Email" value={modal.target.email} disabled />
+                  <p>
+                    Vai trò: {modal.target.roles.map(roleLabel).join(', ')} · Trạng thái:{' '}
+                    {statuses[modal.target.status]}
+                  </p>
                   <p>
                     ID: {modal.target.id}
                     <br />
@@ -507,13 +578,14 @@ export default function AdminAccountsPage() {
             <Button onClick={close} disabled={busy}>
               Đóng
             </Button>
-            {(showCreate || modal?.type !== 'detail' || can(user, 'USER_UPDATE')) && (
+            {(showCreate || ['edit', 'delete', 'status'].includes(modal?.type)) && (
               <Button
                 variant="contained"
+                color={modal?.type === 'delete' ? 'error' : 'primary'}
                 type="submit"
-                disabled={busy || (modal?.type === 'roles' && !selectedRoles.length)}
+                disabled={busy || ((showCreate || modal?.type === 'edit') && !selectedRoles.length)}
               >
-                {busy ? 'Đang lưu...' : 'Lưu thay đổi'}
+                {busy ? 'Đang xử lý...' : modal?.type === 'delete' ? 'Xóa tài khoản' : 'Lưu thay đổi'}
               </Button>
             )}
           </DialogActions>

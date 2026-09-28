@@ -4,12 +4,13 @@ import com.elearning.auth.common.exception.AppException;
 import com.elearning.auth.common.exception.ErrorCode;
 import com.elearning.auth.common.response.ApiResponse;
 import com.elearning.auth.common.response.PageResponse;
+import com.elearning.auth.dto.AdminCreateUserRequest;
+import com.elearning.auth.dto.AdminUpdateUserRequest;
 import com.elearning.auth.dto.AdminUserResponse;
-import com.elearning.auth.dto.RegisterRequest;
-import com.elearning.auth.dto.UpdateProfileRequest;
 import com.elearning.auth.dto.UpdateUserRolesRequest;
 import com.elearning.auth.dto.UpdateUserStatusRequest;
 import com.elearning.auth.entity.enums.UserStatus;
+import com.elearning.auth.security.AdminAccess;
 import com.elearning.auth.service.AdminManagementService;
 import com.elearning.auth.service.UserService;
 import jakarta.validation.Valid;
@@ -25,10 +26,12 @@ public class AdminUserController {
     private final UserService userService;
 
     private final AdminManagementService admin;
+    private final AdminAccess access;
 
-    public AdminUserController(UserService userService, AdminManagementService admin) {
+    public AdminUserController(UserService userService, AdminManagementService admin, AdminAccess access) {
         this.admin = admin;
         this.userService = userService;
+        this.access = access;
     }
 
     @GetMapping
@@ -75,20 +78,36 @@ public class AdminUserController {
     @PostMapping
     @PreAuthorize("@adminAccess.allowed(authentication, 'USER_CREATE')")
     public ApiResponse<AdminUserResponse> create(
-        @Valid @RequestBody RegisterRequest request,
+        @Valid @RequestBody AdminCreateUserRequest request,
         Authentication auth
     ) {
-        return ApiResponse.success(admin.createUser(request, getUserId(auth)));
+        return ApiResponse.success(
+            admin.createUser(
+                request,
+                getUserId(auth),
+                access.allowed(auth, "USER_ROLES_ASSIGN"),
+                access.allowed(auth, "USER_STATUS_UPDATE")
+            )
+        );
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("@adminAccess.allowed(authentication, 'USER_UPDATE')")
     public ApiResponse<AdminUserResponse> update(
         @PathVariable Long id,
-        @Valid @RequestBody UpdateProfileRequest request,
+        @Valid @RequestBody AdminUpdateUserRequest request,
         Authentication auth
     ) {
-        return ApiResponse.success(admin.updateUser(id, request, getUserId(auth)));
+        return ApiResponse.success(
+            admin.updateUser(id, request, getUserId(auth), access.allowed(auth, "USER_ROLES_ASSIGN"))
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@adminAccess.allowed(authentication, 'USER_DELETE')")
+    public ApiResponse<Void> delete(@PathVariable Long id, Authentication auth) {
+        admin.deleteUser(id, getUserId(auth));
+        return ApiResponse.success(null);
     }
 
     private Long getUserId(Authentication authentication) {
