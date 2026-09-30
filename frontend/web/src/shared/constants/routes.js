@@ -9,4 +9,5 @@ export const ROUTES = Object.freeze({
   PAYMENT_RESULT: '/payment/result',
   PAYMENT_HISTORY: '/payment/history',
   ADMIN_ANALYTICS: '/admin/analytics',
+  ADMIN_QUIZZES: '/admin/quizzes',
 });

@@ -92,7 +92,23 @@ Gateway removes incoming `X-User-Id`, `X-User-Role` and `X-User-Roles`; services
 
 Protected routes retain the requested pathname, query string and hash through login/register navigation and successful registration. After login, the form returns to that internal destination; without one it uses the role-based default. External URLs and login/register destinations are rejected by the existing redirect check.
 
-Successful login data includes `{ accessToken, tokenType, expiresIn, user }`; `useAuth().login(values)` calls the existing authApi and establishes the session. `establishSession(response.data)` remains available. User contains `{ id, fullName, email, roles }`. AuthProvider restores persisted sessions using `/api/v1/users/me`; guards consume the returned user roles, not decoded JWT roles. Session storage keeps only the access token, with an in-memory fallback when storage is blocked. Passwords and backend secrets are never persisted. Decoding claims in the browser does not verify the signature.
+Successful login data includes `{ accessToken, tokenType, expiresIn, user }`; `useAuth().login(values)` calls the existing authApi and establishes the session. `establishSession(response.data)` remains available. User contains `{ id, fullName, email, roles }`. AuthProvider restores persisted sessions using `/api/v1/users/me`; guards consume the returned user roles, not decoded JWT roles. Auth storage keeps only the access token, with an in-memory fallback when storage is blocked. The quiz UI separately keeps the current attempt's answer draft in session storage, keyed by user, quiz and attempt; it is not an authentication credential. Passwords and backend secrets are never persisted. Decoding claims in the browser does not verify the signature.
+
+## User quiz attempts and answer review
+
+All paths below require an authenticated user. Published quiz questions require enrollment in the course; the question payload omits correct-answer flags. Draft quizzes are not available to learners.
+
+| Method / path | Request | Data / status |
+| --- | --- | --- |
+| GET `/api/v1/learning/quizzes/{quizId}` | None | Published quiz without answer key / 200 |
+| POST `/api/v1/learning/quizzes/{quizId}/attempts` | None | In-progress attempt summary / 200; resumes an unexpired attempt |
+| POST `/api/v1/learning/quizzes/attempts/{attemptId}/submit` | `{ "answers": [{ "questionId": 1, "optionIds": [2] }] }` | Graded attempt summary / 200 |
+| GET `/api/v1/learning/quizzes/{quizId}/result` | None | Latest graded attempt summary / 200 |
+| GET `/api/v1/learning/quizzes/attempts/{attemptId}/review` | None | Graded attempt with answer review / 200 |
+
+Each question has a positive point value. A single-choice question accepts at most one option; a multiple-choice question requires the exact set of correct options. A correct question earns all its points, otherwise zero. Omitted questions earn zero. `score` is the rounded percentage of points earned over available points; `passed` is `score >= passingScore`. Duplicate question/option IDs, unknown IDs and options from another question are rejected with 400. An attempt can be submitted only once; an expired or already graded attempt returns 409. A later start creates a new attempt after grading.
+
+Review is specific to one attempt. It returns `attemptId`, `quizId`, `courseId`, `quizTitle`, `score`, `passed`, `passingScore`, `startedAt`, `submittedAt`, and ordered `questions`. Each question includes `id`, `questionText`, `questionType`, `position`, `points`, `pointsAwarded`, `answered`, `correct`, and ordered `options`. Each option includes `id`, `optionText`, `position`, `selected`, and `correct`. Only the attempt owner can read it: another user's attempt returns 404, and an ungraded attempt returns 409. The user result page uses `/quizzes/attempts/{attemptId}/result`; the older `/quizzes/{quizId}/result` route resolves the latest graded attempt for compatibility.
 
 Protected requests returning 401 share one cookie refresh operation, save the new access token through the existing storage abstraction, and retry once. Login/register/refresh/logout never trigger automatic refresh. A failed refresh or a second 401 clears the matching local session. Late responses cannot replace or clear a newer login. Startup with a missing/expired access token tries refresh, then loads the authoritative profile from `/users/me`.
 

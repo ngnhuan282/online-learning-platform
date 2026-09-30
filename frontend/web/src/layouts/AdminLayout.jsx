@@ -7,6 +7,7 @@ import {
   PeopleOutlined,
   AdminPanelSettingsOutlined,
   MenuBookOutlined,
+  QuizOutlined,
   HistoryOutlined,
   Menu,
   Search,
@@ -30,6 +31,7 @@ const menu = [
     permission: 'ROLE_VIEW',
   },
   { to: '/admin/courses', label: 'Khóa học Tiếng Anh', icon: MenuBookOutlined, permission: 'COURSE_VIEW' },
+  { to: ROUTES.ADMIN_QUIZZES, label: 'Quản lý quiz', icon: QuizOutlined, permission: 'ADMIN_ACCESS', adminOnly: true },
   { to: '/admin/audit', label: 'Nhật ký quản trị', icon: HistoryOutlined, permission: 'AUDIT_VIEW' },
 ];
 
@@ -57,7 +59,7 @@ export default function AdminLayout() {
           <div className="admin-menu-label">QUẢN TRỊ HỆ THỐNG</div>
           <nav aria-label="Quản trị">
             {menu
-              .filter(item => can(user, item.permission))
+              .filter(item => can(user, item.permission) && (!item.adminOnly || user?.roles?.includes('ADMIN')))
               .map(({ to, label, icon: Icon, end }) => (
                 <NavLink key={to} to={to} end={end} onClick={() => setOpen(false)}>
                   <Icon fontSize="small" />

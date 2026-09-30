@@ -5,6 +5,8 @@ import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
 import { demoCourseProgress } from '../data/learningDemoData';
 import useToast from '../../../shared/hooks/useToast';
+import ErrorState from '../../../shared/components/ErrorState';
+import '../styles/quiz.css';
 
 const DEFAULT_LESSON_IDS = [1, 2, 3, 4, 5];
 
@@ -21,6 +23,9 @@ export default function LearningPage() {
   const [updatingLessonId, setUpdatingLessonId] = useState(null);
   const [error, setError] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [courseQuizzes, setCourseQuizzes] = useState([]);
+  const [quizError, setQuizError] = useState(null);
+  const [quizzesLoading, setQuizzesLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +59,35 @@ export default function LearningPage() {
     };
   }, [courseId]);
 
+  useEffect(() => {
+    if (loading || usingFallback) return undefined;
+    let active = true;
+    Promise.resolve().then(() => {
+      if (!active) return;
+      setQuizzesLoading(true);
+      setCourseQuizzes([]);
+      setQuizError(null);
+    });
+    learningApi
+      .getCourseQuizzes(courseId)
+      .then(response => {
+        if (!active) return;
+        setCourseQuizzes(response.data ?? []);
+        setQuizError(null);
+      })
+      .catch(loadError => {
+        if (!active) return;
+        setCourseQuizzes([]);
+        setQuizError(loadError);
+      })
+      .finally(() => {
+        if (active) setQuizzesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [courseId, loading, usingFallback]);
+
   const progressByLesson = useMemo(() => {
     const next = new Map();
     progressItems.forEach(item => next.set(item.lessonId, item));
@@ -63,10 +97,12 @@ export default function LearningPage() {
   const lessons = useMemo(() => {
     const ids = new Set(DEFAULT_LESSON_IDS);
     progressItems.forEach(item => ids.add(item.lessonId));
-    return [...ids].sort((a, b) => a - b).map(lessonId => ({
-      lessonId,
-      progress: progressByLesson.get(lessonId),
-    }));
+    return [...ids]
+      .sort((a, b) => a - b)
+      .map(lessonId => ({
+        lessonId,
+        progress: progressByLesson.get(lessonId),
+      }));
   }, [progressByLesson, progressItems]);
 
   const selectedProgress = progressByLesson.get(selectedLessonId);
@@ -139,8 +175,8 @@ export default function LearningPage() {
             </div>
             <h2>Lesson #{selectedLessonId}</h2>
             <p>
-              Mở bài học sẽ ghi nhận trạng thái đang học. Khi bạn hoàn tất nội dung, hãy đánh dấu hoàn
-              thành để cập nhật Course Progress.
+              Mở bài học sẽ ghi nhận trạng thái đang học. Khi bạn hoàn tất nội dung, hãy đánh dấu hoàn thành
+              để cập nhật Course Progress.
             </p>
             <button
               className="button button-primary"
@@ -164,9 +200,7 @@ export default function LearningPage() {
             <h2>Tiến độ bài học</h2>
             {lessons.map(item => (
               <button
-                className={`lesson-progress-item ${
-                  item.lessonId === selectedLessonId ? 'is-selected' : ''
-                }`}
+                className={`lesson-progress-item ${item.lessonId === selectedLessonId ? 'is-selected' : ''}`}
                 key={item.lessonId}
                 onClick={() => openLesson(item.lessonId)}
                 type="button"
@@ -180,6 +214,27 @@ export default function LearningPage() {
             ))}
           </aside>
         </div>
+        {!usingFallback && (
+          <section className="course-quiz-section">
+            <h2>Bài kiểm tra</h2>
+            {quizzesLoading && <p>Đang tải quiz...</p>}
+            {quizError && <ErrorState error={quizError} title="Không thể tải quiz" />}
+            {!quizzesLoading && !quizError && courseQuizzes.length === 0 && (
+              <p>Khóa học chưa có quiz được xuất bản.</p>
+            )}
+            <div className="course-quiz-list">
+              {courseQuizzes.map(quiz => (
+                <Link className="course-quiz-link" to={`/quizzes/${quiz.id}`} key={quiz.id}>
+                  <strong>{quiz.title}</strong>
+                  <span>
+                    {quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} phút · ` : ''}Điểm đạt{' '}
+                    {quiz.passingScore}%
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </section>
   );

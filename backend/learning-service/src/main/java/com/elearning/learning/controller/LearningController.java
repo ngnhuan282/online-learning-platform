@@ -5,6 +5,7 @@ import com.elearning.learning.common.exception.ErrorCode;
 import com.elearning.learning.common.response.ApiResponse;
 import com.elearning.learning.dto.*;
 import com.elearning.learning.service.LearningService;
+import com.elearning.learning.service.QuizService;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import org.springframework.web.bind.annotation.*;
@@ -14,9 +15,11 @@ import org.springframework.web.bind.annotation.*;
 public class LearningController {
 
     private final LearningService learning;
+    private final QuizService quizzes;
 
-    public LearningController(LearningService learning) {
+    public LearningController(LearningService learning, QuizService quizzes) {
         this.learning = learning;
+        this.quizzes = quizzes;
     }
 
     @GetMapping("/dashboard")
@@ -61,13 +64,37 @@ public class LearningController {
     }
 
     @GetMapping("/quizzes/{quizId}")
-    ApiResponse<QuizResponse> quiz(@PathVariable Long quizId) {
-        return ApiResponse.success(learning.getQuiz(quizId));
+    ApiResponse<QuizResponse> quiz(Principal principal, @PathVariable Long quizId) {
+        return ApiResponse.success(quizzes.getPublished(userId(principal), quizId));
+    }
+
+    @GetMapping("/courses/{courseId}/quizzes")
+    ApiResponse<?> courseQuizzes(Principal principal, @PathVariable Long courseId) {
+        return ApiResponse.success(quizzes.listPublished(userId(principal), courseId));
+    }
+
+    @PostMapping("/quizzes/{quizId}/attempts")
+    ApiResponse<QuizResultResponse> startQuiz(Principal principal, @PathVariable Long quizId) {
+        return ApiResponse.success(quizzes.start(userId(principal), quizId));
+    }
+
+    @PostMapping("/quizzes/attempts/{attemptId}/submit")
+    ApiResponse<QuizResultResponse> submitQuiz(
+        Principal principal,
+        @PathVariable Long attemptId,
+        @Valid @RequestBody QuizSubmissionRequest request
+    ) {
+        return ApiResponse.success(quizzes.submit(userId(principal), attemptId, request));
     }
 
     @GetMapping("/quizzes/{quizId}/result")
     ApiResponse<QuizResultResponse> latestQuizResult(Principal principal, @PathVariable Long quizId) {
-        return ApiResponse.success(learning.getLatestQuizResult(userId(principal), quizId));
+        return ApiResponse.success(quizzes.latestResult(userId(principal), quizId));
+    }
+
+    @GetMapping("/quizzes/attempts/{attemptId}/review")
+    ApiResponse<QuizReviewResponse> reviewQuiz(Principal principal, @PathVariable Long attemptId) {
+        return ApiResponse.success(quizzes.review(userId(principal), attemptId));
     }
 
     @GetMapping("/notifications")

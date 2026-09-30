@@ -6,6 +6,7 @@ import com.elearning.learning.dto.*;
 import com.elearning.learning.entity.Enrollment;
 import com.elearning.learning.entity.LessonProgress;
 import com.elearning.learning.entity.Notification;
+import com.elearning.learning.entity.enums.AttemptStatus;
 import com.elearning.learning.entity.enums.EnrollmentStatus;
 import com.elearning.learning.entity.enums.NotificationType;
 import com.elearning.learning.entity.enums.ProgressStatus;
@@ -22,20 +23,17 @@ public class LearningServiceImpl implements LearningService {
 
     private final EnrollmentRepository enrollments;
     private final LessonProgressRepository progress;
-    private final QuizRepository quizzes;
     private final QuizAttemptRepository attempts;
     private final NotificationRepository notifications;
 
     public LearningServiceImpl(
         EnrollmentRepository enrollments,
         LessonProgressRepository progress,
-        QuizRepository quizzes,
         QuizAttemptRepository attempts,
         NotificationRepository notifications
     ) {
         this.enrollments = enrollments;
         this.progress = progress;
-        this.quizzes = quizzes;
         this.attempts = attempts;
         this.notifications = notifications;
     }
@@ -48,7 +46,8 @@ public class LearningServiceImpl implements LearningService {
             progress.countByUserIdAndStatus(userId, ProgressStatus.COMPLETED),
             notifications.countByUserIdAndReadAtIsNull(userId),
             getMyEnrollments(userId).stream().limit(5).toList(),
-            attempts.findTop5ByUserIdOrderByStartedAtDesc(userId).stream().map(QuizResultResponse::from).toList(),
+            attempts.findTop5ByUserIdAndStatusOrderByIdDesc(userId, AttemptStatus.GRADED)
+                .stream().map(QuizResultResponse::from).toList(),
             getNotifications(userId).stream().limit(5).toList()
         );
     }
@@ -117,22 +116,6 @@ public class LearningServiceImpl implements LearningService {
         item.setProgressPercent(100);
         item.setCompletedAt(Instant.now());
         return LessonProgressResponse.from(progress.save(item));
-    }
-
-    @Override
-    public QuizResponse getQuiz(Long quizId) {
-        return quizzes
-            .findWithQuestionsByIdAndPublishedTrue(quizId)
-            .map(QuizResponse::from)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
-    }
-
-    @Override
-    public QuizResultResponse getLatestQuizResult(Long userId, Long quizId) {
-        return attempts
-            .findTopByUserIdAndQuizIdOrderByStartedAtDesc(userId, quizId)
-            .map(QuizResultResponse::from)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
     @Override

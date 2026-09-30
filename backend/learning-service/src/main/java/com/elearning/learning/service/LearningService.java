@@ -16,10 +16,6 @@ public interface LearningService {
 
     LessonProgressResponse markLessonComplete(Long userId, Long courseId, Long lessonId);
 
-    QuizResponse getQuiz(Long quizId);
-
-    QuizResultResponse getLatestQuizResult(Long userId, Long quizId);
-
     List<NotificationResponse> getNotifications(Long userId);
 
     NotificationResponse markNotificationRead(Long userId, Long notificationId);
