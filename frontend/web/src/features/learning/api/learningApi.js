@@ -11,7 +11,18 @@ export const learningApi = {
   markLessonComplete: (courseId, lessonId) =>
     axiosClient.patch(ENDPOINTS.learning.lessonComplete(courseId, lessonId)),
   getQuiz: quizId => axiosClient.get(ENDPOINTS.learning.quiz(quizId)),
+  getCourseQuizzes: courseId => axiosClient.get(ENDPOINTS.learning.courseQuizzes(courseId)),
+  startQuiz: quizId => axiosClient.post(ENDPOINTS.learning.quizStart(quizId)),
+  submitQuiz: (attemptId, answers) =>
+    axiosClient.post(ENDPOINTS.learning.quizSubmit(attemptId), { answers }),
   getQuizResult: quizId => axiosClient.get(ENDPOINTS.learning.quizResult(quizId)),
+  getQuizReview: attemptId => axiosClient.get(ENDPOINTS.learning.quizReview(attemptId)),
+  getAdminQuizzes: () => axiosClient.get(ENDPOINTS.learning.adminQuizzes),
+  getAdminQuiz: quizId => axiosClient.get(ENDPOINTS.learning.adminQuiz(quizId)),
+  createQuiz: payload => axiosClient.post(ENDPOINTS.learning.adminQuizzes, payload),
+  updateQuiz: (quizId, payload) => axiosClient.put(ENDPOINTS.learning.adminQuiz(quizId), payload),
+  publishQuiz: quizId => axiosClient.patch(ENDPOINTS.learning.adminQuizPublish(quizId)),
+  deleteQuiz: quizId => axiosClient.delete(ENDPOINTS.learning.adminQuiz(quizId)),
   getNotifications: () => axiosClient.get(ENDPOINTS.learning.notifications),
   markNotificationRead: notificationId => axiosClient.patch(ENDPOINTS.learning.notificationRead(notificationId)),
 };

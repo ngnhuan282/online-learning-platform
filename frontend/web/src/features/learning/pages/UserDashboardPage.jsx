@@ -69,7 +69,11 @@ export default function UserDashboardPage() {
             </div>
             <div className="learning-list">
               {data.recentQuizResults.map(result => (
-                <Link className="learning-row" to={`/quizzes/${result.quizId}/result`} key={result.attemptId}>
+                <Link
+                  className="learning-row"
+                  to={`/quizzes/attempts/${result.attemptId}/result`}
+                  key={result.attemptId}
+                >
                   <span>Quiz #{result.quizId}</span>
                   <ProgressBar value={result.score ?? 0} />
                   <b>{result.score ?? 0}%</b>

@@ -12,6 +12,7 @@ import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
 import PaymentHistoryPage from '../features/payment/pages/PaymentHistoryPage';
 import PaymentResultPage from '../features/payment/pages/PaymentResultPage';
 import PermissionRoute from '../routes/PermissionRoute';
+import RoleRoute from '../routes/RoleRoute';
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
 import AdminAccountsPage from '../features/admin/pages/AdminAccountsPage';
 import AdminRolesPage from '../features/admin/pages/AdminRolesPage';
@@ -62,6 +63,16 @@ const router = createBrowserRouter([
         ),
       },
       { path: 'course', element: <Navigate to="/admin/courses" replace /> },
+      {
+        path: 'quizzes',
+        element: <RoleRoute roles={['ADMIN']} />,
+        children: [{
+          index: true,
+          lazy: async () => ({
+            Component: (await import('../features/learning/pages/AdminQuizPage')).default,
+          }),
+        }],
+      },
       {
         path: 'courses',
         element: <PermissionRoute permission="COURSE_VIEW" />,
@@ -139,7 +150,19 @@ const router = createBrowserRouter([
             }),
           },
           {
+            path: 'quizzes/:quizId',
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/QuizPage')).default,
+            }),
+          },
+          {
             path: 'quizzes/:quizId/result',
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/QuizResultPage')).default,
+            }),
+          },
+          {
+            path: 'quizzes/attempts/:attemptId/result',
             lazy: async () => ({
               Component: (await import('../features/learning/pages/QuizResultPage')).default,
             }),
