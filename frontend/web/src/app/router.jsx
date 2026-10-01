@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import MainLayout from '../layouts/MainLayout';
 import AdminLayout from '../layouts/AdminLayout';
-import UserLayout from '../layouts/UserLayout'; // Thêm import UserLayout
+import UserLayout from '../layouts/UserLayout';
 import ProtectedRoute from '../routes/ProtectedRoute';
 
 import HomePage from '../pages/HomePage';
@@ -96,9 +96,15 @@ const router = createBrowserRouter([
       { path: 'category', element: <Navigate to="/admin/categories" replace /> },
       {
         path: 'categories',
-        lazy: async () => ({
-          Component: (await import('../features/courses/pages/AdminCategoryPage')).default,
-        }),
+        element: <PermissionRoute permission="COURSE_VIEW" />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/courses/pages/AdminCategoryPage')).default,
+            }),
+          },
+        ],
       },
     ],
   },

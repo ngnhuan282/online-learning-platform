@@ -13,14 +13,17 @@ import com.elearning.auth.entity.enums.UserStatus;
 import com.elearning.auth.security.AdminAccess;
 import com.elearning.auth.service.AdminManagementService;
 import com.elearning.auth.service.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/admin/users")
+@Tag(name = "Account administration", description = "Each operation requires its USER_* permission, checked against current database roles")
 public class AdminUserController {
 
     private final UserService userService;
@@ -76,6 +79,7 @@ public class AdminUserController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@adminAccess.allowed(authentication, 'USER_CREATE')")
     public ApiResponse<AdminUserResponse> create(
         @Valid @RequestBody AdminCreateUserRequest request,

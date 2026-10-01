@@ -4,6 +4,7 @@ import useAuth from '../hooks/useAuth';
 import useToast from '../../../shared/hooks/useToast';
 import { getErrorMessage } from '../../../shared/utils/errorUtils';
 import { ROUTES } from '../../../shared/constants/routes';
+import { can } from '../../admin/utils/adminUtils';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import Lock from '@mui/icons-material/Lock';
@@ -88,9 +89,10 @@ export default function AuthForm({ mode }) {
           from.startsWith('/') &&
           !from.startsWith('//') &&
           !from.includes('\\') &&
-          !/^\/(login|register)([/?#]|$)/.test(from)
+          !/^\/(login|register)([/?#]|$)/.test(from) &&
+          (!/^\/admin([/?#]|$)/.test(from) || can(user, 'ADMIN_ACCESS'))
             ? from
-            : user.roles.includes('ADMIN') || user.permissions?.includes('ADMIN_ACCESS')
+            : can(user, 'ADMIN_ACCESS')
               ? '/admin'
               : '/account';
         showToast('Đăng nhập thành công.');

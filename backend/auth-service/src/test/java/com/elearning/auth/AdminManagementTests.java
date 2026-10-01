@@ -84,7 +84,7 @@ class AdminManagementTests {
     }
 
     private JsonNode data(HttpResponse<String> response) {
-        assertThat(response.statusCode()).withFailMessage(response.body()).isEqualTo(200);
+        assertThat(response.statusCode()).withFailMessage(response.body()).isIn(200, 201);
         return mapper.readTree(response.body()).get("data");
     }
 
@@ -93,25 +93,25 @@ class AdminManagementTests {
         User administrator = user("ADMIN");
         String admin = token(administrator, "ADMIN");
         String email = UUID.randomUUID() + "@test.com";
-        JsonNode created = data(
-            request(
-                "POST",
-                "/admin/users",
-                admin,
-                Map.of(
-                    "fullName",
-                    "New Learner",
-                    "email",
-                    email,
-                    "password",
-                    "Password123!",
-                    "roles",
-                    List.of("USER", "ADMIN"),
-                    "status",
-                    "ACTIVE"
-                )
+        var creation = request(
+            "POST",
+            "/admin/users",
+            admin,
+            Map.of(
+                "fullName",
+                "New Learner",
+                "email",
+                email,
+                "password",
+                "Password123!",
+                "roles",
+                List.of("USER", "ADMIN"),
+                "status",
+                "ACTIVE"
             )
         );
+        assertThat(creation.statusCode()).isEqualTo(201);
+        JsonNode created = data(creation);
         long id = created.get("id").asLong();
         assertThat(created.get("roles").toString()).contains("USER", "ADMIN");
         assertThat(created.toString()).doesNotContain("Password123!");
@@ -221,7 +221,9 @@ class AdminManagementTests {
                 0
             )
         );
-        JsonNode role = data(request("POST", "/admin/roles", admin, payload));
+        var creation = request("POST", "/admin/roles", admin, payload);
+        assertThat(creation.statusCode()).isEqualTo(201);
+        JsonNode role = data(creation);
         long id = role.get("id").asLong();
         assertThat(role.get("permissions").toString()).contains("USER_VIEW", "ADMIN_ACCESS", "USER_CREATE");
         payload.put("version", role.get("version").asLong());
@@ -254,7 +256,7 @@ class AdminManagementTests {
     }
 
     @Test
-    void adminCanConfigureDefaultUserPermissionsForExistingAndNewAccounts() throws Exception {
+    void defaultUserCannotInheritLegacyAdminPermissionsAndBuiltInRolesAreImmutable() throws Exception {
         String admin = token(user("ADMIN"), "ADMIN");
         User existing = user("USER");
         String existingToken = token(existing, "USER");
@@ -267,8 +269,7 @@ class AdminManagementTests {
                 "USER",
                 "label",
                 userRole.getLabel(),
-                "permissions",
-                List.of("DASHBOARD_VIEW"),
+                "permissions", List.of("ADMIN_ACCESS", "AUDIT_VIEW"),
                 "version",
                 userRole.getVersion()
             )
@@ -276,12 +277,13 @@ class AdminManagementTests {
         payload.put("description", userRole.getDescription());
         try {
             assertThat(request("PUT", path, existingToken, payload).statusCode()).isEqualTo(403);
-            JsonNode updated = data(request("PUT", path, admin, payload));
-            assertThat(updated.get("systemRole").asBoolean()).isTrue();
-            assertThat(updated.get("permissions").toString()).contains("DASHBOARD_VIEW", "ADMIN_ACCESS");
-            assertThat(request("PUT", path, admin, payload).statusCode()).isEqualTo(409);
-            assertThat(request("GET", "/admin/overview", existingToken, null).statusCode()).isEqualTo(200);
-            assertThat(request("GET", "/admin/users", existingToken, null).statusCode()).isEqualTo(403);
+            assertThat(request("PUT", path, admin, payload).statusCode()).isEqualTo(403);
+            userRole.update(userRole.getLabel(), userRole.getDescription(), Set.of("ADMIN_ACCESS", "AUDIT_VIEW"));
+            roles.saveAndFlush(userRole);
+            assertThat(data(request("GET", "/users/me", existingToken, null)).get("permissions").size())
+                .isZero();
+            assertThat(request("GET", "/admin/overview", existingToken, null).statusCode()).isEqualTo(403);
+            assertThat(request("GET", "/admin/audit", existingToken, null).statusCode()).isEqualTo(403);
 
             String email = UUID.randomUUID() + "@test.com";
             assertThat(
@@ -301,26 +303,11 @@ class AdminManagementTests {
                 )
             );
             assertThat(login.get("user").get("roles").toString()).isEqualTo("[\"USER\"]");
-            assertThat(login.get("user").get("permissions").toString()).contains("DASHBOARD_VIEW");
+            assertThat(login.get("user").get("permissions").size()).isZero();
             String newToken = login.get("accessToken").asString();
-            assertThat(tokens.validate(newToken).get("permissions", List.class)).contains("DASHBOARD_VIEW");
-            assertThat(request("GET", "/admin/overview", newToken, null).statusCode()).isEqualTo(200);
-
-            payload.put("version", updated.get("version").asLong());
-            payload.put("permissions", List.of("ROLE_MANAGE"));
-            assertThat(request("PUT", path, admin, payload).statusCode()).isEqualTo(403);
-            payload.put("permissions", List.of("USER_ROLES_ASSIGN"));
-            assertThat(request("PUT", path, admin, payload).statusCode()).isEqualTo(403);
-            assertThat(request("DELETE", path, admin, null).statusCode()).isEqualTo(403);
-            payload.put("permissions", List.of());
-            data(request("PUT", path, admin, payload));
-            assertThat(request("GET", "/admin/overview", existingToken, null).statusCode()).isEqualTo(403);
+            assertThat(tokens.validate(newToken).get("permissions", List.class)).isEmpty();
             assertThat(request("GET", "/admin/overview", newToken, null).statusCode()).isEqualTo(403);
-            assertThat(data(request("GET", "/admin/audit", admin, null)).toString()).contains(
-                "ROLE_UPDATE",
-                "USER"
-            );
-
+            assertThat(request("DELETE", path, admin, null).statusCode()).isEqualTo(403);
             var adminRole = roles.findByName("ADMIN").orElseThrow();
             payload.put("name", "ADMIN");
             payload.put("version", adminRole.getVersion());
@@ -329,10 +316,8 @@ class AdminManagementTests {
             ).isEqualTo(403);
         } finally {
             var current = roles.findByName("USER").orElseThrow();
-            payload.put("name", "USER");
-            payload.put("permissions", originalPermissions);
-            payload.put("version", current.getVersion());
-            data(request("PUT", path, admin, payload));
+            current.update(current.getLabel(), current.getDescription(), originalPermissions);
+            roles.saveAndFlush(current);
         }
     }
 

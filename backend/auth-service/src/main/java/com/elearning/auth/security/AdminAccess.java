@@ -45,6 +45,8 @@ public class AdminAccess {
         return user
             .getRoles()
             .stream()
+            // USER is the default learner role. Its historical admin grants must never authorize /admin.
+            .filter(role -> !"USER".equals(role.getName()))
             .flatMap(role -> role.getPermissions().stream())
             .collect(Collectors.toSet());
     }

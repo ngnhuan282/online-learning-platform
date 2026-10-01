@@ -80,11 +80,21 @@ Convert entity pages to DTO pages before calling `PageResponse.from(page)`.
 
 ## Authentication and authorization
 
+Auth/User/RBAC OpenAPI is available through Gateway at `/v3/api-docs` and `/swagger-ui.html`. It describes request validation, the shared success/error envelopes, Bearer JWT and the HttpOnly refresh cookie. Password fields are write-only in the schema; no password, password hash, refresh cookie value or token example belongs in documentation or logs.
+
+`POST /api/v1/admin/users` and `POST /api/v1/admin/roles` return 201 with the existing success envelope; updates and deletes return 200. Frontend callers consume the envelope and do not assume that every successful mutation is 200.
+
+For Auth administration, `/users/me` supplies the current `status`, `roles` and `permissions`. Frontend menus and guards use `permissions` and wait for session restoration; the backend remains authoritative and checks current database roles and account status on Auth/User/RBAC operations. A custom role may grant `ADMIN_ACCESS` and individual `USER_*`, `ROLE_*` or audit permissions. A route with only an access token still needs its own resource or ownership check. Security filters and Gateway return the same `ApiError` shape as controller validation failures: 400 invalid request, 401 missing/invalid authentication, 403 missing permission or inactive account, 404 missing resource and 409 conflicting state. Allowed CORS preflights run before authentication.
+
+The built-in `USER` role is reserved for learners and never contributes admin permissions, even if an older database still has `role_permissions` rows for USER. V6 removes those rows and role updates reject changes to both built-in roles. A user can enter `/admin` only through `ADMIN` or an explicitly assigned custom role with `ADMIN_ACCESS`.
+
+This contract covers Auth/User/RBAC. Course, Learning and Payment pages that still use demo fallback data are pending their owners' API integration; demo records are not evidence of backend integration.
+
 Send `Authorization: Bearer <accessToken>`. JWT is signed with HS256 and validates signature, issuer, expiration, issued-at, nonempty subject, `tokenType: access` and `role: USER|ADMIN`. Only Auth exposes token issuance; all services and Gateway verify tokens. Default access-token lifetime is 900 seconds; allowed configuration is 1–86400 seconds. `JWT_SECRET` must be at least 32 UTF-8 bytes of random data and identical across backend processes. HS256 verification keys can also sign tokens; keep them within trusted backend deployments.
 
-JWT role values are `USER` and `ADMIN`. Spring authorities are `ROLE_USER` and `ROLE_ADMIN`. Future privileged service methods must use `@PreAuthorize("hasRole('ADMIN')")`; an authenticated route alone does not enforce business ownership or administrator permissions. Frontend guards only control navigation.
+Built-in JWT roles include `USER` and `ADMIN`; custom roles are also supported. Auth administration uses `@adminAccess.allowed(authentication, 'PERMISSION_CODE')` against the current database state. Other services must enforce their own ownership and authorization rules. Frontend guards only control navigation.
 
-Explicit guest operations: POST login/register, GET course list and a single course, and actuator health. All other operations require a token. Deeper course content is protected. Future route authors must add appropriate ownership/role checks, including any new administrative GET endpoint; broad guest patterns must never expose paid lessons or draft content. VNPay callbacks will need a narrowly scoped guest route plus signature validation when payment implementation begins.
+Explicit guest operations include the four POST Auth endpoints, GET course list and a single course, actuator health, and Auth OpenAPI. All other operations require a token. Deeper course content is protected. Future route authors must add appropriate ownership/permission checks, including any new administrative GET endpoint; broad guest patterns must never expose paid lessons or draft content. VNPay callbacks will need a narrowly scoped guest route plus signature validation when payment implementation begins.
 
 Gateway removes incoming `X-User-Id`, `X-User-Role` and `X-User-Roles`; services derive identity from the signed JWT. CORS uses an allowlist from `CORS_ALLOWED_ORIGINS` and runs before authentication. Requests receive a server-generated `X-Request-ID`; logs omit authorization, payloads and query strings.
 

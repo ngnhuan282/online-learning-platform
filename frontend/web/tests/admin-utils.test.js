@@ -10,9 +10,11 @@ const catalog = [
 
 test('custom roles require explicit admin permission; USER is not admin', () => {
   assert.equal(can({ roles: ['USER'] }, 'USER_VIEW'), false);
-  assert.equal(can({ roles: ['SUPPORT'], permissions: ['USER_VIEW'] }, 'USER_VIEW'), true);
-  assert.equal(can({ roles: ['SUPPORT'], permissions: ['USER_VIEW'] }, 'ROLE_MANAGE'), false);
-  assert.equal(can({ roles: ['ADMIN'] }, 'ROLE_MANAGE'), true);
+  assert.equal(can({ status: 'ACTIVE', roles: ['SUPPORT'], permissions: ['USER_VIEW'] }, 'USER_VIEW'), true);
+  assert.equal(can({ status: 'ACTIVE', roles: ['SUPPORT'], permissions: ['USER_VIEW'] }, 'ROLE_MANAGE'), false);
+  assert.equal(can({ status: 'ACTIVE', roles: ['ADMIN'] }, 'ROLE_MANAGE'), false);
+  assert.equal(can({ status: 'ACTIVE', roles: ['USER'], permissions: ['ADMIN_ACCESS'] }, 'ADMIN_ACCESS'), false);
+  assert.equal(can({ status: 'LOCKED', permissions: ['USER_VIEW'] }, 'USER_VIEW'), false);
 });
 
 test('matrix adds required view permissions and removes dependent permissions', () => {

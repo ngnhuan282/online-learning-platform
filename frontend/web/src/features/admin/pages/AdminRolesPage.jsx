@@ -61,7 +61,7 @@ export default function AdminRolesPage() {
   const dirty = Boolean(
     selected && [...permissions].sort().join() !== [...selected.permissions].sort().join(),
   );
-  const editable = selected && (!selected.systemRole || selected.name === 'USER') && can(user, 'ROLE_MANAGE');
+  const editable = selected && !selected.systemRole && can(user, 'ROLE_MANAGE');
   useEffect(() => {
     if (!dirty) return;
     const beforeUnload = event => {
@@ -189,7 +189,7 @@ export default function AdminRolesPage() {
         <StatCard
           title="VAI TRÒ HỆ THỐNG"
           value={state.roles.filter(r => r.systemRole).length}
-          detail="Không thể xóa; USER được tùy chỉnh quyền"
+          detail="Vai trò mặc định, không thể chỉnh sửa hoặc xóa"
           icon={<LockOutlined />}
           tone="amber"
         />
@@ -297,10 +297,8 @@ export default function AdminRolesPage() {
                 )}
                 {selected.name === 'USER' ? (
                   <Alert severity="info">
-                    ADMIN có thể tùy chỉnh quyền của USER. Thay đổi áp dụng cho tất cả {selected.userCount}{' '}
-                    tài khoản đang mang vai trò USER và các tài khoản đăng ký mới. Để cấp quyền riêng cho một
-                    nhóm người dùng, hãy tạo và gán vai trò tùy chỉnh. USER là vai trò mặc định, không thể
-                    xóa.
+                    USER là vai trò học viên mặc định và không có quyền quản trị. Để cấp quyền quản trị cho
+                    một nhóm tài khoản, hãy tạo và gán thêm vai trò tùy chỉnh.
                   </Alert>
                 ) : selected.systemRole ? (
                   <Alert severity="info">

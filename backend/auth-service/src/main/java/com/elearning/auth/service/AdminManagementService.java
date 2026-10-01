@@ -95,9 +95,8 @@ public class AdminManagementService {
             role = new Role(request.name(), request.label().trim(), request.description(), permissions);
         } else {
             role = roles.findById(id).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
-            // USER is the configurable default for existing and newly registered accounts.
-            // Keep ADMIN's authority fixed and preserve deletion protection for system roles.
-            if (role.isSystemRole() && !"USER".equals(role.getName())) {
+            // Built-in roles are fixed. Admin privileges belong to ADMIN or explicit custom roles.
+            if (role.isSystemRole()) {
                 throw new AppException(ErrorCode.FORBIDDEN);
             }
             if (!role.getName().equals(request.name())) throw new AppException(ErrorCode.BAD_REQUEST);

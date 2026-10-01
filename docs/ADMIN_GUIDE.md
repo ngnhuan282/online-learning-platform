@@ -57,9 +57,9 @@ Doanh thu tính tổng các đơn `PAID` có tiền tệ `VND`, không cộng l�
 6. Mở **Nhật ký quản trị** bằng tài khoản ADMIN để kiểm tra các thao tác vừa thực hiện.
 7. Thử lưu thay đổi cùng một vai trò ở hai cửa sổ: bản lưu sử dụng phiên bản cũ bị từ chối với HTTP 409; tải lại trang để lấy cấu hình mới.
 
-`ADMIN` luôn có toàn quyền và không được sửa/xóa. **ADMIN có thể chỉnh quyền của vai trò USER ngay trong ma trận**: chọn USER, bật/tắt các quyền rồi bấm **Lưu thay đổi**. Quyền áp dụng cho tất cả tài khoản đang mang USER và các tài khoản đăng ký mới; trang hiển thị số tài khoản chịu ảnh hưởng. USER vẫn là vai trò mặc định, không thể đổi mã hoặc xóa. Quyền học tập và quản lý tài khoản cá nhân qua các API hiện có vẫn được giữ; ma trận này quản lý các quyền chức năng quản trị trong catalog. Nếu cấp `ADMIN_ACCESS`, người dùng nhận quyền truy cập khu vực admin theo các chức năng được chọn.
+`ADMIN` luôn có toàn quyền và không được sửa/xóa. `USER` là vai trò học viên mặc định, không cấp quyền quản trị và không thể chỉnh sửa/xóa. Migration V6 xóa các quyền quản trị từng gán cho USER; backend cũng bỏ qua quyền cũ từ vai trò này. Để cấp quyền quản trị có giới hạn, tạo và gán thêm vai trò tùy chỉnh có `ADMIN_ACCESS` và các quyền chức năng cần thiết.
 
-Chỉ ADMIN được quản lý vai trò và gán vai trò cho tài khoản; hai quyền này không thể cấp cho USER hay vai trò tùy chỉnh. Để đặt quyền khác nhau cho một nhóm tài khoản, tạo và gán vai trò tùy chỉnh. Quyền hiệu lực là tổng quyền từ tất cả vai trò được gán. Vai trò tùy chỉnh có người dùng đang gán không thể bị xóa.
+Chỉ ADMIN được quản lý vai trò và gán vai trò cho tài khoản; hai quyền này không thể cấp cho USER hay vai trò tùy chỉnh. Để đặt quyền khác nhau cho một nhóm tài khoản, tạo và gán vai trò tùy chỉnh. Quyền hiệu lực là tổng quyền từ các vai trò tùy chỉnh và ADMIN, không tính quyền quản trị từng gán cho USER. Vai trò tùy chỉnh có người dùng đang gán không thể bị xóa.
 
 Không thể tự khóa tài khoản, tự bỏ ADMIN hoặc loại bỏ quản trị viên hoạt động cuối cùng. Vai trò hỗ trợ không thể sửa/khóa tài khoản ADMIN. Mọi API quản trị đều kiểm tra quyền ở backend; ẩn menu chỉ phục vụ giao diện.
 

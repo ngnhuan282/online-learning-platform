@@ -197,7 +197,7 @@ try {
   await wait('document.querySelector("[role=menu]")');
   assert.deepEqual(
     await run('[...document.querySelectorAll("[role=menuitem]")].map(item => item.textContent.trim())'),
-    ['Hồ sơ cá nhân', 'Đăng xuất'],
+    ['Hồ sơ cá nhân', 'Không gian quản trị', 'Đăng xuất'],
   );
   await screenshot('admin-account-menu');
   await run('document.querySelector(\'[role=menuitem][href="/admin/profile"]\').click()');
@@ -246,36 +246,24 @@ try {
     role.click();
   })()`);
   await wait('document.querySelector(".admin-role-option.selected strong")?.textContent === "USER"');
-  assert.equal(await run('document.querySelector("input[aria-label=DASHBOARD_VIEW]").disabled'), false);
+  assert.equal(await run('document.querySelector("input[aria-label=DASHBOARD_VIEW]").disabled'), true);
   assert.equal(await run('document.querySelector("input[aria-label=ROLE_MANAGE]").disabled'), true);
   assert.equal(
     await run('document.querySelector(".admin-role-detail").textContent.includes("Xóa vai trò")'),
     false,
   );
-  const originalDashboard = await run('document.querySelector("input[aria-label=DASHBOARD_VIEW]").checked');
-  await run('document.querySelector("input[aria-label=DASHBOARD_VIEW]").click()');
-  await wait('document.body.textContent.includes("Có thay đổi chưa được lưu")');
-  await screenshot('user-permissions-editable');
-  await clickText('Hoàn tác');
-  await wait('!document.body.textContent.includes("Có thay đổi chưa được lưu")');
-  assert.equal(
-    await run('document.querySelector("input[aria-label=DASHBOARD_VIEW]").checked'),
-    originalDashboard,
-  );
-  // Check the real USER update endpoint without changing the permissions of existing accounts.
+  await screenshot('user-role-protected');
+  // The built-in learner role is immutable at both UI and API layers.
   const defaultRole = (await api('GET', '/admin/roles')).data.find(role => role.name === 'USER');
-  const unchanged = await api('PUT', `/admin/roles/${defaultRole.id}`, {
+  const rejected = await api('PUT', `/admin/roles/${defaultRole.id}`, {
     name: defaultRole.name,
     label: defaultRole.label,
     description: defaultRole.description,
     permissions: defaultRole.permissions,
     version: defaultRole.version,
   });
-  assert.equal(unchanged.status, 200);
-  assert.deepEqual([...unchanged.data.permissions].sort(), [...defaultRole.permissions].sort());
-  report.checks.push(
-    'USER permissions editable with undo; system deletion protected; real USER save accepted',
-  );
+  assert.equal(rejected.status, 403);
+  report.checks.push('Built-in USER role cannot gain admin rights through UI or API');
   await clickText('Tạo vai trò');
   await wait('document.querySelector("[role=dialog]")');
   await field('Mã vai trò', roleName);
@@ -356,6 +344,29 @@ try {
   await wait('location.pathname === "/login" && document.querySelector("[name=email]")');
   assert.equal(await run('sessionStorage.length'), 0);
   report.checks.push('Admin menu logout clears session and returns to login');
+  const learner = await api('POST', '/auth/login', {
+    email: 'demo.an@example.com',
+    password: 'User123!',
+  }, null);
+  assert.equal(learner.status, 200);
+  assert.deepEqual(learner.data.user.roles, ['USER']);
+  assert.equal(learner.data.user.permissions.includes('ADMIN_ACCESS'), false);
+  assert.equal((await api('GET', '/admin/overview', null, learner.data.accessToken)).status, 403);
+  await navigate('/admin');
+  await wait('location.pathname === "/login" && document.querySelector("[name=email]")');
+  for (const [name, value] of [
+    ['email', 'demo.an@example.com'],
+    ['password', 'User123!'],
+  ])
+    await run(
+      `(() => { const el = document.querySelector('[name=${name}]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', { bubbles: true })); })()`,
+    );
+  await run('document.querySelector("button.auth-submit").click()');
+  await wait('location.pathname === "/account"');
+  await navigate('/admin');
+  await wait('document.querySelector("[role=alert]")?.textContent.includes("không có quyền")');
+  assert.equal(await run('document.querySelector(".admin-shell") === null'), true);
+  report.checks.push('Default USER receives 403 from admin API and cannot enter /admin in React');
   report.checks.push('Audit trail visible; dashboard/accounts/roles fit 390px; no runtime exceptions');
   await writeFile(resolve(output, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));

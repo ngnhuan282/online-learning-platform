@@ -34,7 +34,7 @@ public class SecurityConfig {
             .logout(logout -> logout.disable())
             .authorizeHttpRequests(auth ->
                 auth
-                    .requestMatchers("/actuator/health", "/actuator/health/**")
+                    .requestMatchers("/actuator/health", "/actuator/health/**", "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll()
                     .requestMatchers(
                         HttpMethod.POST,

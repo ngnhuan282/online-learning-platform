@@ -4,6 +4,7 @@ import { Avatar, ButtonBase, Divider, ListItemIcon, ListItemText, Menu, MenuItem
 import { KeyboardArrowDown, Logout, PersonOutlineOutlined } from '@mui/icons-material';
 import useAuth from '../../features/auth/hooks/useAuth';
 import { ROUTES } from '../constants/routes';
+import { can } from '../../features/admin/utils/adminUtils';
 import './AccountMenu.css';
 
 export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = false }) {
@@ -67,6 +68,11 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
           </ListItemIcon>
           <ListItemText>Hồ sơ cá nhân</ListItemText>
         </MenuItem>
+        {can(user, 'ADMIN_ACCESS') && (
+          <MenuItem component={Link} to="/admin" onClick={() => setAnchor(null)}>
+            <ListItemText>Không gian quản trị</ListItemText>
+          </MenuItem>
+        )}
         <Divider />
         <MenuItem onClick={signOut} disabled={isLoggingOut} className="account-menu-logout">
           <ListItemIcon>

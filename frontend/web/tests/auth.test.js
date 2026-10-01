@@ -24,6 +24,7 @@ const load = path => server.ssrLoadModule(`/src/${path}`);
 const { AuthContext, AuthProvider } = await load('features/auth/context/AuthContext.jsx');
 const { default: ProtectedRoute } = await load('routes/ProtectedRoute.jsx');
 const { default: RoleRoute } = await load('routes/RoleRoute.jsx');
+const { default: PermissionRoute } = await load('routes/PermissionRoute.jsx');
 const { default: AdminRolesPage } = await load('features/admin/pages/AdminRolesPage.jsx');
 const { ToastContext } = await load('shared/context/ToastContext.jsx');
 const { default: client } = await load('shared/apis/axiosClient.js');
@@ -129,8 +130,8 @@ test('custom role sessions preserve server permissions and restore successfully'
   assert.deepEqual(auth.user.permissions, custom.permissions);
 });
 
-test('admin can edit and save USER permissions while system-role deletion and ADMIN edits stay protected', async () => {
-  let role = {
+test('system roles are read-only while a custom role can be edited', async () => {
+  const role = {
     id: 1,
     name: 'USER',
     label: 'Học viên',
@@ -146,6 +147,14 @@ test('admin can edit and save USER permissions while system-role deletion and AD
     name: 'ADMIN',
     label: 'Quản trị viên',
     permissions: ['ADMIN_ACCESS', 'DASHBOARD_VIEW', 'ROLE_MANAGE'],
+  };
+  let customRole = {
+    ...role,
+    id: 3,
+    name: 'SUPPORT',
+    label: 'Hỗ trợ',
+    systemRole: false,
+    userCount: 1,
   };
   const catalog = [
     {
@@ -179,27 +188,33 @@ test('admin can edit and save USER permissions while system-role deletion and AD
   let saved = false;
   tokens.setAccessToken(makeToken({ role: 'ADMIN', roles: ['ADMIN'] }));
   client.defaults.adapter = async config => {
-    if (config.url.endsWith('/users/me')) return reply(config, { ...user, roles: ['ADMIN'] });
-    if (config.url.endsWith('/admin/roles/1') && config.method === 'put') {
+    if (config.url.endsWith('/users/me')) return reply(config, { ...user, roles: ['ADMIN'], permissions: ['ADMIN_ACCESS', 'ROLE_VIEW', 'ROLE_MANAGE'] });
+    if (config.url.endsWith('/admin/roles/3') && config.method === 'put') {
       const payload = JSON.parse(config.data);
-      assert.equal(payload.name, 'USER');
+      assert.equal(payload.name, 'SUPPORT');
       assert.equal(payload.version, 0);
       assert.deepEqual(new Set(payload.permissions), new Set(['DASHBOARD_VIEW', 'ADMIN_ACCESS']));
-      role = { ...role, ...payload, version: 1 };
+      customRole = { ...customRole, ...payload, version: 1 };
       saved = true;
-      return reply(config, role);
+      return reply(config, customRole);
     }
-    if (config.url.endsWith('/admin/roles')) return reply(config, [role, adminRole]);
+    if (config.url.endsWith('/admin/roles')) return reply(config, [role, adminRole, customRole]);
     if (config.url.endsWith('/admin/permissions')) return reply(config, catalog);
     throw Error(`Unexpected request: ${config.method} ${config.url}`);
   };
   await mount(h(ToastContext.Provider, { value: () => {} }, h(AdminRolesPage)));
   await flush();
   const checkbox = code => document.querySelector(`input[aria-label="${code}"]`);
-  assert.equal(checkbox('DASHBOARD_VIEW').disabled, false);
+  assert.equal(checkbox('DASHBOARD_VIEW').disabled, true);
   assert.equal(checkbox('ROLE_MANAGE').disabled, true);
-  assert.ok(document.body.textContent.includes('tài khoản đang mang vai trò USER'));
+  assert.ok(document.body.textContent.includes('USER là vai trò học viên mặc định'));
   assert.equal(document.body.textContent.includes('Xóa vai trò'), false);
+  await act(async () =>
+    [...document.querySelectorAll('.admin-role-option')]
+      .find(button => button.textContent.startsWith('SUPPORT'))
+      .click(),
+  );
+  assert.equal(checkbox('DASHBOARD_VIEW').disabled, false);
   await act(async () => checkbox('DASHBOARD_VIEW').click());
   assert.equal(checkbox('ADMIN_ACCESS').checked, true);
   const save = [...document.querySelectorAll('button')].find(
@@ -338,6 +353,32 @@ test('RoleRoute denies USER and allows ADMIN from AuthContext', async () => {
   client.defaults.adapter = async config => reply(config, { ...user, roles: ['USER', 'ADMIN'] });
   await mount(routes);
   assert.match(document.body.textContent, /admin content/);
+});
+
+test('PermissionRoute uses restored custom permissions and shows a clear forbidden state', async () => {
+  const route = h(MemoryRouter, null, h(PermissionRoute, { permission: 'USER_VIEW' }, h('p', null, 'accounts')));
+  tokens.setAccessToken(makeToken());
+  client.defaults.adapter = async config => reply(config, {
+    ...user, permissions: ['ADMIN_ACCESS', 'USER_VIEW'], status: 'ACTIVE',
+  });
+  await mount(route);
+  assert.match(document.body.textContent, /không có quyền truy cập/);
+  assert.doesNotMatch(document.body.textContent, /accounts/);
+  await act(async () => root.unmount());
+  root = null;
+  client.defaults.adapter = async config => reply(config, {
+    ...user, roles: ['SUPPORT'], permissions: ['ADMIN_ACCESS', 'USER_VIEW'], status: 'ACTIVE',
+  });
+  await mount(route);
+  assert.match(document.body.textContent, /accounts/);
+  await act(async () => root.unmount());
+  root = null;
+  client.defaults.adapter = async config => reply(config, {
+    ...user, roles: ['ADMIN'], permissions: ['ADMIN_ACCESS'], status: 'ACTIVE',
+  });
+  await mount(route);
+  assert.match(document.body.textContent, /không có quyền truy cập/);
+  assert.doesNotMatch(document.body.textContent, /accounts/);
 });
 
 test('missing access token restores through one refresh then authoritative me, including StrictMode', async () => {

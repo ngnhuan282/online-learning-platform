@@ -356,10 +356,7 @@ export default function AdminAccountsPage() {
                           <Tooltip title={row.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở tài khoản'}>
                             <span>
                               <IconButton
-                                disabled={
-                                  row.id === user.id ||
-                                  (row.roles.includes('ADMIN') && !user.roles.includes('ADMIN'))
-                                }
+                                disabled={row.id === user.id}
                                 aria-label={`Đổi trạng thái ${row.fullName}`}
                                 onClick={() => open('status', row)}
                               >
@@ -527,7 +524,9 @@ export default function AdminAccountsPage() {
                           disabled={
                             busy ||
                             !can(user, 'USER_ROLES_ASSIGN') ||
-                            (modal?.target?.id === user.id && r.name === 'ADMIN')
+                            (modal?.target?.id === user.id &&
+                              selectedRoles.length === 1 &&
+                              selectedRoles.includes(r.name))
                           }
                           onChange={e =>
                             setSelectedRoles(current =>

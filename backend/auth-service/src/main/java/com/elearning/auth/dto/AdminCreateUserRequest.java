@@ -2,6 +2,7 @@ package com.elearning.auth.dto;
 
 import com.elearning.auth.entity.enums.UserStatus;
 import com.elearning.auth.validation.Utf8Size;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.util.List;
 import java.util.Locale;
@@ -13,6 +14,7 @@ public record AdminCreateUserRequest(
     @Size(min = 8, max = 72)
     @Pattern(regexp = "(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).*")
     @Utf8Size(max = 72)
+    @Schema(accessMode = Schema.AccessMode.WRITE_ONLY)
     String password,
     @Size(min = 1, max = 32) List<@NotBlank @Pattern(regexp = "[A-Z][A-Z0-9_]{1,63}") String> roles,
     UserStatus status

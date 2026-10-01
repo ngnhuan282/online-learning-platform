@@ -44,6 +44,10 @@ public class AuthenticationFilter implements WebFilter, Ordered {
             method == HttpMethod.OPTIONS ||
             path.equals("/actuator/health") ||
             path.startsWith("/actuator/health/") ||
+            path.equals("/v3/api-docs") ||
+            path.startsWith("/v3/api-docs/") ||
+            path.equals("/swagger-ui.html") ||
+            path.startsWith("/swagger-ui/") ||
             publicAuth ||
             (method == HttpMethod.GET &&
                 (path.equals("/api/v1/courses") ||

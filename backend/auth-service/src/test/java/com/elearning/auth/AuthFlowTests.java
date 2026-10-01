@@ -104,6 +104,19 @@ class AuthFlowTests {
     }
 
     @Test
+    void openApiDocumentsAuthContractWithoutCredentialExamples() throws Exception {
+        var response = request("/v3/api-docs", null, null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        JsonNode spec = mapper.readTree(response.body());
+        assertThat(spec.get("paths").get("/api/v1/auth/login")).isNotNull();
+        assertThat(spec.get("paths").get("/api/v1/admin/users")).isNotNull();
+        assertThat(spec.get("paths").get("/api/v1/users/me")).isNotNull();
+        assertThat(spec.get("paths").get("/api/v1/auth/login").get("post").get("responses").get("401"))
+            .isNotNull();
+        assertThat(response.body()).doesNotContain("passwordHash", "password_hash", SECRET);
+    }
+
+    @Test
     void registersNormalizesHashesAndIgnoresCallerRoles() throws Exception {
         String email = email();
         var input = new HashMap<>(registration("  " + email.toUpperCase(Locale.ROOT) + "  "));
@@ -319,10 +332,14 @@ class AuthFlowTests {
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
             )
-        ).isEqualTo(5);
+        ).isEqualTo(6);
         assertThat(jdbc.queryForList("SELECT name FROM roles", String.class)).containsExactlyInAnyOrder(
             "USER",
             "ADMIN"
         );
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'USER'",
+            Integer.class
+        )).isZero();
     }
 }

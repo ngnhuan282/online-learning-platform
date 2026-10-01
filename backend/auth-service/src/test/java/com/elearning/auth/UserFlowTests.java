@@ -215,6 +215,22 @@ class UserFlowTests {
     }
 
     @Test
+    void userCannotReadAnotherProfileThroughAdminEndpoint() throws Exception {
+        User viewer = createUser("viewer_" + UUID.randomUUID() + "@test.com", "Password123!", "Viewer", false);
+        User other = createUser("other_" + UUID.randomUUID() + "@test.com", "Password123!", "Other", false);
+        HttpRequest request = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/v1/admin/users/" + other.getId())
+        )
+            .header("Authorization", "Bearer " + tokenFor(viewer))
+            .GET()
+            .build();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(403);
+        assertThat(mapper.readTree(response.body()).get("code").asString()).isEqualTo("FORBIDDEN");
+        assertThat(response.body()).doesNotContain(other.getEmail());
+    }
+
+    @Test
     void adminCanLockOtherUserAndCannotLockSelf() throws Exception {
         User admin = createUser(
             "admin2_" + UUID.randomUUID() + "@test.com",

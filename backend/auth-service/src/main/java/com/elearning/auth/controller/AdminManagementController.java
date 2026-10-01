@@ -4,14 +4,17 @@ import com.elearning.auth.common.response.ApiResponse;
 import com.elearning.auth.dto.SaveRoleRequest;
 import com.elearning.auth.security.AdminPermission;
 import com.elearning.auth.service.AdminManagementService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/admin")
+@Tag(name = "RBAC administration", description = "Roles, permission catalog, overview and audit; requires the relevant current database permission")
 public class AdminManagementController {
 
     private final AdminManagementService service;
@@ -56,6 +59,7 @@ public class AdminManagementController {
     }
 
     @PostMapping("/roles")
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@adminAccess.allowed(authentication, 'ROLE_MANAGE')")
     public ApiResponse<?> create(@Valid @RequestBody SaveRoleRequest request, Authentication auth) {
         return ApiResponse.success(service.saveRole(null, request, Long.valueOf(auth.getName())));

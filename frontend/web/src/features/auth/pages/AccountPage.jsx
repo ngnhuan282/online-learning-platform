@@ -4,6 +4,7 @@ import useAuth from '../hooks/useAuth';
 import { userApi } from '../api/userApi';
 import Icon from '../../../shared/components/Icon';
 import StatusChip from '../../../shared/components/StatusChip';
+import { can } from '../../admin/utils/adminUtils';
 
 export default function AccountPage() {
   const { user, updateCurrentUser } = useAuth();
@@ -24,7 +25,7 @@ export default function AccountPage() {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const isAdmin = user?.roles?.includes('ADMIN');
+  const hasAdminAccess = can(user, 'ADMIN_ACCESS');
 
   async function handleProfileSubmit(e) {
     e.preventDefault();
@@ -105,7 +106,7 @@ export default function AccountPage() {
           }}
         >
           <div>
-            <span className="eyebrow">{isAdmin ? 'QUẢN TRỊ VIÊN' : 'THÔNG TIN CÁ NHÂN'}</span>
+            <span className="eyebrow">{hasAdminAccess ? 'KHÔNG GIAN QUẢN TRỊ' : 'THÔNG TIN CÁ NHÂN'}</span>
             <h1 style={{ marginTop: 8, fontSize: '1.875rem' }}>Hồ sơ cá nhân</h1>
             <p style={{ color: 'var(--muted)', marginTop: 4 }}>
               Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.
@@ -122,8 +123,8 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Admin Quick Navigation if Admin */}
-        {isAdmin && (
+        {/* Quick links for granted administration permissions */}
+        {hasAdminAccess && (
           <div
             style={{
               background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
@@ -141,26 +142,23 @@ export default function AccountPage() {
               <strong style={{ fontSize: 17, color: '#fff' }}>Bảng điều khiển Quản trị viên</strong>
             </div>
             <p style={{ color: '#cbd5e1', fontSize: 14, margin: 0 }}>
-              Bạn có quyền Quản trị viên hệ thống. Truy cập nhanh các tính năng quản trị:
+              Truy cập nhanh các tính năng quản trị bạn được cấp quyền:
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-              <Link className="button button-primary" to="/admin/users" style={{ background: '#3b82f6' }}>
-                👥 Quản lý người dùng
-              </Link>
-              <Link
-                className="button button-outline"
-                to="/admin/courses"
-                style={{ color: '#fff', borderColor: '#475569' }}
-              >
-                📚 Quản lý khóa học
-              </Link>
-              <Link
-                className="button button-outline"
-                to="/admin/analytics"
-                style={{ color: '#fff', borderColor: '#475569' }}
-              >
-                📊 Thống kê thanh toán
-              </Link>
+              {can(user, 'USER_VIEW') && (
+                <Link className="button button-primary" to="/admin/users" style={{ background: '#3b82f6' }}>
+                  👥 Quản lý người dùng
+                </Link>
+              )}
+              {can(user, 'COURSE_VIEW') && (
+                <Link
+                  className="button button-outline"
+                  to="/admin/courses"
+                  style={{ color: '#fff', borderColor: '#475569' }}
+                >
+                  📚 Quản lý khóa học
+                </Link>
+              )}
             </div>
           </div>
         )}

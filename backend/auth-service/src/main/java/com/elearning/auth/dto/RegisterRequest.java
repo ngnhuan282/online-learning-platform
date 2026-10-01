@@ -1,6 +1,7 @@
 package com.elearning.auth.dto;
 
 import com.elearning.auth.validation.Utf8Size;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.util.Locale;
 
@@ -14,6 +15,7 @@ public record RegisterRequest(
         message = "Password must include uppercase and lowercase letters and a number"
     )
     @Utf8Size(max = 72)
+    @Schema(accessMode = Schema.AccessMode.WRITE_ONLY)
     String password
 ) {
     public RegisterRequest {

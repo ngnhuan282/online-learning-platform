@@ -107,6 +107,7 @@ class ApiGatewayApplicationTests {
     @Test
     void startsWithoutBusinessServicesOrDatabase() throws Exception {
         assertThat(request("/actuator/health", null, "GET", null).statusCode()).isEqualTo(200);
+        assertThat(request("/v3/api-docs", null, "GET", null).body()).startsWith("/v3/api-docs|");
     }
 
     @Test

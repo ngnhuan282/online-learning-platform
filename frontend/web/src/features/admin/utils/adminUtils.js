@@ -1,5 +1,11 @@
 export const can = (user, permission) =>
-  Boolean(user?.roles?.includes('ADMIN') || user?.permissions?.includes(permission));
+  Boolean(
+    permission &&
+      user?.status !== 'LOCKED' &&
+      user?.status !== 'DISABLED' &&
+      user?.roles?.some(role => role !== 'USER') &&
+      user?.permissions?.includes(permission),
+  );
 export const number = value => (value == null ? '—' : new Intl.NumberFormat('vi-VN').format(value));
 export const money = value =>
   value == null
