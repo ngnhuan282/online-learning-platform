@@ -224,6 +224,9 @@ export default function AdminDashboardPage() {
               </h2>
               <p>5 đơn mới nhất, gồm cả đơn chưa thanh toán</p>
             </div>
+            <Button component={Link} to="/admin/payments" endIcon={<ArrowForward />}>
+              Quản lý thanh toán
+            </Button>
           </div>
           <div className="admin-table-scroll">
             <table className="admin-table">
@@ -241,7 +244,9 @@ export default function AdminDashboardPage() {
                 {recentTransactions.slice(0, 5).map(order => (
                   <tr key={order.orderCode}>
                     <td>
-                      <strong>{order.orderCode}</strong>
+                      <Link className="admin-link-strong" to={`/admin/payments/${order.orderCode}`}>
+                        {order.orderCode}
+                      </Link>
                     </td>
                     <td>#{order.userId}</td>
                     <td>{order.courseTitle || '—'}</td>

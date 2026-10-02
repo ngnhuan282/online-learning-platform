@@ -6,8 +6,10 @@ export const ROUTES = Object.freeze({
   ADMIN_PROFILE: '/admin/profile',
   COURSES: '/courses',
   CHECKOUT: '/checkout',
+  PAYMENT_MOCK: '/payment/mock',
   PAYMENT_RESULT: '/payment/result',
   PAYMENT_HISTORY: '/payment/history',
+  ADMIN_PAYMENTS: '/admin/payments',
   ADMIN_ANALYTICS: '/admin/analytics',
   ADMIN_QUIZZES: '/admin/quizzes',
 });

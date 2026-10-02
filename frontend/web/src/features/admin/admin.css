@@ -595,6 +595,13 @@
 .admin-users-table td:first-child {
   min-width: 245px;
 }
+.admin-payments-table {
+  min-width: 980px;
+}
+.admin-link-strong {
+  color: var(--admin-blue);
+  font-weight: 700;
+}
 .admin-table tr.muted-row {
   background: #fffafb;
 }
@@ -712,6 +719,55 @@
 }
 .admin-dialog-content .MuiAlert-root {
   margin: 0;
+}
+.admin-payment-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.admin-detail-list {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+.admin-detail-list > div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-detail-list > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.admin-detail-list dt {
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+.admin-detail-list dd {
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.admin-status-form {
+  display: grid;
+  gap: 16px;
+}
+.admin-status-form .MuiInputLabel-root {
+  background: white;
+  padding: 0 5px;
+}
+.admin-status-form .MuiInputLabel-shrink {
+  transform: translate(14px, -8px) scale(0.75);
+}
+.admin-payment-timeline {
+  margin-top: 24px;
+}
+.admin-payment-timeline .admin-card-heading {
+  padding: 24px 24px 0;
 }
 .admin-roles-layout {
   display: grid;
@@ -961,8 +1017,13 @@
   }
   .admin-dashboard-charts,
   .admin-bottom-grid,
+  .admin-payment-detail-grid,
   .admin-roles-layout {
     grid-template-columns: 1fr;
+  }
+  .admin-detail-list > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
   .admin-profile > span {
     display: none;

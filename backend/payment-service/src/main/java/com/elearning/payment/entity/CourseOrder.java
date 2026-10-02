@@ -70,6 +70,10 @@ public class CourseOrder {
         items.add(item);
     }
 
+    public void changeStatus(OrderStatus status) {
+        this.status = status;
+    }
+
     @PrePersist
     void created() {
         createdAt = updatedAt = Instant.now();

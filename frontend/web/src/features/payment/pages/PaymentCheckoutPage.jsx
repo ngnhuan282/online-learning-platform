@@ -28,8 +28,14 @@ export default function PaymentCheckoutPage() {
         courseId: getPaymentCourseId(course),
         provider: 'MOCK',
         returnUrl: `${window.location.origin}${ROUTES.PAYMENT_RESULT}`,
+        cancelUrl: `${window.location.origin}${ROUTES.CHECKOUT}?course=${encodeURIComponent(course.id)}`,
       });
-      navigate(`${ROUTES.PAYMENT_RESULT}?orderCode=${encodeURIComponent(response.data.orderCode)}`);
+      const checkoutUrl = new URL(response.data.checkoutUrl, window.location.origin);
+      if (checkoutUrl.origin === window.location.origin) {
+        navigate(`${checkoutUrl.pathname}${checkoutUrl.search}${checkoutUrl.hash}`);
+      } else {
+        window.location.assign(checkoutUrl.toString());
+      }
     } catch (checkoutError) {
       setError(checkoutError);
     } finally {
@@ -41,9 +47,9 @@ export default function PaymentCheckoutPage() {
     <section className="payment-page payment-checkout-page">
       <div className="container">
         <div className="payment-page-heading">
-          <span className="eyebrow">PAYMENT CORE</span>
+          <span className="eyebrow">CHECKOUT</span>
           <h1>Thanh toán khóa học</h1>
-          <p>Tạo order/payment nội bộ, lưu trạng thái PENDING và ghi lịch sử thanh toán.</p>
+          <p>Kiểm tra thông tin khóa học trước khi chuyển sang bước thanh toán mô phỏng.</p>
         </div>
 
         <div className="checkout-grid">
@@ -81,15 +87,15 @@ export default function PaymentCheckoutPage() {
               <ul className="payment-check-list">
                 <li>
                   <Icon name="check" size={18} />
-                  Backend tạo amount từ catalog nội bộ, frontend không gửi giá tiền.
+                  Số tiền thanh toán được lấy từ thông tin khóa học đã lưu trong hệ thống.
                 </li>
                 <li>
                   <Icon name="check" size={18} />
-                  Enrollment chỉ kích hoạt sau khi Payment SUCCESS.
+                  Giao dịch thành công sẽ sẵn sàng cho bước ghi danh khóa học.
                 </li>
                 <li>
                   <Icon name="check" size={18} />
-                  Provider thật vẫn tách sang VNPay Sandbox ở D9.
+                  Tuần này sử dụng cổng thanh toán mô phỏng để kiểm thử luồng nghiệp vụ.
                 </li>
               </ul>
             </div>
@@ -131,7 +137,7 @@ export default function PaymentCheckoutPage() {
                 <input type="radio" name="provider" defaultChecked />
                 <span>
                   <b>Mock Payment</b>
-                  <small>Mô phỏng flow tuần 5</small>
+                  <small>Thanh toán mô phỏng</small>
                 </span>
               </label>
               <label className="payment-method">
@@ -150,7 +156,7 @@ export default function PaymentCheckoutPage() {
               onClick={handleCheckout}
               disabled={submitting}
             >
-              {submitting ? 'Đang tạo thanh toán...' : 'Tạo thanh toán nội bộ'}{' '}
+              {submitting ? 'Đang tạo giao dịch...' : 'Tiếp tục thanh toán'}{' '}
               <Icon name="arrow" size={17} />
             </button>
             <Link className="button button-outline checkout-secondary" to={ROUTES.PAYMENT_HISTORY}>
@@ -162,7 +168,7 @@ export default function PaymentCheckoutPage() {
 
             <p className="payment-safe-note">
               <Icon name="shield" size={16} />
-              Payment sẽ ở trạng thái PENDING cho đến khi mock provider ở D5 xử lý kết quả.
+              Bạn sẽ được chuyển sang màn mô phỏng để chọn kết quả thanh toán.
             </p>
           </aside>
         </div>

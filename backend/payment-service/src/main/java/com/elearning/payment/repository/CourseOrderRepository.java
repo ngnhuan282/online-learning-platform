@@ -47,6 +47,34 @@ public interface CourseOrderRepository extends JpaRepository<CourseOrder, Long> 
         Pageable pageable
     );
 
+    @Query(
+        value = """
+        select distinct o from CourseOrder o
+        left join o.items item
+        where (:status is null or exists (
+            select p.id from Payment p where p.order = o and p.status = :status
+          ))
+          and (:keyword is null
+            or lower(o.orderCode) like :keyword
+            or lower(item.courseTitle) like :keyword)
+        """,
+        countQuery = """
+        select count(distinct o) from CourseOrder o
+        left join o.items item
+        where (:status is null or exists (
+            select p.id from Payment p where p.order = o and p.status = :status
+          ))
+          and (:keyword is null
+            or lower(o.orderCode) like :keyword
+            or lower(item.courseTitle) like :keyword)
+        """
+    )
+    Page<CourseOrder> searchAdminOrders(
+        @Param("status") PaymentStatus status,
+        @Param("keyword") String keyword,
+        Pageable pageable
+    );
+
     @Query("select count(distinct o.userId) from CourseOrder o")
     long countDistinctUsers();
 

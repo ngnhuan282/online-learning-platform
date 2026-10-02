@@ -5,6 +5,7 @@ import {
   SchoolOutlined,
   DashboardOutlined,
   PeopleOutlined,
+  AccountBalanceWalletOutlined,
   AdminPanelSettingsOutlined,
   MenuBookOutlined,
   QuizOutlined,
@@ -24,6 +25,12 @@ import '../features/admin/admin.css';
 const menu = [
   { to: '/admin', label: 'Tổng quan', icon: DashboardOutlined, permission: 'DASHBOARD_VIEW', end: true },
   { to: '/admin/users', label: 'Quản lý tài khoản', icon: PeopleOutlined, permission: 'USER_VIEW' },
+  {
+    to: '/admin/payments',
+    label: 'Thanh toán',
+    icon: AccountBalanceWalletOutlined,
+    permission: 'PAYMENT_REPORT_VIEW',
+  },
   {
     to: '/admin/roles',
     label: 'Vai trò & Phân quyền',
