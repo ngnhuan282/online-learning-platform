@@ -1,7 +1,5 @@
 package com.elearning.payment.controller;
 
-import com.elearning.payment.common.exception.AppException;
-import com.elearning.payment.common.exception.ErrorCode;
 import com.elearning.payment.common.response.ApiResponse;
 import com.elearning.payment.common.response.PageResponse;
 import com.elearning.payment.dto.*;
@@ -47,6 +45,14 @@ public class PaymentController {
         return ApiResponse.success(payments.getOrder(orderCode, user.userId(), user.hasRole("ADMIN")));
     }
 
+    @PostMapping("/mock/orders/{orderCode}/complete")
+    ApiResponse<OrderResponse> completeMockPayment(
+        @PathVariable String orderCode,
+        @Valid @RequestBody MockPaymentRequest request
+    ) {
+        return ApiResponse.success(payments.completeMockPayment(orderCode, user.userId(), request));
+    }
+
     @GetMapping("/history")
     ApiResponse<PageResponse<PaymentHistoryItemResponse>> getHistory(
         @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -65,9 +71,35 @@ public class PaymentController {
     }
 
     @GetMapping("/admin/orders/{orderCode}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PAYMENT_REPORT_VIEW')")
     ApiResponse<AdminPaymentDetailResponse> getAdminOrder(@PathVariable String orderCode) {
-        return unavailable();
+        return ApiResponse.success(payments.getAdminOrder(orderCode));
+    }
+
+    @GetMapping("/admin/orders")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PAYMENT_REPORT_VIEW')")
+    ApiResponse<PageResponse<AdminPaymentListItemResponse>> getAdminOrders(
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+        @RequestParam(required = false) PaymentStatus status,
+        @RequestParam(required = false) String keyword
+    ) {
+        return ApiResponse.success(
+            payments.getAdminOrders(
+                status,
+                keyword,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+            )
+        );
+    }
+
+    @PatchMapping("/admin/orders/{orderCode}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<AdminPaymentDetailResponse> updateAdminOrderStatus(
+        @PathVariable String orderCode,
+        @Valid @RequestBody AdminPaymentStatusUpdateRequest request
+    ) {
+        return ApiResponse.success(payments.updateAdminPaymentStatus(orderCode, request));
     }
 
     @GetMapping("/admin/analytics")
@@ -76,7 +108,4 @@ public class PaymentController {
         return ApiResponse.success(analytics.getAnalytics());
     }
 
-    private <T> ApiResponse<T> unavailable() {
-        throw new AppException(ErrorCode.FEATURE_NOT_IMPLEMENTED);
-    }
 }

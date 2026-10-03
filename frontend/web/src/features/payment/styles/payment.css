@@ -343,6 +343,73 @@
   gap: 12px;
 }
 
+.mock-payment-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.mock-payment-card,
+.mock-provider-panel {
+  display: grid;
+  gap: 22px;
+}
+
+.mock-payment-details {
+  margin: 0;
+}
+
+.mock-provider-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.mock-provider-note.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.mock-provider-note .icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.mock-result-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.mock-result-actions .button {
+  width: 100%;
+}
+
+.mock-failed-button {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.mock-failed-button:hover {
+  background: #fef2f2;
+}
+
+.mock-secondary-actions {
+  justify-content: stretch;
+}
+
+.mock-secondary-actions .button {
+  flex: 1 1 180px;
+}
+
 .admin-heading {
   display: flex;
   align-items: flex-start;
@@ -609,6 +676,7 @@
 
 @media (max-width: 1199px) {
   .checkout-grid,
+  .mock-payment-grid,
   .admin-analytics-grid {
     grid-template-columns: 1fr;
   }

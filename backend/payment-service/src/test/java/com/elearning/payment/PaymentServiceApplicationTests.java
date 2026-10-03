@@ -84,6 +84,15 @@ class PaymentServiceApplicationTests {
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    HttpResponse<String> patch(String path, String token, String body) throws Exception {
+        var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        if (token != null) builder.header("Authorization", "Bearer " + token);
+        builder
+            .header("Content-Type", "application/json")
+            .method("PATCH", HttpRequest.BodyPublishers.ofString(body));
+        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     void error(HttpResponse<String> response, int status, String code, String path) throws Exception {
         assertThat(response.statusCode()).isEqualTo(status);
         JsonNode json = mapper.readTree(response.body());
@@ -200,6 +209,7 @@ class PaymentServiceApplicationTests {
         assertThat(checkoutData.get("payment").get("provider").asString()).isEqualTo("MOCK");
         assertThat(checkoutData.get("payment").get("status").asString()).isEqualTo("PENDING");
         assertThat(checkoutData.get("order").get("items").get(0).get("courseId").asLong()).isEqualTo(101L);
+        assertThat(checkoutData.get("checkoutUrl").asString()).contains("/payment/mock");
         assertThat(checkoutData.get("checkoutUrl").asString()).contains("orderCode=");
 
         String orderCode = checkoutData.get("orderCode").asString();
@@ -260,6 +270,117 @@ class PaymentServiceApplicationTests {
             if (orderCode.equals(transaction.get("orderCode").asString())) containsCreatedOrder = true;
         }
         assertThat(containsCreatedOrder).isTrue();
+
+        error(
+            request("/api/v1/payments/admin/orders", token("USER", 60), null),
+            403,
+            "FORBIDDEN",
+            "/api/v1/payments/admin/orders"
+        );
+
+        var adminOrders = request(
+            "/api/v1/payments/admin/orders?status=PENDING&keyword=IELTS&page=0&size=5",
+            token("ADMIN", 60),
+            null
+        );
+        assertThat(adminOrders.statusCode()).isEqualTo(200);
+        JsonNode adminOrdersData = mapper.readTree(adminOrders.body()).get("data");
+        assertThat(adminOrdersData.get("content").size()).isGreaterThanOrEqualTo(1);
+        assertThat(adminOrdersData.get("content").get(0).get("orderCode").asString()).isEqualTo(orderCode);
+        assertThat(adminOrdersData.get("content").get(0).get("provider").asString()).isEqualTo("MOCK");
+
+        var detail = request("/api/v1/payments/admin/orders/" + orderCode, token("ADMIN", 60), null);
+        assertThat(detail.statusCode()).isEqualTo(200);
+        JsonNode detailData = mapper.readTree(detail.body()).get("data");
+        assertThat(detailData.get("order").get("orderCode").asString()).isEqualTo(orderCode);
+        assertThat(detailData.get("transactions").get(0).get("eventType").asString()).isEqualTo("CREATED");
+        boolean canMarkSuccess = false;
+        for (JsonNode status : detailData.get("availableStatuses")) {
+            if ("SUCCESS".equals(status.asString())) canMarkSuccess = true;
+        }
+        assertThat(canMarkSuccess).isTrue();
+
+        var paid = patch(
+            "/api/v1/payments/admin/orders/" + orderCode + "/status",
+            token("ADMIN", 60),
+            "{\"status\":\"SUCCESS\"}"
+        );
+        assertThat(paid.statusCode()).isEqualTo(200);
+        JsonNode paidData = mapper.readTree(paid.body()).get("data");
+        assertThat(paidData.get("order").get("status").asString()).isEqualTo("PAID");
+        assertThat(paidData.get("order").get("payment").get("status").asString()).isEqualTo("SUCCESS");
+        assertThat(paidData.get("order").get("payment").get("paidAt").isNull()).isFalse();
+        assertThat(paidData.get("transactions").size()).isEqualTo(2);
+        assertThat(paidData.get("transactions").get(1).get("eventType").asString()).isEqualTo(
+            "STATUS_CHANGED"
+        );
+
+        error(
+            patch(
+                "/api/v1/payments/admin/orders/" + orderCode + "/status",
+                token("ADMIN", 60),
+                "{\"status\":\"FAILED\"}"
+            ),
+            409,
+            "CONFLICT",
+            "/api/v1/payments/admin/orders/" + orderCode + "/status"
+        );
+
+        var refunded = patch(
+            "/api/v1/payments/admin/orders/" + orderCode + "/status",
+            token("ADMIN", 60),
+            "{\"status\":\"REFUNDED\"}"
+        );
+        assertThat(refunded.statusCode()).isEqualTo(200);
+        JsonNode refundedData = mapper.readTree(refunded.body()).get("data");
+        assertThat(refundedData.get("order").get("status").asString()).isEqualTo("CANCELLED");
+        assertThat(refundedData.get("order").get("payment").get("status").asString()).isEqualTo(
+            "REFUNDED"
+        );
+        assertThat(refundedData.get("availableStatuses").size()).isZero();
+    }
+
+    @Test
+    void mockProviderCompletesCheckoutAndRejectsInvalidTransitions() throws Exception {
+        var checkout = request(
+            "/api/v1/payments/checkout",
+            token("USER", 60),
+            "{\"courseId\":102,\"provider\":\"MOCK\",\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+        );
+        assertThat(checkout.statusCode()).isEqualTo(200);
+        String orderCode = mapper.readTree(checkout.body()).get("data").get("orderCode").asString();
+        String mockPath = "/api/v1/payments/mock/orders/" + orderCode + "/complete";
+
+        var paid = request(mockPath, token("USER", 60), "{\"status\":\"SUCCESS\"}");
+        assertThat(paid.statusCode()).withFailMessage(paid.body()).isEqualTo(200);
+        JsonNode paidData = mapper.readTree(paid.body()).get("data");
+        assertThat(paidData.get("status").asString()).isEqualTo("PAID");
+        assertThat(paidData.get("payment").get("status").asString()).isEqualTo("SUCCESS");
+        assertThat(paidData.get("payment").get("paidAt").isNull()).isFalse();
+
+        error(request(mockPath, token("USER", 60), "{\"status\":\"FAILED\"}"), 409, "CONFLICT", mockPath);
+
+        var secondCheckout = request(
+            "/api/v1/payments/checkout",
+            token("USER", 60),
+            "{\"courseId\":103,\"provider\":\"MOCK\",\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+        );
+        assertThat(secondCheckout.statusCode()).isEqualTo(200);
+        String failedOrderCode = mapper.readTree(secondCheckout.body()).get("data").get("orderCode").asString();
+        String failedPath = "/api/v1/payments/mock/orders/" + failedOrderCode + "/complete";
+
+        var failed = request(
+            failedPath,
+            token("USER", 60),
+            "{\"status\":\"FAILED\",\"failureMessage\":\"Mock provider declined\"}"
+        );
+        assertThat(failed.statusCode()).withFailMessage(failed.body()).isEqualTo(200);
+        JsonNode failedData = mapper.readTree(failed.body()).get("data");
+        assertThat(failedData.get("status").asString()).isEqualTo("CANCELLED");
+        assertThat(failedData.get("payment").get("status").asString()).isEqualTo("FAILED");
+        assertThat(failedData.get("payment").get("paidAt").isNull()).isTrue();
+
+        error(request(failedPath, token("USER", 60), "{\"status\":\"REFUNDED\"}"), 400, "BAD_REQUEST", failedPath);
     }
 
     @Test

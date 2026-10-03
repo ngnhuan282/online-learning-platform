@@ -73,6 +73,31 @@ public class Payment {
         this.checkoutUrl = checkoutUrl;
     }
 
+    public void transitionTo(
+        PaymentStatus status,
+        String providerTransactionCode,
+        String failureCode,
+        String failureMessage,
+        Instant eventTime
+    ) {
+        this.status = status;
+        if (providerTransactionCode != null && !providerTransactionCode.isBlank()) {
+            this.providerTransactionCode = providerTransactionCode.strip();
+        }
+        if (status == PaymentStatus.SUCCESS) {
+            this.paidAt = eventTime == null ? Instant.now() : eventTime;
+            this.failureCode = null;
+            this.failureMessage = null;
+        } else if (status == PaymentStatus.FAILED || status == PaymentStatus.CANCELLED) {
+            this.paidAt = null;
+            this.failureCode = failureCode;
+            this.failureMessage = failureMessage;
+        } else if (status == PaymentStatus.REFUNDED) {
+            this.failureCode = null;
+            this.failureMessage = null;
+        }
+    }
+
     @PrePersist
     void created() {
         createdAt = updatedAt = Instant.now();

@@ -9,7 +9,10 @@ import HomePage from '../pages/HomePage';
 import NotFoundPage from '../pages/NotFoundPage';
 import AccountPage from '../features/auth/pages/AccountPage';
 import PaymentCheckoutPage from '../features/payment/pages/PaymentCheckoutPage';
+import AdminPaymentDetailPage from '../features/payment/pages/AdminPaymentDetailPage';
+import AdminPaymentManagementPage from '../features/payment/pages/AdminPaymentManagementPage';
 import PaymentHistoryPage from '../features/payment/pages/PaymentHistoryPage';
+import MockPaymentPage from '../features/payment/pages/MockPaymentPage';
 import PaymentResultPage from '../features/payment/pages/PaymentResultPage';
 import PermissionRoute from '../routes/PermissionRoute';
 import RoleRoute from '../routes/RoleRoute';
@@ -35,6 +38,11 @@ const router = createBrowserRouter([
     children: [{ index: true, element: <PaymentResultPage /> }],
   },
   {
+    path: '/payment/mock',
+    element: <UserLayout />,
+    children: [{ index: true, element: <MockPaymentPage /> }],
+  },
+  {
     path: '/payment/history',
     element: <UserLayout />,
     children: [{ index: true, element: <PaymentHistoryPage /> }],
@@ -46,6 +54,14 @@ const router = createBrowserRouter([
       { index: true, element: <AdminDashboardPage /> },
       { path: 'profile', element: <AccountPage /> },
       { path: 'analytics', element: <Navigate to="/admin" replace /> },
+      {
+        path: 'payments',
+        element: <PermissionRoute permission="PAYMENT_REPORT_VIEW" />,
+        children: [
+          { index: true, element: <AdminPaymentManagementPage /> },
+          { path: ':orderCode', element: <AdminPaymentDetailPage /> },
+        ],
+      },
       {
         path: 'roles',
         element: (

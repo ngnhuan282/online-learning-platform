@@ -15,6 +15,13 @@ export function getPaymentCourseId(course) {
   return paymentCourseIds[course.id] || 101;
 }
 
+export function getCheckoutCourseParamFromPaymentCourseId(courseId) {
+  const entry = Object.entries(paymentCourseIds).find(([, paymentCourseId]) => {
+    return Number(paymentCourseId) === Number(courseId);
+  });
+  return entry?.[0] || paidCourses[0]?.id;
+}
+
 export function buildOrderSnapshot(course) {
   const subtotal = course.originalPrice || course.price;
   return {

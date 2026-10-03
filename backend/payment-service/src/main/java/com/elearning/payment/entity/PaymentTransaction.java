@@ -63,12 +63,27 @@ public class PaymentTransaction {
         BigDecimal amount,
         String currency
     ) {
+        this(payment, eventType, provider, status, amount, currency, null, null);
+    }
+
+    public PaymentTransaction(
+        Payment payment,
+        PaymentEventType eventType,
+        PaymentProvider provider,
+        PaymentStatus status,
+        BigDecimal amount,
+        String currency,
+        String providerTransactionCode,
+        String payloadChecksum
+    ) {
         this.payment = payment;
         this.eventType = eventType;
         this.provider = provider;
         this.status = status;
         this.amount = amount;
         this.currency = currency;
+        this.providerTransactionCode = providerTransactionCode;
+        this.payloadChecksum = payloadChecksum;
     }
 
     @PrePersist

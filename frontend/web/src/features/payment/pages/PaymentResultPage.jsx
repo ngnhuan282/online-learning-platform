@@ -5,37 +5,57 @@ import ErrorState from '../../../shared/components/ErrorState';
 import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
 import { paymentApi } from '../api/paymentApi';
-import { buildOrderSnapshot, formatDemoPrice, getCheckoutCourse } from '../data/paymentDemo';
+import {
+  buildOrderSnapshot,
+  formatDemoPrice,
+  getCheckoutCourse,
+  getCheckoutCourseParamFromPaymentCourseId,
+} from '../data/paymentDemo';
 import '../styles/payment.css';
 
 const resultCopy = {
   SUCCESS: {
     tone: 'success',
-    eyebrow: 'PAYMENT SUCCESS',
+    eyebrow: 'THANH TOÁN THÀNH CÔNG',
     title: 'Thanh toán thành công',
-    description: 'Payment đã thành công và sẵn sàng kích hoạt enrollment ở bước tích hợp Learning.',
+    description: 'Giao dịch đã được ghi nhận thành công. Bạn có thể tiếp tục tới khu học tập.',
     icon: 'check',
   },
   FAILED: {
     tone: 'failed',
-    eyebrow: 'PAYMENT FAILED',
-    title: 'Thanh toán chưa hoàn tất',
-    description: 'Giao dịch thất bại hoặc bị hủy. Retry UX sẽ được hoàn thiện ở các tuần tiếp theo.',
+    eyebrow: 'THANH TOÁN THẤT BẠI',
+    title: 'Thanh toán không thành công',
+    description: 'Giao dịch chưa được xử lý thành công. Bạn có thể thử thanh toán lại khóa học này.',
+    icon: 'close',
+  },
+  CANCELLED: {
+    tone: 'failed',
+    eyebrow: 'ĐÃ HỦY THANH TOÁN',
+    title: 'Bạn đã hủy thanh toán',
+    description: 'Giao dịch đã được hủy theo yêu cầu của bạn. Bạn có thể thanh toán lại khi sẵn sàng.',
     icon: 'close',
   },
   PENDING: {
     tone: 'pending',
-    eyebrow: 'PAYMENT PENDING',
-    title: 'Đã tạo thanh toán nội bộ',
-    description: 'Order và payment đã được lưu ở trạng thái PENDING để chuẩn bị cho mock provider flow.',
+    eyebrow: 'ĐANG CHỜ THANH TOÁN',
+    title: 'Giao dịch đang chờ xử lý',
+    description: 'Bạn có thể tiếp tục thanh toán trên cổng mô phỏng hoặc quay lại lịch sử thanh toán.',
     icon: 'clock',
   },
 };
 
 function paymentTone(status) {
   if (status === 'SUCCESS') return resultCopy.SUCCESS;
-  if (status === 'FAILED' || status === 'CANCELLED') return resultCopy.FAILED;
+  if (status === 'FAILED') return resultCopy.FAILED;
+  if (status === 'CANCELLED') return resultCopy.CANCELLED;
   return resultCopy.PENDING;
+}
+
+function fallbackStatusFromParams(status) {
+  if (status === 'failed') return 'FAILED';
+  if (status === 'cancelled') return 'CANCELLED';
+  if (status === 'pending') return 'PENDING';
+  return 'SUCCESS';
 }
 
 export default function PaymentResultPage() {
@@ -87,14 +107,20 @@ export default function PaymentResultPage() {
     );
   }
 
-  const fallbackStatus = params.get('status') === 'failed' ? 'FAILED' : 'SUCCESS';
+  const fallbackStatus = fallbackStatusFromParams(params.get('status'));
   const course = getCheckoutCourse(params.get('course'));
   const demoOrder = buildOrderSnapshot(course);
   const paymentStatus = order?.payment?.status || fallbackStatus;
   const copy = paymentTone(paymentStatus);
   const courseTitle = order?.items?.[0]?.courseTitle || course.title;
+  const paymentCourseId = order?.items?.[0]?.courseId;
+  const retryCourseParam = getCheckoutCourseParamFromPaymentCourseId(paymentCourseId) || course.id;
   const amount = order?.payment?.amount ?? order?.totalAmount ?? demoOrder.total;
   const provider = order?.payment?.provider || demoOrder.provider;
+  const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(retryCourseParam)}`;
+  const resumePaymentUrl = `${ROUTES.PAYMENT_MOCK}?orderCode=${encodeURIComponent(
+    order?.orderCode || orderCode,
+  )}&returnUrl=${encodeURIComponent(`${window.location.origin}${ROUTES.PAYMENT_RESULT}`)}`;
 
   return (
     <section className="payment-page payment-result-page">
@@ -128,16 +154,20 @@ export default function PaymentResultPage() {
 
           <div className="result-actions">
             {paymentStatus === 'SUCCESS' ? (
-              <Link className="button button-primary" to="/#courses">
+              <Link className="button button-primary" to="/my-courses">
                 Vào khu học tập <Icon name="arrow" size={17} />
               </Link>
+            ) : paymentStatus === 'PENDING' && orderCode ? (
+              <Link className="button button-primary" to={resumePaymentUrl}>
+                Tiếp tục thanh toán <Icon name="arrow" size={17} />
+              </Link>
             ) : (
-              <Link className="button button-primary" to={ROUTES.PAYMENT_HISTORY}>
-                Xem lịch sử thanh toán <Icon name="arrow" size={17} />
+              <Link className="button button-primary" to={retryCheckoutUrl}>
+                Thanh toán lại <Icon name="arrow" size={17} />
               </Link>
             )}
-            <Link className="button button-outline" to={ROUTES.HOME}>
-              Về trang chủ
+            <Link className="button button-outline" to={ROUTES.PAYMENT_HISTORY}>
+              Lịch sử thanh toán
             </Link>
           </div>
         </article>
