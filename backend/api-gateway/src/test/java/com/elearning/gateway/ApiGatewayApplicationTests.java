@@ -35,12 +35,11 @@ class ApiGatewayApplicationTests {
         try {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/", exchange -> {
-                String result =
-                    exchange.getRequestURI().getPath() +
-                    "|" +
-                    exchange.getRequestHeaders().getFirst("X-User-Id") +
-                    "|" +
-                    (exchange.getRequestHeaders().getFirst("Authorization") != null);
+                String result = exchange.getRequestURI().getPath() +
+                        "|" +
+                        exchange.getRequestHeaders().getFirst("X-User-Id") +
+                        "|" +
+                        (exchange.getRequestHeaders().getFirst("Authorization") != null);
                 byte[] bytes = result.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(200, bytes.length);
                 try (var body = exchange.getResponseBody()) {
@@ -64,9 +63,8 @@ class ApiGatewayApplicationTests {
         registry.add("security.jwt.secret", () -> SECRET);
         for (String service : new String[] { "AUTH", "COURSE", "LEARNING", "PAYMENT", "AI" }) {
             registry.add(
-                service + "_SERVICE_URL",
-                () -> "http://127.0.0.1:" + upstream.getAddress().getPort()
-            );
+                    service + "_SERVICE_URL",
+                    () -> "http://127.0.0.1:" + upstream.getAddress().getPort());
         }
     }
 
@@ -80,26 +78,28 @@ class ApiGatewayApplicationTests {
 
     String token(long seconds) {
         return Jwts.builder()
-            .subject("user")
-            .issuer("learnsphere")
-            .claim("role", "USER")
-            .claim("tokenType", "access")
-            .issuedAt(Date.from(Instant.now().minusSeconds(120)))
-            .expiration(Date.from(Instant.now().plusSeconds(seconds)))
-            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
-            .compact();
+                .subject("user")
+                .issuer("learnsphere")
+                .claim("role", "USER")
+                .claim("tokenType", "access")
+                .issuedAt(Date.from(Instant.now().minusSeconds(120)))
+                .expiration(Date.from(Instant.now().plusSeconds(seconds)))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+                .compact();
     }
 
     HttpResponse<String> request(String path, String token, String method, String origin) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).header(
-            "X-User-Id",
-            "spoofed"
-        );
-        if (token != null) request.header("Authorization", "Bearer " + token);
-        if (origin != null) request.header("Origin", origin);
-        if (method.equals("OPTIONS")) request
-            .header("Access-Control-Request-Method", "POST")
-            .header("Access-Control-Request-Headers", "authorization,content-type");
+                "X-User-Id",
+                "spoofed");
+        if (token != null)
+            request.header("Authorization", "Bearer " + token);
+        if (origin != null)
+            request.header("Origin", origin);
+        if (method.equals("OPTIONS"))
+            request
+                    .header("Access-Control-Request-Method", "POST")
+                    .header("Access-Control-Request-Headers", "authorization,content-type");
         request.method(method, HttpRequest.BodyPublishers.noBody());
         return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
@@ -132,6 +132,15 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
+    void forwardsMediaAndLessonResourceRoutesWithValidAuth() throws Exception {
+        String adminToken = token(60);
+        assertThat(request("/api/v1/media/download/documents/test.txt", null, "GET", null).statusCode()).isEqualTo(200);
+        assertThat(request("/api/v1/lessons/42/resources", null, "GET", null).statusCode()).isEqualTo(200);
+        assertThat(request("/api/v1/admin/media/upload", adminToken, "POST", null).statusCode()).isEqualTo(200);
+        assertThat(request("/api/v1/admin/lessons/42/resources", adminToken, "POST", null).statusCode()).isEqualTo(200);
+    }
+
+    @Test
     void normalizesAuthenticationErrorsWithCors() throws Exception {
         for (String jwt : new String[] { "broken", token(-60) }) {
             var response = request("/api/v1/users/me", jwt, "GET", "http://localhost:5173");
@@ -144,8 +153,7 @@ class ApiGatewayApplicationTests {
             assertThat(json.has("timestamp")).isTrue();
             assertThat(json.has("trace")).isFalse();
             assertThat(response.headers().firstValue("Access-Control-Allow-Origin")).contains(
-                "http://localhost:5173"
-            );
+                    "http://localhost:5173");
         }
     }
 
@@ -169,11 +177,9 @@ class ApiGatewayApplicationTests {
                 var response = request(path, access, "POST", "http://localhost:5173");
                 assertThat(response.statusCode()).isEqualTo(200);
                 assertThat(response.headers().firstValue("Access-Control-Allow-Origin")).contains(
-                    "http://localhost:5173"
-                );
+                        "http://localhost:5173");
                 assertThat(response.headers().firstValue("Access-Control-Allow-Credentials")).contains(
-                    "true"
-                );
+                        "true");
             }
             assertThat(request(path, null, "GET", null).statusCode()).isEqualTo(401);
             assertThat(request(path, null, "POST", "https://untrusted.example").statusCode()).isEqualTo(403);

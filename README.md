@@ -303,6 +303,65 @@ online-learning-platform-ai-service-1        Up
 online-learning-platform-api-gateway-1       Up
 ```
 
+## Chạy và kiểm tra S3 local bằng RustFS
+
+RustFS là S3-compatible storage chạy local để kiểm tra luồng upload/download trước khi dùng Supabase hoặc AWS thật. Trong dự án hiện tại, file `.env` đang cấu hình theo Supabase Storage, còn RustFS là lựa chọn local fallback/demo.
+
+Nếu muốn chạy local demo với RustFS:
+
+```powershell
+docker compose --profile backend --profile s3 up --build -d
+```
+
+Mở RustFS Console tại `http://localhost:9001`, đăng nhập bằng `RUSTFS_ACCESS_KEY` và `RUSTFS_SECRET_KEY` trong `.env`, rồi tạo bucket `elearning-media` nếu bucket chưa tồn tại. API S3 chạy ở cổng `9000`.
+
+Kiểm tra upload qua web bằng tài khoản ADMIN: vào quản lý khóa học hoặc lesson, upload thumbnail/video/document, lưu lại rồi mở media. Với cấu hình RustFS, endpoint nội bộ dùng `http://rustfs:9000`, còn presigned URL trình duyệt truy cập qua `http://localhost:9000`.
+
+Nếu đang dùng Supabase, các biến quan trọng là:
+
+```env
+STORAGE_TYPE=s3
+AWS_REGION=ap-southeast-1
+AWS_S3_BUCKET=elearning-media
+AWS_ENDPOINT_URL=https://<project>.storage.supabase.co/storage/v1/s3
+AWS_PUBLIC_ENDPOINT_URL=https://<project>.storage.supabase.co/storage/v1/s3
+AWS_S3_FORCE_PATH_STYLE=true
+AWS_ACCESS_KEY_ID=<your-access-key>
+AWS_SECRET_ACCESS_KEY=<your-secret-key>
+```
+
+Nếu muốn chuyển sang AWS thật, đặt `STORAGE_TYPE=s3`, giữ bucket/region/credentials của AWS, và để trống `AWS_ENDPOINT_URL` / `AWS_PUBLIC_ENDPOINT_URL` nếu dùng endpoint AWS mặc định. Không dùng credential RustFS demo cho AWS hoặc production.
+
+Ví dụ cấu hình AWS trong `.env`:
+
+```env
+STORAGE_TYPE=s3
+AWS_REGION=ap-southeast-1
+AWS_S3_BUCKET=your-private-bucket
+AWS_ENDPOINT_URL=
+AWS_PUBLIC_ENDPOINT_URL=
+AWS_S3_FORCE_PATH_STYLE=false
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+```
+
+Không commit `.env` hoặc đưa access key lên chat. Nếu chạy trên AWS với IAM role/task role, để trống hai biến access key để AWS SDK dùng default credentials provider. Bucket nên private; role/user gắn policy tối thiểu sau, thay `your-private-bucket`:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+            "Resource": "arn:aws:s3:::your-private-bucket/*"
+        }
+    ]
+}
+```
+
+Sau khi cấu hình đúng, chạy lại `docker compose --profile backend up --build -d course-service api-gateway`, đăng nhập web và upload một thumbnail/video. Xác nhận object xuất hiện trong bucket tương ứng và presigned download trả HTTP 200. Lưu ý: RustFS local chỉ là kiểm tra tương thích S3, còn xác minh trên AWS/Supabase cần bucket/quyền thật.
+
 ---
 
 # 10. Chạy Frontend

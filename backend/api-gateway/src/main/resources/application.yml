@@ -6,13 +6,18 @@ server:
 spring:
   application:
     name: api-gateway
+  codec:
+    max-in-memory-size: 210MB
   cloud:
     gateway:
       server:
         webflux:
+          max-request-body-size: 220200960
           httpclient:
             connect-timeout: 3000
-            response-timeout: 10s
+            response-timeout: 300s
+            pool:
+              max-idle-time: 30s
           routes:
             - id: auth-openapi
               uri: ${AUTH_SERVICE_URL:http://localhost:8081}
@@ -25,7 +30,7 @@ spring:
             - id: course-service
               uri: ${COURSE_SERVICE_URL:http://localhost:8082}
               predicates:
-                - Path=/api/v1/courses/**,/api/v1/categories/**,/api/v1/admin/**
+                - Path=/api/v1/courses/**,/api/v1/categories/**,/api/v1/lessons/**,/api/v1/media/**,/api/v1/admin/**
             - id: learning-service
               uri: ${LEARNING_SERVICE_URL:http://localhost:8083}
               predicates:

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { categoryApi } from '../api/categoryApi';
 import { courseApi } from '../api/courseApi';
@@ -6,6 +7,7 @@ import { formatPrice } from '../data/demoCourses';
 import useAuth from '../../auth/hooks/useAuth';
 import { can } from '../../admin/utils/adminUtils';
 import ErrorState from '../../../shared/components/ErrorState';
+import MediaUploader from '../components/MediaUploader';
 
 const emptyForm = {
   title: '',
@@ -32,7 +34,7 @@ const coerceCourse = course => ({
   createdAt: course.createdAt ?? new Date().toISOString(),
 });
 
-const normalizeCourseList = response => {
+export const normalizeCourseList = response => {
   const payload = response?.data ?? response;
 
   if (Array.isArray(payload)) return payload.map(coerceCourse);
@@ -43,11 +45,13 @@ const normalizeCourseList = response => {
   return [];
 };
 
-const normalizeCoursePayload = payload => ({
+export const normalizeCoursePayload = payload => ({
+  title: payload.title,
+  description: payload.description,
   ...payload,
+  categoryId: Number(payload.categoryId),
   level: payload.level ? String(payload.level).toUpperCase() : undefined,
   status: payload.status ? String(payload.status).toUpperCase() : 'PUBLISHED',
-  categoryId: Number(payload.categoryId),
   price: Number(payload.price ?? 0),
   originalPrice: Number(payload.originalPrice ?? 0),
   thumbnailUrl: payload.thumbnailUrl || '/images/english-ielts.jpg',
@@ -55,6 +59,7 @@ const normalizeCoursePayload = payload => ({
 
 export default function AdminCoursePage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadError, setLoadError] = useState(null);
@@ -314,6 +319,15 @@ export default function AdminCoursePage() {
                 <option value="ADVANCED">Advanced</option>
               </select>
 
+              <MediaUploader
+                folder="thumbnails"
+                accept="image/*"
+                label="Ảnh đại diện khóa học (Thumbnail)"
+                maxSizeMB={10}
+                currentUrl={form.thumbnailUrl}
+                onUploadSuccess={info => setForm(prev => ({ ...prev, thumbnailUrl: info.url || info.objectKey }))}
+              />
+
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <button
                   className="button button-primary"
@@ -372,6 +386,13 @@ export default function AdminCoursePage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        className="button button-soft"
+                        type="button"
+                        onClick={() => navigate(`/admin/courses/${course.id}/curriculum`)}
+                      >
+                        Bài học
+                      </button>
                       {can(user, 'COURSE_UPDATE') && (
                         <button
                           className="button button-soft"

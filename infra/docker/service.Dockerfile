@@ -7,7 +7,7 @@ RUN mvn -B -ntp -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN groupadd --system app && useradd --system --gid app app
+RUN groupadd --system app && useradd --system --gid app app && mkdir -p /app/uploads && chown app:app /app/uploads
 COPY --from=build /build/target/*-SNAPSHOT.jar /app/app.jar
 USER app
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

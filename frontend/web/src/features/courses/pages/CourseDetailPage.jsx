@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { courseApi } from '../api/courseApi';
 import { formatPrice } from '../data/demoCourses';
+import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 
 const fallbackCourse = {
   id: 1,
@@ -94,7 +95,7 @@ function CourseDetailPage() {
 
       <div className="course-grid" style={{ gridTemplateColumns: '1.4fr 0.6fr' }}>
         <article className="course-card" style={{ padding: 24 }}>
-          <img src={item.thumbnailUrl || '/images/english-ielts.jpg'} alt={item.title} style={{ width: '100%', borderRadius: 12, objectFit: 'cover', marginBottom: 20 }} />
+          <img src={resolveMediaUrl(item.thumbnailUrl || '/images/english-ielts.jpg')} alt={item.title} style={{ width: '100%', borderRadius: 12, objectFit: 'cover', marginBottom: 20 }} />
           <span className="eyebrow">{item.categoryName || 'Luyện thi IELTS'}</span>
           <h2 style={{ margin: '12px 0' }}>{item.title}</h2>
           <p>{item.description}</p>

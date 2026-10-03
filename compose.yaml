@@ -64,11 +64,32 @@ services:
       COURSE_DB_URL: jdbc:mysql://mysql:3306/course_db
       COURSE_DB_USERNAME: course_app
       COURSE_DB_PASSWORD: ${COURSE_DB_PASSWORD}
-      AWS_REGION: ${AWS_REGION:-}
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_LOCAL_DIR: /app/uploads
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
+      AWS_PUBLIC_ENDPOINT_URL: ${AWS_PUBLIC_ENDPOINT_URL:-}
+    volumes:
+      - course_uploads:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
+
+  rustfs:
+    profiles: [s3]
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadminsecret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
 
   learning-service:
     profiles: [backend]
@@ -149,3 +170,5 @@ services:
 
 volumes:
   mysql_data:
+  course_uploads:
+  minio_data:
