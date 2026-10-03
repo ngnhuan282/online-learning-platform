@@ -1,4 +1,5 @@
 import Icon from '../../../shared/components/Icon';
+import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import { formatPrice } from '../data/demoCourses';
 
 export default function CourseCard({
@@ -19,7 +20,7 @@ export default function CourseCard({
         onClick={() => onSelect(course)}
         aria-label={`Xem khóa học ${course.title}`}
       >
-        <img src={course.image} alt={course.imageAlt} loading="lazy" width="640" height="360" />
+        <img src={resolveMediaUrl(course.image)} alt={course.imageAlt} loading="lazy" width="640" height="360" />
         <span className="course-badges">
           <span>{course.tag}</span>
           {course.price === 0 && <b>MIỄN PHÍ</b>}

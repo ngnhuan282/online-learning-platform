@@ -48,8 +48,11 @@ public class AuthenticationFilter implements WebFilter, Ordered {
             (method == HttpMethod.GET &&
                 (path.equals("/api/v1/courses") ||
                     path.matches("/api/v1/courses/[^/]+") ||
+                    path.matches("/api/v1/courses/[^/]+/sections") ||
                     path.equals("/api/v1/categories") ||
-                    path.matches("/api/v1/categories/[^/]+")));
+                    path.matches("/api/v1/categories/[^/]+") ||
+                    path.matches("/api/v1/lessons/[^/]+/resources") ||
+                    path.matches("/api/v1/media/download/.+")));
         if (authorization != null && !publicAuth) {
             try {
                 if (!authorization.regionMatches(true, 0, "Bearer ", 0, 7)) throw new JwtException(
