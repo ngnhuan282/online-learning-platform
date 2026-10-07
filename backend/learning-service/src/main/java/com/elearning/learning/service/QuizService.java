@@ -27,17 +27,20 @@ public class QuizService {
     private final QuizAttemptRepository attempts;
     private final EnrollmentRepository enrollments;
     private final CourseCatalogClient courseCatalog;
+    private final NotificationService notifications;
 
     public QuizService(
         QuizRepository quizzes,
         QuizAttemptRepository attempts,
         EnrollmentRepository enrollments,
-        CourseCatalogClient courseCatalog
+        CourseCatalogClient courseCatalog,
+        NotificationService notifications
     ) {
         this.quizzes = quizzes;
         this.attempts = attempts;
         this.enrollments = enrollments;
         this.courseCatalog = courseCatalog;
+        this.notifications = notifications;
     }
 
     public List<QuizListItemResponse> listPublished(Long userId, Long courseId) {
@@ -180,7 +183,9 @@ public class QuizService {
         attempt.setPassed(score >= quiz.getPassingScore());
         attempt.setStatus(AttemptStatus.GRADED);
         attempt.setSubmittedAt(now);
-        return QuizResultResponse.from(attempts.save(attempt));
+        var saved = attempts.save(attempt);
+        notifications.quizResult(userId, saved.getId(), quiz.getTitle(), score, saved.getPassed());
+        return QuizResultResponse.from(saved);
     }
 
     public QuizResultResponse latestResult(Long userId, Long quizId) {

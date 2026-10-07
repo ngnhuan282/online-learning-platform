@@ -1,4 +1,8 @@
 spring:
+  flyway:
+    placeholders:
+      notificationCheckKeyword: CONSTRAINT
+      notificationEventKeyCollation: ""
   datasource:
     url: jdbc:h2:mem:learning;MODE=MySQL;DB_CLOSE_DELAY=-1
     username: sa
