@@ -9,7 +9,9 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications", uniqueConstraints = @UniqueConstraint(
+    name = "uk_notifications_user_event", columnNames = {"user_id", "event_key"}
+))
 public class Notification {
 
     @Id
@@ -22,6 +24,9 @@ public class Notification {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private NotificationType type;
+
+    @Column(name = "event_key", length = 200)
+    private String eventKey;
 
     @Column(nullable = false)
     private String title;

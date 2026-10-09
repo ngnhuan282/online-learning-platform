@@ -4,8 +4,10 @@ import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
 import { demoLearningDashboard } from '../data/learningDemoData';
 import useLearningResource from '../hooks/useLearningResource';
+import useNotifications from '../hooks/useNotifications';
 
 export default function UserDashboardPage() {
+  const notifications = useNotifications();
   const { data, error, loading, usingFallback } = useLearningResource(
     learningApi.getDashboard,
     demoLearningDashboard,
@@ -15,7 +17,7 @@ export default function UserDashboardPage() {
     { label: 'Khóa đang học', value: data.activeEnrollments },
     { label: 'Khóa hoàn thành', value: data.completedEnrollments },
     { label: 'Bài đã xong', value: data.completedLessons },
-    { label: 'Thông báo mới', value: data.unreadNotifications },
+    { label: 'Thông báo mới', value: notifications.summary.unreadCount ?? '—' },
   ];
 
   return (
@@ -50,11 +52,7 @@ export default function UserDashboardPage() {
             </div>
             <div className="learning-list">
               {data.recentEnrollments.map(enrollment => (
-                <Link
-                  className="learning-row"
-                  to={`/learning/${enrollment.courseId}`}
-                  key={enrollment.id}
-                >
+                <Link className="learning-row" to={`/learning/${enrollment.courseId}`} key={enrollment.id}>
                   <span>Course #{enrollment.courseId}</span>
                   <ProgressBar value={enrollment.status === 'COMPLETED' ? 100 : 48} />
                   <b>{enrollment.status}</b>

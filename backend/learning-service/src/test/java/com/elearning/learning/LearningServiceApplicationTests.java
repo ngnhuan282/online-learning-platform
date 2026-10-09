@@ -211,6 +211,12 @@ class LearningServiceApplicationTests {
     }
 
     @Test
+    void notificationReceiverIsDisabledWithoutAConfiguredKey() throws Exception {
+        String path = "/internal/v1/notifications/events";
+        error(request(path, tokenFor("ADMIN", 912L), "{}"), 503, "SERVICE_UNAVAILABLE", path);
+    }
+
+    @Test
     void freeEnrollmentIsIdempotentForMyCourses() throws Exception {
         String access = Jwts.builder()
             .subject("123")
@@ -380,6 +386,13 @@ class LearningServiceApplicationTests {
             .isFalse();
         error(send("GET", reviewPath, stranger, null), 404, "NOT_FOUND", reviewPath);
         error(send("POST", submitPath, learner, answers), 409, "CONFLICT", submitPath);
+        JsonNode notifications = mapper.readTree(send(
+            "GET", "/api/v1/learning/notifications/feed?category=LEARNING", learner, null
+        ).body()).get("data");
+        assertThat(notifications.get("totalElements").asLong()).isEqualTo(1);
+        assertThat(notifications.get("content").get(0).get("type").asString()).isEqualTo("QUIZ_RESULT_AVAILABLE");
+        assertThat(notifications.get("content").get(0).get("actionUrl").asString())
+            .isEqualTo("/quizzes/attempts/" + attemptId + "/result");
         assertThat(send("GET", quizPath + "/result", learner, null).body()).contains("\"score\":100");
         long retakeId = mapper.readTree(send("POST", startPath, learner, null).body())
             .get("data").get("attemptId").asLong();
