@@ -28,6 +28,16 @@
   align-items: start;
 }
 
+.checkout-state-panel {
+  display: grid;
+  gap: 18px;
+  max-width: 720px;
+}
+
+.checkout-state-panel .button {
+  width: fit-content;
+}
+
 .payment-panel,
 .analytics-card {
   background: #fff;
@@ -343,6 +353,10 @@
   gap: 12px;
 }
 
+.result-error-actions {
+  margin-top: 24px;
+}
+
 .mock-payment-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
@@ -649,29 +663,16 @@
 .payment-pagination {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 0 4px;
+  padding: 22px 0 12px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
-.payment-pagination > div {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.payment-pagination .button {
-  padding: 7px 12px;
-  font-size: 13px;
-}
-
-.payment-pagination strong {
-  min-width: 44px;
-  color: var(--text);
-  text-align: center;
+.payment-pagination .MuiTextField-root {
+  min-width: 130px;
 }
 
 @media (max-width: 1199px) {

@@ -7,3 +7,5 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+integrations:
+  internal-service-token: test-internal-service-token-1234567890

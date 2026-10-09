@@ -14,6 +14,7 @@ import com.elearning.payment.entity.enums.OrderStatus;
 import com.elearning.payment.entity.enums.PaymentEventType;
 import com.elearning.payment.entity.enums.PaymentProvider;
 import com.elearning.payment.entity.enums.PaymentStatus;
+import com.elearning.payment.learning.LearningEnrollmentClient;
 import com.elearning.payment.repository.CourseOrderRepository;
 import com.elearning.payment.repository.PaymentRepository;
 import com.elearning.payment.repository.PaymentTransactionRepository;
@@ -42,28 +43,38 @@ public class PaymentCoreService {
     private final PaymentRepository payments;
     private final PaymentTransactionRepository transactions;
     private final CourseSnapshotProvider courses;
+    private final LearningEnrollmentClient learning;
 
     public PaymentCoreService(
         CourseOrderRepository orders,
         PaymentRepository payments,
         PaymentTransactionRepository transactions,
-        CourseSnapshotProvider courses
+        CourseSnapshotProvider courses,
+        LearningEnrollmentClient learning
     ) {
         this.orders = orders;
         this.payments = payments;
         this.transactions = transactions;
         this.courses = courses;
+        this.learning = learning;
     }
 
     @Transactional
     public CheckoutResponse createCheckout(CheckoutRequest request, Long userId) {
-        CourseSnapshot course = courses
-            .findById(request.courseId())
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        String idempotencyKey = request.idempotencyKey().strip();
+        CourseOrder existingOrder = orders
+            .findByUserIdAndIdempotencyKey(userId, idempotencyKey)
+            .orElse(null);
+        if (existingOrder != null) {
+            return existingCheckout(existingOrder, request.courseId(), provider);
+        }
+
+        CourseSnapshot course = courses.requirePurchasableCourse(request.courseId());
         CourseOrder order = new CourseOrder(
             generateOrderCode(),
             userId,
+            idempotencyKey,
             course.price(),
             course.currency(),
             Instant.now().plusSeconds(15 * 60)
@@ -89,6 +100,29 @@ public class PaymentCoreService {
             )
         );
 
+        return new CheckoutResponse(
+            order.getOrderCode(),
+            toOrderResponse(order, payment),
+            toPaymentSummary(payment),
+            payment.getCheckoutUrl()
+        );
+    }
+
+    private CheckoutResponse existingCheckout(
+        CourseOrder order,
+        Long requestedCourseId,
+        PaymentProvider requestedProvider
+    ) {
+        OrderItem item = firstItem(order);
+        Payment payment = latestPayment(order);
+        if (
+            item == null ||
+            payment == null ||
+            !item.getCourseId().equals(requestedCourseId) ||
+            payment.getProvider() != requestedProvider
+        ) {
+            throw new AppException(ErrorCode.CONFLICT);
+        }
         return new CheckoutResponse(
             order.getOrderCode(),
             toOrderResponse(order, payment),
@@ -206,8 +240,18 @@ public class PaymentCoreService {
         PaymentEventType eventType,
         Instant eventTime
     ) {
+        if (payment.getStatus() == nextStatus) {
+            if (nextStatus == PaymentStatus.SUCCESS) {
+                enrollPaidCourse(order);
+            }
+            return;
+        }
         if (!availableTransitions(payment.getStatus()).contains(nextStatus)) {
             throw new AppException(ErrorCode.CONFLICT);
+        }
+
+        if (nextStatus == PaymentStatus.SUCCESS) {
+            enrollPaidCourse(order);
         }
 
         String transactionCode = providerTransactionCode == null
@@ -229,6 +273,14 @@ public class PaymentCoreService {
                 null
             )
         );
+    }
+
+    private void enrollPaidCourse(CourseOrder order) {
+        OrderItem item = firstItem(order);
+        if (item == null) {
+            throw new AppException(ErrorCode.CONFLICT);
+        }
+        learning.enroll(order.getOrderCode(), order.getUserId(), item.getCourseId());
     }
 
     private PaymentHistoryItemResponse toHistoryItem(CourseOrder order) {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { MenuItem, Pagination, TextField } from '@mui/material';
 import AppLoading from '../../../shared/components/AppLoading';
 import EmptyState from '../../../shared/components/EmptyState';
 import ErrorState from '../../../shared/components/ErrorState';
@@ -9,7 +10,7 @@ import { paymentApi } from '../api/paymentApi';
 import { formatDemoPrice } from '../data/paymentDemo';
 import '../styles/payment.css';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 const statusLabel = {
   PENDING: 'Đang chờ',
@@ -37,6 +38,7 @@ function formatDate(value) {
 export default function PaymentHistoryPage() {
   const [history, setHistory] = useState(null);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [keyword, setKeyword] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -47,7 +49,7 @@ export default function PaymentHistoryPage() {
   useEffect(() => {
     let active = true;
     paymentApi
-      .getHistory({ page, size: PAGE_SIZE, keyword: searchQuery, status: statusFilter })
+      .getHistory({ page, size: pageSize, keyword: searchQuery, status: statusFilter })
       .then(response => {
         if (active) {
           setHistory(response.data);
@@ -63,7 +65,7 @@ export default function PaymentHistoryPage() {
     return () => {
       active = false;
     };
-  }, [page, searchQuery, statusFilter, retryCount]);
+  }, [page, pageSize, searchQuery, statusFilter, retryCount]);
 
   function refreshHistory() {
     setLoading(true);
@@ -93,9 +95,10 @@ export default function PaymentHistoryPage() {
     setRetryCount(value => value + 1);
   }
 
-  function goToPage(nextPage) {
+  function handlePageSizeChange(event) {
     setLoading(true);
-    setPage(nextPage);
+    setPage(0);
+    setPageSize(Number(event.target.value));
   }
 
   const items = history?.content || [];
@@ -218,29 +221,32 @@ export default function PaymentHistoryPage() {
 
               <div className="payment-pagination">
                 <span>
-                  Hiển thị {items.length} trên tổng số {totalElements} giao dịch
+                  Hiển thị {items.length ? page * pageSize + 1 : 0}–{page * pageSize + items.length} /{' '}
+                  {totalElements} giao dịch
                 </span>
-                <div>
-                  <button
-                    className="button button-outline"
-                    type="button"
-                    disabled={page <= 0}
-                    onClick={() => goToPage(Math.max(page - 1, 0))}
-                  >
-                    Trang trước
-                  </button>
-                  <strong>
-                    {page + 1} / {totalPages}
-                  </strong>
-                  <button
-                    className="button button-outline"
-                    type="button"
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => goToPage(page + 1)}
-                  >
-                    Trang sau
-                  </button>
-                </div>
+                <TextField
+                  select
+                  size="small"
+                  label="Số dòng"
+                  value={pageSize}
+                  onChange={handlePageSizeChange}
+                >
+                  {PAGE_SIZE_OPTIONS.map(value => (
+                    <MenuItem key={value} value={value}>
+                      {value} dòng / trang
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Pagination
+                  page={page + 1}
+                  count={Math.max(1, totalPages)}
+                  onChange={(_, value) => {
+                    setLoading(true);
+                    setPage(value - 1);
+                  }}
+                  color="primary"
+                  shape="rounded"
+                />
               </div>
             </>
           )}

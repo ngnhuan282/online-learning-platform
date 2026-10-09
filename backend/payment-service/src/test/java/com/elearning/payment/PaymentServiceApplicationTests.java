@@ -1,17 +1,23 @@
 package com.elearning.payment;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.BDDMockito.*;
 
 import com.elearning.payment.common.exception.AppException;
 import com.elearning.payment.common.exception.ErrorCode;
 import com.elearning.payment.common.response.ApiResponse;
 import com.elearning.payment.common.response.PageResponse;
+import com.elearning.payment.course.CourseSnapshot;
+import com.elearning.payment.course.CourseSnapshotProvider;
+import com.elearning.payment.learning.LearningEnrollmentClient;
 import com.elearning.payment.security.JwtTokenProvider;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -22,6 +28,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +42,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -61,13 +69,57 @@ class PaymentServiceApplicationTests {
     @Autowired
     JwtTokenProvider tokens;
 
+    @MockitoBean
+    CourseSnapshotProvider courses;
+
+    @MockitoBean
+    LearningEnrollmentClient learning;
+
     final HttpClient client = HttpClient.newHttpClient();
 
+    @BeforeEach
+    void stubCrossServiceContracts() {
+        given(courses.requirePurchasableCourse(anyLong())).willAnswer(invocation -> {
+            Long courseId = invocation.getArgument(0);
+            return switch (courseId.intValue()) {
+                case 101 -> new CourseSnapshot(
+                    101L,
+                    "IELTS Intensive",
+                    BigDecimal.valueOf(1_690_000),
+                    "VND"
+                );
+                case 102 -> new CourseSnapshot(
+                    102L,
+                    "English for Tech",
+                    BigDecimal.valueOf(1_290_000),
+                    "VND"
+                );
+                case 103 -> new CourseSnapshot(
+                    103L,
+                    "TOEIC 850+",
+                    BigDecimal.valueOf(1_090_000),
+                    "VND"
+                );
+                default -> throw new AppException(ErrorCode.NOT_FOUND);
+            };
+        });
+        willDoNothing().given(learning).enroll(anyString(), anyLong(), anyLong());
+    }
+
     String token(String role, long seconds) {
+        return token(1L, role, List.of(), seconds);
+    }
+
+    String token(long userId, String role, long seconds) {
+        return token(userId, role, List.of(), seconds);
+    }
+
+    String token(long userId, String role, List<String> permissions, long seconds) {
         return Jwts.builder()
-            .subject("1")
+            .subject(Long.toString(userId))
             .issuer("learnsphere")
             .claim("role", role)
+            .claim("permissions", permissions)
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(120)))
             .expiration(Date.from(Instant.now().plusSeconds(seconds)))
@@ -190,7 +242,11 @@ class PaymentServiceApplicationTests {
         assertThat(mapper.readTree(invalidCheckout.body()).get("errors").get("courseId").isArray()).isTrue();
 
         error(
-            request("/api/v1/payments/checkout", token("USER", 60), "{\"courseId\":999}"),
+            request(
+                "/api/v1/payments/checkout",
+                token("USER", 60),
+                "{\"courseId\":999,\"idempotencyKey\":\"checkout-missing-course-001\"}"
+            ),
             404,
             "NOT_FOUND",
             "/api/v1/payments/checkout"
@@ -199,7 +255,8 @@ class PaymentServiceApplicationTests {
         var checkout = request(
             "/api/v1/payments/checkout",
             token("USER", 60),
-            "{\"courseId\":101,\"provider\":\"MOCK\",\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+            "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"checkout-course-101-main\"," +
+            "\"amount\":1,\"returnUrl\":\"http://localhost:5173/payment/result\"}"
         );
         assertThat(checkout.statusCode()).isEqualTo(200);
         JsonNode checkoutJson = mapper.readTree(checkout.body());
@@ -209,10 +266,32 @@ class PaymentServiceApplicationTests {
         assertThat(checkoutData.get("payment").get("provider").asString()).isEqualTo("MOCK");
         assertThat(checkoutData.get("payment").get("status").asString()).isEqualTo("PENDING");
         assertThat(checkoutData.get("order").get("items").get(0).get("courseId").asLong()).isEqualTo(101L);
+        assertThat(checkoutData.get("order").get("totalAmount").decimalValue()).isEqualByComparingTo(
+            "1690000.00"
+        );
         assertThat(checkoutData.get("checkoutUrl").asString()).contains("/payment/mock");
         assertThat(checkoutData.get("checkoutUrl").asString()).contains("orderCode=");
 
         String orderCode = checkoutData.get("orderCode").asString();
+        var repeatedCheckout = request(
+            "/api/v1/payments/checkout",
+            token("USER", 60),
+            "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"checkout-course-101-main\"}"
+        );
+        assertThat(repeatedCheckout.statusCode()).isEqualTo(200);
+        assertThat(mapper.readTree(repeatedCheckout.body()).get("data").get("orderCode").asString())
+            .isEqualTo(orderCode);
+
+        error(
+            request(
+                "/api/v1/payments/checkout",
+                token("USER", 60),
+                "{\"courseId\":102,\"provider\":\"MOCK\",\"idempotencyKey\":\"checkout-course-101-main\"}"
+            ),
+            409,
+            "CONFLICT",
+            "/api/v1/payments/checkout"
+        );
         var order = request("/api/v1/payments/orders/" + orderCode, token("USER", 60), null);
         assertThat(order.statusCode()).isEqualTo(200);
         assertThat(mapper.readTree(order.body()).get("data").get("orderCode").asString()).isEqualTo(
@@ -345,7 +424,8 @@ class PaymentServiceApplicationTests {
         var checkout = request(
             "/api/v1/payments/checkout",
             token("USER", 60),
-            "{\"courseId\":102,\"provider\":\"MOCK\",\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+            "{\"courseId\":102,\"provider\":\"MOCK\",\"idempotencyKey\":\"mock-success-course-102\"," +
+            "\"returnUrl\":\"http://localhost:5173/payment/result\"}"
         );
         assertThat(checkout.statusCode()).isEqualTo(200);
         String orderCode = mapper.readTree(checkout.body()).get("data").get("orderCode").asString();
@@ -358,12 +438,17 @@ class PaymentServiceApplicationTests {
         assertThat(paidData.get("payment").get("status").asString()).isEqualTo("SUCCESS");
         assertThat(paidData.get("payment").get("paidAt").isNull()).isFalse();
 
+        var repeatedSuccess = request(mockPath, token("USER", 60), "{\"status\":\"SUCCESS\"}");
+        assertThat(repeatedSuccess.statusCode()).isEqualTo(200);
+        then(learning).should(times(2)).enroll(orderCode, 1L, 102L);
+
         error(request(mockPath, token("USER", 60), "{\"status\":\"FAILED\"}"), 409, "CONFLICT", mockPath);
 
         var secondCheckout = request(
             "/api/v1/payments/checkout",
             token("USER", 60),
-            "{\"courseId\":103,\"provider\":\"MOCK\",\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+            "{\"courseId\":103,\"provider\":\"MOCK\",\"idempotencyKey\":\"mock-failed-course-103\"," +
+            "\"returnUrl\":\"http://localhost:5173/payment/result\"}"
         );
         assertThat(secondCheckout.statusCode()).isEqualTo(200);
         String failedOrderCode = mapper.readTree(secondCheckout.body()).get("data").get("orderCode").asString();
@@ -381,6 +466,148 @@ class PaymentServiceApplicationTests {
         assertThat(failedData.get("payment").get("paidAt").isNull()).isTrue();
 
         error(request(failedPath, token("USER", 60), "{\"status\":\"REFUNDED\"}"), 400, "BAD_REQUEST", failedPath);
+    }
+
+    @Test
+    void ignoresClientOwnedPaymentFieldsAndPreventsCrossUserAccess() throws Exception {
+        long ownerId = 7_101L;
+        long otherUserId = 7_102L;
+        String ownerAccess = token(ownerId, "USER", 60);
+        String otherAccess = token(otherUserId, "USER", 60);
+
+        var checkout = request(
+            "/api/v1/payments/checkout",
+            ownerAccess,
+            "{\"courseId\":101,\"provider\":\"MOCK\"," +
+            "\"idempotencyKey\":\"hardening-owner-checkout-101\"," +
+            "\"amount\":1,\"status\":\"SUCCESS\",\"userId\":" + otherUserId + "}"
+        );
+        assertThat(checkout.statusCode()).withFailMessage(checkout.body()).isEqualTo(200);
+        JsonNode checkoutData = mapper.readTree(checkout.body()).get("data");
+        String orderCode = checkoutData.get("orderCode").asString();
+        assertThat(checkoutData.get("order").get("userId").asLong()).isEqualTo(ownerId);
+        assertThat(checkoutData.get("order").get("totalAmount").decimalValue()).isEqualByComparingTo(
+            "1690000.00"
+        );
+        assertThat(checkoutData.get("payment").get("amount").decimalValue()).isEqualByComparingTo(
+            "1690000.00"
+        );
+        assertThat(checkoutData.get("payment").get("status").asString()).isEqualTo("PENDING");
+
+        String orderPath = "/api/v1/payments/orders/" + orderCode;
+        error(request(orderPath, otherAccess, null), 403, "FORBIDDEN", orderPath);
+
+        String mockPath = "/api/v1/payments/mock/orders/" + orderCode + "/complete";
+        error(
+            request(mockPath, otherAccess, "{\"status\":\"SUCCESS\"}"),
+            403,
+            "FORBIDDEN",
+            mockPath
+        );
+
+        var otherHistory = request(
+            "/api/v1/payments/history?keyword=" + orderCode,
+            otherAccess,
+            null
+        );
+        assertThat(otherHistory.statusCode()).isEqualTo(200);
+        assertThat(mapper.readTree(otherHistory.body()).get("data").get("totalElements").asLong())
+            .isZero();
+
+        String adminStatusPath = "/api/v1/payments/admin/orders/" + orderCode + "/status";
+        error(
+            patch(adminStatusPath, ownerAccess, "{\"status\":\"SUCCESS\"}"),
+            403,
+            "FORBIDDEN",
+            adminStatusPath
+        );
+        assertThat(request(orderPath, ownerAccess, null).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void rollsBackSuccessWhenLearningIsUnavailableAndRetriesSafely() throws Exception {
+        long userId = 7_201L;
+        String access = token(userId, "USER", 60);
+        var checkout = request(
+            "/api/v1/payments/checkout",
+            access,
+            "{\"courseId\":102,\"provider\":\"MOCK\"," +
+            "\"idempotencyKey\":\"hardening-learning-retry-102\"}"
+        );
+        assertThat(checkout.statusCode()).withFailMessage(checkout.body()).isEqualTo(200);
+        String orderCode = mapper.readTree(checkout.body()).get("data").get("orderCode").asString();
+        willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE))
+            .willDoNothing()
+            .given(learning)
+            .enroll(orderCode, userId, 102L);
+
+        String mockPath = "/api/v1/payments/mock/orders/" + orderCode + "/complete";
+        error(
+            request(mockPath, access, "{\"status\":\"SUCCESS\"}"),
+            503,
+            "SERVICE_UNAVAILABLE",
+            mockPath
+        );
+
+        JsonNode pending = mapper
+            .readTree(request("/api/v1/payments/orders/" + orderCode, access, null).body())
+            .get("data");
+        assertThat(pending.get("status").asString()).isEqualTo("PENDING_PAYMENT");
+        assertThat(pending.get("payment").get("status").asString()).isEqualTo("PENDING");
+
+        var retry = request(mockPath, access, "{\"status\":\"SUCCESS\"}");
+        assertThat(retry.statusCode()).withFailMessage(retry.body()).isEqualTo(200);
+        assertThat(mapper.readTree(retry.body()).get("data").get("payment").get("status").asString())
+            .isEqualTo("SUCCESS");
+
+        var repeated = request(mockPath, access, "{\"status\":\"SUCCESS\"}");
+        assertThat(repeated.statusCode()).isEqualTo(200);
+        then(learning).should(times(3)).enroll(orderCode, userId, 102L);
+
+        var detail = request(
+            "/api/v1/payments/admin/orders/" + orderCode,
+            token("ADMIN", 60),
+            null
+        );
+        assertThat(detail.statusCode()).isEqualTo(200);
+        assertThat(mapper.readTree(detail.body()).get("data").get("transactions").size()).isEqualTo(2);
+
+        JsonNode analytics = mapper
+            .readTree(request("/api/v1/payments/admin/analytics", token("ADMIN", 60), null).body())
+            .get("data");
+        assertThat(analytics.get("successfulPayments").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(analytics.get("grossRevenue").decimalValue()).isGreaterThanOrEqualTo(
+            BigDecimal.valueOf(1_290_000)
+        );
+    }
+
+    @Test
+    void separatesPaymentReportingFromStatusManagementPermission() throws Exception {
+        long reporterId = 7_301L;
+        String reporter = token(
+            reporterId,
+            "USER",
+            List.of("PAYMENT_REPORT_VIEW"),
+            60
+        );
+
+        assertThat(request("/api/v1/payments/admin/orders", reporter, null).statusCode()).isEqualTo(200);
+        assertThat(request("/api/v1/payments/admin/analytics", reporter, null).statusCode()).isEqualTo(200);
+
+        var checkout = request(
+            "/api/v1/payments/checkout",
+            token(reporterId, "USER", 60),
+            "{\"courseId\":103,\"idempotencyKey\":\"hardening-reporter-order-103\"}"
+        );
+        String orderCode = mapper.readTree(checkout.body()).get("data").get("orderCode").asString();
+        String detailPath = "/api/v1/payments/admin/orders/" + orderCode;
+        assertThat(request(detailPath, reporter, null).statusCode()).isEqualTo(200);
+        error(
+            patch(detailPath + "/status", reporter, "{\"status\":\"SUCCESS\"}"),
+            403,
+            "FORBIDDEN",
+            detailPath + "/status"
+        );
     }
 
     @Test

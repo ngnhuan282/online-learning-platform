@@ -10,6 +10,8 @@ public interface LearningService {
 
     EnrollmentResponse enroll(Long userId, EnrollRequest request);
 
+    EnrollmentResponse enrollFromPayment(PaymentEnrollmentRequest request);
+
     List<LessonProgressResponse> getCourseProgress(Long userId, Long courseId);
 
     LessonProgressResponse accessLesson(Long userId, Long courseId, Long lessonId);

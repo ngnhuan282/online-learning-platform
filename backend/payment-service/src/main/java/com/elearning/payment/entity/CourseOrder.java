@@ -25,6 +25,9 @@ public class CourseOrder {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Column(name = "idempotency_key", length = 64)
+    private String idempotencyKey;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)
@@ -53,12 +56,14 @@ public class CourseOrder {
     public CourseOrder(
         String orderCode,
         Long userId,
+        String idempotencyKey,
         BigDecimal totalAmount,
         String currency,
         Instant expiresAt
     ) {
         this.orderCode = orderCode;
         this.userId = userId;
+        this.idempotencyKey = idempotencyKey;
         this.totalAmount = totalAmount;
         this.currency = currency;
         this.expiresAt = expiresAt;

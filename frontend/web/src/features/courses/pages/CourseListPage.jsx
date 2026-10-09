@@ -326,7 +326,10 @@ function CourseListPage() {
                   {selectedEnrollLabel}
                 </button>
               ) : (
-                <button className="button button-primary" onClick={() => navigate('/checkout')}>
+                <button
+                  className="button button-primary"
+                  onClick={() => navigate(`/checkout?course=${encodeURIComponent(selectedCourseId)}`)}
+                >
                   Thanh toán
                 </button>
               )}

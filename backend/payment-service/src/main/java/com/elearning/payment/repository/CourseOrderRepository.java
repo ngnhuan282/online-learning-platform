@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 public interface CourseOrderRepository extends JpaRepository<CourseOrder, Long> {
     Optional<CourseOrder> findByOrderCode(String orderCode);
 
+    Optional<CourseOrder> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
+
     boolean existsByOrderCode(String orderCode);
 
     Page<CourseOrder> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);

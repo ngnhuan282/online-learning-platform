@@ -53,6 +53,7 @@ class LearningServiceApplicationTests {
 
     static final String SECRET = UUID.randomUUID().toString() + UUID.randomUUID();
     static final String BASE = "/api/v1/_foundation-test";
+    static final String INTERNAL_TOKEN = "test-internal-service-token-1234567890";
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -94,6 +95,17 @@ class LearningServiceApplicationTests {
         if (body != null) builder
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body));
+        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    HttpResponse<String> internalEnrollment(String internalToken, String body) throws Exception {
+        var builder = HttpRequest
+            .newBuilder(URI.create("http://localhost:" + port + "/internal/v1/learning/enrollments"))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body));
+        if (internalToken != null) {
+            builder.header("X-Internal-Service-Token", internalToken);
+        }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
@@ -232,6 +244,36 @@ class LearningServiceApplicationTests {
         assertThat(secondData.get("id").asLong()).isEqualTo(firstData.get("id").asLong());
         assertThat(enrollments.findByUserIdAndCourseId(123L, 777L)).isPresent();
         assertThat(enrollments.findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(123L)).hasSize(1);
+    }
+
+    @Test
+    void paymentEnrollmentRequiresInternalTokenAndIsIdempotentByOrder() throws Exception {
+        String path = "/internal/v1/learning/enrollments";
+        String body = "{\"orderCode\":\"LS-PAY-INTEGRATION-001\",\"userId\":5001,\"courseId\":7001}";
+
+        error(internalEnrollment(null, body), 401, "UNAUTHORIZED", path);
+        error(internalEnrollment("wrong-internal-token-that-is-long-enough", body), 401, "UNAUTHORIZED", path);
+
+        var first = internalEnrollment(INTERNAL_TOKEN, body);
+        var repeated = internalEnrollment(INTERNAL_TOKEN, body);
+
+        assertThat(first.statusCode()).withFailMessage(first.body()).isEqualTo(200);
+        assertThat(repeated.statusCode()).withFailMessage(repeated.body()).isEqualTo(200);
+        JsonNode firstData = mapper.readTree(first.body()).get("data");
+        JsonNode repeatedData = mapper.readTree(repeated.body()).get("data");
+        assertThat(repeatedData.get("id").asLong()).isEqualTo(firstData.get("id").asLong());
+        assertThat(enrollments.findBySourceOrderCode("LS-PAY-INTEGRATION-001")).isPresent();
+        assertThat(enrollments.findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(5001L)).hasSize(1);
+
+        error(
+            internalEnrollment(
+                INTERNAL_TOKEN,
+                "{\"orderCode\":\"LS-PAY-INTEGRATION-001\",\"userId\":5002,\"courseId\":7001}"
+            ),
+            409,
+            "CONFLICT",
+            path
+        );
     }
 
     @Test

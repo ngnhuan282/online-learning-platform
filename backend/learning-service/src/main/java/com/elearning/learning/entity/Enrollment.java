@@ -25,6 +25,9 @@ public class Enrollment {
     @Column(name = "course_id", nullable = false)
     private Long courseId;
 
+    @Column(name = "source_order_code", unique = true, length = 40)
+    private String sourceOrderCode;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private EnrollmentStatus status = EnrollmentStatus.ACTIVE;

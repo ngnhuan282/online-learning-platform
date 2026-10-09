@@ -81,6 +81,38 @@ public class LearningServiceImpl implements LearningService {
     }
 
     @Override
+    @Transactional
+    public EnrollmentResponse enrollFromPayment(PaymentEnrollmentRequest request) {
+        String orderCode = request.orderCode().strip();
+        var existingOrder = enrollments.findBySourceOrderCode(orderCode);
+        if (existingOrder.isPresent()) {
+            Enrollment enrollment = existingOrder.get();
+            if (
+                !enrollment.getUserId().equals(request.userId()) ||
+                !enrollment.getCourseId().equals(request.courseId())
+            ) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
+            return EnrollmentResponse.from(enrollment);
+        }
+
+        var existingCourse = enrollments.findByUserIdAndCourseId(request.userId(), request.courseId());
+        if (existingCourse.isPresent()) {
+            return EnrollmentResponse.from(existingCourse.get());
+        }
+
+        var enrollment = new Enrollment();
+        enrollment.setUserId(request.userId());
+        enrollment.setCourseId(request.courseId());
+        enrollment.setSourceOrderCode(orderCode);
+        enrollment.setStatus(EnrollmentStatus.ACTIVE);
+        enrollment.setLastAccessedAt(Instant.now());
+        Enrollment saved = enrollments.saveAndFlush(enrollment);
+        createEnrollmentNotification(request.userId(), request.courseId());
+        return EnrollmentResponse.from(saved);
+    }
+
+    @Override
     public List<LessonProgressResponse> getCourseProgress(Long userId, Long courseId) {
         ensureCourseAccess(userId, courseId);
         return progress.findByUserIdAndCourseIdOrderByLessonIdAsc(userId, courseId)
