@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { courseApi } from '../api/courseApi';
 import { formatPrice } from '../data/demoCourses';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
+import { ROUTES } from '../../../shared/constants/routes';
 
 const fallbackCourse = {
   id: 1,
@@ -132,9 +133,18 @@ function CourseDetailPage() {
                 </div>
               </div>
             ) : null}
-            <button className="button button-primary" type="button">
-              Đăng ký khóa học
-            </button>
+            {Number(item.price || 0) > 0 ? (
+              <Link
+                className="button button-primary"
+                to={`${ROUTES.CHECKOUT}?course=${encodeURIComponent(item.id)}`}
+              >
+                Thanh toán khóa học
+              </Link>
+            ) : (
+              <Link className="button button-primary" to={ROUTES.COURSES}>
+                Xem lựa chọn ghi danh
+              </Link>
+            )}
           </div>
         </aside>
       </div>

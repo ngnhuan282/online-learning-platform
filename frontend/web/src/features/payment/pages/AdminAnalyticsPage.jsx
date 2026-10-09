@@ -161,7 +161,7 @@ export default function AdminAnalyticsPage() {
             <AppLoading label="Đang tải thống kê thanh toán..." />
           </article>
         ) : error ? (
-          <ErrorState error={error} title="Không thể tải payment analytics" onRetry={loadAnalytics} />
+          <ErrorState error={error} title="Không thể tải thống kê thanh toán" onRetry={loadAnalytics} />
         ) : (
           <>
             <div className="analytics-card-grid">

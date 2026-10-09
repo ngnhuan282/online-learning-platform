@@ -15,6 +15,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
     Optional<Enrollment> findByUserIdAndCourseId(Long userId, Long courseId);
 
+    Optional<Enrollment> findBySourceOrderCode(String sourceOrderCode);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Enrollment> findForUpdateByUserIdAndCourseId(Long userId, Long courseId);
 }

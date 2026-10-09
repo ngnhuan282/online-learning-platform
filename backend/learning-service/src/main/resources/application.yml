@@ -27,6 +27,8 @@ security:
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:learnsphere}
     access-token-seconds: ${JWT_ACCESS_TOKEN_SECONDS:900}
+integrations:
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN}
 management:
   endpoints:
     web:
