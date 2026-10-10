@@ -105,6 +105,12 @@ const router = createBrowserRouter([
               Component: (await import('../features/courses/pages/CurriculumBuilderPage')).default,
             }),
           },
+          {
+            path: ':courseId/reviews',
+            lazy: async () => ({
+              Component: (await import('../features/courses/pages/AdminReviewPage')).default,
+            }),
+          },
         ],
       },
       {

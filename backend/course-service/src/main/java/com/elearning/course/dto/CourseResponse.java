@@ -18,6 +18,8 @@ public record CourseResponse(
     CourseLevel level,
     CourseStatus status,
     String thumbnailUrl,
+    double avgRating,
+    int reviewCount,
     Instant createdAt,
     Instant updatedAt
 ) {
@@ -34,8 +36,11 @@ public record CourseResponse(
             course.getLevel(),
             course.getStatus(),
             course.getThumbnailUrl(),
+            course.getAvgRating(),
+            course.getReviewCount(),
             course.getCreatedAt(),
             course.getUpdatedAt()
         );
     }
 }
+

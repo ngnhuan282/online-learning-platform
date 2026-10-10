@@ -51,6 +51,12 @@ public class Course {
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
 
+    @Column(name = "avg_rating", nullable = false)
+    private double avgRating = 0.0;
+
+    @Column(name = "review_count", nullable = false)
+    private int reviewCount = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

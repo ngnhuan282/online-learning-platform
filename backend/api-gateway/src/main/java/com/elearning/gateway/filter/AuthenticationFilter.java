@@ -53,6 +53,7 @@ public class AuthenticationFilter implements WebFilter, Ordered {
                 (path.equals("/api/v1/courses") ||
                     path.matches("/api/v1/courses/[^/]+") ||
                     path.matches("/api/v1/courses/[^/]+/sections") ||
+                    path.matches("/api/v1/courses/[^/]+/reviews") ||
                     path.equals("/api/v1/categories") ||
                     path.matches("/api/v1/categories/[^/]+") ||
                     path.matches("/api/v1/lessons/[^/]+/resources") ||

@@ -29,7 +29,7 @@ public class SectionService {
 
     public List<SectionResponse> listByCourse(Long courseId) {
         findCourse(courseId);
-        return sections.findByCourseIdOrderByOrderIndexAsc(courseId).stream()
+        return sections.findByCourseIdWithLessons(courseId).stream()
             .map(SectionResponse::from)
             .toList();
     }
