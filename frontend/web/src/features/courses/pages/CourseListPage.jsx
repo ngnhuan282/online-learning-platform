@@ -10,6 +10,7 @@ import { categoryApi } from '../api/categoryApi';
 import { courseApi } from '../api/courseApi';
 import { learningApi } from '../../learning/api/learningApi';
 import { formatPrice, normalizeSearch } from '../data/demoCourses';
+import useCourseSearch from '../hooks/useCourseSearch';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
@@ -29,8 +30,8 @@ const coerceCourse = course => ({
   tag: course.status || 'Khóa học',
   image: course.thumbnailUrl || '/images/english-ielts.jpg',
   imageAlt: `${course.title} thumbnail`,
-  rating: '4.8',
-  reviews: '0',
+  rating: course.avgRating ? Number(course.avgRating).toFixed(1) : (course.rating != null ? String(course.rating) : '5.0'),
+  reviews: course.reviewCount != null ? String(course.reviewCount) : (course.reviews != null ? String(course.reviews) : '0'),
   students: 0,
   hours: 8,
   level: course.level ? String(course.level).toLowerCase() : 'beginner',
@@ -82,9 +83,23 @@ function CourseListPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
+  // Search with debounce — keeps input responsive, updates URL after 300ms
+  const initialQuery = params.get('q') || '';
+  const { keyword, setKeyword, debouncedKeyword } = useCourseSearch(initialQuery);
+
+  // Sync debounced keyword → URL param
+  useEffect(() => {
+    const paramsObj = new URLSearchParams(params);
+    if (debouncedKeyword) paramsObj.set('q', debouncedKeyword);
+    else paramsObj.delete('q');
+    setParams(paramsObj, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedKeyword]);
+
   function selectCourse(course) {
-    setEnrollError('');
-    setSelected(course);
+    if (course?.id) {
+      navigate(`/courses/${course.id}`);
+    }
   }
 
   useEffect(() => {
@@ -142,7 +157,7 @@ function CourseListPage() {
     };
   }, [isAuthenticated]);
 
-  const query = params.get('q') || '';
+  const query = debouncedKeyword;
   const category = params.get('category') || '';
   const filter = params.get('filter') || 'all';
   const selectedCourseId = selected ? numericCourseId(selected) : null;
@@ -242,8 +257,8 @@ function CourseListPage() {
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 28px' }}>
         <input
-          value={query}
-          onChange={event => updateFilters({ q: event.target.value.trim() })}
+          value={keyword}
+          onChange={event => setKeyword(event.target.value)}
           placeholder="Tìm khóa học theo tên, kỹ năng, nhãn..."
           style={{
             flex: 1,

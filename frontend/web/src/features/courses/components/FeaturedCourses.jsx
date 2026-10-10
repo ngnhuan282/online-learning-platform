@@ -26,8 +26,8 @@ const coerceCourse = course => ({
   tag: course.status || 'Khóa học',
   image: course.thumbnailUrl || '/images/english-ielts.jpg',
   imageAlt: `${course.title} thumbnail`,
-  rating: '4.8',
-  reviews: '0',
+  rating: course.avgRating ? Number(course.avgRating).toFixed(1) : (course.rating != null ? String(course.rating) : '5.0'),
+  reviews: course.reviewCount != null ? String(course.reviewCount) : (course.reviews != null ? String(course.reviews) : '0'),
   students: 0,
   hours: 8,
   level: course.level ? String(course.level).toLowerCase() : 'beginner',
@@ -158,7 +158,11 @@ export default function FeaturedCourses() {
         {filteredCourses.length ? (
           <div className="course-grid">
             {filteredCourses.map(course => (
-              <CourseCard key={course.id} course={course} onSelect={setSelected} />
+              <CourseCard
+                key={course.id}
+                course={course}
+                onSelect={c => c?.id && navigate(`/courses/${c.id}`)}
+              />
             ))}
           </div>
         ) : (

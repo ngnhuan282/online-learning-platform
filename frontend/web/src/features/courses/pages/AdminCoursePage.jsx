@@ -8,6 +8,9 @@ import useAuth from '../../auth/hooks/useAuth';
 import { can } from '../../admin/utils/adminUtils';
 import ErrorState from '../../../shared/components/ErrorState';
 import MediaUploader from '../components/MediaUploader';
+import useCourseSearch from '../hooks/useCourseSearch';
+
+const PAGE_SIZE = 10;
 
 const emptyForm = {
   title: '',
@@ -68,9 +71,16 @@ export default function AdminCoursePage() {
   const [deletingId, setDeletingId] = useState(null);
   const pending = useRef(false);
   const [form, setForm] = useState(emptyForm);
+  const [formErrors, setFormErrors] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  // Search
+  const { keyword, setKeyword, debouncedKeyword } = useCourseSearch('');
 
   const loadCategories = async () => {
     try {
@@ -89,9 +99,16 @@ export default function AdminCoursePage() {
     }
   };
 
-  const loadCourses = async () => {
+  const loadCourses = async (page = 0) => {
     try {
-      const response = await courseApi.adminList({ page: 0, size: 20 });
+      const response = await courseApi.adminList({ page, size: PAGE_SIZE });
+      const payload = response?.data ?? response;
+      // Extract pagination metadata
+      const pageData = payload?.data ?? payload;
+      if (pageData?.totalPages !== undefined) {
+        setTotalPages(pageData.totalPages);
+        setTotalElements(pageData.totalElements ?? 0);
+      }
       setCourses(normalizeCourseList(response));
     } catch (error) {
       setLoadError(error);
@@ -105,7 +122,8 @@ export default function AdminCoursePage() {
     const loadAll = async () => {
       setLoading(true);
       setLoadError(null);
-      await Promise.all([loadCategories(), loadCourses()]);
+      setCurrentPage(0);
+      await Promise.all([loadCategories(), loadCourses(0)]);
       if (isMounted) setLoading(false);
     };
 
@@ -114,12 +132,27 @@ export default function AdminCoursePage() {
       isMounted = false;
       controller.abort();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retry]);
+
+  // Re-load when page changes
+  useEffect(() => {
+    if (!loading) loadCourses(currentPage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
   const totalRevenue = useMemo(
     () => courses.reduce((sum, item) => sum + Number(item.price || 0), 0),
     [courses],
   );
+
+  const filteredCourses = useMemo(() => {
+    const q = debouncedKeyword.trim().toLowerCase();
+    if (!q) return courses;
+    return courses.filter(
+      c => c.title.toLowerCase().includes(q) || (c.categoryName || '').toLowerCase().includes(q),
+    );
+  }, [courses, debouncedKeyword]);
 
   function resetForm() {
     setForm({
@@ -127,12 +160,27 @@ export default function AdminCoursePage() {
       categoryId: categories[0] ? String(categories[0].id) : '',
       categoryName: categories[0] ? categories[0].name : '',
     });
+    setFormErrors({});
     setEditingId(null);
+  }
+
+  function validateForm() {
+    const errors = {};
+    if (!form.title.trim()) errors.title = 'Tên khóa học không được để trống';
+    else if (form.title.trim().length < 5) errors.title = 'Tên khóa học phải có ít nhất 5 ký tự';
+    if (!form.description.trim()) errors.description = 'Mô tả không được để trống';
+    else if (form.description.trim().length < 10) errors.description = 'Mô tả phải có ít nhất 10 ký tự';
+    if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
+    if (Number(form.price) < 0) errors.price = 'Giá không được âm';
+    if (Number(form.originalPrice) < 0) errors.originalPrice = 'Giá gốc không được âm';
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
     if (pending.current || loading || loadError) return;
+    if (!validateForm()) return;
     pending.current = true;
     setSubmitting(true);
     setMutationError(null);
@@ -252,8 +300,15 @@ export default function AdminCoursePage() {
                 value={form.title}
                 onChange={event => setForm({ ...form, title: event.target.value })}
                 placeholder="Tên khóa học"
-                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: formErrors.title ? '1px solid #ef4444' : '1px solid #dfe3ea',
+                }}
               />
+              {formErrors.title && (
+                <span style={{ color: '#ef4444', fontSize: 12 }}>{formErrors.title}</span>
+              )}
 
               <textarea
                 aria-label="Mô tả khóa học"
@@ -266,10 +321,13 @@ export default function AdminCoursePage() {
                 style={{
                   padding: '10px 12px',
                   borderRadius: 8,
-                  border: '1px solid #dfe3ea',
+                  border: formErrors.description ? '1px solid #ef4444' : '1px solid #dfe3ea',
                   resize: 'vertical',
                 }}
               />
+              {formErrors.description && (
+                <span style={{ color: '#ef4444', fontSize: 12 }}>{formErrors.description}</span>
+              )}
 
               <select
                 aria-label="Danh mục"
@@ -360,13 +418,23 @@ export default function AdminCoursePage() {
           )}
 
           <div className="course-card" style={{ padding: 20 }}>
-            <h3>Danh sách khóa học</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+              <h3 style={{ margin: 0 }}>Danh sách khóa học</h3>
+              <input
+                value={keyword}
+                onChange={e => setKeyword(e.target.value)}
+                placeholder="Tìm khóa học..."
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #dfe3ea', minWidth: 180 }}
+              />
+            </div>
             {loading ? (
               <p>Đang tải khóa học...</p>
             ) : (
               <div style={{ display: 'grid', gap: 12 }}>
-                {!loadError && courses.length === 0 && <p>Chưa có khóa học được xuất bản.</p>}
-                {courses.map(course => (
+                {!loadError && filteredCourses.length === 0 && (
+                  <p>{debouncedKeyword ? 'Không tìm thấy khóa học phù hợp.' : 'Chưa có khóa học được xuất bản.'}</p>
+                )}
+                {filteredCourses.map(course => (
                   <div
                     key={course.id}
                     style={{
@@ -381,8 +449,15 @@ export default function AdminCoursePage() {
                     <div>
                       <strong>{course.title}</strong>
                       <div style={{ color: '#64748b', fontSize: 13 }}>{course.categoryName}</div>
-                      <div style={{ color: '#64748b', fontSize: 13 }}>
-                        {formatPrice(Number(course.price || 0))}
+                      <div style={{ color: '#64748b', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <span>{formatPrice(Number(course.price || 0))}</span>
+                        <span>•</span>
+                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>
+                          ★ {Number(course.avgRating || 0).toFixed(1)}
+                        </span>
+                        <span style={{ color: '#94a3b8' }}>
+                          ({course.reviewCount || 0} đánh giá)
+                        </span>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -392,6 +467,13 @@ export default function AdminCoursePage() {
                         onClick={() => navigate(`/admin/courses/${course.id}/curriculum`)}
                       >
                         Bài học
+                      </button>
+                      <button
+                        className="button button-soft"
+                        type="button"
+                        onClick={() => navigate(`/admin/courses/${course.id}/reviews`)}
+                      >
+                        Đánh giá
                       </button>
                       {can(user, 'COURSE_UPDATE') && (
                         <button
@@ -415,6 +497,31 @@ export default function AdminCoursePage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+                <button
+                  className="button button-soft"
+                  disabled={currentPage === 0 || loading}
+                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  style={{ padding: '6px 14px' }}
+                >
+                  ← Trước
+                </button>
+                <span style={{ fontSize: 13, color: '#64748b' }}>
+                  Trang {currentPage + 1} / {totalPages}
+                  {totalElements > 0 && <span style={{ marginLeft: 6 }}>({totalElements} khóa học)</span>}
+                </span>
+                <button
+                  className="button button-soft"
+                  disabled={currentPage >= totalPages - 1 || loading}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                  style={{ padding: '6px 14px' }}
+                >
+                  Sau →
+                </button>
               </div>
             )}
           </div>
