@@ -5,13 +5,12 @@ import com.elearning.learning.common.exception.ErrorCode;
 import com.elearning.learning.dto.*;
 import com.elearning.learning.entity.Enrollment;
 import com.elearning.learning.entity.LessonProgress;
-import com.elearning.learning.entity.Notification;
 import com.elearning.learning.entity.enums.AttemptStatus;
 import com.elearning.learning.entity.enums.EnrollmentStatus;
-import com.elearning.learning.entity.enums.NotificationType;
 import com.elearning.learning.entity.enums.ProgressStatus;
 import com.elearning.learning.repository.*;
 import com.elearning.learning.service.LearningService;
+import com.elearning.learning.service.NotificationService;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -24,13 +23,13 @@ public class LearningServiceImpl implements LearningService {
     private final EnrollmentRepository enrollments;
     private final LessonProgressRepository progress;
     private final QuizAttemptRepository attempts;
-    private final NotificationRepository notifications;
+    private final NotificationService notifications;
 
     public LearningServiceImpl(
         EnrollmentRepository enrollments,
         LessonProgressRepository progress,
         QuizAttemptRepository attempts,
-        NotificationRepository notifications
+        NotificationService notifications
     ) {
         this.enrollments = enrollments;
         this.progress = progress;
@@ -44,7 +43,7 @@ public class LearningServiceImpl implements LearningService {
             enrollments.countByUserIdAndStatus(userId, EnrollmentStatus.ACTIVE),
             enrollments.countByUserIdAndStatus(userId, EnrollmentStatus.COMPLETED),
             progress.countByUserIdAndStatus(userId, ProgressStatus.COMPLETED),
-            notifications.countByUserIdAndReadAtIsNull(userId),
+            notifications.summary(userId).unreadCount(),
             getMyEnrollments(userId).stream().limit(5).toList(),
             attempts.findTop5ByUserIdAndStatusOrderByIdDesc(userId, AttemptStatus.GRADED)
                 .stream().map(QuizResultResponse::from).toList(),
@@ -76,7 +75,39 @@ public class LearningServiceImpl implements LearningService {
         enrollment.setStatus(EnrollmentStatus.ACTIVE);
         enrollment.setLastAccessedAt(Instant.now());
         Enrollment saved = enrollments.save(enrollment);
-        createEnrollmentNotification(userId, request.courseId());
+        notifications.courseEnrolled(userId, request.courseId(), saved.getId());
+        return EnrollmentResponse.from(saved);
+    }
+
+    @Override
+    @Transactional
+    public EnrollmentResponse enrollFromPayment(PaymentEnrollmentRequest request) {
+        String orderCode = request.orderCode().strip();
+        var existingOrder = enrollments.findBySourceOrderCode(orderCode);
+        if (existingOrder.isPresent()) {
+            Enrollment enrollment = existingOrder.get();
+            if (
+                !enrollment.getUserId().equals(request.userId()) ||
+                !enrollment.getCourseId().equals(request.courseId())
+            ) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
+            return EnrollmentResponse.from(enrollment);
+        }
+
+        var existingCourse = enrollments.findByUserIdAndCourseId(request.userId(), request.courseId());
+        if (existingCourse.isPresent()) {
+            return EnrollmentResponse.from(existingCourse.get());
+        }
+
+        var enrollment = new Enrollment();
+        enrollment.setUserId(request.userId());
+        enrollment.setCourseId(request.courseId());
+        enrollment.setSourceOrderCode(orderCode);
+        enrollment.setStatus(EnrollmentStatus.ACTIVE);
+        enrollment.setLastAccessedAt(Instant.now());
+        Enrollment saved = enrollments.saveAndFlush(enrollment);
+        createEnrollmentNotification(request.userId(), request.courseId());
         return EnrollmentResponse.from(saved);
     }
 
@@ -112,41 +143,24 @@ public class LearningServiceImpl implements LearningService {
         LessonProgress item = progress
             .findByUserIdAndCourseIdAndLessonId(userId, courseId, lessonId)
             .orElseGet(() -> createLessonProgress(userId, courseId, lessonId));
+        boolean firstCompletion = item.getStatus() != ProgressStatus.COMPLETED;
         item.setStatus(ProgressStatus.COMPLETED);
         item.setProgressPercent(100);
         item.setCompletedAt(Instant.now());
-        return LessonProgressResponse.from(progress.save(item));
+        var saved = progress.save(item);
+        if (firstCompletion) notifications.lessonCompleted(userId, courseId, lessonId);
+        return LessonProgressResponse.from(saved);
     }
 
     @Override
     public List<NotificationResponse> getNotifications(Long userId) {
-        return notifications.findTop20ByUserIdOrderByCreatedAtDesc(userId)
-            .stream()
-            .map(NotificationResponse::from)
-            .toList();
+        return notifications.latest(userId);
     }
 
     @Override
     @Transactional
     public NotificationResponse markNotificationRead(Long userId, Long notificationId) {
-        var notification = notifications
-            .findById(notificationId)
-            .filter(item -> item.getUserId().equals(userId))
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
-        if (notification.getReadAt() == null) {
-            notification.setReadAt(Instant.now());
-        }
-        return NotificationResponse.from(notification);
-    }
-
-    private void createEnrollmentNotification(Long userId, Long courseId) {
-        var notification = new Notification();
-        notification.setUserId(userId);
-        notification.setType(NotificationType.ENROLLMENT);
-        notification.setTitle("Ghi danh thành công");
-        notification.setBody("Khóa học #" + courseId + " đã được thêm vào My Courses.");
-        notification.setActionUrl("/learning/" + courseId);
-        notifications.save(notification);
+        return notifications.markRead(userId, notificationId);
     }
 
     private void ensureCourseAccess(Long userId, Long courseId) {

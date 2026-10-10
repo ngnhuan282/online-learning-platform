@@ -53,6 +53,7 @@ class LearningServiceApplicationTests {
 
     static final String SECRET = UUID.randomUUID().toString() + UUID.randomUUID();
     static final String BASE = "/api/v1/_foundation-test";
+    static final String INTERNAL_TOKEN = "test-internal-service-token-1234567890";
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -94,6 +95,17 @@ class LearningServiceApplicationTests {
         if (body != null) builder
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body));
+        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    HttpResponse<String> internalEnrollment(String internalToken, String body) throws Exception {
+        var builder = HttpRequest
+            .newBuilder(URI.create("http://localhost:" + port + "/internal/v1/learning/enrollments"))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body));
+        if (internalToken != null) {
+            builder.header("X-Internal-Service-Token", internalToken);
+        }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
@@ -211,6 +223,12 @@ class LearningServiceApplicationTests {
     }
 
     @Test
+    void notificationReceiverIsDisabledWithoutAConfiguredKey() throws Exception {
+        String path = "/internal/v1/notifications/events";
+        error(request(path, tokenFor("ADMIN", 912L), "{}"), 503, "SERVICE_UNAVAILABLE", path);
+    }
+
+    @Test
     void freeEnrollmentIsIdempotentForMyCourses() throws Exception {
         String access = Jwts.builder()
             .subject("123")
@@ -232,6 +250,36 @@ class LearningServiceApplicationTests {
         assertThat(secondData.get("id").asLong()).isEqualTo(firstData.get("id").asLong());
         assertThat(enrollments.findByUserIdAndCourseId(123L, 777L)).isPresent();
         assertThat(enrollments.findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(123L)).hasSize(1);
+    }
+
+    @Test
+    void paymentEnrollmentRequiresInternalTokenAndIsIdempotentByOrder() throws Exception {
+        String path = "/internal/v1/learning/enrollments";
+        String body = "{\"orderCode\":\"LS-PAY-INTEGRATION-001\",\"userId\":5001,\"courseId\":7001}";
+
+        error(internalEnrollment(null, body), 401, "UNAUTHORIZED", path);
+        error(internalEnrollment("wrong-internal-token-that-is-long-enough", body), 401, "UNAUTHORIZED", path);
+
+        var first = internalEnrollment(INTERNAL_TOKEN, body);
+        var repeated = internalEnrollment(INTERNAL_TOKEN, body);
+
+        assertThat(first.statusCode()).withFailMessage(first.body()).isEqualTo(200);
+        assertThat(repeated.statusCode()).withFailMessage(repeated.body()).isEqualTo(200);
+        JsonNode firstData = mapper.readTree(first.body()).get("data");
+        JsonNode repeatedData = mapper.readTree(repeated.body()).get("data");
+        assertThat(repeatedData.get("id").asLong()).isEqualTo(firstData.get("id").asLong());
+        assertThat(enrollments.findBySourceOrderCode("LS-PAY-INTEGRATION-001")).isPresent();
+        assertThat(enrollments.findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(5001L)).hasSize(1);
+
+        error(
+            internalEnrollment(
+                INTERNAL_TOKEN,
+                "{\"orderCode\":\"LS-PAY-INTEGRATION-001\",\"userId\":5002,\"courseId\":7001}"
+            ),
+            409,
+            "CONFLICT",
+            path
+        );
     }
 
     @Test
@@ -380,6 +428,13 @@ class LearningServiceApplicationTests {
             .isFalse();
         error(send("GET", reviewPath, stranger, null), 404, "NOT_FOUND", reviewPath);
         error(send("POST", submitPath, learner, answers), 409, "CONFLICT", submitPath);
+        JsonNode notifications = mapper.readTree(send(
+            "GET", "/api/v1/learning/notifications/feed?category=LEARNING", learner, null
+        ).body()).get("data");
+        assertThat(notifications.get("totalElements").asLong()).isEqualTo(1);
+        assertThat(notifications.get("content").get(0).get("type").asString()).isEqualTo("QUIZ_RESULT_AVAILABLE");
+        assertThat(notifications.get("content").get(0).get("actionUrl").asString())
+            .isEqualTo("/quizzes/attempts/" + attemptId + "/result");
         assertThat(send("GET", quizPath + "/result", learner, null).body()).contains("\"score\":100");
         long retakeId = mapper.readTree(send("POST", startPath, learner, null).body())
             .get("data").get("attemptId").asLong();

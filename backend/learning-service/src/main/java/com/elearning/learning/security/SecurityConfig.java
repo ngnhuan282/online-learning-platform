@@ -3,6 +3,8 @@ package com.elearning.learning.security;
 import com.elearning.learning.common.exception.ErrorCode;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import jakarta.servlet.DispatcherType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,6 +25,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Order(2)
     SecurityFilterChain securityFilterChain(
         HttpSecurity http,
         JwtTokenProvider tokens,
@@ -37,7 +40,12 @@ public class SecurityConfig {
             .logout(logout -> logout.disable())
             .authorizeHttpRequests(auth ->
                 auth
+                    .requestMatchers(request -> request.getDispatcherType() == DispatcherType.ASYNC
+                        && request.getRequestURI().equals("/api/v1/learning/notifications/stream"))
+                    .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/health/**")
+                    .permitAll()
+                    .requestMatchers("/internal/v1/learning/enrollments")
                     .permitAll()
 
                     .anyRequest()

@@ -4,7 +4,14 @@ server:
     include-message: never
     include-stacktrace: never
     include-binding-errors: never
+notifications:
+  events:
+    api-key: ${NOTIFICATION_EVENT_API_KEY:}
 spring:
+  flyway:
+    placeholders:
+      notificationCheckKeyword: CHECK
+      notificationEventKeyCollation: "CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"
   application:
     name: learning-service
   datasource:
@@ -20,6 +27,8 @@ security:
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:learnsphere}
     access-token-seconds: ${JWT_ACCESS_TOKEN_SECONDS:900}
+integrations:
+  internal-service-token: ${INTERNAL_SERVICE_TOKEN}
 management:
   endpoints:
     web:

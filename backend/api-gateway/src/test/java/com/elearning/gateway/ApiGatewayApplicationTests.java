@@ -39,6 +39,10 @@ class ApiGatewayApplicationTests {
                         "|" +
                         exchange.getRequestHeaders().getFirst("X-User-Id") +
                         "|" +
+                        exchange.getRequestHeaders().getFirst("X-User-Role") +
+                        "|" +
+                        exchange.getRequestHeaders().getFirst("X-User-Roles") +
+                        "|" +
                         (exchange.getRequestHeaders().getFirst("Authorization") != null);
                 byte[] bytes = result.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(200, bytes.length);
@@ -91,7 +95,9 @@ class ApiGatewayApplicationTests {
     HttpResponse<String> request(String path, String token, String method, String origin) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).header(
                 "X-User-Id",
-                "spoofed");
+                "spoofed")
+                .header("X-User-Role", "ADMIN")
+                .header("X-User-Roles", "ADMIN,PAYMENT_REPORT_VIEW");
         if (token != null)
             request.header("Authorization", "Bearer " + token);
         if (origin != null)
@@ -116,9 +122,21 @@ class ApiGatewayApplicationTests {
             String path = "/api/v1/" + namespace + "/probe";
             var response = request(path, token(60), "GET", null);
             assertThat(response.statusCode()).isEqualTo(200);
-            assertThat(response.body()).isEqualTo(path + "|null|true");
+            assertThat(response.body()).isEqualTo(path + "|null|null|null|true");
             assertThat(response.headers().firstValue("X-Request-ID")).isPresent();
         }
+    }
+
+    @Test
+    void protectsPaymentRoutesAndForwardsOnlyValidatedAuthorization() throws Exception {
+        String path = "/api/v1/payments/history";
+        assertThat(request(path, null, "GET", null).statusCode()).isEqualTo(401);
+        assertThat(request(path, "broken", "GET", null).statusCode()).isEqualTo(401);
+        assertThat(request(path, token(-60), "GET", null).statusCode()).isEqualTo(401);
+
+        var response = request(path, token(60), "GET", null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo(path + "|null|null|null|true");
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.elearning.learning.dto;
 
 import com.elearning.learning.entity.Notification;
 import com.elearning.learning.entity.enums.NotificationType;
+import com.elearning.learning.entity.enums.NotificationCategory;
 import java.time.Instant;
 
 public record NotificationResponse(
@@ -12,7 +13,8 @@ public record NotificationResponse(
     String actionUrl,
     boolean read,
     Instant readAt,
-    Instant createdAt
+    Instant createdAt,
+    NotificationCategory category
 ) {
     public static NotificationResponse from(Notification notification) {
         return new NotificationResponse(
@@ -23,7 +25,8 @@ public record NotificationResponse(
             notification.getActionUrl(),
             notification.getReadAt() != null,
             notification.getReadAt(),
-            notification.getCreatedAt()
+            notification.getCreatedAt(),
+            notification.getType().category()
         );
     }
 }

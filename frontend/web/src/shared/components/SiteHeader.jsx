@@ -4,10 +4,10 @@ import Brand from './Brand';
 import Icon from './Icon';
 import useAuth from '../../features/auth/hooks/useAuth';
 import AccountMenu from './AccountMenu';
+import NotificationBell from '../../features/learning/components/NotificationBell';
 
 export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -55,27 +55,7 @@ export default function SiteHeader() {
           />
         </form>
         <div className="header-actions">
-          <div className="notification-wrap">
-            <button
-              className="icon-button notification-button"
-              aria-label="Thông báo"
-              aria-expanded={notificationsOpen}
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
-            >
-              <Icon name="bell" size={20} />
-              <span className="notification-dot" />
-            </button>
-            {notificationsOpen && (
-              <div className="notification-panel">
-                <strong>Thông báo</strong>
-                <p>Chào mừng bạn đến LearnSphere English!</p>
-                <span>Khám phá lộ trình tiếng Anh phù hợp và bắt đầu luyện tập mỗi ngày.</span>
-                <Link to="/#courses" onClick={() => setNotificationsOpen(false)}>
-                  Khám phá khóa học <Icon name="arrow" size={15} />
-                </Link>
-              </div>
-            )}
-          </div>
+          {user && <NotificationBell />}
           <span className="header-divider" />
           {user ? (
             <AccountMenu />

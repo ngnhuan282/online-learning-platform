@@ -217,9 +217,6 @@ export default function FeaturedCourses() {
                   {selected.price ? 'Thanh toán' : 'Đăng ký học'} <Icon name="arrow" size={17} />
                 </Link>
               </div>
-              <p className="demo-note">
-                Khóa học minh họa. Đăng ký học và thanh toán sẽ được kết nối khi backend sẵn sàng.
-              </p>
             </DialogContent>
           )}
         </Dialog>

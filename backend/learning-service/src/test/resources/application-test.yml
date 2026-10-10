@@ -1,4 +1,8 @@
 spring:
+  flyway:
+    placeholders:
+      notificationCheckKeyword: CONSTRAINT
+      notificationEventKeyCollation: ""
   datasource:
     url: jdbc:h2:mem:learning;MODE=MySQL;DB_CLOSE_DELAY=-1
     username: sa
@@ -7,3 +11,5 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+integrations:
+  internal-service-token: test-internal-service-token-1234567890

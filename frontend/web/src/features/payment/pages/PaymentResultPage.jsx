@@ -4,13 +4,8 @@ import AppLoading from '../../../shared/components/AppLoading';
 import ErrorState from '../../../shared/components/ErrorState';
 import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
+import { formatCurrency } from '../../../shared/utils/formatCurrency';
 import { paymentApi } from '../api/paymentApi';
-import {
-  buildOrderSnapshot,
-  formatDemoPrice,
-  getCheckoutCourse,
-  getCheckoutCourseParamFromPaymentCourseId,
-} from '../data/paymentDemo';
 import '../styles/payment.css';
 
 const resultCopy = {
@@ -51,17 +46,11 @@ function paymentTone(status) {
   return resultCopy.PENDING;
 }
 
-function fallbackStatusFromParams(status) {
-  if (status === 'failed') return 'FAILED';
-  if (status === 'cancelled') return 'CANCELLED';
-  if (status === 'pending') return 'PENDING';
-  return 'SUCCESS';
-}
-
 export default function PaymentResultPage() {
   const [params] = useSearchParams();
   const orderCode = params.get('orderCode');
   const [remoteResult, setRemoteResult] = useState({ orderCode: null, order: null, error: null });
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!orderCode) return;
@@ -77,11 +66,39 @@ export default function PaymentResultPage() {
     return () => {
       active = false;
     };
-  }, [orderCode]);
+  }, [orderCode, retryCount]);
+
+  function retryResultLoad() {
+    setRemoteResult({ orderCode: null, order: null, error: null });
+    setRetryCount(value => value + 1);
+  }
 
   const order = remoteResult.orderCode === orderCode ? remoteResult.order : null;
   const error = remoteResult.orderCode === orderCode ? remoteResult.error : null;
   const loading = Boolean(orderCode) && remoteResult.orderCode !== orderCode;
+
+  if (!orderCode) {
+    return (
+      <section className="payment-page payment-result-page">
+        <div className="container payment-result-container">
+          <article className="payment-panel result-card">
+            <ErrorState
+              error={new Error('Không tìm thấy mã đơn hàng để kiểm tra kết quả.')}
+              title="Chưa có thông tin thanh toán"
+            />
+            <div className="result-actions result-error-actions">
+              <Link className="button button-primary" to={ROUTES.PAYMENT_HISTORY}>
+                Xem lịch sử thanh toán
+              </Link>
+              <Link className="button button-outline" to={ROUTES.COURSES}>
+                Chọn khóa học
+              </Link>
+            </div>
+          </article>
+        </div>
+      </section>
+    );
+  }
 
   if (orderCode && loading) {
     return (
@@ -96,30 +113,42 @@ export default function PaymentResultPage() {
   }
 
   if (orderCode && error) {
+    const forbidden = error.status === 403 || error.code === 'FORBIDDEN';
     return (
       <section className="payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
-            <ErrorState error={error} title="Không thể tải kết quả thanh toán" />
+            <ErrorState
+              error={
+                forbidden
+                  ? new Error('Bạn không có quyền xem giao dịch này.')
+                  : error
+              }
+              title={forbidden ? 'Không thể xem giao dịch' : 'Không thể tải kết quả thanh toán'}
+              onRetry={forbidden ? undefined : retryResultLoad}
+            />
+            {forbidden && (
+              <div className="result-actions result-error-actions">
+                <Link className="button button-primary" to={ROUTES.PAYMENT_HISTORY}>
+                  Về lịch sử thanh toán
+                </Link>
+              </div>
+            )}
           </article>
         </div>
       </section>
     );
   }
 
-  const fallbackStatus = fallbackStatusFromParams(params.get('status'));
-  const course = getCheckoutCourse(params.get('course'));
-  const demoOrder = buildOrderSnapshot(course);
-  const paymentStatus = order?.payment?.status || fallbackStatus;
+  const paymentStatus = order.payment.status;
   const copy = paymentTone(paymentStatus);
-  const courseTitle = order?.items?.[0]?.courseTitle || course.title;
-  const paymentCourseId = order?.items?.[0]?.courseId;
-  const retryCourseParam = getCheckoutCourseParamFromPaymentCourseId(paymentCourseId) || course.id;
-  const amount = order?.payment?.amount ?? order?.totalAmount ?? demoOrder.total;
-  const provider = order?.payment?.provider || demoOrder.provider;
-  const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(retryCourseParam)}`;
+  const courseTitle = order.items?.[0]?.courseTitle || 'Khóa học';
+  const paymentCourseId = order.items?.[0]?.courseId;
+  const amount = order.payment.amount ?? order.totalAmount;
+  const provider = order.payment.provider;
+  const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = `${ROUTES.PAYMENT_MOCK}?orderCode=${encodeURIComponent(
-    order?.orderCode || orderCode,
+    order.orderCode,
   )}&returnUrl=${encodeURIComponent(`${window.location.origin}${ROUTES.PAYMENT_RESULT}`)}`;
 
   return (
@@ -136,7 +165,7 @@ export default function PaymentResultPage() {
           <dl className="result-details">
             <div>
               <dt>Mã đơn hàng</dt>
-              <dd>{order?.orderCode || demoOrder.orderCode}</dd>
+              <dd>{order.orderCode}</dd>
             </div>
             <div>
               <dt>Khóa học</dt>
@@ -144,7 +173,7 @@ export default function PaymentResultPage() {
             </div>
             <div>
               <dt>Số tiền</dt>
-              <dd>{formatDemoPrice(Number(amount))}</dd>
+              <dd>{formatCurrency(Number(amount), order.payment.currency || order.currency)}</dd>
             </div>
             <div>
               <dt>Phương thức</dt>

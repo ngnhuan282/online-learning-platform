@@ -18,6 +18,9 @@ const statusLabel = {
 };
 
 function getMockPaymentErrorMessage(error) {
+  if (error?.code === 'SERVICE_UNAVAILABLE' || error?.status === 503) {
+    return 'Chưa thể kích hoạt khóa học. Giao dịch vẫn đang chờ, vui lòng thử lại sau ít phút.';
+  }
   if (error?.code === 'CONFLICT' || error?.status === 409) {
     return 'Giao dịch này đã được xử lý hoặc không còn ở trạng thái chờ. Vui lòng xem kết quả mới nhất.';
   }
@@ -48,6 +51,7 @@ export default function MockPaymentPage() {
   const orderCode = params.get('orderCode');
   const returnUrl = params.get('returnUrl') || ROUTES.PAYMENT_RESULT;
   const [state, setState] = useState({ loading: Boolean(orderCode), order: null, error: null });
+  const [retryCount, setRetryCount] = useState(0);
   const [processingStatus, setProcessingStatus] = useState('');
   const [submitError, setSubmitError] = useState(null);
 
@@ -65,7 +69,13 @@ export default function MockPaymentPage() {
     return () => {
       active = false;
     };
-  }, [orderCode]);
+  }, [orderCode, retryCount]);
+
+  function retryOrderLoad() {
+    setState({ loading: true, order: null, error: null });
+    setSubmitError(null);
+    setRetryCount(value => value + 1);
+  }
 
   const payment = state.order?.payment;
   const item = state.order?.items?.[0];
@@ -141,7 +151,11 @@ export default function MockPaymentPage() {
       <section className="payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
-            <ErrorState error={state.error} title="Không thể tải giao dịch" />
+            <ErrorState
+              error={state.error}
+              title="Không thể tải giao dịch"
+              onRetry={retryOrderLoad}
+            />
           </article>
         </div>
       </section>
