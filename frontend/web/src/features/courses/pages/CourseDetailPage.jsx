@@ -7,6 +7,8 @@ import { reviewApi } from '../api/reviewApi';
 import { formatPrice } from '../data/demoCourses';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import useAuth from '../../auth/hooks/useAuth';
+import { learningApi } from '../../learning/api/learningApi';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import StarRating from '../components/StarRating';
 import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
@@ -14,7 +16,8 @@ import ReviewForm from '../components/ReviewForm';
 const fallbackCourse = {
   id: 1,
   title: 'IELTS Intensive 7.5+: Bứt phá 4 kỹ năng cùng chuyên gia',
-  description: 'Lộ trình luyện thi IELTS chuyên sâu với chiến thuật Writing, Speaking, Reading và Listening để đạt band mục tiêu 7.5+.',
+  description:
+    'Lộ trình luyện thi IELTS chuyên sâu với chiến thuật Writing, Speaking, Reading và Listening để đạt band mục tiêu 7.5+.',
   level: 'Nâng cao',
   price: 1690000,
   originalPrice: 2400000,
@@ -63,18 +66,31 @@ function CourseDetailPage() {
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
   const [reviews, setReviews] = useState([]);
-  const [myReview, setMyReview] = useState(null);
+  const [reviewState, setReviewState] = useState(null);
+  const myReview =
+    reviewState?.userId === user?.id && reviewState?.courseId === id ? reviewState.review : null;
+  const setMyReview = useCallback(
+    review => {
+      setReviewState({ userId: user?.id, courseId: id, review });
+    },
+    [user?.id, id],
+  );
   const [editingReview, setEditingReview] = useState(null);
-  const [reviewPagination, setReviewPagination] = useState({ page: 0, size: 5, totalPages: 1, totalElements: 0 });
+  const [reviewPagination, setReviewPagination] = useState({
+    page: 0,
+    size: 5,
+    totalPages: 1,
+    totalElements: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [isEnrolled, setIsEnrolled] = useState(false); // Placeholder for T8 Learning Service
+  const [enrollment, setEnrollment] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState(null);
+  const isEnrolled = enrollment?.userId === user?.id && enrollment?.courseId === id;
   const [activeTab, setActiveTab] = useState('curriculum'); // 'curriculum' | 'reviews'
 
-  const isAdmin = Boolean(
-    user?.roles?.includes('ADMIN') ||
-    user?.permissions?.includes('COURSE_UPDATE')
-  );
+  const isAdmin = Boolean(user?.roles?.includes('ADMIN') || user?.permissions?.includes('COURSE_UPDATE'));
 
   const [courseNotFound, setCourseNotFound] = useState(false);
 
@@ -91,7 +107,7 @@ function CourseDetailPage() {
       setCourse(normalizeCourse(item));
       setCourseNotFound(false);
     } catch (err) {
-      if (err?.response?.status === 404) {
+      if (err?.status === 404) {
         setCourseNotFound(true);
         setCourse(null);
       } else {
@@ -111,51 +127,69 @@ function CourseDetailPage() {
   }, [id]);
 
   // Load reviews
-  const loadReviews = useCallback(async (page = 0) => {
-    setReviewsLoading(true);
-    try {
-      const res = await reviewApi.list(id, { page, size: 5 });
-      const data = res?.data?.data || res?.data || res;
-      const items = data?.items || data?.content || (Array.isArray(data) ? data : []);
-      setReviews(items);
-      setReviewPagination({
-        page: data?.page ?? page,
-        size: data?.size ?? 5,
-        totalPages: data?.totalPages ?? 1,
-        totalElements: data?.totalElements ?? items.length,
-      });
-    } catch {
-      setReviews([]);
-    } finally {
-      setReviewsLoading(false);
-    }
-  }, [id]);
+  const loadReviews = useCallback(
+    async (page = 0) => {
+      setReviewsLoading(true);
+      try {
+        const res = await reviewApi.list(id, { page, size: 5 });
+        const data = res?.data?.data || res?.data || res;
+        const items = data?.items || data?.content || (Array.isArray(data) ? data : []);
+        setReviews(items);
+        setReviewPagination({
+          page: data?.page ?? page,
+          size: data?.size ?? 5,
+          totalPages: data?.totalPages ?? 1,
+          totalElements: data?.totalElements ?? items.length,
+        });
+      } catch {
+        setReviews([]);
+      } finally {
+        setReviewsLoading(false);
+      }
+    },
+    [id],
+  );
 
   // Load my review if logged in
   const loadMyReview = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || user?.id == null) {
       setMyReview(null);
       return;
     }
+    const version = getSessionVersion();
     try {
       const res = await reviewApi.myReview(id);
       const data = res?.data?.data || res?.data || res;
-      setMyReview(data || null);
+      if (version === getSessionVersion()) setMyReview(data || null);
     } catch {
-      setMyReview(null);
+      if (version === getSessionVersion()) setMyReview(null);
     }
-  }, [id, isAuthenticated]);
+  }, [id, isAuthenticated, user?.id, setMyReview]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    let active = true;
+    learningApi
+      .getMyEnrollments()
+      .then(({ data }) => {
+        if (!active) return;
+        const enrolled = data.some(item => String(item.courseId) === id && item.status !== 'CANCELLED');
+        setEnrollment(enrolled ? { userId: user.id, courseId: id } : null);
+      })
+      .catch(() => {
+        if (active) setEnrollment(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, isAuthenticated, user?.id]);
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
-
-    Promise.all([
-      loadCourseData(),
-      loadSections(),
-      loadReviews(0),
-      loadMyReview(),
-    ]).finally(() => {
+    Promise.resolve().then(async () => {
+      if (!isMounted) return;
+      setLoading(true);
+      await Promise.all([loadCourseData(), loadSections(), loadReviews(0), loadMyReview()]);
       if (isMounted) setLoading(false);
     });
 
@@ -164,14 +198,14 @@ function CourseDetailPage() {
     };
   }, [loadCourseData, loadSections, loadReviews, loadMyReview]);
 
-  const handleReviewSuccess = async (savedReview) => {
+  const handleReviewSuccess = async savedReview => {
     setEditingReview(null);
     setMyReview(savedReview);
     // Reload reviews & course to refresh avgRating and reviewCount
     await Promise.all([loadCourseData(), loadReviews(0), loadMyReview()]);
   };
 
-  const handleDeleteReview = async (reviewId) => {
+  const handleDeleteReview = async reviewId => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá này?')) return;
     try {
       await reviewApi.delete(id, reviewId);
@@ -183,7 +217,7 @@ function CourseDetailPage() {
     }
   };
 
-  const handleAdminHide = async (reviewId) => {
+  const handleAdminHide = async reviewId => {
     try {
       await reviewApi.hide(id, reviewId);
       await Promise.all([loadCourseData(), loadReviews(reviewPagination.page)]);
@@ -192,7 +226,7 @@ function CourseDetailPage() {
     }
   };
 
-  const handleAdminShow = async (reviewId) => {
+  const handleAdminShow = async reviewId => {
     try {
       await reviewApi.show(id, reviewId);
       await Promise.all([loadCourseData(), loadReviews(reviewPagination.page)]);
@@ -201,14 +235,29 @@ function CourseDetailPage() {
     }
   };
 
-  const handleEnroll = () => {
-    // T8 Placeholder
+  const handleEnroll = async () => {
+    const destination = Number(course?.price) > 0 ? `/checkout?course=${id}` : `/courses/${id}`;
     if (!isAuthenticated) {
-      navigate('/login');
+      navigate('/login', { state: { from: destination } });
       return;
     }
-    setIsEnrolled(true);
-    alert('Đăng ký khóa học thành công! Bạn có thể bắt đầu học.');
+    if (Number(course?.price) > 0) {
+      navigate(destination);
+      return;
+    }
+    const version = getSessionVersion();
+    setEnrolling(true);
+    setEnrollmentError(null);
+    try {
+      await learningApi.enroll(Number(id));
+      if (version !== getSessionVersion()) return;
+      setEnrollment({ userId: user.id, courseId: id });
+      navigate(`/learning/${id}`);
+    } catch (error) {
+      if (version === getSessionVersion()) setEnrollmentError(error);
+    } finally {
+      if (version === getSessionVersion()) setEnrolling(false);
+    }
   };
 
   if (loading) {
@@ -228,7 +277,8 @@ function CourseDetailPage() {
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
           <h2 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px' }}>Không tìm thấy khóa học</h2>
           <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-            Khóa học với mã ID <strong>#{id}</strong> không tồn tại trong hệ thống. Vui lòng chọn một khóa học đang có trong danh sách.
+            Khóa học với mã ID <strong>#{id}</strong> không tồn tại trong hệ thống. Vui lòng chọn một khóa học
+            đang có trong danh sách.
           </p>
           <Link to="/courses" className="button button-primary" style={{ textDecoration: 'none' }}>
             Xem danh sách khóa học
@@ -243,16 +293,29 @@ function CourseDetailPage() {
 
   return (
     <main className="container" style={{ padding: '32px 0 80px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Link to="/courses" style={{ color: '#3b82f6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}
+      >
+        <Link
+          to="/courses"
+          style={{ color: '#3b82f6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
           ← Quay lại danh sách
         </Link>
         {isAdmin && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <Link to={`/admin/courses/${item.id}/curriculum`} className="button button-soft" style={{ fontSize: 13, textDecoration: 'none' }}>
+            <Link
+              to={`/admin/courses/${item.id}/curriculum`}
+              className="button button-soft"
+              style={{ fontSize: 13, textDecoration: 'none' }}
+            >
               ⚙️ Quản lý giáo trình
             </Link>
-            <Link to={`/admin/courses/${item.id}/reviews`} className="button button-soft" style={{ fontSize: 13, textDecoration: 'none' }}>
+            <Link
+              to={`/admin/courses/${item.id}/reviews`}
+              className="button button-soft"
+              style={{ fontSize: 13, textDecoration: 'none' }}
+            >
               ⭐ Quản lý đánh giá
             </Link>
           </div>
@@ -266,9 +329,22 @@ function CourseDetailPage() {
             <img
               src={resolveMediaUrl(item.thumbnailUrl || '/images/english-ielts.jpg')}
               alt={item.title}
-              style={{ width: '100%', maxHeight: 380, borderRadius: 12, objectFit: 'cover', marginBottom: 20 }}
+              style={{
+                width: '100%',
+                maxHeight: 380,
+                borderRadius: 12,
+                objectFit: 'cover',
+                marginBottom: 20,
+              }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 8,
+              }}
+            >
               <span className="eyebrow">{item.categoryName || 'Luyện thi IELTS'}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <StarRating value={item.avgRating} readonly size={18} showLabel />
@@ -278,15 +354,34 @@ function CourseDetailPage() {
             <h1 style={{ margin: '8px 0 12px', fontSize: 26, fontWeight: 700 }}>{item.title}</h1>
             <p style={{ color: '#475569', lineHeight: 1.6 }}>{item.description}</p>
 
-            <div className="detail-meta" style={{ marginTop: 20, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              <span>Trình độ: <strong>{String(item.level || 'Beginner').toUpperCase()}</strong></span>
-              <span>Trạng thái: <strong>{item.status || 'PUBLISHED'}</strong></span>
-              <span>Thời lượng: <strong>{sections.length} chương ({totalLessons} bài học)</strong></span>
+            <div
+              className="detail-meta"
+              style={{ marginTop: 20, display: 'flex', gap: 16, flexWrap: 'wrap' }}
+            >
+              <span>
+                Trình độ: <strong>{String(item.level || 'Beginner').toUpperCase()}</strong>
+              </span>
+              <span>
+                Trạng thái: <strong>{item.status || 'PUBLISHED'}</strong>
+              </span>
+              <span>
+                Thời lượng:{' '}
+                <strong>
+                  {sections.length} chương ({totalLessons} bài học)
+                </strong>
+              </span>
             </div>
           </article>
 
           {/* Navigation Tabs */}
-          <div style={{ display: 'flex', gap: 8, borderBottom: '2px solid rgba(148,163,184,0.2)', marginBottom: 24 }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              borderBottom: '2px solid rgba(148,163,184,0.2)',
+              marginBottom: 24,
+            }}
+          >
             <button
               type="button"
               onClick={() => setActiveTab('curriculum')}
@@ -358,7 +453,9 @@ function CourseDetailPage() {
                           alignItems: 'center',
                         }}
                       >
-                        <span>Chương {sIndex + 1}: {section.title}</span>
+                        <span>
+                          Chương {sIndex + 1}: {section.title}
+                        </span>
                         <span style={{ fontSize: 13, color: '#64748b', fontWeight: 400 }}>
                           {section.lessons?.length || 0} bài học
                         </span>
@@ -373,7 +470,10 @@ function CourseDetailPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 padding: '8px 0',
-                                borderBottom: lIndex < section.lessons.length - 1 ? '1px solid rgba(148, 163, 184, 0.1)' : 'none',
+                                borderBottom:
+                                  lIndex < section.lessons.length - 1
+                                    ? '1px solid rgba(148, 163, 184, 0.1)'
+                                    : 'none',
                                 fontSize: 14,
                               }}
                             >
@@ -439,7 +539,8 @@ function CourseDetailPage() {
                 <div style={{ flex: 1, borderLeft: '1px solid rgba(148,163,184,0.2)', paddingLeft: 20 }}>
                   <h4 style={{ margin: '0 0 6px', fontSize: 16 }}>Đánh giá từ học viên</h4>
                   <p style={{ margin: 0, fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
-                    Mỗi học viên chỉ được gửi 1 đánh giá cho khóa học. Đánh giá giúp cải thiện chất lượng bài giảng và hỗ trợ các bạn học sau.
+                    Mỗi học viên chỉ được gửi 1 đánh giá cho khóa học. Đánh giá giúp cải thiện chất lượng bài
+                    giảng và hỗ trợ các bạn học sau.
                   </p>
                 </div>
               </div>
@@ -456,7 +557,14 @@ function CourseDetailPage() {
                       marginBottom: 24,
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 8,
+                      }}
+                    >
                       <span style={{ fontWeight: 600, color: '#3b82f6', fontSize: 14 }}>
                         Đánh giá của bạn
                       </span>
@@ -489,7 +597,11 @@ function CourseDetailPage() {
                     color: '#64748b',
                   }}
                 >
-                  Vui lòng <Link to="/login" style={{ color: '#3b82f6', fontWeight: 600 }}>đăng nhập</Link> để viết đánh giá cho khóa học này.
+                  Vui lòng{' '}
+                  <Link to="/login" style={{ color: '#3b82f6', fontWeight: 600 }}>
+                    đăng nhập
+                  </Link>{' '}
+                  để viết đánh giá cho khóa học này.
                 </div>
               )}
 
@@ -533,7 +645,15 @@ function CourseDetailPage() {
                       >
                         Trang trước
                       </button>
-                      <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 14, color: '#64748b' }}>
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '0 12px',
+                          fontSize: 14,
+                          color: '#64748b',
+                        }}
+                      >
                         Trang {reviewPagination.page + 1} / {reviewPagination.totalPages}
                       </span>
                       <button
@@ -552,7 +672,10 @@ function CourseDetailPage() {
         </div>
 
         {/* Sidebar Column */}
-        <aside className="course-card" style={{ padding: 24, alignSelf: 'start', position: 'sticky', top: 24 }}>
+        <aside
+          className="course-card"
+          style={{ padding: 24, alignSelf: 'start', position: 'sticky', top: 24 }}
+        >
           <h3>Thông tin khóa học</h3>
           <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
             <div>
@@ -570,7 +693,7 @@ function CourseDetailPage() {
               </div>
             ) : null}
 
-            {/* B7-FE-6 / T8 Enrollment Action Placeholder */}
+            {enrollmentError && <p role="alert">{enrollmentError.message}</p>}
             {isEnrolled ? (
               <button
                 className="button button-success"
@@ -586,12 +709,22 @@ function CourseDetailPage() {
                 type="button"
                 style={{ width: '100%', padding: '12px' }}
                 onClick={handleEnroll}
+                disabled={enrolling || !course || course.status !== 'PUBLISHED'}
               >
                 {Number(item.price || 0) === 0 ? 'Đăng ký học miễn phí' : 'Mua khóa học ngay'}
               </button>
             )}
 
-            <div style={{ borderTop: '1px solid rgba(148, 163, 184, 0.2)', paddingTop: 16, display: 'grid', gap: 10, fontSize: 13, color: '#64748b' }}>
+            <div
+              style={{
+                borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+                paddingTop: 16,
+                display: 'grid',
+                gap: 10,
+                fontSize: 13,
+                color: '#64748b',
+              }}
+            >
               <div>✅ Truy cập trọn đời toàn bộ bài giảng</div>
               <div>✅ Học trên máy tính, điện thoại, tablet</div>
               <div>✅ Hỗ trợ giải đáp từ giảng viên</div>

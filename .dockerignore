@@ -6,5 +6,5 @@
 **/qa.local
 **/.env
 **/.env.*
-frontend
+frontend/web/dist
 docs

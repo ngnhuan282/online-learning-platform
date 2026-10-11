@@ -10,7 +10,10 @@ import {
 import { normalizeApiError } from '../utils/errorUtils';
 import { ENDPOINTS } from './endpoints';
 
-const gatewayUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '');
+const gatewayUrl = (import.meta.env.VITE_API_URL?.trim() || globalThis.window?.location?.origin)?.replace(
+  /\/$/,
+  '',
+);
 const axiosClient = axios.create({ baseURL: gatewayUrl, timeout: API_TIMEOUT_MS, withCredentials: true });
 const authPaths = new Set(Object.values(ENDPOINTS.auth));
 let refreshFlight = null;
@@ -77,9 +80,20 @@ axiosClient.interceptors.request.use(config => {
   return config;
 });
 axiosClient.interceptors.response.use(
-  response => response.data,
+  response => {
+    if (response.config.sessionVersion !== getSessionVersion()) {
+      throw normalizeApiError(Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' }));
+    }
+    return response.data;
+  },
   async error => {
     const config = error.config;
+    // A response from an ended session must never clear or populate a newer session.
+    if (config && config.sessionVersion !== getSessionVersion()) {
+      return Promise.reject(
+        normalizeApiError(Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' })),
+      );
+    }
     if (
       error.response?.status === 403 &&
       ['ACCOUNT_LOCKED', 'ACCOUNT_DISABLED'].includes(error.response?.data?.code)

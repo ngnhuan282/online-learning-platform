@@ -14,6 +14,45 @@ import org.junit.jupiter.api.Test;
 class CourseCatalogClientTests {
 
     @Test
+    void onlyPublishedFreeCoursesAllowDirectEnrollment() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/v1/courses/", exchange -> {
+            long id = Long.parseLong(exchange.getRequestURI().getPath().replace("/api/v1/courses/", ""));
+            String status = id == 3 ? "DRAFT" : "PUBLISHED";
+            String price = id == 2 ? "100000" : id == 4 ? "null" : "0";
+            String body =
+                "{\"success\":true,\"data\":{\"id\":" +
+                id +
+                ",\"price\":" +
+                price +
+                ",\"status\":\"" +
+                status +
+                "\"}}";
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (var stream = exchange.getResponseBody()) {
+                stream.write(bytes);
+            }
+        });
+        server.start();
+        try {
+            CourseCatalogClient client = new CourseCatalogClient(
+                "http://127.0.0.1:" + server.getAddress().getPort()
+            );
+            assertThatCode(() -> client.requireFreeCourse(1L)).doesNotThrowAnyException();
+            for (long id : new long[] { 2, 3, 4 }) {
+                assertThatThrownBy(() -> client.requireFreeCourse(id))
+                    .isInstanceOf(AppException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.FORBIDDEN);
+            }
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void validatesCourseThroughCourseServiceAndRejectsMissingOrUnavailableCourses() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/v1/courses/", exchange -> {
@@ -39,13 +78,16 @@ class CourseCatalogClientTests {
             assertThatCode(() -> client.requireExistingCourse(42L)).doesNotThrowAnyException();
             assertThatThrownBy(() -> client.requireExistingCourse(43L))
                 .isInstanceOf(AppException.class)
-                .extracting("errorCode").isEqualTo(ErrorCode.SERVICE_UNAVAILABLE);
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SERVICE_UNAVAILABLE);
             assertThatThrownBy(() -> client.requireExistingCourse(404L))
                 .isInstanceOf(AppException.class)
-                .extracting("errorCode").isEqualTo(ErrorCode.NOT_FOUND);
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
             assertThatThrownBy(() -> client.requireExistingCourse(500L))
                 .isInstanceOf(AppException.class)
-                .extracting("errorCode").isEqualTo(ErrorCode.SERVICE_UNAVAILABLE);
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SERVICE_UNAVAILABLE);
         } finally {
             server.stop(0);
         }

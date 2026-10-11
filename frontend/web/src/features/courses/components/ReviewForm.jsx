@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import StarRating from './StarRating';
 import { reviewApi } from '../api/reviewApi';
 import useAuth from '../../auth/hooks/useAuth';
@@ -110,19 +110,16 @@ const formStyles = {
  *   onSubmitSuccess — callback(review) sau khi lưu thành công
  *   onCancel        — callback khi hủy sửa
  */
-export default function ReviewForm({
-  courseId,
-  existingReview = null,
-  onSubmitSuccess,
-  onCancel,
-}) {
+export default function ReviewForm({ courseId, existingReview = null, onSubmitSuccess, onCancel }) {
   const { user } = useAuth();
+  const [previousReview, setPreviousReview] = useState(existingReview);
   const [rating, setRating] = useState(existingReview?.rating || 5);
   const [comment, setComment] = useState(existingReview?.comment || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  if (previousReview !== existingReview) {
+    setPreviousReview(existingReview);
     if (existingReview) {
       setRating(existingReview.rating || 5);
       setComment(existingReview.comment || '');
@@ -131,7 +128,7 @@ export default function ReviewForm({
       setComment('');
     }
     setError(null);
-  }, [existingReview]);
+  }
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -169,10 +166,7 @@ export default function ReviewForm({
         setComment('');
       }
     } catch (err) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Không thể gửi đánh giá. Vui lòng thử lại.';
+      const msg = err?.response?.data?.message || err?.message || 'Không thể gửi đánh giá. Vui lòng thử lại.';
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -197,9 +191,7 @@ export default function ReviewForm({
       <div style={formStyles.ratingRow}>
         <span style={formStyles.ratingText}>Đánh giá:</span>
         <StarRating value={rating} onChange={setRating} size={24} />
-        <span style={{ ...formStyles.ratingText, fontWeight: 700, color: '#d97706' }}>
-          {rating} / 5 sao
-        </span>
+        <span style={{ ...formStyles.ratingText, fontWeight: 700, color: '#d97706' }}>{rating} / 5 sao</span>
       </div>
 
       <div>
@@ -217,20 +209,11 @@ export default function ReviewForm({
       </div>
 
       <div style={formStyles.actions}>
-        <button
-          type="submit"
-          style={formStyles.submitBtn}
-          disabled={submitting}
-        >
+        <button type="submit" style={formStyles.submitBtn} disabled={submitting}>
           {submitting ? 'Đang gửi...' : existingReview ? 'Cập nhật' : 'Gửi đánh giá'}
         </button>
         {existingReview && onCancel && (
-          <button
-            type="button"
-            style={formStyles.cancelBtn}
-            onClick={onCancel}
-            disabled={submitting}
-          >
+          <button type="button" style={formStyles.cancelBtn} onClick={onCancel} disabled={submitting}>
             Hủy
           </button>
         )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 
@@ -11,6 +11,7 @@ import { courseApi } from '../api/courseApi';
 import { learningApi } from '../../learning/api/learningApi';
 import { formatPrice, normalizeSearch } from '../data/demoCourses';
 import useCourseSearch from '../hooks/useCourseSearch';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
@@ -30,8 +31,17 @@ const coerceCourse = course => ({
   tag: course.status || 'Khóa học',
   image: course.thumbnailUrl || '/images/english-ielts.jpg',
   imageAlt: `${course.title} thumbnail`,
-  rating: course.avgRating ? Number(course.avgRating).toFixed(1) : (course.rating != null ? String(course.rating) : '5.0'),
-  reviews: course.reviewCount != null ? String(course.reviewCount) : (course.reviews != null ? String(course.reviews) : '0'),
+  rating: course.avgRating
+    ? Number(course.avgRating).toFixed(1)
+    : course.rating != null
+      ? String(course.rating)
+      : '5.0',
+  reviews:
+    course.reviewCount != null
+      ? String(course.reviewCount)
+      : course.reviews != null
+        ? String(course.reviews)
+        : '0',
   students: 0,
   hours: 8,
   level: course.level ? String(course.level).toLowerCase() : 'beginner',
@@ -71,13 +81,23 @@ const numericCourseId = course => {
 };
 
 function CourseListPage() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const toast = useToast();
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState(new Set());
+  const [enrollmentState, setEnrollmentState] = useState(null);
+  const enrolledCourseIds =
+    user?.id != null && enrollmentState?.userId === user.id ? enrollmentState.ids : new Set();
+  const setEnrolledCourseIds = useCallback(
+    value =>
+      setEnrollmentState(previous => {
+        const ids = previous && previous.userId === user?.id ? previous.ids : new Set();
+        return { userId: user?.id, ids: typeof value === 'function' ? value(ids) : value };
+      }),
+    [user?.id],
+  );
   const [enrollingCourseId, setEnrollingCourseId] = useState(null);
   const [enrollError, setEnrollError] = useState('');
   const [params, setParams] = useSearchParams();
@@ -93,7 +113,7 @@ function CourseListPage() {
     if (debouncedKeyword) paramsObj.set('q', debouncedKeyword);
     else paramsObj.delete('q');
     setParams(paramsObj, { replace: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedKeyword]);
 
   function selectCourse(course) {
@@ -155,7 +175,7 @@ function CourseListPage() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id, setEnrolledCourseIds]);
 
   const query = debouncedKeyword;
   const category = params.get('category') || '';
@@ -216,20 +236,23 @@ function CourseListPage() {
     }
     if (course.price !== 0 || enrolledCourseIds.has(courseId)) return;
 
+    const version = getSessionVersion();
     setEnrollError('');
     setEnrollingCourseId(course.id);
     try {
       const response = await learningApi.enroll(courseId);
+      if (version !== getSessionVersion()) return;
       const enrollment = response?.data;
       setEnrolledCourseIds(previous => new Set(previous).add(Number(enrollment?.courseId ?? courseId)));
       toast('Đã thêm khóa học vào My Courses.');
       setSelected(null);
       navigate('/my-courses');
     } catch (error) {
+      if (version !== getSessionVersion()) return;
       setEnrollError(error.message || 'Không thể ghi danh khóa học.');
       setSelected(course);
     } finally {
-      setEnrollingCourseId(null);
+      if (version === getSessionVersion()) setEnrollingCourseId(null);
     }
   }
 

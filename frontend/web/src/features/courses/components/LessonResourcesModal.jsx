@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { mediaApi } from '../api/mediaApi';
 import MediaUploader from './MediaUploader';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
@@ -12,6 +12,10 @@ function formatBytes(bytes) {
 }
 
 export default function LessonResourcesModal({ lesson, onClose }) {
+  return <LessonResources key={lesson?.id} lesson={lesson} onClose={onClose} />;
+}
+
+function LessonResources({ lesson, onClose }) {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,25 +27,40 @@ export default function LessonResourcesModal({ lesson, onClose }) {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadResources = async () => {
+  const loadResources = useCallback(
+    (isActive = () => true) =>
+      mediaApi
+        .listResources(lesson.id)
+        .then(res => {
+          if (!isActive()) return;
+          const data = res?.data?.data ?? res?.data ?? res ?? [];
+          setResources(Array.isArray(data) ? data : []);
+        })
+        .catch(err => {
+          if (isActive())
+            setError(err?.response?.data?.message || err?.message || 'Không thể tải danh sách tài liệu.');
+        })
+        .finally(() => {
+          if (isActive()) setLoading(false);
+        }),
+    [lesson.id],
+  );
+
+  const refreshResources = () => {
     setLoading(true);
     setError('');
-    try {
-      const res = await mediaApi.listResources(lesson.id);
-      const data = res?.data?.data ?? res?.data ?? res ?? [];
-      setResources(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không thể tải danh sách tài liệu.');
-    } finally {
-      setLoading(false);
-    }
+    return loadResources();
   };
 
   useEffect(() => {
+    let active = true;
     if (lesson?.id) {
-      loadResources();
+      loadResources(() => active);
     }
-  }, [lesson?.id]);
+    return () => {
+      active = false;
+    };
+  }, [lesson?.id, loadResources]);
 
   const handleAddResource = async e => {
     e.preventDefault();
@@ -62,7 +81,7 @@ export default function LessonResourcesModal({ lesson, onClose }) {
       setTitle('');
       setUploadedFile(null);
       setAdding(false);
-      await loadResources();
+      await refreshResources();
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'Lỗi khi lưu tài liệu đính kèm.');
     } finally {
@@ -74,7 +93,7 @@ export default function LessonResourcesModal({ lesson, onClose }) {
     if (!window.confirm('Bạn có chắc muốn xóa tài liệu này?')) return;
     try {
       await mediaApi.deleteResource(resourceId);
-      await loadResources();
+      await refreshResources();
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'Lỗi khi xóa tài liệu.');
     }
@@ -109,7 +128,9 @@ export default function LessonResourcesModal({ lesson, onClose }) {
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
+        >
           <div>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Tài liệu đính kèm</h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
@@ -148,7 +169,16 @@ export default function LessonResourcesModal({ lesson, onClose }) {
               Đang tải danh sách tài liệu...
             </p>
           ) : resources.length === 0 ? (
-            <p style={{ fontSize: 14, color: '#94a3b8', textAlign: 'center', padding: 16, background: '#f8fafc', borderRadius: 8 }}>
+            <p
+              style={{
+                fontSize: 14,
+                color: '#94a3b8',
+                textAlign: 'center',
+                padding: 16,
+                background: '#f8fafc',
+                borderRadius: 8,
+              }}
+            >
               Chưa có tài liệu đính kèm nào.
             </p>
           ) : (
@@ -171,9 +201,7 @@ export default function LessonResourcesModal({ lesson, onClose }) {
                       {item.resourceType === 'PDF' ? '📕' : item.resourceType === 'VIDEO' ? '🎬' : '📄'}
                     </span>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>
-                        {item.title}
-                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{item.title}</div>
                       <div style={{ fontSize: 12, color: '#64748b' }}>
                         {item.fileName} • {formatBytes(item.fileSize)}
                       </div>
@@ -195,7 +223,14 @@ export default function LessonResourcesModal({ lesson, onClose }) {
                     <button
                       type="button"
                       onClick={() => handleDeleteResource(item.id)}
-                      style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 14, padding: '4px 6px' }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#dc2626',
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        padding: '4px 6px',
+                      }}
                       title="Xóa tài liệu"
                     >
                       🗑️
@@ -234,7 +269,13 @@ export default function LessonResourcesModal({ lesson, onClose }) {
               <button
                 type="button"
                 onClick={() => setAdding(false)}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12 }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
               >
                 Hủy bỏ
               </button>

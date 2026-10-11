@@ -1,9 +1,22 @@
 # MySQL alone: docker compose up -d mysql
 # Full backend: docker compose --profile backend up --build -d
+x-backend-defaults: &backend-defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  healthcheck:
+    test: ["CMD-SHELL", "curl --fail --silent --max-time 4 http://127.0.0.1:$${SERVER_PORT}/actuator/health/readiness >/dev/null"]
+    interval: 10s
+    timeout: 5s
+    start_period: 90s
+    retries: 12
+
 services:
   mysql:
     image: mysql:8.4
-    container_name: elearning-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
@@ -13,7 +26,7 @@ services:
       PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?Set PAYMENT_DB_PASSWORD in .env}
       AI_DB_PASSWORD: ${AI_DB_PASSWORD:?Set AI_DB_PASSWORD in .env}
     ports:
-      - "127.0.0.1:3306:3306"
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./infra/mysql/init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
@@ -25,12 +38,13 @@ services:
       # Run explicitly after service migrations; demo accounts are opt-in.
       - ./infra/mysql/05-seed-data.sql:/seed/05-seed-data.sql:ro
     healthcheck:
-      test: ['CMD-SHELL', 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT 1" >/dev/null 2>&1']
+      test: ['CMD-SHELL', 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -uroot -Nse "SELECT 1" >/dev/null 2>&1']
       interval: 10s
       timeout: 5s
       retries: 10
 
   auth-service:
+    <<: *backend-defaults
     profiles: [backend]
     build:
       context: .
@@ -38,6 +52,8 @@ services:
       args:
         SERVICE: auth-service
     environment:
+      SERVER_PORT: "8081"
+      LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
       JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
@@ -51,6 +67,7 @@ services:
         condition: service_healthy
 
   course-service:
+    <<: *backend-defaults
     profiles: [backend]
     build:
       context: .
@@ -58,6 +75,8 @@ services:
       args:
         SERVICE: course-service
     environment:
+      SERVER_PORT: "8082"
+      LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
       JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
@@ -92,19 +111,21 @@ services:
       - minio_data:/data
 
   learning-service:
+    <<: *backend-defaults
     profiles: [backend]
-    command:
-      - --course.service-url=http://course-service:8082
     build:
       context: .
       dockerfile: infra/docker/service.Dockerfile
       args:
         SERVICE: learning-service
     environment:
+      SERVER_PORT: "8083"
+      LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
       JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN to at least 32 random UTF-8 bytes}
+      COURSE_SERVICE_URL: http://course-service:8082
       LEARNING_DB_URL: jdbc:mysql://mysql:3306/learning_db
       LEARNING_DB_USERNAME: learning_app
       LEARNING_DB_PASSWORD: ${LEARNING_DB_PASSWORD}
@@ -112,8 +133,11 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      course-service:
+        condition: service_healthy
 
   payment-service:
+    <<: *backend-defaults
     profiles: [backend]
     build:
       context: .
@@ -121,6 +145,8 @@ services:
       args:
         SERVICE: payment-service
     environment:
+      SERVER_PORT: "8084"
+      LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
       JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
@@ -136,11 +162,12 @@ services:
       mysql:
         condition: service_healthy
       course-service:
-        condition: service_started
+        condition: service_healthy
       learning-service:
-        condition: service_started
+        condition: service_healthy
 
   ai-service:
+    <<: *backend-defaults
     profiles: [backend]
     build:
       context: .
@@ -148,6 +175,8 @@ services:
       args:
         SERVICE: ai-service
     environment:
+      SERVER_PORT: "8085"
+      LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
       JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
@@ -160,6 +189,7 @@ services:
         condition: service_healthy
 
   api-gateway:
+    <<: *backend-defaults
     profiles: [backend]
     build:
       context: .
@@ -167,6 +197,8 @@ services:
       args:
         SERVICE: api-gateway
     environment:
+      SERVER_PORT: "8080"
+      LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
       JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
@@ -177,7 +209,18 @@ services:
       PAYMENT_SERVICE_URL: http://payment-service:8084
       AI_SERVICE_URL: http://ai-service:8085
     ports:
-      - "8080:8080"
+      - "${GATEWAY_BIND_ADDRESS:-127.0.0.1}:${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      course-service:
+        condition: service_healthy
+      learning-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
 
 volumes:
   mysql_data:

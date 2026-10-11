@@ -1,0 +1,30 @@
+# Requires Compose 2.24.4+ for !override. Put an HTTPS reverse proxy in front of web.
+services:
+  mysql:
+    ports: !override []
+
+  auth-service:
+    environment:
+      REFRESH_COOKIE_SECURE: "true"
+
+  api-gateway:
+    environment:
+      CORS_ALLOWED_ORIGINS: ${STAGING_ORIGIN:?Set STAGING_ORIGIN to the public HTTPS origin}
+    ports: !override []
+
+  web:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "127.0.0.1:${STAGING_WEB_PORT:-8088}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy

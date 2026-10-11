@@ -7,6 +7,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,6 +60,39 @@ public class JwtTokenProvider {
         ) {
             throw new JwtException("Invalid access token claims");
         }
+        roles(claims);
+        permissions(claims);
         return claims;
+    }
+
+    // Auth emits roles plus a legacy primary role. Legacy tokens may omit roles.
+    public List<String> roles(Claims claims) {
+        Object value = claims.get("roles");
+        if (value == null) return List.of(claims.get("role", String.class));
+        List<String> roles = claimCodes(value, "roles", false);
+        String primaryRole = roles.contains("ADMIN") ? "ADMIN" : "USER";
+        if (!primaryRole.equals(claims.get("role", String.class))) {
+            throw new JwtException("Inconsistent access token roles");
+        }
+        return roles;
+    }
+
+    public List<String> permissions(Claims claims) {
+        Object value = claims.get("permissions");
+        return value == null ? List.of() : claimCodes(value, "permissions", true);
+    }
+
+    private List<String> claimCodes(Object value, String claim, boolean allowEmpty) {
+        if (
+            !(value instanceof List<?> list) ||
+            list.size() > 100 ||
+            (!allowEmpty && list.isEmpty()) ||
+            list
+                .stream()
+                .anyMatch(code -> !(code instanceof String name) || !name.matches("[A-Z][A-Z0-9_]{1,63}"))
+        ) {
+            throw new JwtException("Invalid access token " + claim);
+        }
+        return ((List<?>) value).stream().map(String.class::cast).distinct().toList();
     }
 }

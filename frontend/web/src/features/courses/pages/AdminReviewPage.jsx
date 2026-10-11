@@ -6,6 +6,10 @@ import StarRating from '../components/StarRating';
 
 export default function AdminReviewPage() {
   const { courseId } = useParams();
+  return <CourseReviews key={courseId} courseId={courseId} />;
+}
+
+function CourseReviews({ courseId }) {
   const [course, setCourse] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [pagination, setPagination] = useState({ page: 0, size: 10, totalPages: 0, totalElements: 0 });
@@ -13,39 +17,50 @@ export default function AdminReviewPage() {
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
-  const loadData = useCallback(async (page = 0) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [courseRes, reviewsRes] = await Promise.all([
-        courseApi.getById(courseId),
-        reviewApi.adminList(courseId, { page, size: 10 }),
-      ]);
+  const loadData = useCallback(
+    (page = 0, isActive = () => true) =>
+      Promise.all([courseApi.getById(courseId), reviewApi.adminList(courseId, { page, size: 10 })])
+        .then(([courseRes, reviewsRes]) => {
+          if (!isActive()) return;
 
-      const cData = courseRes?.data?.data || courseRes?.data || courseRes;
-      setCourse(cData);
+          const cData = courseRes?.data?.data || courseRes?.data || courseRes;
+          setCourse(cData);
 
-      const rData = reviewsRes?.data?.data || reviewsRes?.data || reviewsRes;
-      const items = rData?.items || rData?.content || (Array.isArray(rData) ? rData : []);
-      setReviews(items);
-      setPagination({
-        page: rData?.page ?? page,
-        size: rData?.size ?? 10,
-        totalPages: rData?.totalPages ?? 1,
-        totalElements: rData?.totalElements ?? items.length,
-      });
-    } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không thể tải danh sách đánh giá');
-    } finally {
-      setLoading(false);
-    }
-  }, [courseId]);
+          const rData = reviewsRes?.data?.data || reviewsRes?.data || reviewsRes;
+          const items = rData?.items || rData?.content || (Array.isArray(rData) ? rData : []);
+          setReviews(items);
+          setPagination({
+            page: rData?.page ?? page,
+            size: rData?.size ?? 10,
+            totalPages: rData?.totalPages ?? 1,
+            totalElements: rData?.totalElements ?? items.length,
+          });
+        })
+        .catch(err => {
+          if (isActive())
+            setError(err?.response?.data?.message || err?.message || 'Không thể tải danh sách đánh giá');
+        })
+        .finally(() => {
+          if (isActive()) setLoading(false);
+        }),
+    [courseId],
+  );
 
   useEffect(() => {
-    loadData(0);
+    let active = true;
+    loadData(0, () => active);
+    return () => {
+      active = false;
+    };
   }, [loadData]);
 
-  const handleToggleHide = async (review) => {
+  const refreshData = page => {
+    setLoading(true);
+    setError(null);
+    return loadData(page);
+  };
+
+  const handleToggleHide = async review => {
     setActionLoading(review.id);
     try {
       if (review.hidden) {
@@ -54,7 +69,7 @@ export default function AdminReviewPage() {
         await reviewApi.hide(courseId, review.id);
       }
       // Reload current page
-      await loadData(pagination.page);
+      await refreshData(pagination.page);
     } catch (err) {
       alert(err?.response?.data?.message || 'Thao tác thất bại');
     } finally {
@@ -68,7 +83,9 @@ export default function AdminReviewPage() {
     <section className="section" style={{ minHeight: '80vh', padding: '24px 0 60px' }}>
       <div className="container">
         {/* Header navigation */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}
+        >
           <div>
             <Link to="/admin/courses" style={{ color: '#3b82f6', textDecoration: 'none', fontSize: 14 }}>
               ← Quay lại quản lý khóa học
@@ -115,7 +132,16 @@ export default function AdminReviewPage() {
 
         {/* Error state */}
         {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', padding: 16, borderRadius: 8, color: '#ef4444', marginBottom: 20 }}>
+          <div
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid #ef4444',
+              padding: 16,
+              borderRadius: 8,
+              color: '#ef4444',
+              marginBottom: 20,
+            }}
+          >
             {error}
           </div>
         )}
@@ -125,7 +151,9 @@ export default function AdminReviewPage() {
           {loading ? (
             <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>Đang tải đánh giá...</p>
           ) : reviews.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>Chưa có đánh giá nào cho khóa học này.</p>
+            <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>
+              Chưa có đánh giá nào cho khóa học này.
+            </p>
           ) : (
             <div style={{ display: 'grid', gap: 16 }}>
               {reviews.map(review => (
@@ -197,11 +225,7 @@ export default function AdminReviewPage() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {actionLoading === review.id
-                        ? 'Đang xử lý...'
-                        : review.hidden
-                        ? 'Bỏ ẩn'
-                        : 'Ẩn review'}
+                      {actionLoading === review.id ? 'Đang xử lý...' : review.hidden ? 'Bỏ ẩn' : 'Ẩn review'}
                     </button>
                   </div>
                 </div>
@@ -215,17 +239,25 @@ export default function AdminReviewPage() {
               <button
                 className="button button-soft"
                 disabled={pagination.page <= 0 || loading}
-                onClick={() => loadData(pagination.page - 1)}
+                onClick={() => refreshData(pagination.page - 1)}
               >
                 Trang trước
               </button>
-              <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 14, color: '#64748b' }}>
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 12px',
+                  fontSize: 14,
+                  color: '#64748b',
+                }}
+              >
                 Trang {pagination.page + 1} / {pagination.totalPages}
               </span>
               <button
                 className="button button-soft"
                 disabled={pagination.page >= pagination.totalPages - 1 || loading}
-                onClick={() => loadData(pagination.page + 1)}
+                onClick={() => refreshData(pagination.page + 1)}
               >
                 Trang sau
               </button>

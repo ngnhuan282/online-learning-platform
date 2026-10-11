@@ -9,6 +9,7 @@ import com.elearning.learning.entity.enums.AttemptStatus;
 import com.elearning.learning.entity.enums.EnrollmentStatus;
 import com.elearning.learning.entity.enums.ProgressStatus;
 import com.elearning.learning.repository.*;
+import com.elearning.learning.service.CourseCatalogClient;
 import com.elearning.learning.service.LearningService;
 import com.elearning.learning.service.NotificationService;
 import java.time.Instant;
@@ -24,17 +25,20 @@ public class LearningServiceImpl implements LearningService {
     private final LessonProgressRepository progress;
     private final QuizAttemptRepository attempts;
     private final NotificationService notifications;
+    private final CourseCatalogClient courseCatalog;
 
     public LearningServiceImpl(
         EnrollmentRepository enrollments,
         LessonProgressRepository progress,
         QuizAttemptRepository attempts,
-        NotificationService notifications
+        NotificationService notifications,
+        CourseCatalogClient courseCatalog
     ) {
         this.enrollments = enrollments;
         this.progress = progress;
         this.attempts = attempts;
         this.notifications = notifications;
+        this.courseCatalog = courseCatalog;
     }
 
     @Override
@@ -45,15 +49,19 @@ public class LearningServiceImpl implements LearningService {
             progress.countByUserIdAndStatus(userId, ProgressStatus.COMPLETED),
             notifications.summary(userId).unreadCount(),
             getMyEnrollments(userId).stream().limit(5).toList(),
-            attempts.findTop5ByUserIdAndStatusOrderByIdDesc(userId, AttemptStatus.GRADED)
-                .stream().map(QuizResultResponse::from).toList(),
+            attempts
+                .findTop5ByUserIdAndStatusOrderByIdDesc(userId, AttemptStatus.GRADED)
+                .stream()
+                .map(QuizResultResponse::from)
+                .toList(),
             getNotifications(userId).stream().limit(5).toList()
         );
     }
 
     @Override
     public List<EnrollmentResponse> getMyEnrollments(Long userId) {
-        return enrollments.findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(userId)
+        return enrollments
+            .findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(userId)
             .stream()
             .map(EnrollmentResponse::from)
             .toList();
@@ -69,6 +77,7 @@ public class LearningServiceImpl implements LearningService {
             return EnrollmentResponse.from(enrollments.save(enrollment));
         }
 
+        courseCatalog.requireFreeCourse(request.courseId());
         var enrollment = new Enrollment();
         enrollment.setUserId(userId);
         enrollment.setCourseId(request.courseId());
@@ -107,14 +116,15 @@ public class LearningServiceImpl implements LearningService {
         enrollment.setStatus(EnrollmentStatus.ACTIVE);
         enrollment.setLastAccessedAt(Instant.now());
         Enrollment saved = enrollments.saveAndFlush(enrollment);
-        createEnrollmentNotification(request.userId(), request.courseId());
+        notifications.courseEnrolled(request.userId(), request.courseId(), saved.getId());
         return EnrollmentResponse.from(saved);
     }
 
     @Override
     public List<LessonProgressResponse> getCourseProgress(Long userId, Long courseId) {
         ensureCourseAccess(userId, courseId);
-        return progress.findByUserIdAndCourseIdOrderByLessonIdAsc(userId, courseId)
+        return progress
+            .findByUserIdAndCourseIdOrderByLessonIdAsc(userId, courseId)
             .stream()
             .map(LessonProgressResponse::from)
             .toList();

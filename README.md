@@ -1,5 +1,8 @@
 # SGSphere – Online Learning Platform
 
+Hướng dẫn tích hợp Auth/Course/Learning/Payment, Docker staging, logging, health check và kiểm tra trước merge:
+[SYSTEM_INTEGRATION.md](docs/testing/SYSTEM_INTEGRATION.md).
+
 SGSphere là nền tảng học trực tuyến được xây dựng theo kiến trúc **Microservices**. Frontend sử dụng **React + Vite**, Backend sử dụng **Spring Boot**, dữ liệu được lưu trên **MySQL**, và mọi request từ trình duyệt đi qua **API Gateway**.
 
 > Mục tiêu của project: xây dựng một nền tảng học trực tuyến có thể mở rộng theo từng module như Course, Learning, Payment/VNPay, AI Assistant và triển khai cloud sau này.

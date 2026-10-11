@@ -164,3 +164,43 @@ test('late refresh cannot overwrite a new login or resurrect a cleared session',
     assert.equal(tokens.getAccessToken(), newerLogin ? newer : null);
   }
 });
+
+test('late Course/Learning/Payment successes and account errors cannot affect a new session', async () => {
+  for (const path of ['/courses/1/reviews/me', '/learning/enrollments/me', '/payments/history']) {
+    for (const failure of [false, true]) {
+      tokens.setAccessToken(old);
+      let release;
+      const pending = client.get(`/api/v1${path}`, {
+        adapter: config =>
+          new Promise((resolve, reject) => {
+            release = () =>
+              failure
+                ? reject({ config, response: { status: 403, data: { code: 'ACCOUNT_LOCKED' } } })
+                : resolve(response(config, { private: 'previous user' }));
+          }),
+      });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const newer = makeToken('other-login');
+      tokens.setAccessToken(newer);
+      release();
+      await assert.rejects(pending, { code: 'ERR_CANCELED' });
+      assert.equal(tokens.getAccessToken(), newer);
+    }
+  }
+});
+
+test('role mismatch 403 remains visible without rotating or clearing a valid session', async () => {
+  tokens.setAccessToken(old);
+  let calls = 0;
+  await assert.rejects(
+    client.get('/api/v1/payments/admin/orders', {
+      adapter: config => {
+        calls++;
+        return Promise.reject({ config, response: { status: 403, data: { code: 'FORBIDDEN' } } });
+      },
+    }),
+    { status: 403, code: 'FORBIDDEN' },
+  );
+  assert.equal(calls, 1);
+  assert.equal(tokens.getAccessToken(), old);
+});

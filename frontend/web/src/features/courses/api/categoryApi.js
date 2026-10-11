@@ -2,7 +2,7 @@ import axiosClient from '../../../shared/apis/axiosClient';
 import { API_PREFIX } from '../../../shared/constants/appConstants';
 
 export const categoryApi = {
-  list: () => axiosClient.get(`${API_PREFIX}/categories`),
+  list: (options = {}) => axiosClient.get(`${API_PREFIX}/categories`, options),
   getById: id => axiosClient.get(`${API_PREFIX}/categories/${id}`),
   create: payload => axiosClient.post(`${API_PREFIX}/admin/categories`, payload),
   update: (id, payload) => axiosClient.put(`${API_PREFIX}/admin/categories/${id}`, payload),

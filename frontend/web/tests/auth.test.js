@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, afterEach, beforeEach, test } from 'node:test';
 import { JSDOM } from 'jsdom';
-import { act, createElement as h, StrictMode, useContext } from 'react';
+import { act, createElement as h, StrictMode, useContext, useState } from 'react';
 import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import { createRoot } from 'react-dom/client';
@@ -25,6 +25,7 @@ const { AuthContext, AuthProvider } = await load('features/auth/context/AuthCont
 const { default: ProtectedRoute } = await load('routes/ProtectedRoute.jsx');
 const { default: RoleRoute } = await load('routes/RoleRoute.jsx');
 const { default: PermissionRoute } = await load('routes/PermissionRoute.jsx');
+const { default: CourseDetailPage } = await load('features/courses/pages/CourseDetailPage.jsx');
 const { default: AdminRolesPage } = await load('features/admin/pages/AdminRolesPage.jsx');
 const { ToastContext } = await load('shared/context/ToastContext.jsx');
 const { default: client } = await load('shared/apis/axiosClient.js');
@@ -188,7 +189,12 @@ test('system roles are read-only while a custom role can be edited', async () =>
   let saved = false;
   tokens.setAccessToken(makeToken({ role: 'ADMIN', roles: ['ADMIN'] }));
   client.defaults.adapter = async config => {
-    if (config.url.endsWith('/users/me')) return reply(config, { ...user, roles: ['ADMIN'], permissions: ['ADMIN_ACCESS', 'ROLE_VIEW', 'ROLE_MANAGE'] });
+    if (config.url.endsWith('/users/me'))
+      return reply(config, {
+        ...user,
+        roles: ['ADMIN'],
+        permissions: ['ADMIN_ACCESS', 'ROLE_VIEW', 'ROLE_MANAGE'],
+      });
     if (config.url.endsWith('/admin/roles/3') && config.method === 'put') {
       const payload = JSON.parse(config.data);
       assert.equal(payload.name, 'SUPPORT');
@@ -341,6 +347,75 @@ test('ProtectedRoute redirects guests and allows authenticated users', async () 
   assert.match(document.body.textContent, /private content/);
 });
 
+test('protected Learning/Payment state is remounted when Auth changes accounts', async () => {
+  function PrivateState() {
+    auth = useContext(AuthContext);
+    const { user } = auth;
+    const [owner] = useState(user.id);
+    return h('p', null, `private state for ${owner}, current user ${user.id}`);
+  }
+  tokens.setAccessToken(makeToken());
+  client.defaults.adapter = async config => reply(config, user);
+  await mount(h(MemoryRouter, null, h(ProtectedRoute, null, h(PrivateState))), true);
+  assert.match(document.body.textContent, /private state for 1, current user 1/);
+  await act(async () =>
+    auth.establishSession({
+      accessToken: makeToken({ sub: '2' }),
+      user: { ...user, id: 2 },
+    }),
+  );
+  assert.match(document.body.textContent, /private state for 2, current user 2/);
+  assert.doesNotMatch(document.body.textContent, /private state for 1/);
+});
+
+test('Course uses authenticated Learning for free enrollment and Payment checkout for paid courses', async () => {
+  for (const price of [0, 100000]) {
+    tokens.setAccessToken(makeToken());
+    const writes = [];
+    client.defaults.adapter = async config => {
+      if (config.url === '/api/v1/users/me') return reply(config, user);
+      if (config.url === '/api/v1/courses/42')
+        return reply(config, {
+          id: 42,
+          title: 'Integration Course',
+          price,
+          status: 'PUBLISHED',
+        });
+      if (config.url === '/api/v1/learning/enrollments' && config.method === 'post') {
+        writes.push(JSON.parse(config.data));
+        assert.equal(config.headers.get('Authorization'), `Bearer ${tokens.getAccessToken()}`);
+        return reply(config, { courseId: 42, status: 'ACTIVE' });
+      }
+      if (config.url.endsWith('/reviews/me')) return reply(config, null);
+      return reply(config, []);
+    };
+    await mount(
+      h(
+        MemoryRouter,
+        { initialEntries: ['/courses/42'] },
+        h(
+          Routes,
+          null,
+          h(Route, { path: '/courses/:id', element: h(CourseDetailPage) }),
+          h(Route, { path: '/checkout', element: h('p', null, 'payment checkout destination') }),
+          h(Route, { path: '/learning/:id', element: h('p', null, 'learning destination') }),
+        ),
+      ),
+    );
+    await flush();
+    const button = [...document.querySelectorAll('button')].find(button =>
+      button.textContent.includes(price ? 'Mua khóa học ngay' : 'Đăng ký học miễn phí'),
+    );
+    assert.ok(button, 'Course enrollment button is present');
+    await act(async () => button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })));
+    await flush();
+    assert.match(document.body.textContent, price ? /payment checkout destination/ : /learning destination/);
+    assert.deepEqual(writes, price ? [] : [{ courseId: 42 }]);
+    await act(async () => root.unmount());
+    root = null;
+  }
+});
+
 test('RoleRoute denies USER and allows ADMIN from AuthContext', async () => {
   const routes = h(MemoryRouter, null, h(RoleRoute, { roles: ['ADMIN'] }, h('p', null, 'admin content')));
   tokens.setAccessToken(makeToken());
@@ -356,26 +431,41 @@ test('RoleRoute denies USER and allows ADMIN from AuthContext', async () => {
 });
 
 test('PermissionRoute uses restored custom permissions and shows a clear forbidden state', async () => {
-  const route = h(MemoryRouter, null, h(PermissionRoute, { permission: 'USER_VIEW' }, h('p', null, 'accounts')));
+  const route = h(
+    MemoryRouter,
+    null,
+    h(PermissionRoute, { permission: 'USER_VIEW' }, h('p', null, 'accounts')),
+  );
   tokens.setAccessToken(makeToken());
-  client.defaults.adapter = async config => reply(config, {
-    ...user, permissions: ['ADMIN_ACCESS', 'USER_VIEW'], status: 'ACTIVE',
-  });
+  client.defaults.adapter = async config =>
+    reply(config, {
+      ...user,
+      permissions: ['ADMIN_ACCESS', 'USER_VIEW'],
+      status: 'ACTIVE',
+    });
   await mount(route);
   assert.match(document.body.textContent, /không có quyền truy cập/);
   assert.doesNotMatch(document.body.textContent, /accounts/);
   await act(async () => root.unmount());
   root = null;
-  client.defaults.adapter = async config => reply(config, {
-    ...user, roles: ['SUPPORT'], permissions: ['ADMIN_ACCESS', 'USER_VIEW'], status: 'ACTIVE',
-  });
+  client.defaults.adapter = async config =>
+    reply(config, {
+      ...user,
+      roles: ['SUPPORT'],
+      permissions: ['ADMIN_ACCESS', 'USER_VIEW'],
+      status: 'ACTIVE',
+    });
   await mount(route);
   assert.match(document.body.textContent, /accounts/);
   await act(async () => root.unmount());
   root = null;
-  client.defaults.adapter = async config => reply(config, {
-    ...user, roles: ['ADMIN'], permissions: ['ADMIN_ACCESS'], status: 'ACTIVE',
-  });
+  client.defaults.adapter = async config =>
+    reply(config, {
+      ...user,
+      roles: ['ADMIN'],
+      permissions: ['ADMIN_ACCESS'],
+      status: 'ACTIVE',
+    });
   await mount(route);
   assert.match(document.body.textContent, /không có quyền truy cập/);
   assert.doesNotMatch(document.body.textContent, /accounts/);

@@ -8,9 +8,18 @@ import { lessonApi } from '../api/lessonApi';
  */
 export function useCurriculum(courseId) {
   const [sections, setSections] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(courseId));
   const [error, setError] = useState(null);
+  const [previousCourseId, setPreviousCourseId] = useState(courseId);
   const mountedRef = useRef(true);
+  const requestRef = useRef(0);
+
+  if (previousCourseId !== courseId) {
+    setPreviousCourseId(courseId);
+    setSections([]);
+    setLoading(Boolean(courseId));
+    setError(null);
+  }
 
   useEffect(() => {
     mountedRef.current = true;
@@ -19,24 +28,41 @@ export function useCurriculum(courseId) {
     };
   }, []);
 
-  const fetch = useCallback(async () => {
+  const loadSections = useCallback(
+    (isActive = () => true) => {
+      if (!courseId) return;
+      const request = ++requestRef.current;
+      const active = () => isActive() && mountedRef.current && request === requestRef.current;
+      return sectionApi
+        .listByCourse(courseId)
+        .then(res => {
+          const data = res?.data?.data ?? res?.data ?? [];
+          if (active()) setSections(Array.isArray(data) ? data : []);
+        })
+        .catch(err => {
+          if (active()) setError(err);
+        })
+        .finally(() => {
+          if (active()) setLoading(false);
+        });
+    },
+    [courseId],
+  );
+
+  useEffect(() => {
+    let active = true;
+    loadSections(() => active);
+    return () => {
+      active = false;
+    };
+  }, [loadSections]);
+
+  const refresh = useCallback(() => {
     if (!courseId) return;
     setLoading(true);
     setError(null);
-    try {
-      const res = await sectionApi.listByCourse(courseId);
-      const data = res?.data?.data ?? res?.data ?? [];
-      if (mountedRef.current) setSections(Array.isArray(data) ? data : []);
-    } catch (err) {
-      if (mountedRef.current) setError(err);
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, [courseId]);
-
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+    return loadSections();
+  }, [courseId, loadSections]);
 
   /* ── Sections ── */
 
@@ -54,9 +80,7 @@ export function useCurriculum(courseId) {
     async (sectionId, payload) => {
       const res = await sectionApi.update(courseId, sectionId, payload);
       const updated = res?.data?.data ?? res?.data;
-      setSections(prev =>
-        prev.map(s => (s.id === sectionId ? { ...s, ...updated } : s)),
-      );
+      setSections(prev => prev.map(s => (s.id === sectionId ? { ...s, ...updated } : s)));
       return updated;
     },
     [courseId],
@@ -93,11 +117,7 @@ export function useCurriculum(courseId) {
     const res = await lessonApi.create(sectionId, payload);
     const newLesson = res?.data?.data ?? res?.data;
     setSections(prev =>
-      prev.map(s =>
-        s.id === sectionId
-          ? { ...s, lessons: [...(s.lessons ?? []), newLesson] }
-          : s,
-      ),
+      prev.map(s => (s.id === sectionId ? { ...s, lessons: [...(s.lessons ?? []), newLesson] } : s)),
     );
     return newLesson;
   }, []);
@@ -110,9 +130,7 @@ export function useCurriculum(courseId) {
         s.id === sectionId
           ? {
               ...s,
-              lessons: (s.lessons ?? []).map(l =>
-                l.id === lessonId ? { ...l, ...updated } : l,
-              ),
+              lessons: (s.lessons ?? []).map(l => (l.id === lessonId ? { ...l, ...updated } : l)),
             }
           : s,
       ),
@@ -124,9 +142,7 @@ export function useCurriculum(courseId) {
     await lessonApi.delete(lessonId);
     setSections(prev =>
       prev.map(s =>
-        s.id === sectionId
-          ? { ...s, lessons: (s.lessons ?? []).filter(l => l.id !== lessonId) }
-          : s,
+        s.id === sectionId ? { ...s, lessons: (s.lessons ?? []).filter(l => l.id !== lessonId) } : s,
       ),
     );
   }, []);
@@ -156,7 +172,7 @@ export function useCurriculum(courseId) {
     sections,
     loading,
     error,
-    refresh: fetch,
+    refresh,
     // section actions
     createSection,
     updateSection,
