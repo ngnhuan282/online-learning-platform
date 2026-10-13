@@ -79,7 +79,11 @@ function LearningCoursePage({ courseId }) {
         </div>
         {course.loading && <AppLoading label="Đang tải nội dung học..." />}
         {course.error && (
-          <ErrorState error={course.error} title="Không thể mở khóa học" onRetry={course.reload} />
+          <ErrorState
+            error={course.error}
+            title={course.error.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể mở khóa học'}
+            onRetry={course.reload}
+          />
         )}
         {actionError && <ErrorState error={actionError} title="Không thể cập nhật bài học" />}
         {!course.loading && !course.error && course.data && (

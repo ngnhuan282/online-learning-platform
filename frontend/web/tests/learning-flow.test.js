@@ -161,7 +161,7 @@ test('denied learning access displays retryable error with no demo content', asy
   };
   learningApi.getCourseQuizzes = async () => ({ data: [] });
   await render('/learning/42');
-  assert.match(document.body.textContent, /Không thể mở khóa học/);
+  assert.match(document.body.textContent, /Bạn chưa có quyền học khóa này/);
   assert.equal(document.querySelector('.lesson-stage'), null);
   learningApi.getLearningCourse = async () => ({ data: course() });
   await act(async () => button('Thử lại').click());
