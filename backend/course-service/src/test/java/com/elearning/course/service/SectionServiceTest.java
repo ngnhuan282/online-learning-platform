@@ -14,6 +14,8 @@ import com.elearning.course.entity.Course;
 import com.elearning.course.entity.Section;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.repository.SectionRepository;
+import com.elearning.course.security.CourseContentAccess;
+import com.elearning.course.security.MediaTickets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,12 @@ class SectionServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
+
+    @Mock
+    private CourseContentAccess access;
+
+    @Mock
+    private MediaTickets tickets;
 
     @InjectMocks
     private SectionService sectionService;

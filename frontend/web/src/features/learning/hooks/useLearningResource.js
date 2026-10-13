@@ -27,7 +27,7 @@ export default function useLearningResource(loader, fallback) {
           data: fallback,
           error,
           loading: false,
-          usingFallback: true,
+          usingFallback: false,
         });
       });
 

@@ -2,15 +2,23 @@ import { Link } from 'react-router-dom';
 import LearningNotice from '../components/LearningNotice';
 import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
-import { demoLearningDashboard } from '../data/learningDemoData';
 import useLearningResource from '../hooks/useLearningResource';
 import useNotifications from '../hooks/useNotifications';
+
+const EMPTY_DASHBOARD = {
+  activeEnrollments: 0,
+  completedEnrollments: 0,
+  completedLessons: 0,
+  recentEnrollments: [],
+  recentQuizResults: [],
+  recentNotifications: [],
+};
 
 export default function UserDashboardPage() {
   const notifications = useNotifications();
   const { data, error, loading, usingFallback } = useLearningResource(
     learningApi.getDashboard,
-    demoLearningDashboard,
+    EMPTY_DASHBOARD,
   );
 
   const stats = [
@@ -54,7 +62,6 @@ export default function UserDashboardPage() {
               {data.recentEnrollments.map(enrollment => (
                 <Link className="learning-row" to={`/learning/${enrollment.courseId}`} key={enrollment.id}>
                   <span>Course #{enrollment.courseId}</span>
-                  <ProgressBar value={enrollment.status === 'COMPLETED' ? 100 : 48} />
                   <b>{enrollment.status}</b>
                 </Link>
               ))}

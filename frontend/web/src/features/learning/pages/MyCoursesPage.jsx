@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import LearningNotice from '../components/LearningNotice';
-import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
-import { demoLearningDashboard } from '../data/learningDemoData';
 import useLearningResource from '../hooks/useLearningResource';
 import { courseApi } from '../../courses/api/courseApi';
 
+const EMPTY_ENROLLMENTS = [];
+
 export default function MyCoursesPage() {
-  const fallback = demoLearningDashboard.recentEnrollments;
-  const { data, error, loading, usingFallback } = useLearningResource(
-    learningApi.getMyEnrollments,
-    fallback,
-  );
+  const fallback = EMPTY_ENROLLMENTS;
+  const { data, error, loading, usingFallback } = useLearningResource(learningApi.getMyEnrollments, fallback);
   const [coursesById, setCoursesById] = useState({});
 
   useEffect(() => {
@@ -71,11 +68,9 @@ export default function MyCoursesPage() {
                 <span className="learning-chip">{enrollment.status}</span>
                 <h2>{enrollment.course?.title || `Course #${enrollment.courseId}`}</h2>
                 <p>
-                  {enrollment.course?.description ||
-                    'Khóa học đã được ghi danh và sẵn sàng để tiếp tục học.'}
+                  {enrollment.course?.description || 'Khóa học đã được ghi danh và sẵn sàng để tiếp tục học.'}
                 </p>
               </div>
-              <ProgressBar value={enrollment.status === 'COMPLETED' ? 100 : 48} />
               <div className="my-course-meta">
                 <span>Ghi danh: {new Date(enrollment.enrolledAt).toLocaleDateString('vi-VN')}</span>
                 {enrollment.lastAccessedAt && (
