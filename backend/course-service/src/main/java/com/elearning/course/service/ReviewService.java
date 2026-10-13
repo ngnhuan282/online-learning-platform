@@ -8,6 +8,7 @@ import com.elearning.course.entity.Course;
 import com.elearning.course.entity.Review;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.repository.ReviewRepository;
+import com.elearning.course.security.CourseContentAccess;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -19,10 +20,12 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final CourseRepository courseRepository;
+    private final CourseContentAccess access;
 
-    public ReviewService(ReviewRepository reviewRepository, CourseRepository courseRepository) {
+    public ReviewService(ReviewRepository reviewRepository, CourseRepository courseRepository, CourseContentAccess access) {
         this.reviewRepository = reviewRepository;
         this.courseRepository = courseRepository;
+        this.access = access;
     }
 
     /**
@@ -30,6 +33,9 @@ public class ReviewService {
      */
     @Transactional(readOnly = true)
     public Page<ReviewResponse> listPublic(Long courseId, int page, int size) {
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        access.requirePublished(course);
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return reviewRepository.findByCourseIdAndHiddenFalse(courseId, pageable)
             .map(ReviewResponse::from);
@@ -180,6 +186,11 @@ public class ReviewService {
     private void verifyEnrollment(Long userId, Long courseId) {
         if (userId == null) {
             throw new AppException(ErrorCode.FORBIDDEN, "Cần đăng nhập để đánh giá khóa học");
+        }
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        if (!access.canReadPrivate(course)) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Enrollment is required to review this course");
         }
     }
 }

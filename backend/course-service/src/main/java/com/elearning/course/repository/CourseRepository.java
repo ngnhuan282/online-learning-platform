@@ -18,4 +18,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         Pageable pageable
     );
     boolean existsBySlug(String slug);
+    boolean existsByThumbnailUrlAndStatus(String thumbnailUrl, CourseStatus status);
+    boolean existsByThumbnailUrlStartingWithAndStatus(String thumbnailUrl, CourseStatus status);
 }

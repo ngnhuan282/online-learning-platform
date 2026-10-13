@@ -1,6 +1,7 @@
 package com.elearning.course.dto;
 
 import com.elearning.course.entity.Section;
+import com.elearning.course.security.MediaTickets;
 import java.time.Instant;
 import java.util.List;
 
@@ -13,6 +14,14 @@ public record SectionResponse(
     Instant createdAt,
     Instant updatedAt
 ) {
+    public static SectionResponse forReader(Section section, boolean enrolled, MediaTickets tickets) {
+        return new SectionResponse(
+            section.getId(), section.getCourse().getId(), section.getTitle(), section.getOrderIndex(),
+            section.getLessons().stream().map(lesson -> LessonResponse.forReader(lesson, enrolled, tickets)).toList(),
+            section.getCreatedAt(), section.getUpdatedAt()
+        );
+    }
+
     public static SectionResponse from(Section section) {
         List<LessonResponse> lessons = section.getLessons().stream()
             .map(LessonResponse::from)

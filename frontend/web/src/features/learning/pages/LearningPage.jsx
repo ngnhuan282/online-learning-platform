@@ -29,7 +29,7 @@ function LearningCoursePage({ courseId }) {
       [...(course.data?.sections ?? [])]
         .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id)
         .flatMap(section =>
-          [...section.lessons]
+          [...(section.lessons ?? [])]
             .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id)
             .map(lesson => ({ ...lesson, sectionTitle: section.title })),
         ),
@@ -107,8 +107,9 @@ function LearningCoursePage({ courseId }) {
                         className="learning-video"
                         src={resolveMediaUrl(selected.videoUrl)}
                         onPlay={() => {
-                          if (!selectedProgress || selectedProgress.status === 'NOT_STARTED')
+                          if (!selectedProgress || selectedProgress.status === 'NOT_STARTED') {
                             updateLesson(selected);
+                          }
                         }}
                       />
                     )}
