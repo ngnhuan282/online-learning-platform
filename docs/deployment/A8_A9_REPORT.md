@@ -48,6 +48,7 @@ Remote-tracking `origin/hoang-week-8-9` và `origin/nguyen-week-8-9` không có 
 - Gateway xóa `X-User-Id`, `X-User-Role`, `X-User-Roles`, `X-Internal-Service-Token` của browser.
   Các service tự xác minh JWT. `/internal/v1/learning/enrollments` không được route qua Gateway;
   Payment gọi trực tiếp bằng secret nội bộ, chỉ có Learning/Payment nhận secret này.
+  Nginx trả 404 cho `/internal/`, không fallback SPA hoặc chuyển tiếp đến Learning.
 - Guest GET `/courses`, `/courses/{id}`, `/courses/{id}/sections`, reviews và categories:
   catalog Published, lesson metadata và preview. Không trả private content/video cho người chưa enroll.
 - Course gọi GET `/api/v1/learning/enrollments/me` tại địa chỉ `LEARNING_SERVICE_URL`, chuyển

@@ -156,8 +156,13 @@ assert.ok(!otherEnrollments.some(item => item.id === firstEnrollment.id));
 await request(`/api/v1/lessons/${lesson.id}/resources`, { token: outsider, status: 403,
   headers: { 'X-User-Id': String(userId), 'X-User-Role': 'ADMIN' } });
 await request(`/api/v1/learning/progress/courses/${free.id}`, { token: outsider, status: 403 });
-await request('/internal/v1/learning/enrollments', { method: 'POST', token: userToken,
-  body: { orderCode: 'forged', userId, courseId: paid.id }, status: 404 });
+// This path is outside /api/v1: Nginx blocks it locally, Gateway has no internal route.
+const internalAttempt = await fetch(`${base}/internal/v1/learning/enrollments`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userToken}` },
+  body: JSON.stringify({ orderCode: 'forged', userId, courseId: paid.id }),
+  signal: AbortSignal.timeout(15000),
+});
+assert.equal(internalAttempt.status, 404, 'Browser ingress must not reach internal enrollment');
 await request('/api/v1/payments/checkout', { method: 'POST', token: userToken, status: 503,
   body: { courseId: paid.id, provider: 'VNPAY', idempotencyKey: randomUUID() } });
 const checkoutBody = { courseId: paid.id, provider: 'MOCK', idempotencyKey: randomUUID(),
