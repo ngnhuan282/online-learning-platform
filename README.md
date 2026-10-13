@@ -3,6 +3,10 @@
 Hướng dẫn tích hợp Auth/Course/Learning/Payment, Docker staging, logging, health check và kiểm tra trước merge:
 [SYSTEM_INTEGRATION.md](docs/testing/SYSTEM_INTEGRATION.md).
 
+Kết quả A8/A9 ngày 13/10/2026, API/auth contracts, lệnh PowerShell và bàn giao owner:
+[A8_A9_REPORT.md](docs/deployment/A8_A9_REPORT.md).
+Minh chứng nghiệm thu: [A8_A9_ACCEPTANCE.md](docs/testing/A8_A9_ACCEPTANCE.md).
+
 SGSphere là nền tảng học trực tuyến được xây dựng theo kiến trúc **Microservices**. Frontend sử dụng **React + Vite**, Backend sử dụng **Spring Boot**, dữ liệu được lưu trên **MySQL**, và mọi request từ trình duyệt đi qua **API Gateway**.
 
 > Mục tiêu của project: xây dựng một nền tảng học trực tuyến có thể mở rộng theo từng module như Course, Learning, Payment/VNPay, AI Assistant và triển khai cloud sau này.
@@ -23,7 +27,10 @@ SGSphere là nền tảng học trực tuyến được xây dựng theo kiến 
 - Password được mã hóa bằng BCrypt.
 - Responsive UI cho desktop và mobile.
 
-Các module Course, Learning, VNPay và AI Assistant sẽ được phát triển ở các milestone tiếp theo.
+Course Published/preview, enrollment miễn phí, Learning/progress và Payment MOCK đã có luồng tích hợp.
+MOCK cần `PAYMENT_MOCK_ENABLED=true` trên môi trường demo/test; mặc định tắt.
+VNPay signed checkout/callback và AI provider vẫn chờ milestone của owner.
+Profile `backend` chạy core; thêm `--profile ai` nếu cần AI skeleton.
 
 ---
 
@@ -857,12 +864,12 @@ Automatic Token Refresh        ✅
 Server-side Logout             ✅
 USER / ADMIN authorization     ✅
 
-Course Public Catalog          🚧 Next
-Course Detail                  ⬜
+Course Public Catalog          ✅ Published / preview
+Course Detail                  ✅ Enrollment authorization
 Admin Course Management        ⬜
-Enrollment / Learning          ⬜
+Enrollment / Learning          ✅ Free / MOCK paid / progress
 Quiz                           ⬜
-VNPay                          ⬜
+VNPay                          ⬜ Signed checkout/callback chờ D9
 AI Assistant                   ⬜
 AWS Deployment                 ⬜
 ```

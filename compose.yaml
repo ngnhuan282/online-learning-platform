@@ -83,6 +83,7 @@ services:
       COURSE_DB_URL: jdbc:mysql://mysql:3306/course_db
       COURSE_DB_USERNAME: course_app
       COURSE_DB_PASSWORD: ${COURSE_DB_PASSWORD}
+      LEARNING_SERVICE_URL: http://learning-service:8083
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_DIR: /app/uploads
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
@@ -158,6 +159,7 @@ services:
       PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
       VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      PAYMENT_MOCK_ENABLED: ${PAYMENT_MOCK_ENABLED:-false}
     depends_on:
       mysql:
         condition: service_healthy
@@ -168,7 +170,7 @@ services:
 
   ai-service:
     <<: *backend-defaults
-    profiles: [backend]
+    profiles: [ai]
     build:
       context: .
       dockerfile: infra/docker/service.Dockerfile
@@ -218,8 +220,6 @@ services:
       learning-service:
         condition: service_healthy
       payment-service:
-        condition: service_healthy
-      ai-service:
         condition: service_healthy
 
 volumes:

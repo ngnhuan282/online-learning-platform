@@ -10,6 +10,8 @@ const sql = query =>
     'docker',
     [
       'compose',
+      ...(process.env.E2E_COMPOSE_ENV_FILE ? ['--env-file', process.env.E2E_COMPOSE_ENV_FILE] : []),
+      ...(process.env.E2E_COMPOSE_PROJECT ? ['-p', process.env.E2E_COMPOSE_PROJECT] : []),
       'exec',
       '-T',
       'mysql',
@@ -23,6 +25,7 @@ const sql = query =>
 export default async function refreshScenarios({
   send,
   run,
+  reload,
   waitFor,
   report,
   responses,
@@ -65,14 +68,21 @@ export default async function refreshScenarios({
   );
   const remaining = expiry * 1000 - Date.now();
   assert.ok(remaining < 15000, 'Run refresh E2E with JWT_ACCESS_TOKEN_SECONDS=5');
-  await pause(Math.max(0, remaining) + 1100);
+  // Notification requests share the client and can be the first request after expiry.
   const checkpoint = responses.length;
+  await pause(Math.max(0, remaining) + 1100);
   const email = await run(
     '(async () => { const {default: client} = await import("/src/shared/apis/axiosClient.js"); return (await client.get("/api/v1/users/me")).data.email; })()',
   );
   assert.equal(email, report.uiEmail);
   const flow = responses.slice(checkpoint).filter(item => item.method !== 'OPTIONS');
-  assert.ok(flow.some(item => item.url.endsWith('/users/me') && item.status === 401));
+  assert.ok(
+    flow.some(
+      item =>
+        item.url.startsWith(gateway + '/api/v1/') && !item.url.includes('/auth/') && item.status === 401,
+    ),
+    'Expired protected request must receive 401',
+  );
   assert.equal(flow.filter(item => item.url.endsWith('/auth/refresh') && item.status === 200).length, 1);
   assert.ok(flow.some(item => item.url.endsWith('/users/me') && item.status === 200));
   const rotated = await cookie();
@@ -83,14 +93,13 @@ export default async function refreshScenarios({
   );
   assert.equal((await api('/auth/refresh', {}, null, before.value)).body.code, 'REFRESH_TOKEN_REVOKED');
   report.checks.push(
-    'Real access expiry produces 401 -> one refresh -> successful protected retry',
+    'Real access expiry across the shared client produces protected 401 -> one refresh -> authoritative me succeeds',
     'Rotation changes cookie; old hash revoked and old cookie rejected',
   );
 
   const restoreStart = responses.length;
   await run('sessionStorage.removeItem("learnsphere.accessToken")');
-  await send('Page.reload', { ignoreCache: true });
-  await waitFor('document.body.textContent.includes("Nguyễn Auth E2E")');
+  await reload('sessionStorage.length === 1 && document.body.textContent.includes("Nguyễn Auth E2E")');
   assert.equal(await run('sessionStorage.length'), 1);
   const restoreFlow = responses.slice(restoreStart);
   assert.ok(
@@ -102,9 +111,7 @@ export default async function refreshScenarios({
   report.checks.push('Reload without access token restores through cookie refresh and authoritative me');
 
   const lastCookie = await cookie();
-  await run(
-    'document.querySelector(".account-menu-trigger").click()',
-  );
+  await run('document.querySelector(".account-menu-trigger").click()');
   await waitFor('document.querySelector(".account-menu-logout") !== null');
   await run('document.querySelector(".account-menu-logout").click()');
   await waitFor('location.pathname === "/login" && document.querySelector("[name=email]") !== null');

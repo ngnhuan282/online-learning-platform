@@ -8,6 +8,8 @@ public enum ErrorCode {
     BAD_REQUEST(HttpStatus.BAD_REQUEST, "Invalid request"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication is required or the token is invalid"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "Access is denied"),
+    PAYMENT_MOCK_DISABLED(HttpStatus.FORBIDDEN, "MOCK payments are disabled; enable PAYMENT_MOCK_ENABLED explicitly for testing"),
+    PAYMENT_CONFIGURATION_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "VNPay Sandbox requires VNPAY_TMN_CODE and VNPAY_HASH_SECRET"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
     CONFLICT(HttpStatus.CONFLICT, "Resource conflict"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dependent service is unavailable"),

@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import LearningNotice from '../components/LearningNotice';
 import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
-import { demoCourseProgress } from '../data/learningDemoData';
+import { sectionApi } from '../../courses/api/sectionApi';
+import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import useToast from '../../../shared/hooks/useToast';
 import ErrorState from '../../../shared/components/ErrorState';
 import '../styles/quiz.css';
-
-const DEFAULT_LESSON_IDS = [1, 2, 3, 4, 5];
 
 const progressValue = item => item?.progressPercent ?? 0;
 
@@ -17,12 +15,13 @@ const lessonStatus = item => item?.status ?? 'NOT_STARTED';
 export default function LearningPage() {
   const { courseId } = useParams();
   const toast = useToast();
-  const [progressItems, setProgressItems] = useState(demoCourseProgress);
-  const [selectedLessonId, setSelectedLessonId] = useState(DEFAULT_LESSON_IDS[0]);
+  const [progressItems, setProgressItems] = useState([]);
+  const [curriculum, setCurriculum] = useState([]);
+  const [selectedLessonId, setSelectedLessonId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updatingLessonId, setUpdatingLessonId] = useState(null);
   const [error, setError] = useState(null);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const usingFallback = Boolean(error);
   const [courseQuizzes, setCourseQuizzes] = useState([]);
   const [quizError, setQuizError] = useState(null);
   const [quizzesLoading, setQuizzesLoading] = useState(true);
@@ -35,20 +34,20 @@ export default function LearningPage() {
       setError(null);
     });
 
-    learningApi
-      .getCourseProgress(courseId)
-      .then(response => {
+    Promise.all([learningApi.getCourseProgress(courseId), sectionApi.listByCourse(courseId)])
+      .then(([response, sections]) => {
         if (!active) return;
         const next = response?.data ?? [];
         setProgressItems(next);
-        setUsingFallback(false);
-        if (next[0]?.lessonId) setSelectedLessonId(next[0].lessonId);
+        const items = sections.data.flatMap(section => section.lessons ?? []);
+        setCurriculum(items);
+        setSelectedLessonId(items[0]?.id ?? null);
       })
       .catch(error => {
         if (!active) return;
-        setProgressItems(demoCourseProgress);
+        setProgressItems([]);
+        setCurriculum([]);
         setError(error);
-        setUsingFallback(true);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -95,17 +94,15 @@ export default function LearningPage() {
   }, [progressItems]);
 
   const lessons = useMemo(() => {
-    const ids = new Set(DEFAULT_LESSON_IDS);
-    progressItems.forEach(item => ids.add(item.lessonId));
-    return [...ids]
-      .sort((a, b) => a - b)
-      .map(lessonId => ({
-        lessonId,
-        progress: progressByLesson.get(lessonId),
-      }));
-  }, [progressByLesson, progressItems]);
+    return curriculum.map(lesson => ({
+      ...lesson,
+      lessonId: lesson.id,
+      progress: progressByLesson.get(lesson.id),
+    }));
+  }, [progressByLesson, curriculum]);
 
   const selectedProgress = progressByLesson.get(selectedLessonId);
+  const selectedLesson = curriculum.find(lesson => lesson.id === selectedLessonId);
   const completedCount = lessons.filter(item => lessonStatus(item.progress) === 'COMPLETED').length;
   const courseProgress = lessons.length ? Math.round((completedCount / lessons.length) * 100) : 0;
 
@@ -160,60 +157,74 @@ export default function LearningPage() {
           </Link>
         </div>
 
-        <LearningNotice error={error} usingFallback={usingFallback} />
+        {error && (
+          <ErrorState
+            error={error}
+            title={error.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể tải bài học'}
+          />
+        )}
 
-        <div className="learning-studio-grid" aria-busy={loading}>
-          <article className="lesson-stage">
-            <div className="course-progress-summary">
-              <span>Tiến độ khóa học</span>
-              <strong>{courseProgress}%</strong>
-              <ProgressBar value={courseProgress} />
-            </div>
-            <div className="lesson-player">
-              <span>Lesson #{selectedLessonId}</span>
-              <strong>{lessonStatus(selectedProgress) === 'COMPLETED' ? 'Đã hoàn thành' : 'Đang học'}</strong>
-            </div>
-            <h2>Lesson #{selectedLessonId}</h2>
-            <p>
-              Mở bài học sẽ ghi nhận trạng thái đang học. Khi bạn hoàn tất nội dung, hãy đánh dấu hoàn thành
-              để cập nhật Course Progress.
-            </p>
-            <button
-              className="button button-primary"
-              disabled={
-                loading ||
-                usingFallback ||
-                updatingLessonId === selectedLessonId ||
-                lessonStatus(selectedProgress) === 'COMPLETED'
-              }
-              onClick={completeLesson}
-            >
-              {lessonStatus(selectedProgress) === 'COMPLETED'
-                ? 'Đã hoàn thành'
-                : updatingLessonId === selectedLessonId
-                  ? 'Đang cập nhật...'
-                  : 'Đánh dấu hoàn thành'}
-            </button>
-          </article>
-
-          <aside className="lesson-timeline">
-            <h2>Tiến độ bài học</h2>
-            {lessons.map(item => (
+        {!error && (
+          <div className="learning-studio-grid" aria-busy={loading}>
+            <article className="lesson-stage">
+              <div className="course-progress-summary">
+                <span>Tiến độ khóa học</span>
+                <strong>{courseProgress}%</strong>
+                <ProgressBar value={courseProgress} />
+              </div>
+              <div className="lesson-player">
+                {selectedLesson?.videoUrl && (
+                  <video controls src={resolveMediaUrl(selectedLesson.videoUrl)} />
+                )}
+                <span>Lesson #{selectedLessonId}</span>
+                <strong>
+                  {lessonStatus(selectedProgress) === 'COMPLETED' ? 'Đã hoàn thành' : 'Đang học'}
+                </strong>
+              </div>
+              <h2>{selectedLesson?.title ?? 'Đang tải bài học'}</h2>
+              {selectedLesson?.content && <p>{selectedLesson.content}</p>}
+              <p>
+                Mở bài học sẽ ghi nhận trạng thái đang học. Khi bạn hoàn tất nội dung, hãy đánh dấu hoàn thành
+                để cập nhật Course Progress.
+              </p>
               <button
-                className={`lesson-progress-item ${item.lessonId === selectedLessonId ? 'is-selected' : ''}`}
-                key={item.lessonId}
-                onClick={() => openLesson(item.lessonId)}
-                type="button"
+                className="button button-primary"
+                disabled={
+                  loading ||
+                  usingFallback ||
+                  !selectedLessonId ||
+                  updatingLessonId === selectedLessonId ||
+                  lessonStatus(selectedProgress) === 'COMPLETED'
+                }
+                onClick={completeLesson}
               >
-                <div>
-                  <strong>Lesson #{item.lessonId}</strong>
-                  <span>{lessonStatus(item.progress)}</span>
-                </div>
-                <ProgressBar value={progressValue(item.progress)} />
+                {lessonStatus(selectedProgress) === 'COMPLETED'
+                  ? 'Đã hoàn thành'
+                  : updatingLessonId === selectedLessonId
+                    ? 'Đang cập nhật...'
+                    : 'Đánh dấu hoàn thành'}
               </button>
-            ))}
-          </aside>
-        </div>
+            </article>
+
+            <aside className="lesson-timeline">
+              <h2>Tiến độ bài học</h2>
+              {lessons.map(item => (
+                <button
+                  className={`lesson-progress-item ${item.lessonId === selectedLessonId ? 'is-selected' : ''}`}
+                  key={item.lessonId}
+                  onClick={() => openLesson(item.lessonId)}
+                  type="button"
+                >
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>{lessonStatus(item.progress)}</span>
+                  </div>
+                  <ProgressBar value={progressValue(item.progress)} />
+                </button>
+              ))}
+            </aside>
+          </div>
+        )}
         {!usingFallback && (
           <section className="course-quiz-section">
             <h2>Bài kiểm tra</h2>

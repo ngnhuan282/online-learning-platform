@@ -6,6 +6,7 @@ import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
 import { formatCurrency } from '../../../shared/utils/formatCurrency';
 import { paymentApi } from '../api/paymentApi';
+import { learningApi } from '../../learning/api/learningApi';
 import '../styles/payment.css';
 
 const resultCopy = {
@@ -13,7 +14,7 @@ const resultCopy = {
     tone: 'success',
     eyebrow: 'THANH TOÁN THÀNH CÔNG',
     title: 'Thanh toán thành công',
-    description: 'Giao dịch đã được ghi nhận thành công. Bạn có thể tiếp tục tới khu học tập.',
+    description: 'Giao dịch đã được xác nhận thành công.',
     icon: 'check',
   },
   FAILED: {
@@ -51,6 +52,7 @@ export default function PaymentResultPage() {
   const orderCode = params.get('orderCode');
   const [remoteResult, setRemoteResult] = useState({ orderCode: null, order: null, error: null });
   const [retryCount, setRetryCount] = useState(0);
+  const [enrollmentState, setEnrollmentState] = useState({ orderCode: null, ready: false, error: null });
 
   useEffect(() => {
     if (!orderCode) return;
@@ -58,7 +60,27 @@ export default function PaymentResultPage() {
     paymentApi
       .getOrder(orderCode)
       .then(response => {
-        if (active) setRemoteResult({ orderCode, order: response.data, error: null });
+        if (!active) return;
+        setRemoteResult({ orderCode, order: response.data, error: null });
+        if (response.data.payment?.status !== 'SUCCESS') return;
+        const courseId = response.data.items?.[0]?.courseId;
+        return learningApi
+          .getMyEnrollments()
+          .then(enrollments => {
+            if (active)
+              setEnrollmentState({
+                orderCode,
+                ready: enrollments.data.some(
+                  item =>
+                    String(item.courseId) === String(courseId) &&
+                    ['ACTIVE', 'COMPLETED'].includes(item.status),
+                ),
+                error: null,
+              });
+          })
+          .catch(error => {
+            if (active) setEnrollmentState({ orderCode, ready: false, error });
+          });
       })
       .catch(fetchError => {
         if (active) setRemoteResult({ orderCode, order: null, error: fetchError });
@@ -71,6 +93,7 @@ export default function PaymentResultPage() {
   function retryResultLoad() {
     setRemoteResult({ orderCode: null, order: null, error: null });
     setRetryCount(value => value + 1);
+    setEnrollmentState({ orderCode: null, ready: false, error: null });
   }
 
   const order = remoteResult.orderCode === orderCode ? remoteResult.order : null;
@@ -119,11 +142,7 @@ export default function PaymentResultPage() {
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
             <ErrorState
-              error={
-                forbidden
-                  ? new Error('Bạn không có quyền xem giao dịch này.')
-                  : error
-              }
+              error={forbidden ? new Error('Bạn không có quyền xem giao dịch này.') : error}
               title={forbidden ? 'Không thể xem giao dịch' : 'Không thể tải kết quả thanh toán'}
               onRetry={forbidden ? undefined : retryResultLoad}
             />
@@ -141,6 +160,7 @@ export default function PaymentResultPage() {
   }
 
   const paymentStatus = order.payment.status;
+  const enrollmentReady = enrollmentState.orderCode === orderCode && enrollmentState.ready;
   const copy = paymentTone(paymentStatus);
   const courseTitle = order.items?.[0]?.courseTitle || 'Khóa học';
   const paymentCourseId = order.items?.[0]?.courseId;
@@ -161,6 +181,13 @@ export default function PaymentResultPage() {
           <span className="eyebrow">{copy.eyebrow}</span>
           <h1>{copy.title}</h1>
           <p>{copy.description}</p>
+          {paymentStatus === 'SUCCESS' && !enrollmentReady && (
+            <p role="status">
+              {enrollmentState.error
+                ? 'Chưa kiểm tra được quyền học. Vui lòng kiểm tra lại.'
+                : 'Thanh toán đã được xác nhận. Đang chờ quyền học được đồng bộ.'}
+            </p>
+          )}
 
           <dl className="result-details">
             <div>
@@ -182,11 +209,15 @@ export default function PaymentResultPage() {
           </dl>
 
           <div className="result-actions">
-            {paymentStatus === 'SUCCESS' ? (
+            {paymentStatus === 'SUCCESS' && enrollmentReady ? (
               <Link className="button button-primary" to="/my-courses">
                 Vào khu học tập <Icon name="arrow" size={17} />
               </Link>
-            ) : paymentStatus === 'PENDING' && orderCode ? (
+            ) : paymentStatus === 'SUCCESS' ? (
+              <button className="button button-primary" onClick={retryResultLoad}>
+                Kiểm tra lại quyền học
+              </button>
+            ) : paymentStatus === 'PENDING' && provider === 'MOCK' && orderCode ? (
               <Link className="button button-primary" to={resumePaymentUrl}>
                 Tiếp tục thanh toán <Icon name="arrow" size={17} />
               </Link>

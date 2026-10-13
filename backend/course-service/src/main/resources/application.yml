@@ -46,6 +46,9 @@ storage:
   type: ${STORAGE_TYPE:local}
   local-dir: ${STORAGE_LOCAL_DIR:./uploads}
 
+learning:
+  service-url: ${LEARNING_SERVICE_URL:http://localhost:8083}
+
 integrations:
   s3:
     region: ${AWS_REGION:ap-southeast-1}

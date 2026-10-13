@@ -13,7 +13,7 @@ export default function QuizResultPage() {
     const selectedAttemptId = attemptId ?? (await learningApi.getQuizResult(quizId)).data.attemptId;
     return learningApi.getQuizReview(selectedAttemptId);
   }, [attemptId, quizId]);
-  const { data, error, loading, usingFallback } = useLearningResource(loadReview, null);
+  const { data, error, loading } = useLearningResource(loadReview, null);
   const result = data && (!attemptId || String(data.attemptId) === attemptId) ? data : null;
   const correctCount = result?.questions.filter(question => question.correct).length ?? 0;
 
@@ -33,7 +33,7 @@ export default function QuizResultPage() {
         </div>
 
         {loading && !result && <p>Đang tải kết quả...</p>}
-        {usingFallback && <ErrorState error={error} title="Không thể tải kết quả quiz" />}
+        {error && <ErrorState error={error} title="Không thể tải kết quả quiz" />}
 
         {result && (
           <>
@@ -64,8 +64,8 @@ export default function QuizResultPage() {
                       <span>Câu {index + 1}</span>
                       <span className={question.correct ? 'is-correct' : 'is-incorrect'}>
                         {question.correct ? 'Đúng' : question.answered ? 'Chưa đúng' : 'Chưa trả lời'}
-                        {' · '}{question.pointsAwarded}/
-                        {question.points} điểm
+                        {' · '}
+                        {question.pointsAwarded}/{question.points} điểm
                       </span>
                     </div>
                     <h3>{question.questionText}</h3>

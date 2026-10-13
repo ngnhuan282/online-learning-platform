@@ -10,6 +10,7 @@ import com.elearning.course.entity.CourseLevel;
 import com.elearning.course.entity.CourseStatus;
 import com.elearning.course.repository.CategoryRepository;
 import com.elearning.course.repository.CourseRepository;
+import com.elearning.course.security.CourseContentAccess;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,10 +30,12 @@ public class CourseService {
 
     private final CourseRepository courses;
     private final CategoryRepository categories;
+    private final CourseContentAccess access;
 
-    public CourseService(CourseRepository courses, CategoryRepository categories) {
+    public CourseService(CourseRepository courses, CategoryRepository categories, CourseContentAccess access) {
         this.courses = courses;
         this.categories = categories;
+        this.access = access;
     }
 
     public Page<CourseResponse> list(int page, int size, String keyword) {
@@ -80,7 +83,9 @@ public class CourseService {
     }
 
     public CourseResponse get(Long id) {
-        return CourseResponse.from(findCourse(id));
+        Course course = findCourse(id);
+        access.requirePublished(course);
+        return CourseResponse.from(course);
     }
 
     @Transactional

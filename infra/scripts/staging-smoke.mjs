@@ -5,10 +5,12 @@ const origin = process.env.STAGING_ORIGIN || 'https://staging.example.test';
 const get = (path, options = {}) => fetch(`${base}${path}`, {
   ...options, signal: AbortSignal.timeout(15000),
 });
-for (const path of ['/healthz', '/courses', '/actuator/health/readiness', '/api/v1/courses']) {
+for (const path of ['/healthz', '/courses', '/learning/42', '/payment/result?orderCode=test', '/actuator/health/readiness', '/api/v1/courses']) {
   const response = await get(path);
   assert.equal(response.status, 200, `Staging ${path}`);
-  if (path === '/courses') assert.match(await response.text(), /id="root"/);
+  if (path === '/courses' || path.startsWith('/learning/') || path.startsWith('/payment/')) {
+    assert.match(await response.text(), /id="root"/);
+  }
 }
 const denied = await get('/api/v1/payments/history', { headers: { Origin: origin } });
 assert.equal(denied.status, 401);
