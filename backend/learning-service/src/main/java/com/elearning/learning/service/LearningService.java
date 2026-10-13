@@ -14,6 +14,8 @@ public interface LearningService {
 
     List<LessonProgressResponse> getCourseProgress(Long userId, Long courseId);
 
+    LearningCourseResponse getLearningCourse(Long userId, Long courseId);
+
     LessonProgressResponse accessLesson(Long userId, Long courseId, Long lessonId);
 
     LessonProgressResponse markLessonComplete(Long userId, Long courseId, Long lessonId);

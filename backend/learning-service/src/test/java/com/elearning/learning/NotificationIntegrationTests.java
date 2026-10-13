@@ -6,6 +6,8 @@ import com.elearning.learning.dto.NotificationEventRequest;
 import com.elearning.learning.entity.Notification;
 import com.elearning.learning.entity.enums.NotificationType;
 import com.elearning.learning.repository.NotificationRepository;
+import static org.mockito.Mockito.when;
+
 import com.elearning.learning.service.CourseCatalogClient;
 import com.elearning.learning.service.NotificationService;
 import com.elearning.learning.service.NotificationStreamService;
@@ -21,12 +23,14 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -77,6 +81,37 @@ class NotificationIntegrationTests {
     @Autowired NotificationStreamService streams;
     @Autowired TransactionTemplate transaction;
     @MockitoBean CourseCatalogClient courseCatalog;
+
+    @BeforeEach
+    void curriculumForLearningNotificationFixture() {
+        when(courseCatalog.getCurriculum(42L)).thenReturn(
+            new CourseCatalogClient.Curriculum(
+                42L,
+                "Notification fixture",
+                List.of(
+                    new CourseCatalogClient.SectionReference(
+                        4L,
+                        42L,
+                        "Section",
+                        0,
+                        List.of(
+                            new CourseCatalogClient.LessonReference(
+                                8L,
+                                4L,
+                                "Lesson",
+                                "TEXT",
+                                "Content",
+                                null,
+                                null,
+                                0,
+                                false
+                            )
+                        )
+                    )
+                )
+            )
+        );
+    }
 
     private String token(Long user, long seconds) {
         return Jwts.builder().subject(user.toString()).issuer("learnsphere")
