@@ -24,9 +24,8 @@ const { default: ResultPage } = await load('features/payment/pages/PaymentResult
 const { default: LearningPage } = await load('features/learning/pages/LearningPage.jsx');
 const { paymentApi } = await load('features/payment/api/paymentApi.js');
 const { learningApi } = await load('features/learning/api/learningApi.js');
-const { sectionApi } = await load('features/courses/api/sectionApi.js');
 const { ToastContext } = await load('shared/context/ToastContext.jsx');
-const originals = [paymentApi, learningApi, sectionApi].map(api => [api, { ...api }]);
+const originals = [paymentApi, learningApi].map(api => [api, { ...api }]);
 let root;
 const cache = createCache({ key: 'integration-test' });
 const order = status => ({
@@ -99,10 +98,10 @@ test('successful payment waits for matching active enrollment before exposing le
 });
 
 test('private learning denial shows enrollment error and renders no demo content', async () => {
-  learningApi.getCourseProgress = async () => {
-    throw { status: 403, message: 'Enrollment is required' };
+  learningApi.getLearningCourse = async () => {
+    throw Object.assign(new Error('Enrollment is required'), { status: 403 });
   };
-  sectionApi.listByCourse = async () => ({ data: [] });
+  learningApi.getCourseQuizzes = async () => ({ data: [] });
   await render(LearningPage, '/learning/42', '/learning/:courseId');
   assert.ok(document.body.textContent.includes('Bạn chưa có quyền học khóa này'));
   assert.equal(document.querySelector('.lesson-stage'), null);
@@ -110,10 +109,37 @@ test('private learning denial shows enrollment error and renders no demo content
 });
 
 test('learning uses actual curriculum IDs and preserves backend progress', async () => {
-  learningApi.getCourseProgress = async () => ({ data: [] });
-  sectionApi.listByCourse = async () => ({
-    data: [{ lessons: [{ id: 812, title: 'Actual lesson', content: 'Allowed private text' }] }],
-  });
+  learningApi.getLearningCourse = async courseId => {
+    assert.equal(courseId, '42');
+    return {
+      data: {
+        courseId: 42,
+        title: 'Real course',
+        totalLessons: 1,
+        completedLessons: 0,
+        progressPercent: 0,
+        progress: [{ lessonId: 812, status: 'IN_PROGRESS', progressPercent: 10 }],
+        sections: [
+          {
+            id: 81,
+            courseId: 42,
+            title: 'Private section',
+            orderIndex: 0,
+            lessons: [
+              {
+                id: 812,
+                sectionId: 81,
+                title: 'Actual lesson',
+                content: 'Allowed private text',
+                lessonType: 'TEXT',
+                orderIndex: 0,
+              },
+            ],
+          },
+        ],
+      },
+    };
+  };
   learningApi.getCourseQuizzes = async () => ({ data: [] });
   learningApi.markLessonComplete = async (courseId, lessonId) => {
     assert.equal(courseId, '42');
@@ -123,6 +149,7 @@ test('learning uses actual curriculum IDs and preserves backend progress', async
   await render(LearningPage, '/learning/42', '/learning/:courseId');
   assert.ok(document.body.textContent.includes('Allowed private text'));
   assert.equal(document.querySelectorAll('.lesson-progress-item').length, 1);
+  assert.ok(document.querySelector('.lesson-stage').textContent.includes('Đang học'));
   await act(async () => document.querySelector('.lesson-stage button').click());
   assert.ok(document.body.textContent.includes('100%'));
   assert.equal(document.querySelector('.lesson-stage button').disabled, true);

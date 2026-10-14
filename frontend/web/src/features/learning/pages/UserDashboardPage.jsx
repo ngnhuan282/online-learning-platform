@@ -1,24 +1,25 @@
 import { Link } from 'react-router-dom';
-import LearningNotice from '../components/LearningNotice';
+import ErrorState from '../../../shared/components/ErrorState';
+import AppLoading from '../../../shared/components/AppLoading';
 import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
 import useLearningResource from '../hooks/useLearningResource';
 import useNotifications from '../hooks/useNotifications';
 
-const EMPTY_DASHBOARD = {
+const emptyDashboard = {
   activeEnrollments: 0,
   completedEnrollments: 0,
   completedLessons: 0,
   recentEnrollments: [],
   recentQuizResults: [],
-  recentNotifications: [],
 };
 
 export default function UserDashboardPage() {
   const notifications = useNotifications();
-  const { data, error, loading, usingFallback } = useLearningResource(
+  const { data, error, loading, reload } = useLearningResource(
     learningApi.getDashboard,
-    EMPTY_DASHBOARD,
+    emptyDashboard,
+    notifications.revision,
   );
 
   const stats = [
@@ -41,13 +42,14 @@ export default function UserDashboardPage() {
           </Link>
         </div>
 
-        <LearningNotice error={error} usingFallback={usingFallback} />
+        {loading && <AppLoading label="Đang tải bảng điều khiển..." />}
+        {error && <ErrorState error={error} onRetry={reload} />}
 
         <div className="learning-stats" aria-busy={loading}>
           {stats.map(item => (
             <article className="learning-stat-card" key={item.label}>
               <span>{item.label}</span>
-              <strong>{item.value}</strong>
+              <strong>{loading || error ? '—' : item.value}</strong>
             </article>
           ))}
         </div>

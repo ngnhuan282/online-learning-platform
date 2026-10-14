@@ -8,6 +8,8 @@ import com.elearning.learning.common.response.ApiResponse;
 import com.elearning.learning.common.response.PageResponse;
 import com.elearning.learning.repository.EnrollmentRepository;
 import com.elearning.learning.security.JwtTokenProvider;
+import static org.mockito.Mockito.when;
+
 import com.elearning.learning.service.CourseCatalogClient;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -27,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -74,6 +77,37 @@ class LearningServiceApplicationTests {
 
     @MockitoBean
     CourseCatalogClient courseCatalog;
+
+    @BeforeEach
+    void curriculumForExistingProgressFixture() {
+        when(courseCatalog.getCurriculum(888L)).thenReturn(
+            new CourseCatalogClient.Curriculum(
+                888L,
+                "Progress fixture",
+                List.of(
+                    new CourseCatalogClient.SectionReference(
+                        88L,
+                        888L,
+                        "Section",
+                        0,
+                        List.of(
+                            new CourseCatalogClient.LessonReference(
+                                10001L,
+                                88L,
+                                "Lesson",
+                                "TEXT",
+                                "Content",
+                                null,
+                                null,
+                                0,
+                                false
+                            )
+                        )
+                    )
+                )
+            )
+        );
+    }
 
     final HttpClient client = HttpClient.newHttpClient();
 

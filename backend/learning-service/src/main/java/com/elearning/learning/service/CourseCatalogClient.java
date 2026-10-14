@@ -5,6 +5,9 @@ import com.elearning.learning.common.exception.ErrorCode;
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
@@ -48,6 +51,91 @@ public class CourseCatalogClient {
         }
     }
 
+    public Curriculum getCurriculum(Long courseId) {
+        CourseReference course = fetchCourse(courseId);
+        try {
+            CurriculumEnvelope response = client
+                .get()
+                .uri("/api/v1/courses/{id}/sections", courseId)
+                .retrieve()
+                .onStatus(
+                    status -> status.value() == 404,
+                    (request, result) -> {
+                        throw new AppException(ErrorCode.NOT_FOUND);
+                    }
+                )
+                .onStatus(HttpStatusCode::isError, (request, result) -> {
+                    throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+                })
+                .body(CurriculumEnvelope.class);
+            if (
+                response == null ||
+                !response.success() ||
+                response.data() == null ||
+                response
+                    .data()
+                    .stream()
+                    .anyMatch(
+                        section ->
+                            section == null ||
+                            section.id() == null ||
+                            !courseId.equals(section.courseId()) ||
+                            section.lessons() == null ||
+                            section
+                                .lessons()
+                                .stream()
+                                .anyMatch(
+                                    lesson ->
+                                        lesson == null ||
+                                        lesson.id() == null ||
+                                        !section.id().equals(lesson.sectionId())
+                                )
+                    )
+            ) {
+                throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+            }
+            return new Curriculum(courseId, course.title(), response.data());
+        } catch (RestClientException ex) {
+            throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+        }
+    }
+
+    public record Curriculum(Long courseId, String title, List<SectionReference> sections) {
+        public Set<Long> lessonIds() {
+            return sections
+                .stream()
+                .flatMap(section -> section.lessons().stream())
+                .map(LessonReference::id)
+                .collect(Collectors.toSet());
+        }
+
+        public void requireLesson(Long lessonId) {
+            if (!lessonIds().contains(lessonId)) throw new AppException(ErrorCode.NOT_FOUND);
+        }
+    }
+
+    public record SectionReference(
+        Long id,
+        Long courseId,
+        String title,
+        int orderIndex,
+        List<LessonReference> lessons
+    ) {}
+
+    public record LessonReference(
+        Long id,
+        Long sectionId,
+        String title,
+        String lessonType,
+        String content,
+        String videoUrl,
+        Integer duration,
+        int orderIndex,
+        boolean preview
+    ) {}
+
+    private record CurriculumEnvelope(boolean success, List<SectionReference> data) {}
+
     private CourseReference fetchCourse(Long courseId) {
         try {
             CourseEnvelope response = client
@@ -80,5 +168,5 @@ public class CourseCatalogClient {
 
     private record CourseEnvelope(boolean success, CourseReference data) {}
 
-    private record CourseReference(Long id, BigDecimal price, String status) {}
+    private record CourseReference(Long id, BigDecimal price, String status, String title) {}
 }

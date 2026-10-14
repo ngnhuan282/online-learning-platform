@@ -19,6 +19,7 @@ export const ENDPOINTS = Object.freeze({
     dashboard: `${API_PREFIX}/learning/dashboard`,
     enrollments: `${API_PREFIX}/learning/enrollments/me`,
     enroll: `${API_PREFIX}/learning/enrollments`,
+    course: courseId => `${API_PREFIX}/learning/courses/${courseId}`,
     progress: courseId => `${API_PREFIX}/learning/progress/courses/${courseId}`,
     lessonAccess: (courseId, lessonId) =>
       `${API_PREFIX}/learning/progress/courses/${courseId}/lessons/${lessonId}/access`,

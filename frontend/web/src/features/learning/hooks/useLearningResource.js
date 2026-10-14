@@ -1,21 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-export default function useLearningResource(loader, fallback) {
+export default function useLearningResource(loader, emptyData, revision = 0) {
   const [state, setState] = useState({
-    data: fallback,
+    data: emptyData,
     error: null,
     loading: true,
     usingFallback: false,
   });
 
+  const [attempt, setAttempt] = useState(0);
+
+  const reload = useCallback(() => {
+    setAttempt(value => value + 1);
+  }, []);
+
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
-    loader()
+    Promise.resolve()
+      .then(() => {
+        if (!active) return undefined;
+
+        setState({
+          data: emptyData,
+          error: null,
+          loading: true,
+          usingFallback: false,
+        });
+
+        return loader({ signal: controller.signal });
+      })
       .then(response => {
         if (!active) return;
+
         setState({
-          data: response?.data ?? fallback,
+          data: response?.data ?? emptyData,
           error: null,
           loading: false,
           usingFallback: false,
@@ -23,8 +43,9 @@ export default function useLearningResource(loader, fallback) {
       })
       .catch(error => {
         if (!active) return;
+
         setState({
-          data: fallback,
+          data: emptyData,
           error,
           loading: false,
           usingFallback: false,
@@ -33,8 +54,17 @@ export default function useLearningResource(loader, fallback) {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [loader, fallback]);
+  }, [loader, emptyData, revision, attempt]);
 
-  return state;
+  useEffect(() => {
+    window.addEventListener('focus', reload);
+
+    return () => {
+      window.removeEventListener('focus', reload);
+    };
+  }, [reload]);
+
+  return { ...state, reload };
 }

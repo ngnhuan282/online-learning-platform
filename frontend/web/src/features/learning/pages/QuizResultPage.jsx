@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CheckCircleOutlined, HighlightOff, RadioButtonUnchecked } from '@mui/icons-material';
+import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';
+import HighlightOff from '@mui/icons-material/HighlightOff';
+import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import ErrorState from '../../../shared/components/ErrorState';
 import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
@@ -13,7 +15,7 @@ export default function QuizResultPage() {
     const selectedAttemptId = attemptId ?? (await learningApi.getQuizResult(quizId)).data.attemptId;
     return learningApi.getQuizReview(selectedAttemptId);
   }, [attemptId, quizId]);
-  const { data, error, loading } = useLearningResource(loadReview, null);
+  const { data, error, loading, reload } = useLearningResource(loadReview, null);
   const result = data && (!attemptId || String(data.attemptId) === attemptId) ? data : null;
   const correctCount = result?.questions.filter(question => question.correct).length ?? 0;
 
@@ -33,7 +35,7 @@ export default function QuizResultPage() {
         </div>
 
         {loading && !result && <p>Đang tải kết quả...</p>}
-        {error && <ErrorState error={error} title="Không thể tải kết quả quiz" />}
+        {error && <ErrorState error={error} title="Không thể tải kết quả quiz" onRetry={reload} />}
 
         {result && (
           <>
