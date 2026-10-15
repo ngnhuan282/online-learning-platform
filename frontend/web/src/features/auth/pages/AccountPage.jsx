@@ -4,6 +4,7 @@ import useAuth from '../hooks/useAuth';
 import { userApi } from '../api/userApi';
 import Icon from '../../../shared/components/Icon';
 import StatusChip from '../../../shared/components/StatusChip';
+import SignInMethods from '../components/SignInMethods';
 import { can } from '../../admin/utils/adminUtils';
 
 export default function AccountPage() {
@@ -24,6 +25,7 @@ export default function AccountPage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [methods, setMethods] = useState(null);
 
   const hasAdminAccess = can(user, 'ADMIN_ACCESS');
 
@@ -220,6 +222,8 @@ export default function AccountPage() {
           </div>
         </div>
 
+        <SignInMethods onStatus={setMethods} />
+
         {/* Grid 2 Forms: Profile & Change Password */}
         <div
           style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24 }}
@@ -328,164 +332,166 @@ export default function AccountPage() {
           </div>
 
           {/* Card 2: Đổi mật khẩu */}
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: 24,
-              boxShadow: 'var(--shadow)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}
-          >
-            <div>
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>Đổi mật khẩu</h3>
-              <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-                Bảo vệ tài khoản với mật khẩu tối thiểu 8 ký tự.
-              </p>
-            </div>
-
-            {passwordSuccess && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background: '#ecfdf5',
-                  color: '#065f46',
-                  fontSize: 13,
-                }}
-              >
-                ✓ {passwordSuccess}
-              </div>
-            )}
-            {passwordError && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background: '#fef2f2',
-                  color: '#991b1b',
-                  fontSize: 13,
-                }}
-              >
-                ✕ {passwordError}
-              </div>
-            )}
-
-            <form
-              onSubmit={handlePasswordSubmit}
-              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+          {methods?.passwordEnabled !== false && (
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: 24,
+                boxShadow: 'var(--shadow)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+              }}
             >
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Mật khẩu hiện tại
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showCurrentPassword ? 'text' : 'password'}
-                    required
-                    placeholder="Mật khẩu đang dùng"
-                    value={currentPassword}
-                    onChange={e => setCurrentPassword(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 40px 10px 12px',
-                      borderRadius: 8,
-                      border: '1px solid var(--border)',
-                      fontSize: 14,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: 10,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--muted)',
-                      padding: 4,
-                      fontSize: 12,
-                    }}
-                  >
-                    {showCurrentPassword ? 'Ẩn' : 'Hiện'}
-                  </button>
-                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 700 }}>Đổi mật khẩu</h3>
+                <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
+                  Bảo vệ tài khoản với mật khẩu tối thiểu 8 ký tự.
+                </p>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Mật khẩu mới
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    required
-                    placeholder="Tối thiểu 8 ký tự, gồm HOA, thường, số"
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 40px 10px 12px',
-                      borderRadius: 8,
-                      border: '1px solid var(--border)',
-                      fontSize: 14,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: 10,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--muted)',
-                      padding: 4,
-                      fontSize: 12,
-                    }}
-                  >
-                    {showNewPassword ? 'Ẩn' : 'Hiện'}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Xác nhận mật khẩu mới
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Nhập lại mật khẩu mới"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
+              {passwordSuccess && (
+                <div
                   style={{
-                    width: '100%',
-                    padding: '10px 12px',
+                    padding: '10px 14px',
                     borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    fontSize: 14,
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    fontSize: 13,
                   }}
-                />
-              </div>
+                >
+                  ✓ {passwordSuccess}
+                </div>
+              )}
+              {passwordError && (
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    background: '#fef2f2',
+                    color: '#991b1b',
+                    fontSize: 13,
+                  }}
+                >
+                  ✕ {passwordError}
+                </div>
+              )}
 
-              <button
-                type="submit"
-                className="button button-primary"
-                disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword}
-                style={{ marginTop: 8 }}
+              <form
+                onSubmit={handlePasswordSubmit}
+                style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
               >
-                {passwordLoading ? 'Đang đổi...' : 'Đổi mật khẩu'}
-              </button>
-            </form>
-          </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                    Mật khẩu hiện tại
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Mật khẩu đang dùng"
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 40px 10px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        fontSize: 14,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--muted)',
+                        padding: 4,
+                        fontSize: 12,
+                      }}
+                    >
+                      {showCurrentPassword ? 'Ẩn' : 'Hiện'}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                    Mật khẩu mới
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Tối thiểu 8 ký tự, gồm HOA, thường, số"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 40px 10px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        fontSize: 14,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--muted)',
+                        padding: 4,
+                        fontSize: 12,
+                      }}
+                    >
+                      {showNewPassword ? 'Ẩn' : 'Hiện'}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                    Xác nhận mật khẩu mới
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      fontSize: 14,
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword}
+                  style={{ marginTop: 8 }}
+                >
+                  {passwordLoading ? 'Đang đổi...' : 'Đổi mật khẩu'}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       </div>
     </section>

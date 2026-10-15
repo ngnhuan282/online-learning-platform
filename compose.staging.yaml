@@ -6,6 +6,8 @@ services:
   auth-service:
     environment:
       REFRESH_COOKIE_SECURE: "true"
+      GOOGLE_REDIRECT_URI: ${STAGING_ORIGIN:?Set STAGING_ORIGIN}/api/v1/auth/google/callback/google
+      GOOGLE_FRONTEND_ORIGIN: ${STAGING_ORIGIN:?Set STAGING_ORIGIN}
 
   api-gateway:
     environment:

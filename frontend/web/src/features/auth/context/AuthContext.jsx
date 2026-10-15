@@ -102,14 +102,14 @@ export function AuthProvider({ children }) {
     restoreRefresh.current = null;
     setRestoreState(null);
   }, []);
-  const login = useCallback(
-    async values => {
+  const authenticate = useCallback(
+    async requestLogin => {
       if (pendingLogout.current) throw new Error('Vui lòng chờ đăng xuất hoàn tất.');
       const attempt = ++generation.current;
       // Finish any cookie rotation before a new login sets its own session cookie.
       await waitForRefresh();
       if (attempt !== generation.current) throw new Error('Yêu cầu đăng nhập đã bị hủy.');
-      const request = authApi.login(values);
+      const request = requestLogin();
       pendingLogin.current = request;
       let response;
       try {
@@ -122,6 +122,11 @@ export function AuthProvider({ children }) {
       return response.data.user;
     },
     [establishSession],
+  );
+  const login = useCallback(values => authenticate(() => authApi.login(values)), [authenticate]);
+  const completeGoogleLogin = useCallback(
+    values => authenticate(() => authApi.exchangeGoogle(values)),
+    [authenticate],
   );
   const register = useCallback(async values => (await authApi.register(values)).data, []);
   const updateCurrentUser = useCallback(nextUser => {
@@ -179,6 +184,7 @@ export function AuthProvider({ children }) {
       retrySession,
       establishSession,
       login,
+      completeGoogleLogin,
       register,
       updateCurrentUser,
       logout,
@@ -193,6 +199,7 @@ export function AuthProvider({ children }) {
       retrySession,
       establishSession,
       login,
+      completeGoogleLogin,
       register,
       updateCurrentUser,
       logout,

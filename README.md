@@ -889,6 +889,11 @@ REFRESH_TOKEN_REPORT.md
 DESIGN.md
 ```
 
+Google Login và liên kết local cùng email (TV1): [cấu hình OAuth, migration V7/V8, API và checklist demo](docs/auth/GOOGLE_LOGIN_REPORT.md).
+Mặc định tắt; bật bằng `GOOGLE_LOGIN_ENABLED` và cung cấp Google OAuth Web client credentials ở backend.
+Người dùng local liên kết trong Hồ sơ → Phương thức đăng nhập sau khi xác nhận mật khẩu; cả hai cách
+đăng nhập giữ cùng userId. Không tự gộp theo email hoặc xóa database/volume để nâng migration.
+
 Quy tắc phát triển toàn project:
 
 ```text

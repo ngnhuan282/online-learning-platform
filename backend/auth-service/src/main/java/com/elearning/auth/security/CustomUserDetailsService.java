@@ -24,6 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         var user = users
             .findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT))
             .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
+        if (user.getPasswordHash() == null) throw new UsernameNotFoundException("Use Google login");
         return User.withUsername(user.getEmail())
             .password(user.getPasswordHash())
             .roles(

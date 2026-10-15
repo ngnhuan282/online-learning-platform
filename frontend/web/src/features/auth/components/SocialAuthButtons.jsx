@@ -20,14 +20,20 @@ function GoogleIcon() {
   );
 }
 
-export default function SocialAuthButtons({ registering, onSelect }) {
+export default function SocialAuthButtons({ registering, onSelect, disabled, googleLoading }) {
   return (
     <div className="auth-social-buttons">
-      <button type="button" onClick={() => onSelect('Google')}>
+      <button type="button" disabled={disabled} onClick={() => onSelect('Google')} aria-busy={googleLoading}>
         <GoogleIcon />
-        <span>{registering ? 'Đăng ký với Google' : 'Google'}</span>
+        <span>
+          {googleLoading
+            ? 'Đang chuyển đến Google...'
+            : registering
+              ? 'Đăng ký với Google'
+              : 'Đăng nhập bằng Google'}
+        </span>
       </button>
-      <button type="button" onClick={() => onSelect('GitHub')}>
+      <button type="button" disabled={disabled} onClick={() => onSelect('GitHub')}>
         <GitHub style={{ fontSize: 22 }} />
         <span>{registering ? 'Đăng ký với GitHub' : 'GitHub'}</span>
       </button>

@@ -214,7 +214,8 @@ class ApiGatewayApplicationTests {
 
     @Test
     void permitsCookieAuthEndpointsWithoutValidAccessAndEnablesCredentialCors() throws Exception {
-        for (String path : new String[] { "/api/v1/auth/refresh", "/api/v1/auth/logout" }) {
+        for (String path : new String[] { "/api/v1/auth/refresh", "/api/v1/auth/logout",
+            "/api/v1/auth/google/start", "/api/v1/auth/google/exchange" }) {
             for (String access : new String[] { null, "broken", token(-60) }) {
                 var response = request(path, access, "POST", "http://localhost:5173");
                 assertThat(response.statusCode()).isEqualTo(200);
@@ -230,5 +231,29 @@ class ApiGatewayApplicationTests {
         config.setAllowedOrigins(List.of("*"));
         config.setAllowCredentials(true);
         assertThatThrownBy(config::validateAllowCredentials).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void permitsOnlyExactGoogleBrowserEndpointsWithoutJwt() throws Exception {
+        for (String path : List.of(
+            "/api/v1/auth/google/authorize/google",
+            "/api/v1/auth/google/callback/google"
+        )) {
+            var response = request(path, null, "GET", null);
+            assertThat(response.statusCode()).isEqualTo(200);
+            assertThat(response.body()).startsWith(path + "|null|null|null|false");
+            assertThat(request(path, null, "POST", null).statusCode()).isEqualTo(401);
+        }
+        assertThat(request("/api/v1/auth/google/private", null, "GET", null).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void googleLinkAndMethodStatusRequireJwtAtGateway() throws Exception {
+        for (String path : List.of("/api/v1/auth/google/link/start", "/api/v1/auth/google/link/complete",
+            "/api/v1/users/me/linked-accounts")) {
+            String method = path.endsWith("linked-accounts") ? "GET" : "POST";
+            assertThat(request(path, null, method, null).statusCode()).isEqualTo(401);
+            assertThat(request(path, token(60), method, null).statusCode()).isEqualTo(200);
+        }
     }
 }

@@ -2,6 +2,7 @@ import axiosClient from '../../../shared/apis/axiosClient';
 import { ENDPOINTS } from '../../../shared/apis/endpoints';
 
 export const userApi = {
+  linkedAccounts: (options = {}) => axiosClient.get(ENDPOINTS.users.linkedAccounts, options),
   adminCreateUser: payload => axiosClient.post(ENDPOINTS.adminUsers, payload),
   adminUpdateUser: (id, payload) => axiosClient.put(`${ENDPOINTS.adminUsers}/${id}`, payload),
   adminDeleteUser: id => axiosClient.delete(`${ENDPOINTS.adminUsers}/${id}`),
