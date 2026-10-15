@@ -82,7 +82,7 @@ Từ root repo, tạo stack **riêng** để test (tạo user/course và giao d�
 ```powershell
 node infra/scripts/create-integration-env.mjs
 docker compose --env-file .tmp/integration.env -p auth-integration --profile backend up --build -d --wait --wait-timeout 300
-docker compose --env-file .tmp/integration.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -uroot < /seed/05-seed-data.sql'
+docker compose --env-file .tmp/integration.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -uroot < /seed/seed-data.sql'
 node infra/scripts/integration-smoke.mjs --demo
 ```
 

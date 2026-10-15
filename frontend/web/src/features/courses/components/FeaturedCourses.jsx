@@ -1,12 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Dialog, DialogContent, DialogTitle } from '@mui/material';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
-import { ROUTES } from '../../../shared/constants/routes';
+import ErrorState from '../../../shared/components/ErrorState';
 import CourseCard from './CourseCard';
-import { formatPrice, normalizeSearch } from '../data/demoCourses';
-import { categoryApi } from '../api/categoryApi';
-import { courseApi } from '../api/courseApi';
+import { normalizeSearch } from '../data/demoCourses';
+import useCourseCatalog from '../hooks/useCourseCatalog';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
@@ -15,83 +12,10 @@ const filters = [
   { id: 'free', label: 'Miễn phí' },
 ];
 
-const coerceCourse = course => ({
-  id: course.id,
-  title: course.title,
-  description: course.description,
-  categoryId: course.categoryId ?? course.category_id ?? null,
-  category: course.categoryName || course.category || 'general',
-  categories: [course.categoryName || course.category || 'general'],
-  group: course.categoryName ? 'communication' : 'certificates',
-  tag: course.status || 'Khóa học',
-  image: course.thumbnailUrl || '/images/english-ielts.jpg',
-  imageAlt: `${course.title} thumbnail`,
-  rating: course.avgRating ? Number(course.avgRating).toFixed(1) : (course.rating != null ? String(course.rating) : '5.0'),
-  reviews: course.reviewCount != null ? String(course.reviewCount) : (course.reviews != null ? String(course.reviews) : '0'),
-  students: 0,
-  hours: 8,
-  level: course.level ? String(course.level).toLowerCase() : 'beginner',
-  price: Number(course.price ?? 0),
-  originalPrice: Number(course.originalPrice ?? course.price ?? 0),
-  discount: course.originalPrice && course.price ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100) : 0,
-  date: course.createdAt || '2026-09-01',
-  keywords: `${course.title} ${course.description}`,
-  lessons: [course.description],
-});
-
-const normalizeCourseList = response => {
-  const payload = response?.data ?? response;
-
-  if (Array.isArray(payload)) return payload.map(coerceCourse);
-  if (Array.isArray(payload?.content)) return payload.content.map(coerceCourse);
-  if (Array.isArray(payload?.data?.content)) return payload.data.content.map(coerceCourse);
-  if (Array.isArray(payload?.items)) return payload.items.map(coerceCourse);
-  if (Array.isArray(payload?.data)) return payload.data.map(coerceCourse);
-  return [];
-};
-
-const normalizeCategoryList = response => {
-  const payload = response?.data ?? response;
-
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  return [];
-};
-
 export default function FeaturedCourses() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [courses, setCourses] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadData = async () => {
-      try {
-        const [coursesResponse, categoriesResponse] = await Promise.all([
-          courseApi.list({ page: 0, size: 20 }),
-          categoryApi.list(),
-        ]);
-
-        if (isMounted) {
-          setCourses(normalizeCourseList(coursesResponse));
-          setCategories(normalizeCategoryList(categoriesResponse));
-        }
-      } catch {
-        if (isMounted) {
-          setCourses([]);
-          setCategories([]);
-        }
-      }
-    };
-
-    loadData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { courses, categories, loading, error, categoryError, retry } = useCourseCatalog();
 
   function setParams(next) {
     navigate(
@@ -105,7 +29,9 @@ export default function FeaturedCourses() {
   let filteredCourses = courses.filter(course => {
     const selectedCategoryName = categories.find(item => String(item.id) === String(category))?.name;
     return (
-      (!category || String(course.categoryId) === String(category) || course.category === selectedCategoryName) &&
+      (!category ||
+        String(course.categoryId) === String(category) ||
+        course.category === selectedCategoryName) &&
       (!query ||
         normalizeSearch(`${course.title} ${course.description} ${course.keywords}`).includes(
           normalizeSearch(query),
@@ -115,12 +41,13 @@ export default function FeaturedCourses() {
     );
   });
   if (filter === 'popular') filteredCourses = [...filteredCourses].sort((a, b) => b.students - a.students);
-  if (filter === 'newest') filteredCourses = [...filteredCourses].sort((a, b) => b.date.localeCompare(a.date));
+  if (filter === 'newest')
+    filteredCourses = [...filteredCourses].sort((a, b) => b.date.localeCompare(a.date));
   function setFilter(value) {
     const next = new URLSearchParams(params);
     if (value === 'all') next.delete('filter');
     else next.set('filter', value);
-    setParams(next, { preventScrollReset: true });
+    setParams(next);
   }
   return (
     <section className="courses-section" id="courses">
@@ -148,14 +75,23 @@ export default function FeaturedCourses() {
           <div className="search-results-summary" role="status">
             <span>
               {filteredCourses.length} khóa học {query && <>cho “{query}”</>}
-              {category && <> thuộc {categories.find(item => String(item.id) === String(category))?.name || category}</>}
+              {category && (
+                <> thuộc {categories.find(item => String(item.id) === String(category))?.name || category}</>
+              )}
             </span>
-            <button className="text-link" onClick={() => setParams({}, { preventScrollReset: true })}>
+            <button className="text-link" onClick={() => setParams({})}>
               Xóa bộ lọc <Icon name="close" size={16} />
             </button>
           </div>
         )}
-        {filteredCourses.length ? (
+        {categoryError && <ErrorState error={categoryError} title="Không thể tải danh mục" onRetry={retry} />}
+        {error ? (
+          <ErrorState error={error} title="Không thể tải khóa học" onRetry={retry} />
+        ) : loading ? (
+          <div className="empty-courses" role="status">
+            <h3>Đang tải khóa học...</h3>
+          </div>
+        ) : filteredCourses.length ? (
           <div className="course-grid">
             {filteredCourses.map(course => (
               <CourseCard
@@ -170,56 +106,11 @@ export default function FeaturedCourses() {
             <Icon name="search" size={38} />
             <h3>Chưa tìm thấy khóa học phù hợp</h3>
             <p>Hãy thử từ khóa khác hoặc khám phá các khóa học hiện có.</p>
-            <button
-              className="button button-outline"
-              onClick={() => setParams({}, { preventScrollReset: true })}
-            >
+            <button className="button button-outline" onClick={() => setParams({})}>
               Xem tất cả khóa học
             </button>
           </div>
         )}
-        <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} maxWidth="sm" fullWidth>
-          <DialogTitle className="dialog-heading">
-            Thông tin khóa học
-            <button className="icon-button" aria-label="Đóng" onClick={() => setSelected(null)}>
-              <Icon name="close" />
-            </button>
-          </DialogTitle>
-          {selected && (
-            <DialogContent>
-              <img className="detail-image" src={selected.image} alt={selected.title} />
-              <h2 className="detail-title">{selected.title}</h2>
-              <p>{selected.description}</p>
-              <div className="detail-meta">
-                <span>★ {selected.rating}</span>
-                <span>{selected.hours} giờ học</span>
-                <span>{selected.level}</span>
-              </div>
-              <h3>Bạn sẽ học được gì?</h3>
-              <ul className="lesson-list">
-                {selected.lessons.map(lesson => (
-                  <li key={lesson}>
-                    <Icon name="check" size={18} />
-                    {lesson}
-                  </li>
-                ))}
-              </ul>
-              <div className="detail-enroll">
-                <strong>{selected.price ? formatPrice(selected.price) : 'Miễn phí'}</strong>
-                <Link
-                  className="button button-primary"
-                  to={
-                    selected.price
-                      ? `${ROUTES.CHECKOUT}?course=${encodeURIComponent(selected.id)}`
-                      : ROUTES.REGISTER
-                  }
-                >
-                  {selected.price ? 'Thanh toán' : 'Đăng ký học'} <Icon name="arrow" size={17} />
-                </Link>
-              </div>
-            </DialogContent>
-          )}
-        </Dialog>
       </div>
     </section>
   );

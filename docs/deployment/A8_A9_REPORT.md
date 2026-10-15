@@ -77,7 +77,7 @@ Tại root repo, tạo secret ngẫu nhiên vào file bị Git ignore, không gh
 node infra/scripts/create-integration-env.mjs .tmp/a8-a9.env
 docker compose --env-file .tmp/a8-a9.env -p auth-integration --profile backend config -q
 docker compose --env-file .tmp/a8-a9.env -p auth-integration --profile backend up --build -d --wait --wait-timeout 300
-docker compose --env-file .tmp/a8-a9.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot < /seed/05-seed-data.sql'
+docker compose --env-file .tmp/a8-a9.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot < /seed/seed-data.sql'
 node infra/scripts/integration-smoke.mjs --demo
 node infra/scripts/runtime-smoke.mjs --isolated
 ```

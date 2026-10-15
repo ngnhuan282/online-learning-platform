@@ -20,7 +20,7 @@ assert.equal((await denied.json()).code, 'UNAUTHORIZED');
 if (process.argv.includes('--demo')) {
   const login = await get('/api/v1/auth/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin },
-    body: JSON.stringify({ email: 'demo.admin@example.com', password: 'Admin123' }),
+    body: JSON.stringify({ email: 'admin@gmail.com', password: 'Admin123' }),
   });
   assert.equal(login.status, 200);
   const cookie = login.headers.getSetCookie().find(cookie => cookie.startsWith('refresh_token='));

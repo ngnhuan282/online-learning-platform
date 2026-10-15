@@ -943,10 +943,12 @@ docker compose --profile backend down
 Sau khi backend đã tạo schema bằng Flyway, chạy tại root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\infra\mysql\seed.ps1
+docker compose cp infra/mysql/seed-data.sql mysql:/tmp/sgsphere-seed.sql
+
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot < /tmp/sgsphere-seed.sql'
 ```
 
-File `infra/mysql/05-seed-data.sql` bổ sung 5 bản ghi mẫu mỗi bảng nghiệp vụ, riêng `roles` giữ 2 role hợp lệ `USER`/`ADMIN`. Hướng dẫn, tài khoản demo và lưu ý với database cũ: [infra/mysql/README.md](infra/mysql/README.md).
+File `infra/mysql/seed-data.sql` tạo tài khoản `admin@gmail.com` / `Admin123`, `user@gmail.com` / `User123`, khóa học, giáo trình và dữ liệu Learning/Payment mẫu. Seed giữ nguyên ID tài khoản đã có và có thể chạy lại. Hướng dẫn chi tiết: [infra/mysql/README.md](infra/mysql/README.md).
 
 ## SGSphere
 

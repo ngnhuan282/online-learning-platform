@@ -95,6 +95,17 @@ test('authApi register sends only backend fields and no bearer token', async () 
   assert.equal(seen.headers.has('Authorization'), false);
 });
 
+test('failed guest restoration invalidates the session only once before public detail requests start', async () => {
+  tokens.clearTokens();
+  tokens.allowSessionRestore();
+  const version = tokens.getSessionVersion();
+  await mount();
+  await flush();
+  assert.equal(auth.isLoading, false);
+  assert.equal(auth.isAuthenticated, false);
+  assert.equal(tokens.getSessionVersion(), version + 1);
+});
+
 test('login establishes user from server and stores only access token; logout clears both', async () => {
   const accessToken = makeToken();
   client.defaults.adapter = async config => {

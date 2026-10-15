@@ -11,7 +11,7 @@ const gateway = process.env.E2E_GATEWAY_URL || 'http://localhost:8080';
 const origin = 'http://localhost:5173';
 const output = resolve('../../.tmp/admin-e2e');
 await mkdir(output, { recursive: true });
-const adminEmail = process.env.E2E_ADMIN_EMAIL || 'demo.admin@example.com';
+const adminEmail = process.env.E2E_ADMIN_EMAIL || 'admin@gmail.com';
 const adminPassword = process.env.E2E_ADMIN_PASSWORD || 'Admin123';
 const marker = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
 const email = `admin-e2e-${marker.toLowerCase()}@example.com`;
@@ -345,8 +345,8 @@ try {
   assert.equal(await run('sessionStorage.length'), 0);
   report.checks.push('Admin menu logout clears session and returns to login');
   const learner = await api('POST', '/auth/login', {
-    email: 'demo.an@example.com',
-    password: 'User123!',
+    email: 'user@gmail.com',
+    password: 'User123',
   }, null);
   assert.equal(learner.status, 200);
   assert.deepEqual(learner.data.user.roles, ['USER']);
@@ -355,8 +355,8 @@ try {
   await navigate('/admin');
   await wait('location.pathname === "/login" && document.querySelector("[name=email]")');
   for (const [name, value] of [
-    ['email', 'demo.an@example.com'],
-    ['password', 'User123!'],
+    ['email', 'user@gmail.com'],
+    ['password', 'User123'],
   ])
     await run(
       `(() => { const el = document.querySelector('[name=${name}]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', { bubbles: true })); })()`,

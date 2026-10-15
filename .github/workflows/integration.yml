@@ -55,7 +55,7 @@ jobs:
       - name: Start isolated MySQL and backend
         run: docker compose --env-file .tmp/integration.env -p auth-integration --profile backend up --build -d --wait --wait-timeout 300
       - name: Seed disposable demo fixtures
-        run: docker compose --env-file .tmp/integration.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot < /seed/05-seed-data.sql'
+        run: docker compose --env-file .tmp/integration.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot < /seed/seed-data.sql'
       - run: node infra/scripts/integration-smoke.mjs --demo
       - name: Verify dependency failure and persistent data on isolated stack
         run: node infra/scripts/runtime-smoke.mjs --isolated

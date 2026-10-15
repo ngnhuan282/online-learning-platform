@@ -20,7 +20,13 @@ export default function CourseCard({
         onClick={() => onSelect(course)}
         aria-label={`Xem khóa học ${course.title}`}
       >
-        <img src={resolveMediaUrl(course.image)} alt={course.imageAlt} loading="lazy" width="640" height="360" />
+        <img
+          src={resolveMediaUrl(course.image)}
+          alt={course.imageAlt}
+          loading="lazy"
+          width="640"
+          height="360"
+        />
         <span className="course-badges">
           <span>{course.tag}</span>
           {course.price === 0 && <b>MIỄN PHÍ</b>}
@@ -31,18 +37,24 @@ export default function CourseCard({
           <span>
             <b className="star">★</b> <strong>{course.rating}</strong> ({course.reviews} đánh giá)
           </span>
-          <span>•</span>
-          <span>{new Intl.NumberFormat('en-US').format(course.students)} học viên</span>
+          {course.students != null && (
+            <>
+              <span>•</span>
+              <span>{new Intl.NumberFormat('en-US').format(course.students)} học viên</span>
+            </>
+          )}
         </div>
         <h3>
           <button onClick={() => onSelect(course)}>{course.title}</button>
         </h3>
         <p>{course.description}</p>
         <div className="course-meta">
-          <span>
-            <Icon name="clock" size={14} />
-            {course.hours} giờ
-          </span>
+          {course.hours != null && (
+            <span>
+              <Icon name="clock" size={14} />
+              {course.hours} giờ
+            </span>
+          )}
           <span>
             <Icon name="level" size={15} />
             {course.level}
