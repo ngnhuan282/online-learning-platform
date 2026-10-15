@@ -35,6 +35,41 @@ after(async () => {
   delete globalThis.window;
 });
 
+test('public catalog lists survive a failed session restore and never send bearer credentials', async () => {
+  for (const path of ['/api/v1/courses', '/api/v1/categories']) {
+    tokens.setAccessToken(old);
+    let release;
+    let sentAuthorization;
+    const pending = client.get(path, {
+      adapter: config => {
+        sentAuthorization = config.headers.has('Authorization');
+        return new Promise(resolve => {
+          release = () => resolve(response(config, [{ id: 42, title: 'Database course' }]));
+        });
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    tokens.clearTokens();
+    release();
+    assert.equal((await pending).data[0].id, 42);
+    assert.equal(sentAuthorization, false);
+  }
+});
+
+test('public catalog errors remain visible without attempting to refresh the session', async () => {
+  let calls = 0;
+  await assert.rejects(
+    client.get('/api/v1/courses', {
+      adapter: config => {
+        calls++;
+        return unauthorized(config);
+      },
+    }),
+    { status: 401 },
+  );
+  assert.equal(calls, 1);
+});
+
 test('credential-enabled 401 refresh retries original request with new bearer and payload', async () => {
   tokens.setAccessToken(old);
   const calls = [];

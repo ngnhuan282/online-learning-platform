@@ -36,7 +36,7 @@ services:
       - ./infra/mysql/04-learning-migrations.sql:/docker-entrypoint-initdb.d/04-learning-migrations.sql:ro
       - ./infra/mysql/04-payment-migrations.sql:/docker-entrypoint-initdb.d/04-payment-migrations.sql:ro
       # Run explicitly after service migrations; demo accounts are opt-in.
-      - ./infra/mysql/05-seed-data.sql:/seed/05-seed-data.sql:ro
+      - ./infra/mysql/seed-data.sql:/seed/seed-data.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -uroot -Nse "SELECT 1" >/dev/null 2>&1']
       interval: 10s

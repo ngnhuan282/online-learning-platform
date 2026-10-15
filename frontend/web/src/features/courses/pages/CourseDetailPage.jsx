@@ -12,56 +12,50 @@ import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import StarRating from '../components/StarRating';
 import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
+import ErrorState from '../../../shared/components/ErrorState';
 
-const fallbackCourse = {
-  id: 1,
-  title: 'IELTS Intensive 7.5+: Bứt phá 4 kỹ năng cùng chuyên gia',
-  description:
-    'Lộ trình luyện thi IELTS chuyên sâu với chiến thuật Writing, Speaking, Reading và Listening để đạt band mục tiêu 7.5+.',
-  level: 'Nâng cao',
-  price: 1690000,
-  originalPrice: 2400000,
-  categoryName: 'Luyện thi IELTS',
-  category: 'ielts',
-  status: 'PUBLISHED',
+const courseDefaults = {
+  title: '',
+  description: '',
+  level: '',
+  price: 0,
+  originalPrice: 0,
+  categoryName: '',
+  category: '',
+  status: '',
   thumbnailUrl: '/images/english-ielts.jpg',
-  avgRating: 4.8,
+  avgRating: 0,
   reviewCount: 0,
-  lessons: [
-    'Phát triển kỹ năng Writing Task 2',
-    'Luyện phản xạ Speaking Part 2 & 3',
-    'Mẹo Reading và Listening hiệu quả',
-  ],
+  lessons: [],
 };
 
 const normalizeCourse = value => {
-  if (!value || typeof value !== 'object') return fallbackCourse;
+  if (!value || typeof value !== 'object') return courseDefaults;
 
   const course = Array.isArray(value) ? value[0] : value;
 
   return {
-    ...fallbackCourse,
+    ...courseDefaults,
     ...course,
-    id: course?.id ?? course?.courseId ?? fallbackCourse.id,
-    title: course?.title ?? fallbackCourse.title,
-    description: course?.description ?? fallbackCourse.description,
-    level: course?.level ?? fallbackCourse.level,
-    price: Number(course?.price ?? fallbackCourse.price),
-    originalPrice: Number(course?.originalPrice ?? fallbackCourse.originalPrice),
-    categoryName: course?.categoryName ?? course?.category ?? fallbackCourse.categoryName,
-    category: course?.category ?? fallbackCourse.category,
-    status: course?.status ?? fallbackCourse.status,
-    thumbnailUrl: course?.thumbnailUrl ?? course?.image ?? fallbackCourse.thumbnailUrl,
-    avgRating: Number(course?.avgRating ?? fallbackCourse.avgRating),
+    id: course?.id ?? course?.courseId ?? courseDefaults.id,
+    title: course?.title ?? courseDefaults.title,
+    description: course?.description ?? courseDefaults.description,
+    level: course?.level ?? courseDefaults.level,
+    price: Number(course?.price ?? courseDefaults.price),
+    originalPrice: Number(course?.originalPrice ?? courseDefaults.originalPrice),
+    categoryName: course?.categoryName ?? course?.category ?? courseDefaults.categoryName,
+    category: course?.category ?? courseDefaults.category,
+    status: course?.status ?? courseDefaults.status,
+    thumbnailUrl: course?.thumbnailUrl ?? course?.image ?? courseDefaults.thumbnailUrl,
+    avgRating: Number(course?.avgRating ?? courseDefaults.avgRating),
     reviewCount: Number(course?.reviewCount ?? 0),
-    lessons: course?.lessons ?? fallbackCourse.lessons,
+    lessons: course?.lessons ?? courseDefaults.lessons,
   };
 };
 
-function CourseDetailPage() {
-  const { id } = useParams();
+function CourseDetail({ id }) {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
@@ -93,25 +87,27 @@ function CourseDetailPage() {
   const isAdmin = Boolean(user?.roles?.includes('ADMIN') || user?.permissions?.includes('COURSE_UPDATE'));
 
   const [courseNotFound, setCourseNotFound] = useState(false);
+  const [courseError, setCourseError] = useState(null);
 
   // Load course details & curriculum
   const loadCourseData = useCallback(async () => {
+    setCourseError(null);
     try {
       const response = await courseApi.getById(id);
       const payload = response?.data ?? response;
       const item = payload?.data ?? payload?.course ?? payload;
-      if (!item) {
-        setCourseNotFound(true);
-        return;
+      if (item?.id == null || typeof item.title !== 'string' || !item.title.trim()) {
+        throw new Error('Dữ liệu khóa học không hợp lệ. Vui lòng thử lại.');
       }
       setCourse(normalizeCourse(item));
       setCourseNotFound(false);
     } catch (err) {
+      setCourse(null);
       if (err?.status === 404) {
         setCourseNotFound(true);
-        setCourse(null);
       } else {
-        setCourse(fallbackCourse);
+        setCourseNotFound(false);
+        setCourseError(err);
       }
     }
   }, [id]);
@@ -185,6 +181,7 @@ function CourseDetailPage() {
   }, [id, isAuthenticated, user?.id]);
 
   useEffect(() => {
+    if (isAuthLoading) return undefined;
     let isMounted = true;
     Promise.resolve().then(async () => {
       if (!isMounted) return;
@@ -196,7 +193,7 @@ function CourseDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [loadCourseData, loadSections, loadReviews, loadMyReview]);
+  }, [isAuthLoading, loadCourseData, loadSections, loadReviews, loadMyReview]);
 
   const handleReviewSuccess = async savedReview => {
     setEditingReview(null);
@@ -288,7 +285,23 @@ function CourseDetailPage() {
     );
   }
 
-  const item = normalizeCourse(course || fallbackCourse);
+  if (courseError || !course) {
+    return (
+      <main className="container" style={{ padding: '32px 0 80px' }}>
+        <ErrorState
+          error={courseError}
+          title="Không thể tải khóa học"
+          onRetry={async () => {
+            setLoading(true);
+            await loadCourseData();
+            setLoading(false);
+          }}
+        />
+      </main>
+    );
+  }
+
+  const item = course;
   const totalLessons = sections.reduce((sum, sec) => sum + (sec.lessons?.length || 0), 0);
 
   return (
@@ -345,7 +358,7 @@ function CourseDetailPage() {
                 marginBottom: 8,
               }}
             >
-              <span className="eyebrow">{item.categoryName || 'Luyện thi IELTS'}</span>
+              <span className="eyebrow">{item.categoryName || 'Khóa học'}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <StarRating value={item.avgRating} readonly size={18} showLabel />
                 <span style={{ fontSize: 13, color: '#64748b' }}>({item.reviewCount} đánh giá)</span>
@@ -426,7 +439,7 @@ function CourseDetailPage() {
                 <div>
                   <p style={{ color: '#64748b' }}>Khóa học đang được cập nhật chi tiết giáo trình.</p>
                   <ul style={{ paddingLeft: 18, margin: 0, display: 'grid', gap: 8 }}>
-                    {(item.lessons || fallbackCourse.lessons).map((lesson, index) => (
+                    {(item.lessons || courseDefaults.lessons).map((lesson, index) => (
                       <li key={`${item.id}-lesson-${index}`}>{lesson}</li>
                     ))}
                   </ul>
@@ -737,4 +750,7 @@ function CourseDetailPage() {
   );
 }
 
-export default CourseDetailPage;
+export default function CourseDetailPage() {
+  const { id } = useParams();
+  return <CourseDetail key={id} id={id} />;
+}

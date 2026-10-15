@@ -1,4 +1,5 @@
 const coerceCourse = course => ({
+  ...course,
   id: course.id ?? course.courseId ?? Date.now(),
   title: course.title ?? 'Khóa học mới',
   description: course.description ?? 'Mô tả khóa học',

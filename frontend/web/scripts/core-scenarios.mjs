@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 // Called by auth-e2e --core; browser requests use the real shared client and Gateway.
 export default async function coreScenarios({ api, run, reload, waitFor, navigate, report }) {
   const email =
-    process.env.SMOKE_ADMIN_EMAIL || (process.argv.includes('--demo') ? 'demo.admin@example.com' : null);
+    process.env.SMOKE_ADMIN_EMAIL || (process.argv.includes('--demo') ? 'admin@gmail.com' : null);
   const password = process.env.SMOKE_ADMIN_PASSWORD || (process.argv.includes('--demo') ? 'Admin123' : null);
   assert.ok(
     email && password,

@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 const base = process.env.SMOKE_BASE_URL || 'http://localhost:18080';
 const allowedOrigin = process.env.SMOKE_ORIGIN || 'http://localhost:5173';
 const demo = process.argv.includes('--demo');
-const adminEmail = process.env.SMOKE_ADMIN_EMAIL || (demo ? 'demo.admin@example.com' : null);
+const adminEmail = process.env.SMOKE_ADMIN_EMAIL || (demo ? 'admin@gmail.com' : null);
 const adminPassword = process.env.SMOKE_ADMIN_PASSWORD || (demo ? 'Admin123' : null);
 assert.ok(adminEmail && adminPassword, 'Set SMOKE_ADMIN_EMAIL/SMOKE_ADMIN_PASSWORD or seed the isolated stack and use --demo.');
 

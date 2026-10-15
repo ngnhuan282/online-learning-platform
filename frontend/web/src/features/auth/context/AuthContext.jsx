@@ -82,7 +82,8 @@ export function AuthProvider({ children }) {
         // A failed refresh can clear the token and cancel this effect before its catch runs.
         if (controller.signal.aborted && getAccessToken()) return;
         if ([401, 403, 404].includes(error.status)) {
-          clearTokens();
+          // Refresh already invalidates the session; a second invalidation cancels new guest requests.
+          if (!wasSessionCleared()) clearTokens();
           setLoggedOut(true);
           setSession(null);
           setRestoreState(null);
