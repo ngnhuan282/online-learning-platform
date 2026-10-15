@@ -72,9 +72,27 @@ public class AuthServiceImpl implements AuthService {
         var user = users.findByEmailIgnoreCase(request.email()).orElse(null);
         boolean matches =
             request.password().getBytes(StandardCharsets.UTF_8).length <= 72 &&
-            passwords.matches(request.password(), user == null ? missingUserHash : user.getPasswordHash());
+            passwords.matches(
+                request.password(),
+                user == null || user.getPasswordHash() == null ? missingUserHash : user.getPasswordHash()
+            );
+        if (user != null && user.getPasswordHash() == null) throw new AppException(
+            ErrorCode.GOOGLE_LOGIN_REQUIRED
+        );
         // Wrong credentials always have the same error, including inactive accounts.
         if (user == null || !matches) throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        return authenticate(user);
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse loginUser(Long userId) {
+        return authenticate(
+            users.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND))
+        );
+    }
+
+    private AuthResponse authenticate(User user) {
         checkStatus(user);
         user.recordLogin();
         var response = UserResponse.from(user);

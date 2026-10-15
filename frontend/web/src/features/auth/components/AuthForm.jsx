@@ -1,10 +1,15 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import useToast from '../../../shared/hooks/useToast';
 import { getErrorMessage } from '../../../shared/utils/errorUtils';
 import { ROUTES } from '../../../shared/constants/routes';
-import { can } from '../../admin/utils/adminUtils';
+import {
+  clearGoogleAttempt,
+  googleErrorMessage,
+  loginDestination,
+  startGoogleLogin,
+} from '../utils/googleLogin';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import Lock from '@mui/icons-material/Lock';
@@ -26,6 +31,7 @@ export default function AuthForm({ mode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const pending = useRef(false);
   const [values, setValues] = useState({
     fullName: '',
@@ -45,6 +51,18 @@ export default function AuthForm({ mode }) {
   const [forgotOpen, setForgotOpen] = useState(false);
   const noticeRef = useRef(null);
   const strength = getPasswordStrength(values.password);
+
+  useEffect(() => {
+    const reset = event => {
+      if (!event.persisted) return;
+      pending.current = false;
+      setSubmitting(false);
+      setGoogleLoading(false);
+      clearGoogleAttempt();
+    };
+    window.addEventListener('pageshow', reset);
+    return () => window.removeEventListener('pageshow', reset);
+  }, []);
 
   function update(event) {
     const { name, type, checked, value } = event.target;
@@ -83,18 +101,7 @@ export default function AuthForm({ mode }) {
         navigate(ROUTES.LOGIN, { replace: true, state: { from: location.state?.from } });
       } else {
         const user = await login(values);
-        const from = location.state?.from;
-        const destination =
-          typeof from === 'string' &&
-          from.startsWith('/') &&
-          !from.startsWith('//') &&
-          !from.includes('\\') &&
-          !/^\/(login|register)([/?#]|$)/.test(from) &&
-          (!/^\/admin([/?#]|$)/.test(from) || can(user, 'ADMIN_ACCESS'))
-            ? from
-            : can(user, 'ADMIN_ACCESS')
-              ? '/admin'
-              : '/account';
+        const destination = loginDestination(user, location.state?.from);
         showToast('Đăng nhập thành công.');
         navigate(destination, { replace: true });
       }
@@ -108,9 +115,11 @@ export default function AuthForm({ mode }) {
       if (error.code === 'EMAIL_ALREADY_EXISTS') fieldErrors.email = 'Email này đã được đăng ký.';
       setErrors(fieldErrors);
       setNotice(
-        error.code === 'INVALID_CREDENTIALS'
-          ? 'Email hoặc mật khẩu không chính xác.'
-          : getErrorMessage(error),
+        error.code === 'GOOGLE_LOGIN_REQUIRED'
+          ? googleErrorMessage(error.code)
+          : error.code === 'INVALID_CREDENTIALS'
+            ? 'Email hoặc mật khẩu không chính xác.'
+            : getErrorMessage(error),
       );
       requestAnimationFrame(() => noticeRef.current?.focus());
     } finally {
@@ -118,11 +127,30 @@ export default function AuthForm({ mode }) {
       setSubmitting(false);
     }
   }
-  function social(provider) {
-    setNotice(
-      `${registering ? 'Đăng ký' : 'Đăng nhập'} bằng ${provider} hiện chưa khả dụng. Vui lòng thử lại sau.`,
-    );
-    requestAnimationFrame(() => noticeRef.current?.focus());
+  async function social(provider) {
+    if (pending.current) return;
+    if (provider !== 'Google') {
+      setNotice(
+        `${registering ? 'Đăng ký' : 'Đăng nhập'} bằng ${provider} hiện chưa khả dụng. Vui lòng thử lại sau.`,
+      );
+      requestAnimationFrame(() => noticeRef.current?.focus());
+      return;
+    }
+    pending.current = true;
+    setSubmitting(true);
+    setGoogleLoading(true);
+    setNotice('');
+    try {
+      window.location.assign(await startGoogleLogin(location.state?.from));
+    } catch (error) {
+      pending.current = false;
+      setSubmitting(false);
+      setGoogleLoading(false);
+      setNotice(
+        error.code === 'GOOGLE_LOGIN_UNAVAILABLE' ? googleErrorMessage(error.code) : getErrorMessage(error),
+      );
+      requestAnimationFrame(() => noticeRef.current?.focus());
+    }
   }
   const fieldProps = name => ({
     name,
@@ -144,7 +172,12 @@ export default function AuthForm({ mode }) {
               : 'Chào mừng bạn quay trở lại! Vui lòng nhập thông tin để tiếp tục.'}
           </p>
         </div>
-        <SocialAuthButtons registering={registering} onSelect={social} />
+        <SocialAuthButtons
+          registering={registering}
+          onSelect={social}
+          disabled={submitting}
+          googleLoading={googleLoading}
+        />
         <div className="auth-divider">
           <span>Hoặc {registering ? 'đăng ký' : 'đăng nhập'} bằng Email</span>
         </div>

@@ -6,10 +6,17 @@ export const ENDPOINTS = Object.freeze({
     register: `${API_PREFIX}/auth/register`,
     refresh: `${API_PREFIX}/auth/refresh`,
     logout: `${API_PREFIX}/auth/logout`,
+    googleStart: `${API_PREFIX}/auth/google/start`,
+    googleExchange: `${API_PREFIX}/auth/google/exchange`,
   },
   users: {
     me: `${API_PREFIX}/users/me`,
     changePassword: `${API_PREFIX}/users/change-password`,
+    linkedAccounts: `${API_PREFIX}/users/me/linked-accounts`,
+  },
+  googleLink: {
+    start: `${API_PREFIX}/auth/google/link/start`,
+    complete: `${API_PREFIX}/auth/google/link/complete`,
   },
   adminUsers: `${API_PREFIX}/admin/users`,
   courses: `${API_PREFIX}/courses`,

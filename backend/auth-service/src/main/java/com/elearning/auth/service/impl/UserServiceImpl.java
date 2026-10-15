@@ -59,15 +59,18 @@ public class UserServiceImpl implements UserService {
     @Override
     public void changePassword(Long userId, ChangePasswordRequest request) {
         User user = userRepository
-            .findById(userId)
+            .findForUpdate(userId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         requireActive(user);
 
+        if (user.getPasswordHash() == null) throw new AppException(ErrorCode.LOCAL_PASSWORD_UNAVAILABLE);
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new AppException(ErrorCode.OLD_PASSWORD_INCORRECT);
         }
 
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
+        // Existing sessions remain valid under the current password-change policy; re-confirm linking.
+        jdbc.update("DELETE FROM google_link_intents WHERE user_id = ?", userId);
     }
 
     @Override
