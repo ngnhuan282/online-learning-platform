@@ -50,6 +50,7 @@ class AiServiceApplicationTests {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("security.jwt.secret", () -> SECRET);
+        registry.add("integrations.ai.api-key", () -> "test-ai-key-never-exposed");
     }
 
     @LocalServerPort
@@ -99,6 +100,79 @@ class AiServiceApplicationTests {
     @Test
     void startsIndependentlyAndExposesHealth() throws Exception {
         assertThat(request("/actuator/health", null, null).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void exposesAuthenticatedCapabilitiesWithoutSecretsOrFakeAvailability() throws Exception {
+        String path = "/api/v1/ai/capabilities";
+        error(request(path, null, null), 401, "UNAUTHORIZED", path);
+        var response = request(path, token("USER", 60), null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        JsonNode capabilities = mapper.readTree(response.body()).get("data");
+        assertThat(capabilities.get("available").asBoolean()).isFalse();
+        assertThat(capabilities.get("historyAvailable").asBoolean()).isFalse();
+        assertThat(capabilities.get("maxMessageLength").asInt()).isEqualTo(4000);
+        assertThat(response.body()).doesNotContain("test-ai-key-never-exposed", "apiKey", "providerUrl");
+    }
+
+    @Test
+    void failsClosedForConversationAndMessageSkeletons() throws Exception {
+        String conversations = "/api/v1/ai/conversations";
+        String messages = conversations + "/1/messages";
+        for (String path : List.of(conversations, messages)) {
+            error(request(path, null, null), 401, "UNAUTHORIZED", path);
+            error(request(path, token("USER", 60), null), 501, "AI_NOT_AVAILABLE", path);
+        }
+        error(request(conversations, token("USER", 60), "{}"), 501, "AI_NOT_AVAILABLE", conversations);
+        error(
+            request(messages, token("USER", 60), "{\"content\":\"Explain this lesson\"}"),
+            501,
+            "AI_NOT_AVAILABLE",
+            messages
+        );
+    }
+
+    @Test
+    void validatesAiInputsBeforeRejectingUnavailableOperations() throws Exception {
+        String conversations = "/api/v1/ai/conversations";
+        String messages = conversations + "/1/messages";
+        error(
+            request(conversations, token("USER", 60), "{\"courseId\":-1}"),
+            400,
+            "VALIDATION_ERROR",
+            conversations
+        );
+        error(
+            request(messages, token("USER", 60), "{\"content\":\"   \"}"),
+            400,
+            "VALIDATION_ERROR",
+            messages
+        );
+        error(
+            request(messages, token("USER", 60), "{\"content\":\"" + "a".repeat(4001) + "\"}"),
+            400,
+            "VALIDATION_ERROR",
+            messages
+        );
+        error(request(messages, token("USER", 60), "{"), 400, "MALFORMED_REQUEST", messages);
+        error(
+            request(conversations + "?page=-1", token("USER", 60), null),
+            400,
+            "VALIDATION_ERROR",
+            conversations
+        );
+        error(
+            request(conversations + "?size=101", token("USER", 60), null),
+            400,
+            "VALIDATION_ERROR",
+            conversations
+        );
+        error(
+            request(conversations + "/0/messages", token("USER", 60), null),
+            400,
+            "VALIDATION_ERROR",
+            conversations + "/0/messages"
+        );
     }
 
     @Test

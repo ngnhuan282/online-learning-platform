@@ -18,6 +18,7 @@ import com.elearning.payment.learning.LearningEnrollmentClient;
 import com.elearning.payment.repository.CourseOrderRepository;
 import com.elearning.payment.repository.PaymentRepository;
 import com.elearning.payment.repository.PaymentTransactionRepository;
+import com.elearning.payment.vnpay.VnpayGateway;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -44,28 +45,30 @@ public class PaymentCoreService {
     private final PaymentTransactionRepository transactions;
     private final CourseSnapshotProvider courses;
     private final LearningEnrollmentClient learning;
+    private final VnpayGateway vnpay;
 
     public PaymentCoreService(
         CourseOrderRepository orders,
         PaymentRepository payments,
         PaymentTransactionRepository transactions,
         CourseSnapshotProvider courses,
-        LearningEnrollmentClient learning
+        LearningEnrollmentClient learning,
+        VnpayGateway vnpay
     ) {
         this.orders = orders;
         this.payments = payments;
         this.transactions = transactions;
         this.courses = courses;
         this.learning = learning;
+        this.vnpay = vnpay;
     }
 
     @Transactional
-    public CheckoutResponse createCheckout(CheckoutRequest request, Long userId) {
+    public CheckoutResponse createCheckout(CheckoutRequest request, Long userId, String clientIp) {
         PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        if (provider == PaymentProvider.VNPAY) vnpay.requireAvailable();
         String idempotencyKey = request.idempotencyKey().strip();
-        CourseOrder existingOrder = orders
-            .findByUserIdAndIdempotencyKey(userId, idempotencyKey)
-            .orElse(null);
+        CourseOrder existingOrder = orders.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
         if (existingOrder != null) {
             return existingCheckout(existingOrder, request.courseId(), provider);
         }
@@ -77,7 +80,7 @@ public class PaymentCoreService {
             idempotencyKey,
             course.price(),
             course.currency(),
-            Instant.now().plusSeconds(15 * 60)
+            Instant.now().plusSeconds((provider == PaymentProvider.VNPAY ? vnpay.expireMinutes() : 15) * 60L)
         );
         order.addItem(
             new OrderItem(course.id(), course.title(), course.price(), BigDecimal.ZERO, course.price())
@@ -86,7 +89,9 @@ public class PaymentCoreService {
 
         Payment payment = new Payment(order, provider, course.price(), course.currency());
         payment.assignCheckoutUrl(
-            buildCheckoutUrl(provider, request.returnUrl(), request.cancelUrl(), order.getOrderCode())
+            provider == PaymentProvider.VNPAY
+                ? vnpay.createUrl(order, clientIp)
+                : buildCheckoutUrl(provider, request.returnUrl(), request.cancelUrl(), order.getOrderCode())
         );
         payments.saveAndFlush(payment);
         transactions.saveAndFlush(
@@ -123,12 +128,42 @@ public class PaymentCoreService {
         ) {
             throw new AppException(ErrorCode.CONFLICT);
         }
+        if (
+            payment.getProvider() == PaymentProvider.VNPAY &&
+            payment.getStatus() == PaymentStatus.PENDING &&
+            (order.getStatus() == OrderStatus.EXPIRED ||
+                (order.getExpiresAt() != null && !order.getExpiresAt().isAfter(Instant.now())))
+        ) {
+            throw new AppException(ErrorCode.CHECKOUT_EXPIRED);
+        }
         return new CheckoutResponse(
             order.getOrderCode(),
             toOrderResponse(order, payment),
             toPaymentSummary(payment),
             payment.getCheckoutUrl()
         );
+    }
+
+    @Transactional
+    public boolean expireVnpayOrder(String orderCode) {
+        CourseOrder order = orders.findLockedByOrderCode(orderCode).orElse(null);
+        if (
+            order == null ||
+            order.getStatus() != OrderStatus.PENDING_PAYMENT ||
+            order.getExpiresAt() == null ||
+            order.getExpiresAt().isAfter(Instant.now())
+        ) return false;
+        Payment payment = latestPayment(order);
+        if (
+            payment == null ||
+            payment.getProvider() != PaymentProvider.VNPAY ||
+            payment.getStatus() != PaymentStatus.PENDING
+        ) return false;
+
+        // Close the checkout, not the provider outcome: a valid on-time payment may have a late IPN.
+        order.changeStatus(OrderStatus.EXPIRED);
+        orders.save(order);
+        return true;
     }
 
     @Transactional(readOnly = true)
@@ -145,17 +180,20 @@ public class PaymentCoreService {
         Long userId,
         PaymentStatus status,
         String keyword,
+        boolean expired,
         Pageable pageable
     ) {
         return PageResponse.from(
-            orders.searchUserHistory(userId, status, keywordPattern(keyword), pageable).map(this::toHistoryItem)
+            orders
+                .searchUserHistory(userId, status, keywordPattern(keyword), expired, Instant.now(), pageable)
+                .map(this::toHistoryItem)
         );
     }
 
     @Transactional
     public OrderResponse completeMockPayment(String orderCode, Long userId, MockPaymentRequest request) {
         CourseOrder order = orders
-            .findByOrderCode(orderCode)
+            .findLockedByOrderCode(orderCode)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         if (!order.getUserId().equals(userId)) throw new AppException(ErrorCode.FORBIDDEN);
 
@@ -190,10 +228,13 @@ public class PaymentCoreService {
     public PageResponse<AdminPaymentListItemResponse> getAdminOrders(
         PaymentStatus status,
         String keyword,
+        boolean expired,
         Pageable pageable
     ) {
         return PageResponse.from(
-            orders.searchAdminOrders(status, keywordPattern(keyword), pageable).map(this::toAdminListItem)
+            orders
+                .searchAdminOrders(status, keywordPattern(keyword), expired, Instant.now(), pageable)
+                .map(this::toAdminListItem)
         );
     }
 
@@ -211,10 +252,12 @@ public class PaymentCoreService {
         AdminPaymentStatusUpdateRequest request
     ) {
         CourseOrder order = orders
-            .findByOrderCode(orderCode)
+            .findLockedByOrderCode(orderCode)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         Payment payment = latestPayment(order);
         if (payment == null) throw new AppException(ErrorCode.NOT_FOUND);
+
+        if (payment.getProvider() != PaymentProvider.MOCK) throw new AppException(ErrorCode.CONFLICT);
 
         PaymentStatus nextStatus = request.status();
         applyPaymentTransition(
@@ -254,9 +297,10 @@ public class PaymentCoreService {
             enrollPaidCourse(order);
         }
 
-        String transactionCode = providerTransactionCode == null
-            ? mockTransactionCode(order.getOrderCode(), nextStatus)
-            : providerTransactionCode;
+        String transactionCode =
+            providerTransactionCode == null
+                ? mockTransactionCode(order.getOrderCode(), nextStatus)
+                : providerTransactionCode;
         payment.transitionTo(nextStatus, transactionCode, failureCode, failureMessage, eventTime);
         order.changeStatus(orderStatusFor(nextStatus));
         payments.save(payment);
@@ -293,7 +337,10 @@ public class PaymentCoreService {
             payment == null ? order.getCurrency() : payment.getCurrency(),
             item == null ? "Course" : item.getCourseTitle(),
             order.getCreatedAt(),
-            payment == null ? null : payment.getPaidAt()
+            payment == null ? null : payment.getPaidAt(),
+            order.getStatus(),
+            order.getExpiresAt(),
+            payment == null ? null : payment.getProvider()
         );
     }
 
@@ -311,22 +358,26 @@ public class PaymentCoreService {
             item == null ? "Course" : item.getCourseTitle(),
             order.getCreatedAt(),
             payment == null ? null : payment.getPaidAt(),
-            order.getUpdatedAt()
+            order.getUpdatedAt(),
+            order.getExpiresAt()
         );
     }
 
     private AdminPaymentDetailResponse toAdminDetail(CourseOrder order, Payment payment) {
-        List<PaymentTransactionResponse> transactionResponses = payment == null
-            ? List.of()
-            : transactions
-                .findByPayment_IdOrderByCreatedAtAsc(payment.getId())
-                .stream()
-                .map(this::toPaymentTransactionResponse)
-                .toList();
+        List<PaymentTransactionResponse> transactionResponses =
+            payment == null
+                ? List.of()
+                : transactions
+                      .findByPayment_IdOrderByCreatedAtAsc(payment.getId())
+                      .stream()
+                      .map(this::toPaymentTransactionResponse)
+                      .toList();
         return new AdminPaymentDetailResponse(
             toOrderResponse(order, payment),
             transactionResponses,
-            payment == null ? List.of() : availableTransitions(payment.getStatus())
+            payment == null || payment.getProvider() != PaymentProvider.MOCK
+                ? List.of()
+                : availableTransitions(payment.getStatus())
         );
     }
 
@@ -383,7 +434,9 @@ public class PaymentCoreService {
             payment.getProviderTransactionCode(),
             payment.getPaidAt(),
             payment.getCreatedAt(),
-            payment.getUpdatedAt()
+            payment.getUpdatedAt(),
+            payment.getStatus() == PaymentStatus.SUCCESS &&
+                (payment.getProvider() == PaymentProvider.MOCK || payment.getEnrollmentActivatedAt() != null)
         );
     }
 

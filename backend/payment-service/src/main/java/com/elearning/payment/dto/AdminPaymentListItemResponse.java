@@ -17,5 +17,6 @@ public record AdminPaymentListItemResponse(
     String courseTitle,
     Instant createdAt,
     Instant paidAt,
-    Instant updatedAt
+    Instant updatedAt,
+    Instant expiresAt
 ) {}

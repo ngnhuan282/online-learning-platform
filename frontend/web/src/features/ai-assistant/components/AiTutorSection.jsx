@@ -1,5 +1,7 @@
 ﻿import { useRef, useState } from 'react';
 import Icon from '../../../shared/components/Icon';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants/routes';
 import { normalizeSearch } from '../../courses/data/demoCourses';
 
 const features = [
@@ -85,6 +87,10 @@ export default function AiTutorSection() {
               <Icon name="mic" size={18} />
               Luyện nói với AI ngay
             </button>
+            <Link className="button button-outline" to={ROUTES.AI_ASSISTANT}>
+              Mở trợ lý AI
+              <Icon name="arrow" size={18} />
+            </Link>
           </div>
           <div className="ai-chat">
             <div className="ai-chat-header">

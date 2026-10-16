@@ -8,12 +8,14 @@ import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
 import { paymentApi } from '../api/paymentApi';
 import { formatDemoPrice } from '../data/paymentDemo';
+import { getPaymentDisplayStatus } from '../utils/paymentFlow';
 import '../styles/payment.css';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 const statusLabel = {
   PENDING: 'Đang chờ',
+  EXPIRED: 'Hết hạn thanh toán',
   SUCCESS: 'Thành công',
   FAILED: 'Thất bại',
   CANCELLED: 'Đã hủy',
@@ -137,6 +139,7 @@ export default function PaymentHistoryPage() {
             <select aria-label="Lọc trạng thái thanh toán" value={statusFilter} onChange={handleStatusChange}>
               <option value="">Tất cả trạng thái</option>
               <option value="PENDING">Đang chờ</option>
+              <option value="EXPIRED">Hết hạn thanh toán</option>
               <option value="SUCCESS">Thành công</option>
               <option value="FAILED">Thất bại</option>
               <option value="CANCELLED">Đã hủy</option>
@@ -200,8 +203,8 @@ export default function PaymentHistoryPage() {
                         <td>{item.courseTitle}</td>
                         <td>{formatDemoPrice(Number(item.amount))}</td>
                         <td>
-                          <span className={`payment-status ${statusTone(item.paymentStatus)}`}>
-                            {statusLabel[item.paymentStatus] || item.paymentStatus}
+                          <span className={`payment-status ${statusTone(getPaymentDisplayStatus(item))}`}>
+                            {statusLabel[getPaymentDisplayStatus(item)] || item.paymentStatus}
                           </span>
                         </td>
                         <td>{formatDate(item.createdAt)}</td>

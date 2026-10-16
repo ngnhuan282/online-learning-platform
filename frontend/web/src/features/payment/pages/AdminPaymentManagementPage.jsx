@@ -14,9 +14,11 @@ import {
 import { PageHeading, StatCard, LoadState } from '../../admin/components/AdminUi';
 import { date, money, number } from '../../admin/utils/adminUtils';
 import { paymentApi } from '../api/paymentApi';
+import { getPaymentDisplayStatus } from '../utils/paymentFlow';
 
 const statuses = {
   PENDING: 'Đang chờ',
+  EXPIRED: 'Hết hạn thanh toán',
   SUCCESS: 'Thành công',
   FAILED: 'Thất bại',
   CANCELLED: 'Đã hủy',
@@ -209,8 +211,8 @@ export default function AdminPaymentManagementPage() {
                     <td>{row.courseTitle || '—'}</td>
                     <td className="admin-nowrap">{currency(row.amount, row.currency)}</td>
                     <td>
-                      <span className={`admin-pill ${statusTone(row.paymentStatus)}`}>
-                        {statuses[row.paymentStatus] || row.paymentStatus}
+                      <span className={`admin-pill ${statusTone(getPaymentDisplayStatus(row))}`}>
+                        {statuses[getPaymentDisplayStatus(row)] || row.paymentStatus}
                       </span>
                     </td>
                     <td>

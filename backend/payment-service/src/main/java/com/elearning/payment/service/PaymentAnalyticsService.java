@@ -32,13 +32,15 @@ public class PaymentAnalyticsService {
     @Transactional(readOnly = true)
     public PaymentAnalyticsResponse getAnalytics() {
         long successfulPayments = payments.countByStatus(PaymentStatus.SUCCESS);
+        Instant now = Instant.now();
+        BigDecimal pendingAmount = payments.sumAwaitingPayment(now);
         return new PaymentAnalyticsResponse(
             orders.count(),
-            payments.countByStatus(PaymentStatus.PENDING),
+            payments.countAwaitingPayment(now),
             successfulPayments,
             payments.countByStatusIn(List.of(PaymentStatus.FAILED, PaymentStatus.CANCELLED)),
             sum(PaymentStatus.SUCCESS),
-            sum(PaymentStatus.PENDING),
+            pendingAmount == null ? BigDecimal.ZERO : pendingAmount,
             sum(PaymentStatus.REFUNDED),
             new PaymentAnalyticsResponse.CrossServiceStats(
                 orders.countDistinctUsers(),
@@ -97,7 +99,10 @@ public class PaymentAnalyticsService {
                     payment.getAmount(),
                     payment.getCurrency(),
                     payment.getStatus(),
-                    payment.getCreatedAt()
+                    payment.getCreatedAt(),
+                    payment.getOrder().getStatus(),
+                    payment.getOrder().getExpiresAt(),
+                    payment.getProvider()
                 );
             })
             .toList();

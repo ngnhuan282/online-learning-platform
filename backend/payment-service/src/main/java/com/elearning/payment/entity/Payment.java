@@ -53,6 +53,9 @@ public class Payment {
     @Column(name = "paid_at")
     private Instant paidAt;
 
+    @Column(name = "enrollment_activated_at")
+    private Instant enrollmentActivatedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -71,6 +74,10 @@ public class Payment {
 
     public void assignCheckoutUrl(String checkoutUrl) {
         this.checkoutUrl = checkoutUrl;
+    }
+
+    public void markEnrollmentActivated() {
+        this.enrollmentActivatedAt = Instant.now();
     }
 
     public void transitionTo(

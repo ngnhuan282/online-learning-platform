@@ -11,7 +11,10 @@ import com.elearning.payment.common.response.PageResponse;
 import com.elearning.payment.course.CourseSnapshot;
 import com.elearning.payment.course.CourseSnapshotProvider;
 import com.elearning.payment.learning.LearningEnrollmentClient;
+import com.elearning.payment.repository.CourseOrderRepository;
+import com.elearning.payment.repository.PaymentRepository;
 import com.elearning.payment.security.JwtTokenProvider;
+import com.elearning.payment.vnpay.VnpayProperties;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -58,6 +61,8 @@ class PaymentServiceApplicationTests {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("security.jwt.secret", () -> SECRET);
+        registry.add("integrations.vnpay.tmn-code", () -> "test-merchant");
+        registry.add("integrations.vnpay.hash-secret", () -> "test-vnpay-secret-not-for-responses");
     }
 
     @LocalServerPort
@@ -68,6 +73,15 @@ class PaymentServiceApplicationTests {
 
     @Autowired
     JwtTokenProvider tokens;
+
+    @Autowired
+    CourseOrderRepository orders;
+
+    @Autowired
+    PaymentRepository payments;
+
+    @Autowired
+    VnpayProperties vnpay;
 
     @MockitoBean
     CourseSnapshotProvider courses;
@@ -189,6 +203,43 @@ class PaymentServiceApplicationTests {
     @Test
     void startsIndependentlyAndExposesHealth() throws Exception {
         assertThat(request("/actuator/health", null, null).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void exposesOnlySafePaymentMethodsAndKeepsVnpayUnavailable() throws Exception {
+        String path = "/api/v1/payments/methods";
+        error(request(path, null, null), 401, "UNAUTHORIZED", path);
+        var response = request(path, token("USER", 60), null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        JsonNode methods = mapper.readTree(response.body()).get("data");
+        assertThat(methods.get(0).get("provider").asString()).isEqualTo("MOCK");
+        assertThat(methods.get(0).get("available").asBoolean()).isTrue();
+        assertThat(methods.get(1).get("provider").asString()).isEqualTo("VNPAY");
+        assertThat(methods.get(1).get("available").asBoolean()).isFalse();
+        assertThat(vnpay.getTmnCode()).isEqualTo("test-merchant");
+        assertThat(vnpay.getExpireMinutes()).isEqualTo(15);
+        assertThat(response.body()).doesNotContain(vnpay.getHashSecret(), vnpay.getTmnCode(), "hashSecret");
+    }
+
+    @Test
+    void rejectsUnconfiguredVnpayBeforeCreatingOrdersOrCallingCourseAndLearning() throws Exception {
+        long orderCount = orders.count();
+        long paymentCount = payments.count();
+        String path = "/api/v1/payments/checkout";
+        error(
+            request(
+                path,
+                token("USER", 60),
+                "{\"courseId\":101,\"provider\":\"VNPAY\",\"idempotencyKey\":\"week-eight-vnpay-disabled\"}"
+            ),
+            503,
+            "VNPAY_UNAVAILABLE",
+            path
+        );
+        assertThat(orders.count()).isEqualTo(orderCount);
+        assertThat(payments.count()).isEqualTo(paymentCount);
+        then(courses).shouldHaveNoInteractions();
+        then(learning).shouldHaveNoInteractions();
     }
 
     @Test

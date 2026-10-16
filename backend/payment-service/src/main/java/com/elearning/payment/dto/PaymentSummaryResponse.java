@@ -15,5 +15,6 @@ public record PaymentSummaryResponse(
     String providerTransactionCode,
     Instant paidAt,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    boolean enrollmentReady
 ) {}

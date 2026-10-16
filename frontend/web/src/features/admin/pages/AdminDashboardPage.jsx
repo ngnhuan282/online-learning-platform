@@ -13,6 +13,7 @@ import useAuth from '../../auth/hooks/useAuth';
 import { adminApi } from '../api/adminApi';
 import { can, number, money, date } from '../utils/adminUtils';
 import { PageHeading, StatCard, LoadState } from '../components/AdminUi';
+import { getPaymentDisplayStatus } from '../../payment/utils/paymentFlow';
 
 const sources = [
   ['overview', 'DASHBOARD_VIEW', 'Tài khoản'],
@@ -257,7 +258,7 @@ export default function AdminDashboardPage() {
                     </td>
                     <td>
                       <span className={`admin-pill ${order.status === 'SUCCESS' ? 'green' : 'amber'}`}>
-                        {order.status}
+                        {getPaymentDisplayStatus(order) === 'EXPIRED' ? 'Hết hạn thanh toán' : order.status}
                       </span>
                     </td>
                     <td>{date(order.createdAt)}</td>
