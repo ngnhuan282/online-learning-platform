@@ -82,6 +82,47 @@ export default function AdminCoursePage() {
   // Search
   const { keyword, setKeyword, debouncedKeyword } = useCourseSearch('');
 
+  // Quick Add Category Modal
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [categoryModalError, setCategoryModalError] = useState('');
+
+  const handleCreateCategory = async e => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) {
+      setCategoryModalError('Vui lòng nhập tên danh mục');
+      return;
+    }
+    setCreatingCategory(true);
+    setCategoryModalError('');
+    try {
+      const res = await categoryApi.create({
+        name: newCategoryName.trim(),
+        description: newCategoryDesc.trim(),
+      });
+      const created = res?.data?.data ?? res?.data ?? res;
+      if (created && created.id) {
+        setCategories(prev => [...prev, created]);
+        setForm(prev => ({
+          ...prev,
+          categoryId: String(created.id),
+          categoryName: created.name,
+        }));
+      } else {
+        await loadCategories();
+      }
+      setNewCategoryName('');
+      setNewCategoryDesc('');
+      setShowAddCategoryModal(false);
+    } catch (err) {
+      setCategoryModalError(err?.response?.data?.message || 'Không thể tạo danh mục mới.');
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
   const loadCategories = async () => {
     try {
       const response = await categoryApi.list();
@@ -260,9 +301,21 @@ export default function AdminCoursePage() {
   return (
     <section className="container" style={{ padding: '32px 0 80px' }}>
       <div style={{ display: 'grid', gap: 24 }}>
-        <div>
-          <span className="eyebrow">ADMIN</span>
-          <h1 style={{ marginTop: 8 }}>Quản lý khóa học</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <span className="eyebrow">ADMIN</span>
+            <h1 style={{ marginTop: 8 }}>Quản lý khóa học</h1>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="button button-soft"
+              onClick={() => navigate('/admin/categories')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}
+            >
+              Danh sách danh mục
+            </button>
+          </div>
         </div>
 
         {loadError && <ErrorState error={loadError} onRetry={() => setRetry(value => value + 1)} />}
@@ -329,20 +382,36 @@ export default function AdminCoursePage() {
                 <span style={{ color: '#ef4444', fontSize: 12 }}>{formErrors.description}</span>
               )}
 
-              <select
-                aria-label="Danh mục"
-                required
-                value={form.categoryId}
-                onChange={event => setForm({ ...form, categoryId: event.target.value })}
-                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
-              >
-                <option value="">Chọn danh mục</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6, display: 'block' }}>
+                  Danh mục khóa học
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <select
+                    aria-label="Danh mục"
+                    required
+                    value={form.categoryId}
+                    onChange={event => setForm({ ...form, categoryId: event.target.value })}
+                    style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
+                  >
+                    <option value="">-- Chọn danh mục --</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="button button-soft"
+                    title="Thêm danh mục mới nhanh"
+                    onClick={() => setShowAddCategoryModal(true)}
+                    style={{ padding: '0 14px', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600 }}
+                  >
+                    ➕ Thêm mới
+                  </button>
+                </div>
+              </div>
               {!loading && !loadError && categories.length === 0 && <p>Chưa có danh mục để tạo khóa học.</p>}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -430,74 +499,81 @@ export default function AdminCoursePage() {
             {loading ? (
               <p>Đang tải khóa học...</p>
             ) : (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {!loadError && filteredCourses.length === 0 && (
-                  <p>{debouncedKeyword ? 'Không tìm thấy khóa học phù hợp.' : 'Chưa có khóa học được xuất bản.'}</p>
-                )}
-                {filteredCourses.map(course => (
-                  <div
-                    key={course.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 12,
-                      padding: '12px 14px',
-                      border: '1px solid #e7ebf0',
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <strong>{course.title}</strong>
-                      <div style={{ color: '#64748b', fontSize: 13 }}>{course.categoryName}</div>
-                      <div style={{ color: '#64748b', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center' }}>
-                        <span>{formatPrice(Number(course.price || 0))}</span>
-                        <span>•</span>
-                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>
-                          ★ {Number(course.avgRating || 0).toFixed(1)}
-                        </span>
-                        <span style={{ color: '#94a3b8' }}>
-                          ({course.reviewCount || 0} đánh giá)
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button
-                        className="button button-soft"
-                        type="button"
-                        onClick={() => navigate(`/admin/courses/${course.id}/curriculum`)}
-                      >
-                        Bài học
-                      </button>
-                      <button
-                        className="button button-soft"
-                        type="button"
-                        onClick={() => navigate(`/admin/courses/${course.id}/reviews`)}
-                      >
-                        Đánh giá
-                      </button>
-                      {can(user, 'COURSE_UPDATE') && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e7ebf0' }}>
+                    <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Khóa học</th>
+                    <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Giá</th>
+                    <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loadError && filteredCourses.length === 0 && (
+                    <tr><td colSpan={3} style={{ padding: '16px 10px', color: '#94a3b8', fontSize: 14 }}>
+                      {debouncedKeyword ? 'Không tìm thấy khóa học phù hợp.' : 'Chưa có khóa học được xuất bản.'}
+                    </td></tr>
+                  )}
+                  {filteredCourses.map(course => (
+                    <tr key={course.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 10px' }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{course.title}</div>
+                        <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
+                          {course.categoryName}
+                          <span style={{ margin: '0 5px', color: '#cbd5e1' }}>•</span>
+                          <span style={{ color: '#f59e0b', fontWeight: 600 }}>&#9733; {Number(course.avgRating || 0).toFixed(1)}</span>
+                          <span style={{ color: '#94a3b8', marginLeft: 4 }}>({course.reviewCount || 0} đánh giá)</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 10px', fontSize: 13, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                        {formatPrice(Number(course.price || 0))}
+                      </td>
+                      <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
                         <button
                           className="button button-soft"
                           type="button"
-                          onClick={() => handleEdit(course)}
+                          title="Quản lý bài học"
+                          onClick={() => navigate(`/admin/courses/${course.id}/curriculum`)}
+                          style={{ padding: '5px 11px', fontSize: 12, marginRight: 4 }}
                         >
-                          Sửa
+                          Bài học
                         </button>
-                      )}
-                      {can(user, 'COURSE_DELETE') && (
                         <button
                           className="button button-soft"
                           type="button"
-                          disabled={submitting || deletingId !== null || Boolean(loadError)}
-                          onClick={() => handleDelete(course.id)}
+                          title="Xem đánh giá"
+                          onClick={() => navigate(`/admin/courses/${course.id}/reviews`)}
+                          style={{ padding: '5px 11px', fontSize: 12, marginRight: 4 }}
                         >
-                          {deletingId === course.id ? 'Đang xóa...' : 'Xóa'}
+                          Đánh giá
                         </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        {can(user, 'COURSE_UPDATE') && (
+                          <button
+                            className="button button-soft"
+                            type="button"
+                            title="Sửa khóa học"
+                            onClick={() => handleEdit(course)}
+                            style={{ padding: '5px 11px', fontSize: 12, marginRight: 4 }}
+                          >
+                            Sửa
+                          </button>
+                        )}
+                        {can(user, 'COURSE_DELETE') && (
+                          <button
+                            className="button button-soft"
+                            type="button"
+                            title="Xóa khóa học"
+                            disabled={submitting || deletingId !== null || Boolean(loadError)}
+                            onClick={() => handleDelete(course.id)}
+                            style={{ padding: '5px 11px', fontSize: 12, color: '#e53e3e', borderColor: '#fed7d7' }}
+                          >
+                            {deletingId === course.id ? 'Đang xóa...' : 'Xóa'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
             {/* Pagination controls */}
             {totalPages > 1 && (
@@ -527,6 +603,113 @@ export default function AdminCoursePage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Thêm danh mục nhanh */}
+      {showAddCategoryModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => {
+            setShowAddCategoryModal(false);
+            setCategoryModalError('');
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              maxWidth: 480,
+              width: '100%',
+              padding: 24,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>➕ Thêm danh mục mới</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddCategoryModal(false);
+                  setCategoryModalError('');
+                }}
+                style={{ background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {categoryModalError && (
+              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+                {categoryModalError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateCategory} style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>
+                  Tên danh mục <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={100}
+                  placeholder="Ví dụ: Luyện thi VSTEP, Tiếng Anh Du học..."
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>
+                  Mô tả danh mục
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Mô tả ngắn gọn về đối tượng và mục tiêu của danh mục này..."
+                  value={newCategoryDesc}
+                  onChange={e => setNewCategoryDesc(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={() => {
+                    setShowAddCategoryModal(false);
+                    setCategoryModalError('');
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={creatingCategory}
+                >
+                  {creatingCategory ? 'Đang lưu...' : 'Lưu danh mục'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

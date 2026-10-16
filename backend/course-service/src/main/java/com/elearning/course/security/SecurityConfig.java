@@ -49,7 +49,8 @@ public class SecurityConfig {
                         "/api/v1/lessons/{lessonId}/resources",
                         "/api/v1/categories",
                         "/api/v1/categories/{id}",
-                        "/api/v1/media/download/**"
+                        "/api/v1/media/download/**",
+                        "/api/v1/courses/{courseId}/lessons/{lessonId}/play-url"
                     )
                     .permitAll()
                     .anyRequest()

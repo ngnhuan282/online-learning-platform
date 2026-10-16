@@ -38,6 +38,9 @@ class ReviewServiceTest {
     @Mock
     private CourseRepository courseRepository;
 
+    @Mock
+    private com.elearning.course.integration.learning.EnrollmentClient enrollmentClient;
+
     @InjectMocks
     private ReviewService reviewService;
 
@@ -64,6 +67,7 @@ class ReviewServiceTest {
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(5, "Tuyệt vời!");
 
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(false);
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
         when(reviewRepository.avgRatingByCourseId(courseId)).thenReturn(5.0);
@@ -84,11 +88,25 @@ class ReviewServiceTest {
     }
 
     @Test
+    void create_notEnrolled_throwsForbidden() {
+        Long courseId = 10L;
+        Long userId = 42L;
+        ReviewRequest request = new ReviewRequest(5, "Tuyệt vời!");
+
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(false);
+
+        assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    }
+
+    @Test
     void create_duplicateReview_throwsConflict() {
         Long courseId = 10L;
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(4, "Khóa học hay");
 
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(true);
 
         assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
@@ -104,6 +122,7 @@ class ReviewServiceTest {
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(4, "Good");
 
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(false);
         when(courseRepository.findById(courseId)).thenReturn(Optional.empty());
 

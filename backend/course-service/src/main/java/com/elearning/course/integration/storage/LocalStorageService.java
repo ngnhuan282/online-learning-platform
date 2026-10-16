@@ -79,9 +79,37 @@ public class LocalStorageService implements StorageService {
         return "/api/v1/media/download/" + objectKey;
     }
 
+    private static final String SIGNING_SECRET = "learnsphere-local-storage-secret-key-2026";
+
     @Override
     public String generatePresignedUrl(String objectKey, Duration duration) {
-        return "/api/v1/media/download/" + objectKey;
+        long durationMs = (duration != null ? duration.toMillis() : Duration.ofMinutes(30).toMillis());
+        long expires = System.currentTimeMillis() + durationMs;
+        String token = computeHmac(objectKey + ":" + expires, SIGNING_SECRET);
+        return "/api/v1/media/download/" + objectKey + "?expires=" + expires + "&token=" + token;
+    }
+
+    @Override
+    public boolean verifySignedToken(String objectKey, Long expires, String token) {
+        if (expires == null || token == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() > expires) {
+            return false;
+        }
+        String expected = computeHmac(objectKey + ":" + expires, SIGNING_SECRET);
+        return expected.equals(token);
+    }
+
+    private String computeHmac(String data, String key) {
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new javax.crypto.spec.SecretKeySpec(key.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] bytes = mac.doFinal(data.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(bytes);
+        } catch (Exception e) {
+            return Integer.toHexString((data + key).hashCode());
+        }
     }
 
     @Override

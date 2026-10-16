@@ -4,7 +4,7 @@ import com.elearning.payment.common.exception.AppException;
 import com.elearning.payment.common.exception.ErrorCode;
 import com.elearning.payment.common.response.PageResponse;
 import com.elearning.payment.course.CourseSnapshot;
-import com.elearning.payment.course.CourseSnapshotProvider;
+import com.elearning.payment.course.CourseClient;
 import com.elearning.payment.dto.*;
 import com.elearning.payment.entity.CourseOrder;
 import com.elearning.payment.entity.OrderItem;

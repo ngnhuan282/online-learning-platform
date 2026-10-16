@@ -110,6 +110,7 @@ axiosClient.interceptors.response.use(
             throw Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' });
           return axiosClient(config);
         } catch (refreshError) {
+          clearTokens();
           return Promise.reject(normalizeApiError(refreshError));
         }
       }
