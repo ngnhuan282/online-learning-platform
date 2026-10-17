@@ -8,6 +8,7 @@ public interface RefreshTokenService {
     RefreshToken validate(String rawToken);
     Rotation rotate(String rawToken);
     void revoke(String rawToken);
+    String requireSession(Long userId, String rawToken);
 
     // Internal transport only. Controllers return auth(), never this record.
     record Rotation(String rawToken, AuthResponse auth) {

@@ -33,13 +33,20 @@ public class AuthenticationFilter implements WebFilter, Ordered {
         HttpMethod method = exchange.getRequest().getMethod();
         String authorization = exchange.getRequest().getHeaders().getFirst("Authorization");
         boolean publicAuth =
-            method == HttpMethod.POST &&
-            Set.of(
-                "/api/v1/auth/login",
-                "/api/v1/auth/register",
-                "/api/v1/auth/refresh",
-                "/api/v1/auth/logout"
-            ).contains(path);
+            (method == HttpMethod.POST &&
+                Set.of(
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/register",
+                    "/api/v1/auth/refresh",
+                    "/api/v1/auth/logout",
+                    "/api/v1/auth/google/start",
+                    "/api/v1/auth/google/exchange"
+                ).contains(path)) ||
+            (method == HttpMethod.GET &&
+                Set.of(
+                    "/api/v1/auth/google/authorize/google",
+                    "/api/v1/auth/google/callback/google"
+                ).contains(path));
         boolean publicRequest =
             method == HttpMethod.OPTIONS ||
             path.equals("/actuator/health") ||
@@ -79,6 +86,7 @@ public class AuthenticationFilter implements WebFilter, Ordered {
                 headers.remove("X-User-Id");
                 headers.remove("X-User-Role");
                 headers.remove("X-User-Roles");
+                headers.remove("X-Internal-Service-Token");
             })
             .build();
         return chain.filter(exchange.mutate().request(request).build());

@@ -15,6 +15,7 @@ import com.elearning.course.entity.CourseLevel;
 import com.elearning.course.entity.CourseStatus;
 import com.elearning.course.repository.CategoryRepository;
 import com.elearning.course.repository.CourseRepository;
+import com.elearning.course.security.CourseContentAccess;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
@@ -33,6 +34,9 @@ class CourseServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private CourseContentAccess access;
 
     @InjectMocks
     private CourseService courseService;

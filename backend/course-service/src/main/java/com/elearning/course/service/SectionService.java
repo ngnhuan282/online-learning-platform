@@ -9,6 +9,8 @@ import com.elearning.course.entity.Course;
 import com.elearning.course.entity.Section;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.repository.SectionRepository;
+import com.elearning.course.security.CourseContentAccess;
+import com.elearning.course.security.MediaTickets;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -21,16 +23,22 @@ public class SectionService {
 
     private final SectionRepository sections;
     private final CourseRepository courses;
+    private final CourseContentAccess access;
+    private final MediaTickets tickets;
 
-    public SectionService(SectionRepository sections, CourseRepository courses) {
+    public SectionService(SectionRepository sections, CourseRepository courses, CourseContentAccess access, MediaTickets tickets) {
         this.sections = sections;
         this.courses = courses;
+        this.access = access;
+        this.tickets = tickets;
     }
 
     public List<SectionResponse> listByCourse(Long courseId) {
-        findCourse(courseId);
+        Course course = findCourse(courseId);
+        access.requirePublished(course);
+        boolean enrolled = access.canReadPrivate(course);
         return sections.findByCourseIdWithLessons(courseId).stream()
-            .map(SectionResponse::from)
+            .map(section -> SectionResponse.forReader(section, enrolled, tickets))
             .toList();
     }
 

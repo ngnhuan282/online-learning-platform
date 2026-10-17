@@ -35,6 +35,41 @@ after(async () => {
   delete globalThis.window;
 });
 
+test('public catalog lists survive a failed session restore and never send bearer credentials', async () => {
+  for (const path of ['/api/v1/courses', '/api/v1/categories']) {
+    tokens.setAccessToken(old);
+    let release;
+    let sentAuthorization;
+    const pending = client.get(path, {
+      adapter: config => {
+        sentAuthorization = config.headers.has('Authorization');
+        return new Promise(resolve => {
+          release = () => resolve(response(config, [{ id: 42, title: 'Database course' }]));
+        });
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    tokens.clearTokens();
+    release();
+    assert.equal((await pending).data[0].id, 42);
+    assert.equal(sentAuthorization, false);
+  }
+});
+
+test('public catalog errors remain visible without attempting to refresh the session', async () => {
+  let calls = 0;
+  await assert.rejects(
+    client.get('/api/v1/courses', {
+      adapter: config => {
+        calls++;
+        return unauthorized(config);
+      },
+    }),
+    { status: 401 },
+  );
+  assert.equal(calls, 1);
+});
+
 test('credential-enabled 401 refresh retries original request with new bearer and payload', async () => {
   tokens.setAccessToken(old);
   const calls = [];
@@ -163,4 +198,44 @@ test('late refresh cannot overwrite a new login or resurrect a cleared session',
     await assert.rejects(pending, { code: 'ERR_CANCELED' });
     assert.equal(tokens.getAccessToken(), newerLogin ? newer : null);
   }
+});
+
+test('late Course/Learning/Payment successes and account errors cannot affect a new session', async () => {
+  for (const path of ['/courses/1/reviews/me', '/learning/enrollments/me', '/payments/history']) {
+    for (const failure of [false, true]) {
+      tokens.setAccessToken(old);
+      let release;
+      const pending = client.get(`/api/v1${path}`, {
+        adapter: config =>
+          new Promise((resolve, reject) => {
+            release = () =>
+              failure
+                ? reject({ config, response: { status: 403, data: { code: 'ACCOUNT_LOCKED' } } })
+                : resolve(response(config, { private: 'previous user' }));
+          }),
+      });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const newer = makeToken('other-login');
+      tokens.setAccessToken(newer);
+      release();
+      await assert.rejects(pending, { code: 'ERR_CANCELED' });
+      assert.equal(tokens.getAccessToken(), newer);
+    }
+  }
+});
+
+test('role mismatch 403 remains visible without rotating or clearing a valid session', async () => {
+  tokens.setAccessToken(old);
+  let calls = 0;
+  await assert.rejects(
+    client.get('/api/v1/payments/admin/orders', {
+      adapter: config => {
+        calls++;
+        return Promise.reject({ config, response: { status: 403, data: { code: 'FORBIDDEN' } } });
+      },
+    }),
+    { status: 403, code: 'FORBIDDEN' },
+  );
+  assert.equal(calls, 1);
+  assert.equal(tokens.getAccessToken(), old);
 });

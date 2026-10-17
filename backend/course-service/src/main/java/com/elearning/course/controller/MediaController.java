@@ -2,6 +2,12 @@ package com.elearning.course.controller;
 
 import com.elearning.course.common.response.ApiResponse;
 import com.elearning.course.dto.MediaUploadResponse;
+import com.elearning.course.common.exception.AppException;
+import com.elearning.course.common.exception.ErrorCode;
+import com.elearning.course.entity.CourseStatus;
+import com.elearning.course.repository.CourseRepository;
+import com.elearning.course.security.CourseContentAccess;
+import com.elearning.course.security.MediaTickets;
 import com.elearning.course.integration.storage.StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -21,6 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class MediaController {
 
     private final StorageService storageService;
+    private final CourseRepository courses;
+    private final CourseContentAccess access;
+    private final MediaTickets tickets;
 
     /**
      * Upload file media (Video, Thumbnail, Document).
@@ -32,7 +41,10 @@ public class MediaController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "folder", defaultValue = "media") String folder) {
         MediaUploadResponse response = storageService.upload(file, folder);
-        return ApiResponse.success(response);
+        return ApiResponse.success(new MediaUploadResponse(
+            response.objectKey(), tickets.signLocalUrl(response.url()), response.fileName(),
+            response.fileSize(), response.contentType()
+        ));
     }
 
     /**

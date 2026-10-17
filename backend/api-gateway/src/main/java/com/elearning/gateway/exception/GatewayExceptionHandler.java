@@ -66,7 +66,8 @@ public class GatewayExceptionHandler implements WebExceptionHandler, Ordered {
         body.put("errors", null);
         body.put("timestamp", Instant.now());
         body.put("path", exchange.getRequest().getPath().value());
-        if (status >= 500) log.error("Gateway failure code={}", code, error);
+        if (status >= 500) log.error("Gateway failure code={} type={} stack={}", code,
+                error.getClass().getName(), java.util.Arrays.toString(error.getStackTrace()));
         else log.warn("Gateway request rejected code={}", code);
         exchange.getResponse().setStatusCode(HttpStatusCode.valueOf(status));
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);

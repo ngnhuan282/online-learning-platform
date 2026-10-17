@@ -24,6 +24,8 @@ course:
   service-url: ${COURSE_SERVICE_URL:http://localhost:8082}
 learning:
   service-url: ${LEARNING_SERVICE_URL:http://localhost:8083}
+payment:
+  mock-enabled: ${PAYMENT_MOCK_ENABLED:false}
 integrations:
   internal-service-token: ${INTERNAL_SERVICE_TOKEN}
   vnpay:
@@ -37,3 +39,13 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:ecs}

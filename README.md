@@ -1,5 +1,12 @@
 # SGSphere – Online Learning Platform
 
+Hướng dẫn tích hợp Auth/Course/Learning/Payment, Docker staging, logging, health check và kiểm tra trước merge:
+[SYSTEM_INTEGRATION.md](docs/testing/SYSTEM_INTEGRATION.md).
+
+Kết quả A8/A9 ngày 13/10/2026, API/auth contracts, lệnh PowerShell và bàn giao owner:
+[A8_A9_REPORT.md](docs/deployment/A8_A9_REPORT.md).
+Minh chứng nghiệm thu: [A8_A9_ACCEPTANCE.md](docs/testing/A8_A9_ACCEPTANCE.md).
+
 SGSphere là nền tảng học trực tuyến được xây dựng theo kiến trúc **Microservices**. Frontend sử dụng **React + Vite**, Backend sử dụng **Spring Boot**, dữ liệu được lưu trên **MySQL**, và mọi request từ trình duyệt đi qua **API Gateway**.
 
 > Mục tiêu của project: xây dựng một nền tảng học trực tuyến có thể mở rộng theo từng module như Course, Learning, Payment/VNPay, AI Assistant và triển khai cloud sau này.
@@ -20,7 +27,10 @@ SGSphere là nền tảng học trực tuyến được xây dựng theo kiến 
 - Password được mã hóa bằng BCrypt.
 - Responsive UI cho desktop và mobile.
 
-Các module Course, Learning, VNPay và AI Assistant sẽ được phát triển ở các milestone tiếp theo.
+Course Published/preview, enrollment miễn phí, Learning/progress và Payment MOCK đã có luồng tích hợp.
+MOCK cần `PAYMENT_MOCK_ENABLED=true` trên môi trường demo/test; mặc định tắt.
+VNPay signed checkout/callback và AI provider vẫn chờ milestone của owner.
+Profile `backend` chạy core; thêm `--profile ai` nếu cần AI skeleton.
 
 ---
 
@@ -854,12 +864,12 @@ Automatic Token Refresh        ✅
 Server-side Logout             ✅
 USER / ADMIN authorization     ✅
 
-Course Public Catalog          🚧 Next
-Course Detail                  ⬜
+Course Public Catalog          ✅ Published / preview
+Course Detail                  ✅ Enrollment authorization
 Admin Course Management        ⬜
-Enrollment / Learning          ⬜
+Enrollment / Learning          ✅ Free / MOCK paid / progress
 Quiz                           ⬜
-VNPay                          ⬜
+VNPay                          ⬜ Signed checkout/callback chờ D9
 AI Assistant                   ⬜
 AWS Deployment                 ⬜
 ```
@@ -878,6 +888,11 @@ AUTH_REPORT.md
 REFRESH_TOKEN_REPORT.md
 DESIGN.md
 ```
+
+Google Login và liên kết local cùng email (TV1): [cấu hình OAuth, migration V7/V8, API và checklist demo](docs/auth/GOOGLE_LOGIN_REPORT.md).
+Mặc định tắt; bật bằng `GOOGLE_LOGIN_ENABLED` và cung cấp Google OAuth Web client credentials ở backend.
+Người dùng local liên kết trong Hồ sơ → Phương thức đăng nhập sau khi xác nhận mật khẩu; cả hai cách
+đăng nhập giữ cùng userId. Không tự gộp theo email hoặc xóa database/volume để nâng migration.
 
 Quy tắc phát triển toàn project:
 
@@ -928,10 +943,12 @@ docker compose --profile backend down
 Sau khi backend đã tạo schema bằng Flyway, chạy tại root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\infra\mysql\seed.ps1
+docker compose cp infra/mysql/seed-data.sql mysql:/tmp/sgsphere-seed.sql
+
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot < /tmp/sgsphere-seed.sql'
 ```
 
-File `infra/mysql/05-seed-data.sql` bổ sung 5 bản ghi mẫu mỗi bảng nghiệp vụ, riêng `roles` giữ 2 role hợp lệ `USER`/`ADMIN`. Hướng dẫn, tài khoản demo và lưu ý với database cũ: [infra/mysql/README.md](infra/mysql/README.md).
+File `infra/mysql/seed-data.sql` tạo tài khoản `admin@gmail.com` / `Admin123`, `user@gmail.com` / `User123`, khóa học, giáo trình và dữ liệu Learning/Payment mẫu. Seed giữ nguyên ID tài khoản đã có và có thể chạy lại. Hướng dẫn chi tiết: [infra/mysql/README.md](infra/mysql/README.md).
 
 ## SGSphere
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { categoryApi } from '../api/categoryApi';
@@ -9,6 +9,7 @@ import { can } from '../../admin/utils/adminUtils';
 import ErrorState from '../../../shared/components/ErrorState';
 import MediaUploader from '../components/MediaUploader';
 import useCourseSearch from '../hooks/useCourseSearch';
+import { normalizeCourseList, normalizeCoursePayload } from '../utils/courseForm';
 
 const PAGE_SIZE = 10;
 
@@ -23,43 +24,6 @@ const emptyForm = {
   thumbnailUrl: '/images/english-ielts.jpg',
 };
 
-const coerceCourse = course => ({
-  id: course.id ?? course.courseId ?? Date.now(),
-  title: course.title ?? 'Khóa học mới',
-  description: course.description ?? 'Mô tả khóa học',
-  categoryId: course.categoryId ?? course.category_id ?? null,
-  categoryName: course.categoryName ?? course.category ?? 'Luyện thi IELTS',
-  level: course.level ?? 'beginner',
-  price: Number(course.price ?? 0),
-  originalPrice: Number(course.originalPrice ?? course.price ?? 0),
-  thumbnailUrl: course.thumbnailUrl ?? course.image ?? '/images/english-ielts.jpg',
-  status: course.status ?? 'PUBLISHED',
-  createdAt: course.createdAt ?? new Date().toISOString(),
-});
-
-export const normalizeCourseList = response => {
-  const payload = response?.data ?? response;
-
-  if (Array.isArray(payload)) return payload.map(coerceCourse);
-  if (Array.isArray(payload?.content)) return payload.content.map(coerceCourse);
-  if (Array.isArray(payload?.data?.content)) return payload.data.content.map(coerceCourse);
-  if (Array.isArray(payload?.items)) return payload.items.map(coerceCourse);
-  if (Array.isArray(payload?.data)) return payload.data.map(coerceCourse);
-  return [];
-};
-
-export const normalizeCoursePayload = payload => ({
-  title: payload.title,
-  description: payload.description,
-  ...payload,
-  categoryId: Number(payload.categoryId),
-  level: payload.level ? String(payload.level).toUpperCase() : undefined,
-  status: payload.status ? String(payload.status).toUpperCase() : 'PUBLISHED',
-  price: Number(payload.price ?? 0),
-  originalPrice: Number(payload.originalPrice ?? 0),
-  thumbnailUrl: payload.thumbnailUrl || '/images/english-ielts.jpg',
-});
-
 export default function AdminCoursePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -70,6 +34,7 @@ export default function AdminCoursePage() {
   const [retry, setRetry] = useState(0);
   const [deletingId, setDeletingId] = useState(null);
   const pending = useRef(false);
+  const courseRequest = useRef(0);
   const [form, setForm] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -125,7 +90,8 @@ export default function AdminCoursePage() {
 
   const loadCategories = async () => {
     try {
-      const response = await categoryApi.list();
+      const response = await categoryApi.list(options);
+      if (options.signal?.aborted) return;
       const payload = response?.data ?? response;
       const list = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
       setCategories(list);
@@ -136,13 +102,15 @@ export default function AdminCoursePage() {
         categoryName: prev.categoryName || list[0].name,
       }));
     } catch (error) {
-      setLoadError(error);
+      if (!options.signal?.aborted && error.code !== 'ERR_CANCELED') setLoadError(error);
     }
-  };
+  }, []);
 
-  const loadCourses = async (page = 0) => {
+  const loadCourses = useCallback(async (page = 0, options = {}) => {
+    const request = ++courseRequest.current;
     try {
-      const response = await courseApi.adminList({ page, size: PAGE_SIZE });
+      const response = await courseApi.adminList({ page, size: PAGE_SIZE }, options);
+      if (options.signal?.aborted || request !== courseRequest.current) return false;
       const payload = response?.data ?? response;
       // Extract pagination metadata
       const pageData = payload?.data ?? payload;
@@ -152,19 +120,22 @@ export default function AdminCoursePage() {
       }
       setCourses(normalizeCourseList(response));
     } catch (error) {
+      if (options.signal?.aborted || request !== courseRequest.current || error.code === 'ERR_CANCELED')
+        return false;
       setLoadError(error);
     }
-  };
+    return true;
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
     const controller = new AbortController();
 
     const loadAll = async () => {
-      setLoading(true);
-      setLoadError(null);
-      setCurrentPage(0);
-      await Promise.all([loadCategories(), loadCourses(0)]);
+      await Promise.all([
+        loadCategories({ signal: controller.signal }),
+        loadCourses(0, { signal: controller.signal }),
+      ]);
       if (isMounted) setLoading(false);
     };
 
@@ -173,14 +144,21 @@ export default function AdminCoursePage() {
       isMounted = false;
       controller.abort();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retry]);
+  }, [retry, loadCategories, loadCourses]);
 
-  // Re-load when page changes
-  useEffect(() => {
-    if (!loading) loadCourses(currentPage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  const retryLoad = () => {
+    setLoading(true);
+    setLoadError(null);
+    setCurrentPage(0);
+    setRetry(value => value + 1);
+  };
+
+  const changePage = async page => {
+    setCurrentPage(page);
+    setLoading(true);
+    setLoadError(null);
+    if (await loadCourses(page)) setLoading(false);
+  };
 
   const totalRevenue = useMemo(
     () => courses.reduce((sum, item) => sum + Number(item.price || 0), 0),
@@ -256,6 +234,7 @@ export default function AdminCoursePage() {
 
       resetForm();
       await loadCategories();
+      setCurrentPage(0);
       await loadCourses();
     } catch (error) {
       setMutationError(error);
@@ -318,7 +297,7 @@ export default function AdminCoursePage() {
           </div>
         </div>
 
-        {loadError && <ErrorState error={loadError} onRetry={() => setRetry(value => value + 1)} />}
+        {loadError && <ErrorState error={loadError} onRetry={retryLoad} />}
         {mutationError && <ErrorState title="Không thể lưu thay đổi" error={mutationError} />}
 
         <div className="course-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
@@ -359,9 +338,7 @@ export default function AdminCoursePage() {
                   border: formErrors.title ? '1px solid #ef4444' : '1px solid #dfe3ea',
                 }}
               />
-              {formErrors.title && (
-                <span style={{ color: '#ef4444', fontSize: 12 }}>{formErrors.title}</span>
-              )}
+              {formErrors.title && <span style={{ color: '#ef4444', fontSize: 12 }}>{formErrors.title}</span>}
 
               <textarea
                 aria-label="Mô tả khóa học"
@@ -452,7 +429,9 @@ export default function AdminCoursePage() {
                 label="Ảnh đại diện khóa học (Thumbnail)"
                 maxSizeMB={10}
                 currentUrl={form.thumbnailUrl}
-                onUploadSuccess={info => setForm(prev => ({ ...prev, thumbnailUrl: info.url || info.objectKey }))}
+                onUploadSuccess={info =>
+                  setForm(prev => ({ ...prev, thumbnailUrl: info.url || info.objectKey }))
+                }
               />
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -487,7 +466,15 @@ export default function AdminCoursePage() {
           )}
 
           <div className="course-card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 14,
+              }}
+            >
               <h3 style={{ margin: 0 }}>Danh sách khóa học</h3>
               <input
                 value={keyword}
@@ -581,7 +568,7 @@ export default function AdminCoursePage() {
                 <button
                   className="button button-soft"
                   disabled={currentPage === 0 || loading}
-                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  onClick={() => changePage(Math.max(0, currentPage - 1))}
                   style={{ padding: '6px 14px' }}
                 >
                   ← Trước
@@ -593,7 +580,7 @@ export default function AdminCoursePage() {
                 <button
                   className="button button-soft"
                   disabled={currentPage >= totalPages - 1 || loading}
-                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                  onClick={() => changePage(Math.min(totalPages - 1, currentPage + 1))}
                   style={{ padding: '6px 14px' }}
                 >
                   Sau →

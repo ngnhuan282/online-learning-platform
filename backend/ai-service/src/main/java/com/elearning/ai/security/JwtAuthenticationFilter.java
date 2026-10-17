@@ -8,7 +8,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -38,10 +37,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     "Invalid scheme"
                 );
                 Claims claims = tokens.validate(authorization.substring(7));
+                var authorities = new java.util.ArrayList<SimpleGrantedAuthority>();
+                tokens
+                    .roles(claims)
+                    .forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
+                tokens
+                    .permissions(claims)
+                    .forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
                 var authentication = new UsernamePasswordAuthenticationToken(
                     claims.getSubject(),
                     null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + claims.get("role", String.class)))
+                    authorities
                 );
                 var context = SecurityContextHolder.createEmptyContext();
                 context.setAuthentication(authentication);

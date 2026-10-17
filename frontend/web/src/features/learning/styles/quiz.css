@@ -307,3 +307,18 @@
     text-align: left;
   }
 }
+.learning-video {
+  display: block;
+  width: 100%;
+  max-height: 65vh;
+  border-radius: 12px;
+  background: #111827;
+  margin: 16px 0;
+}
+
+.learning-lesson-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  margin: 16px 0;
+}

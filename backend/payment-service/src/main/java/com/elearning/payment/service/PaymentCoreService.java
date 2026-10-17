@@ -3,6 +3,7 @@ package com.elearning.payment.service;
 import com.elearning.payment.common.exception.AppException;
 import com.elearning.payment.common.exception.ErrorCode;
 import com.elearning.payment.common.response.PageResponse;
+import com.elearning.payment.config.PaymentProviderPolicy;
 import com.elearning.payment.course.CourseSnapshot;
 import com.elearning.payment.course.CourseClient;
 import com.elearning.payment.dto.*;
@@ -44,24 +45,28 @@ public class PaymentCoreService {
     private final PaymentTransactionRepository transactions;
     private final CourseSnapshotProvider courses;
     private final LearningEnrollmentClient learning;
+    private final PaymentProviderPolicy providers;
 
     public PaymentCoreService(
         CourseOrderRepository orders,
         PaymentRepository payments,
         PaymentTransactionRepository transactions,
         CourseSnapshotProvider courses,
-        LearningEnrollmentClient learning
+        LearningEnrollmentClient learning,
+        PaymentProviderPolicy providers
     ) {
         this.orders = orders;
         this.payments = payments;
         this.transactions = transactions;
         this.courses = courses;
         this.learning = learning;
+        this.providers = providers;
     }
 
     @Transactional
     public CheckoutResponse createCheckout(CheckoutRequest request, Long userId) {
         PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        providers.requireAvailable(provider);
         String idempotencyKey = request.idempotencyKey().strip();
         CourseOrder existingOrder = orders
             .findByUserIdAndIdempotencyKey(userId, idempotencyKey)
@@ -154,6 +159,7 @@ public class PaymentCoreService {
 
     @Transactional
     public OrderResponse completeMockPayment(String orderCode, Long userId, MockPaymentRequest request) {
+        providers.requireAvailable(PaymentProvider.MOCK);
         CourseOrder order = orders
             .findByOrderCode(orderCode)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
@@ -240,6 +246,7 @@ public class PaymentCoreService {
         PaymentEventType eventType,
         Instant eventTime
     ) {
+        if (nextStatus == PaymentStatus.SUCCESS) providers.requireAvailable(payment.getProvider());
         if (payment.getStatus() == nextStatus) {
             if (nextStatus == PaymentStatus.SUCCESS) {
                 enrollPaidCourse(order);

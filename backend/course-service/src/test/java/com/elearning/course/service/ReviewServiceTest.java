@@ -15,6 +15,7 @@ import com.elearning.course.entity.Course;
 import com.elearning.course.entity.Review;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.repository.ReviewRepository;
+import com.elearning.course.security.CourseContentAccess;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -70,6 +71,7 @@ class ReviewServiceTest {
         when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(false);
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
+        when(access.canReadPrivate(sampleCourse)).thenReturn(true);
         when(reviewRepository.avgRatingByCourseId(courseId)).thenReturn(5.0);
         when(reviewRepository.countByCourseId(courseId)).thenReturn(1);
 
@@ -108,6 +110,8 @@ class ReviewServiceTest {
 
         when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(true);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
+        when(access.canReadPrivate(sampleCourse)).thenReturn(true);
 
         assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
             .isInstanceOf(AppException.class)
@@ -232,6 +236,7 @@ class ReviewServiceTest {
 
         when(reviewRepository.findByCourseIdAndHiddenFalse(eq(courseId), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(rev)));
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
 
         Page<ReviewResponse> page = reviewService.listPublic(courseId, 0, 10);
         assertThat(page.getTotalElements()).isEqualTo(1);

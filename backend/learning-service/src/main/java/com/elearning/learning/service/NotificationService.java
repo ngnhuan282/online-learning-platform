@@ -11,7 +11,6 @@ import com.elearning.learning.entity.enums.NotificationType;
 import com.elearning.learning.repository.NotificationRepository;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -98,6 +97,14 @@ public class NotificationService {
     }
 
     @Transactional
+    public void paymentSucceeded(Long userId, String orderCode) {
+        // Use the same event identity if Payment retries through the notifications receiver.
+        receive(
+            new NotificationEventRequest(orderCode, userId, NotificationType.PAYMENT_SUCCESS, null, orderCode)
+        );
+    }
+
+    @Transactional
     public void lessonCompleted(Long userId, Long courseId, Long lessonId) {
         create(userId, NotificationType.LESSON_COMPLETED, "lesson:" + courseId + ":" + lessonId,
             "Hoàn thành bài học", "Bạn đã hoàn thành bài #" + lessonId + " của khóa học #" + courseId + ".",
@@ -142,9 +149,9 @@ public class NotificationService {
         // An atomic upsert avoids poisoning the business transaction on concurrent retries.
         jdbc.update("""
             INSERT INTO notifications (user_id, type, event_key, title, body, action_url, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON DUPLICATE KEY UPDATE event_key = event_key
-            """, userId, type.name(), key, title, body, actionUrl, Timestamp.from(Instant.now()));
+            """, userId, type.name(), key, title, body, actionUrl);
         // A locking read sees the winning row even under MySQL REPEATABLE READ.
         var notification = notifications.findByUserIdAndEventKey(userId, key).orElseThrow();
         changedAfterCommit(userId);

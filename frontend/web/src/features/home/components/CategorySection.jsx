@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
 import { categoryApi } from '../../courses/api/categoryApi';
+import { normalizeCategoryList } from '../../courses/utils/courseCatalog';
+import ErrorState from '../../../shared/components/ErrorState';
 
 const keywords = [
   'IELTS 7.0+',
@@ -12,28 +14,23 @@ const keywords = [
   'Tiếng Anh Thương mại',
 ];
 
-const normalizeCategoryList = response => {
-  const payload = response?.data ?? response;
-
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  return [];
-};
-
 export default function CategorySection() {
   const [query, setQuery] = useState('');
   const [categories, setCategories] = useState([]);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
 
     const loadCategories = async () => {
+      setError(null);
       try {
         const response = await categoryApi.list();
         if (isMounted) setCategories(normalizeCategoryList(response));
-      } catch {
-        if (isMounted) setCategories([]);
+      } catch (failure) {
+        if (isMounted) setError(failure);
       }
     };
 
@@ -41,7 +38,7 @@ export default function CategorySection() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [attempt]);
 
   function search(value, category) {
     const params = new URLSearchParams();
@@ -101,16 +98,23 @@ export default function CategorySection() {
               Xem tất cả danh mục <Icon name="arrow" size={17} />
             </button>
           </div>
+          {error && (
+            <ErrorState
+              error={error}
+              title="Không thể tải danh mục"
+              onRetry={() => setAttempt(value => value + 1)}
+            />
+          )}
           <div className="category-grid">
             {categories.map(category => (
               <button className="category-card" key={category.id} onClick={() => search('', category.id)}>
-                <span className={`feature-icon ${category.color}`}>
-                  <Icon name={category.icon} size={25} />
+                <span className={`feature-icon ${category.color || 'blue'}`}>
+                  <Icon name={category.icon || 'cap'} size={25} />
                 </span>
                 <h3>{category.name}</h3>
                 <p>{category.description}</p>
                 <span className="category-bottom">
-                  <span>{category.count} khóa học</span>
+                  <span>{category.count != null ? `${category.count} khóa học` : 'Khám phá khóa học'}</span>
                   <Icon name="arrow" size={23} />
                 </span>
               </button>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { buildLessonPayload, normalizeLessonFormData } from '../utils/lessonForm';
 import MediaUploader from './MediaUploader';
 
@@ -9,16 +9,16 @@ const LESSON_TYPES = [
   { value: 'QUIZ', label: '✅ Bài kiểm tra / Quiz' },
 ];
 
-export { buildLessonPayload, normalizeLessonFormData };
-
 export default function AddLessonDialog({ initialLesson = null, mode = 'create', onConfirm, onCancel }) {
+  const [previousLesson, setPreviousLesson] = useState(initialLesson);
   const [form, setForm] = useState(() => normalizeLessonFormData(initialLesson ?? {}));
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  useEffect(() => {
+  if (previousLesson !== initialLesson) {
+    setPreviousLesson(initialLesson);
     setForm(normalizeLessonFormData(initialLesson ?? {}));
-  }, [initialLesson]);
+  }
 
   const updateField = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -45,7 +45,8 @@ export default function AddLessonDialog({ initialLesson = null, mode = 'create',
       await onConfirm(payload);
     } catch (err) {
       setValidationError(
-        err?.response?.data?.message || err?.message ||
+        err?.response?.data?.message ||
+          err?.message ||
           (mode === 'edit' ? 'Không thể cập nhật bài học.' : 'Không thể tạo bài học.'),
       );
     } finally {
@@ -256,21 +257,13 @@ export default function AddLessonDialog({ initialLesson = null, mode = 'create',
               onChange={e => updateField('preview', e.target.checked)}
               style={{ width: 16, height: 16, cursor: 'pointer' }}
             />
-            <label
-              htmlFor="lesson-preview"
-              style={{ fontSize: 14, cursor: 'pointer', userSelect: 'none' }}
-            >
+            <label htmlFor="lesson-preview" style={{ fontSize: 14, cursor: 'pointer', userSelect: 'none' }}>
               Cho phép học thử (Preview miễn phí cho Guest)
             </label>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-            <button
-              type="button"
-              className="button button-soft"
-              onClick={onCancel}
-              disabled={submitting}
-            >
+            <button type="button" className="button button-soft" onClick={onCancel} disabled={submitting}>
               Hủy
             </button>
             <button
@@ -279,8 +272,12 @@ export default function AddLessonDialog({ initialLesson = null, mode = 'create',
               disabled={!form.title.trim() || submitting}
             >
               {submitting
-                ? (isEditMode ? 'Đang lưu...' : 'Đang thêm...')
-                : (isEditMode ? 'Lưu thay đổi' : 'Tạo bài học')}
+                ? isEditMode
+                  ? 'Đang lưu...'
+                  : 'Đang thêm...'
+                : isEditMode
+                  ? 'Lưu thay đổi'
+                  : 'Tạo bài học'}
             </button>
           </div>
         </form>

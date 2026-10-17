@@ -10,6 +10,13 @@ import { randomUUID } from 'node:crypto';
 const gateway = process.env.E2E_GATEWAY_URL || 'http://localhost:8080';
 const origin = 'http://localhost:5173';
 const refreshMode = process.argv.includes('--refresh');
+if (refreshMode && gateway !== 'http://localhost:8080' && !process.env.E2E_COMPOSE_PROJECT) {
+  throw new Error(
+    'Set E2E_COMPOSE_PROJECT (and E2E_COMPOSE_ENV_FILE if needed) for the same stack as E2E_GATEWAY_URL.',
+  );
+}
+// Vite development mode and the API fixture driver must always use the same Gateway.
+process.env.VITE_API_URL = gateway;
 const output = resolve(refreshMode ? '../../.tmp/refresh-e2e' : '../../.tmp/auth-e2e');
 await mkdir(output, { recursive: true });
 const password = `Test9!${randomUUID()}`;
@@ -180,8 +187,13 @@ try {
       if (await run(expression)) return;
       await pause(100);
     }
-    await writeFile(resolve(output, 'failure.png'), Buffer.from((await send('Page.captureScreenshot')).data, 'base64'));
-    throw Error(`Timed out: ${expression}; ${await run('location.pathname + " " + document.body.innerText.slice(0, 1500)')}`);
+    await writeFile(
+      resolve(output, 'failure.png'),
+      Buffer.from((await send('Page.captureScreenshot')).data, 'base64'),
+    );
+    throw Error(
+      `Timed out: ${expression}; ${await run('location.pathname + " " + document.body.innerText.slice(0, 1500)')}`,
+    );
   };
   const navigate = async path => {
     await send('Page.navigate', { url: origin + path });
@@ -190,6 +202,11 @@ try {
         ? 'document.body.textContent.includes("Bạn không có quyền truy cập chức năng này.")'
         : 'document.querySelector(".site-header") !== null',
     );
+  };
+  const reload = async expression => {
+    await run('window.__e2eReloadPending = true');
+    await send('Page.reload', { ignoreCache: true });
+    await waitFor(`!window.__e2eReloadPending && (${expression})`);
   };
   const setField = (name, value) =>
     run(
@@ -280,14 +297,17 @@ try {
     Buffer.from((await send('Page.captureScreenshot')).data, 'base64'),
   );
 
+  if (process.argv.includes('--core')) {
+    await (await import('./core-scenarios.mjs')).default({ api, run, reload, waitFor, navigate, report });
+  }
+
   if (refreshMode) {
     await (
       await import('./refresh-scenarios.mjs')
-    ).default({ send, run, waitFor, report, responses, pause, gateway, api });
+    ).default({ send, run, reload, waitFor, report, responses, pause, gateway, api });
   } else {
     const meCount = responses.filter(response => response.url.endsWith('/users/me')).length;
-    await send('Page.reload', { ignoreCache: true });
-    await waitFor('document.body.textContent.includes("Nguyễn Auth E2E")');
+    await reload('document.body.textContent.includes("Nguyễn Auth E2E")');
     assert.ok(
       responses.filter(response => response.url.endsWith('/users/me') && response.status === 200).length >
         meCount,

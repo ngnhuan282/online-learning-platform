@@ -8,6 +8,7 @@ import com.elearning.course.entity.Course;
 import com.elearning.course.entity.Review;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.repository.ReviewRepository;
+import com.elearning.course.security.CourseContentAccess;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,6 +38,9 @@ public class ReviewService {
      */
     @Transactional(readOnly = true)
     public Page<ReviewResponse> listPublic(Long courseId, int page, int size) {
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        access.requirePublished(course);
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return reviewRepository.findByCourseIdAndHiddenFalse(courseId, pageable)
             .map(ReviewResponse::from);

@@ -332,7 +332,7 @@ class AuthFlowTests {
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
             )
-        ).isEqualTo(6);
+        ).isEqualTo(8);
         assertThat(jdbc.queryForList("SELECT name FROM roles", String.class)).containsExactlyInAnyOrder(
             "USER",
             "ADMIN"
@@ -341,5 +341,24 @@ class AuthFlowTests {
             "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'USER'",
             Integer.class
         )).isZero();
+    }
+
+    @Test
+    void googleRemainsExplicitlyUnavailableWithoutConfiguration() throws Exception {
+        error(
+            request("/api/v1/auth/google/start", Map.of("challenge", "c".repeat(43)), null),
+            503,
+            "GOOGLE_LOGIN_UNAVAILABLE"
+        );
+        error(
+            request(
+                "/api/v1/auth/google/exchange",
+                Map.of("code", "c".repeat(43), "verifier", "v".repeat(43)),
+                null
+            ),
+            503,
+            "GOOGLE_LOGIN_UNAVAILABLE"
+        );
+        error(request("/api/v1/auth/google/private", null, null), 401, "UNAUTHORIZED");
     }
 }

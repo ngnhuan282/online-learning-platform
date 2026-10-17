@@ -1,5 +1,6 @@
 package com.elearning.auth.security;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -9,6 +10,13 @@ public class RefreshTokenCookie {
 
     public static final String NAME = "refresh_token";
     private final boolean secure;
+
+    public static String read(HttpServletRequest request) {
+        if (request.getCookies() != null) for (var cookie : request.getCookies()) {
+            if (NAME.equals(cookie.getName())) return cookie.getValue();
+        }
+        return null;
+    }
 
     public RefreshTokenCookie(@Value("${security.refresh.cookie-secure:false}") boolean secure) {
         this.secure = secure;

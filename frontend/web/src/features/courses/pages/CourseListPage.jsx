@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 
@@ -6,11 +6,12 @@ import Icon from '../../../shared/components/Icon';
 import useAuth from '../../auth/hooks/useAuth';
 import useToast from '../../../shared/hooks/useToast';
 import CourseCard from '../components/CourseCard';
-import { categoryApi } from '../api/categoryApi';
-import { courseApi } from '../api/courseApi';
+import ErrorState from '../../../shared/components/ErrorState';
+import useCourseCatalog from '../hooks/useCourseCatalog';
 import { learningApi } from '../../learning/api/learningApi';
 import { formatPrice, normalizeSearch } from '../data/demoCourses';
 import useCourseSearch from '../hooks/useCourseSearch';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
@@ -19,65 +20,27 @@ const filters = [
   { id: 'free', label: 'Miễn phí' },
 ];
 
-const coerceCourse = course => ({
-  id: course.id,
-  title: course.title,
-  description: course.description,
-  categoryId: course.categoryId ?? course.category_id ?? null,
-  category: course.categoryName || course.category || 'general',
-  categories: [course.categoryName || course.category || 'general'],
-  group: course.categoryName ? 'communication' : 'certificates',
-  tag: course.status || 'Khóa học',
-  image: course.thumbnailUrl || '/images/english-ielts.jpg',
-  imageAlt: `${course.title} thumbnail`,
-  rating: course.avgRating ? Number(course.avgRating).toFixed(1) : (course.rating != null ? String(course.rating) : '5.0'),
-  reviews: course.reviewCount != null ? String(course.reviewCount) : (course.reviews != null ? String(course.reviews) : '0'),
-  students: 0,
-  hours: 8,
-  level: course.level ? String(course.level).toLowerCase() : 'beginner',
-  price: Number(course.price ?? 0),
-  originalPrice: Number(course.originalPrice ?? course.price ?? 0),
-  discount:
-    course.originalPrice && course.price
-      ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100)
-      : 0,
-  date: course.createdAt || '2026-09-01',
-  keywords: `${course.title} ${course.description}`,
-  lessons: [course.description],
-});
-
-const normalizeCourseList = response => {
-  const payload = response?.data ?? response;
-
-  if (Array.isArray(payload)) return payload.map(coerceCourse);
-  if (Array.isArray(payload?.content)) return payload.content.map(coerceCourse);
-  if (Array.isArray(payload?.data?.content)) return payload.data.content.map(coerceCourse);
-  if (Array.isArray(payload?.items)) return payload.items.map(coerceCourse);
-  if (Array.isArray(payload?.data)) return payload.data.map(coerceCourse);
-  return [];
-};
-
-const normalizeCategoryList = response => {
-  const payload = response?.data ?? response;
-
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  return [];
-};
-
 const numericCourseId = course => {
   const id = Number(course?.id);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 };
 
 function CourseListPage() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const toast = useToast();
-  const [courses, setCourses] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { courses, categories, loading, error, categoryError, retry } = useCourseCatalog();
   const [selected, setSelected] = useState(null);
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState(new Set());
+  const [enrollmentState, setEnrollmentState] = useState(null);
+  const enrolledCourseIds =
+    user?.id != null && enrollmentState?.userId === user.id ? enrollmentState.ids : new Set();
+  const setEnrolledCourseIds = useCallback(
+    value =>
+      setEnrollmentState(previous => {
+        const ids = previous && previous.userId === user?.id ? previous.ids : new Set();
+        return { userId: user?.id, ids: typeof value === 'function' ? value(ids) : value };
+      }),
+    [user?.id],
+  );
   const [enrollingCourseId, setEnrollingCourseId] = useState(null);
   const [enrollError, setEnrollError] = useState('');
   const [params, setParams] = useSearchParams();
@@ -93,7 +56,7 @@ function CourseListPage() {
     if (debouncedKeyword) paramsObj.set('q', debouncedKeyword);
     else paramsObj.delete('q');
     setParams(paramsObj, { replace: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedKeyword]);
 
   function selectCourse(course) {
@@ -101,37 +64,6 @@ function CourseListPage() {
       navigate(`/courses/${course.id}`);
     }
   }
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const [coursesResponse, categoriesResponse] = await Promise.all([
-          courseApi.list({ page: 0, size: 20 }),
-          categoryApi.list(),
-        ]);
-
-        if (isMounted) {
-          setCourses(normalizeCourseList(coursesResponse));
-          setCategories(normalizeCategoryList(categoriesResponse));
-        }
-      } catch {
-        if (isMounted) {
-          setCourses([]);
-          setCategories([]);
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -146,7 +78,12 @@ function CourseListPage() {
       .getMyEnrollments()
       .then(response => {
         const enrollments = response?.data ?? [];
-        if (isMounted) setEnrolledCourseIds(new Set(enrollments.map(item => Number(item.courseId))));
+        if (isMounted)
+          setEnrolledCourseIds(
+            new Set(
+              enrollments.filter(item => item.status !== 'CANCELLED').map(item => Number(item.courseId)),
+            ),
+          );
       })
       .catch(() => {
         if (isMounted) setEnrolledCourseIds(new Set());
@@ -155,7 +92,7 @@ function CourseListPage() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id, setEnrolledCourseIds]);
 
   const query = debouncedKeyword;
   const category = params.get('category') || '';
@@ -216,20 +153,23 @@ function CourseListPage() {
     }
     if (course.price !== 0 || enrolledCourseIds.has(courseId)) return;
 
+    const version = getSessionVersion();
     setEnrollError('');
     setEnrollingCourseId(course.id);
     try {
       const response = await learningApi.enroll(courseId);
+      if (version !== getSessionVersion()) return;
       const enrollment = response?.data;
       setEnrolledCourseIds(previous => new Set(previous).add(Number(enrollment?.courseId ?? courseId)));
       toast('Đã thêm khóa học vào My Courses.');
       setSelected(null);
       navigate('/my-courses');
     } catch (error) {
+      if (version !== getSessionVersion()) return;
       setEnrollError(error.message || 'Không thể ghi danh khóa học.');
       setSelected(course);
     } finally {
-      setEnrollingCourseId(null);
+      if (version === getSessionVersion()) setEnrollingCourseId(null);
     }
   }
 
@@ -282,7 +222,10 @@ function CourseListPage() {
         </select>
       </div>
 
-      {loading ? (
+      {categoryError && <ErrorState error={categoryError} title="Không thể tải danh mục" onRetry={retry} />}
+      {error ? (
+        <ErrorState error={error} title="Không thể tải khóa học" onRetry={retry} />
+      ) : loading ? (
         <div className="empty-courses" role="status">
           <Icon name="search" size={32} />
           <h3>Đang tải khóa học...</h3>

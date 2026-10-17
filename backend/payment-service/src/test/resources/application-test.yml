@@ -9,3 +9,5 @@ spring:
       ddl-auto: validate
 integrations:
   internal-service-token: test-internal-service-token-1234567890
+payment:
+  mock-enabled: true

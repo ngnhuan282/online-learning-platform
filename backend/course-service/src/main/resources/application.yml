@@ -10,11 +10,11 @@ spring:
   datasource:
     url: ${COURSE_DB_URL:jdbc:mysql://localhost:3306/course_db}
     username: ${COURSE_DB_USERNAME:course_app}
-    password: ${COURSE_DB_PASSWORD:CoursePass123}
+    password: ${COURSE_DB_PASSWORD}
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update # <--- ĐÃ SỬA THÀNH UPDATE
+      ddl-auto: validate
   servlet:
     multipart:
       max-file-size: 200MB
@@ -25,7 +25,7 @@ spring:
     baseline-version: 1
 security:
   jwt:
-    secret: ${JWT_SECRET:SGSphereJWTSecretKeyForLocalDevelopment2026!}
+    secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:learnsphere}
     access-token-seconds: ${JWT_ACCESS_TOKEN_SECONDS:900}
 management:
@@ -36,10 +36,18 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
 
 storage:
   type: ${STORAGE_TYPE:local}
   local-dir: ${STORAGE_LOCAL_DIR:./uploads}
+
+learning:
+  service-url: ${LEARNING_SERVICE_URL:http://localhost:8083}
 
 integrations:
   learning:
@@ -53,3 +61,7 @@ integrations:
     endpoint-url: ${AWS_ENDPOINT_URL:}
     force-path-style: ${AWS_S3_FORCE_PATH_STYLE:false}
     public-endpoint-url: ${AWS_PUBLIC_ENDPOINT_URL:}
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:ecs}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { mediaApi } from '../api/mediaApi';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 
@@ -26,6 +26,7 @@ export default function MediaUploader({
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [previewUrl, setPreviewUrl] = useState(currentUrl);
+  const [previousUrl, setPreviousUrl] = useState(currentUrl);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef(null);
@@ -34,11 +35,10 @@ export default function MediaUploader({
   const isVideo = accept.includes('video') || (previewUrl && previewUrl.match(/\.(mp4|webm|mov)$/i));
 
   // Sync preview khi currentUrl thay đổi từ bên ngoài (vd: edit khóa học khác)
-  useEffect(() => {
-    if (!uploading) {
-      setPreviewUrl(currentUrl || '');
-    }
-  }, [currentUrl]);
+  if (previousUrl !== currentUrl && !uploading) {
+    setPreviousUrl(currentUrl);
+    setPreviewUrl(currentUrl || '');
+  }
 
   const handleFile = async file => {
     if (!file) return;
@@ -154,9 +154,7 @@ export default function MediaUploader({
 
         {uploading ? (
           <div style={{ display: 'grid', gap: 8, padding: '10px 0' }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#1e293b' }}>
-              Đang tải lên... {progress}%
-            </div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#1e293b' }}>Đang tải lên... {progress}%</div>
             {/* Progress Bar */}
             <div
               style={{
@@ -189,9 +187,7 @@ export default function MediaUploader({
             <span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb' }}>
               Nhấn để chọn tệp hoặc kéo thả vào đây
             </span>
-            <span style={{ fontSize: 12, color: '#64748b' }}>
-              Hỗ trợ: {accept.replace(/\*/g, 'tất cả')}
-            </span>
+            <span style={{ fontSize: 12, color: '#64748b' }}>Hỗ trợ: {accept.replace(/\*/g, 'tất cả')}</span>
           </div>
         )}
       </div>
@@ -231,7 +227,13 @@ export default function MediaUploader({
               <img
                 src={resolveMediaUrl(previewUrl)}
                 alt="Preview"
-                style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
+                style={{
+                  width: 48,
+                  height: 48,
+                  objectFit: 'cover',
+                  borderRadius: 6,
+                  border: '1px solid #e2e8f0',
+                }}
               />
             ) : isVideo ? (
               <span style={{ fontSize: 24 }}>🎬</span>
@@ -251,9 +253,7 @@ export default function MediaUploader({
               >
                 {uploadedFile?.fileName || 'Tệp đã tải lên'}
               </div>
-              <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>
-                ✓ Đã tải lên máy chủ
-              </div>
+              <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ Đã tải lên máy chủ</div>
             </div>
           </div>
 

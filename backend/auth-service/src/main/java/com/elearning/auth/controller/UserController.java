@@ -8,6 +8,8 @@ import com.elearning.auth.dto.UpdateProfileRequest;
 import com.elearning.auth.dto.UserResponse;
 import com.elearning.auth.service.AuthService;
 import com.elearning.auth.service.UserService;
+import com.elearning.auth.service.GoogleLinkService;
+import com.elearning.auth.dto.LinkedAccountsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -21,10 +23,19 @@ public class UserController {
 
     private final AuthService auth;
     private final UserService userService;
+    private final GoogleLinkService links;
 
-    public UserController(AuthService auth, UserService userService) {
+    public UserController(AuthService auth, UserService userService, GoogleLinkService links) {
         this.auth = auth;
         this.userService = userService;
+        this.links = links;
+    }
+
+    @GetMapping("/me/linked-accounts")
+    public ApiResponse<LinkedAccountsResponse> linkedAccounts(Authentication authentication,
+        jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return ApiResponse.success(links.status(getUserId(authentication)));
     }
 
     @GetMapping("/me")
