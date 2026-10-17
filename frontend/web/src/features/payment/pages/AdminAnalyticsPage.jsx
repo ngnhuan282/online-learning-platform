@@ -7,6 +7,7 @@ import ErrorState from '../../../shared/components/ErrorState';
 import Icon from '../../../shared/components/Icon';
 import { paymentApi } from '../api/paymentApi';
 import { formatDemoPrice } from '../data/paymentDemo';
+import { getPaymentDisplayStatus } from '../utils/paymentFlow';
 import '../styles/payment.css';
 
 const EMPTY_LIST = [];
@@ -14,6 +15,7 @@ const EMPTY_LIST = [];
 const statusLabel = {
   SUCCESS: 'Thành công',
   PENDING: 'Đang chờ',
+  EXPIRED: 'Hết hạn thanh toán',
   FAILED: 'Thất bại',
   CANCELLED: 'Đã hủy',
   REFUNDED: 'Hoàn tiền',
@@ -267,8 +269,10 @@ export default function AdminAnalyticsPage() {
                           <td>{transaction.courseTitle}</td>
                           <td>{formatAmount(transaction.amount, transaction.currency)}</td>
                           <td>
-                            <span className={`payment-status ${statusTone(transaction.status)}`}>
-                              {statusLabel[transaction.status] || transaction.status}
+                            <span
+                              className={`payment-status ${statusTone(getPaymentDisplayStatus(transaction))}`}
+                            >
+                              {statusLabel[getPaymentDisplayStatus(transaction)] || transaction.status}
                             </span>
                           </td>
                           <td>{formatDate(transaction.createdAt)}</td>

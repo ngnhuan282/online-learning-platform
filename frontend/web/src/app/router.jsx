@@ -23,6 +23,18 @@ import AdminAuditPage from '../features/admin/pages/AdminAuditPage';
 
 const router = createBrowserRouter([
   {
+    path: '/ai-assistant',
+    element: <UserLayout />,
+    children: [
+      {
+        index: true,
+        lazy: async () => ({
+          Component: (await import('../features/ai-assistant/pages/AiAssistantPage')).default,
+        }),
+      },
+    ],
+  },
+  {
     path: '/account',
     element: <UserLayout />,
     children: [{ index: true, element: <AccountPage /> }],

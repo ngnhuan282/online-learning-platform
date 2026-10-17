@@ -5,10 +5,10 @@ import ErrorState from '../../../shared/components/ErrorState';
 import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
 import { formatCurrency } from '../../../shared/utils/formatCurrency';
-import { getErrorMessage } from '../../../shared/utils/errorUtils';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import { courseApi } from '../../courses/api/courseApi';
 import { paymentApi } from '../api/paymentApi';
+import { getCheckoutErrorMessage, readCheckoutRedirect } from '../utils/paymentFlow';
 import '../styles/payment.css';
 
 function normalizeCourse(value) {
@@ -41,9 +41,43 @@ export default function PaymentCheckoutPage() {
   const [courseRetry, setCourseRetry] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [methodState, setMethodState] = useState({ loading: true, methods: [], error: null });
+  const [methodRetry, setMethodRetry] = useState(0);
+  const [provider, setProvider] = useState('MOCK');
+
+  useEffect(() => {
+    let active = true;
+    paymentApi
+      .getMethods()
+      .then(response => {
+        if (!active) return;
+        if (!Array.isArray(response.data)) {
+          throw new Error('Không thể tải phương thức thanh toán. Vui lòng thử lại.');
+        }
+        setMethodState({ loading: false, methods: response.data, error: null });
+      })
+      .catch(fetchError => {
+        if (active) {
+          const message =
+            fetchError.status === 403
+              ? 'Bạn không có quyền truy cập phương thức thanh toán.'
+              : 'Không thể tải phương thức thanh toán. Vui lòng thử lại sau.';
+          setMethodState({ loading: false, methods: [], error: new Error(message) });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [methodRetry]);
+
+  function retryMethodLoad() {
+    setMethodState({ loading: true, methods: [], error: null });
+    setMethodRetry(value => value + 1);
+  }
 
   useEffect(() => {
     if (!validCourseId) return;
+    idempotencyKey.current = crypto.randomUUID();
     let active = true;
     courseApi
       .getById(courseId)
@@ -115,19 +149,22 @@ export default function PaymentCheckoutPage() {
   const course = courseState.course;
   const subtotal = Math.max(course.originalPrice || course.price, course.price);
   const discount = Math.max(subtotal - course.price, 0);
+  const selectedMethod = methodState.methods.find(method => method.provider === provider);
+  const canCheckout = !methodState.loading && !methodState.error && selectedMethod?.available === true;
 
   const handleCheckout = async () => {
+    if (submitting || !canCheckout) return;
     setSubmitting(true);
     setError(null);
     try {
       const response = await paymentApi.createCheckout({
         courseId: course.id,
-        provider: 'MOCK',
+        provider,
         idempotencyKey: idempotencyKey.current,
         returnUrl: `${window.location.origin}${ROUTES.PAYMENT_RESULT}`,
         cancelUrl: `${window.location.origin}${ROUTES.CHECKOUT}?course=${encodeURIComponent(course.id)}`,
       });
-      const checkoutUrl = new URL(response.data.checkoutUrl, window.location.origin);
+      const checkoutUrl = readCheckoutRedirect(response.data.checkoutUrl, provider, window.location.origin);
       if (checkoutUrl.origin === window.location.origin) {
         navigate(`${checkoutUrl.pathname}${checkoutUrl.search}${checkoutUrl.hash}`);
       } else {
@@ -146,7 +183,7 @@ export default function PaymentCheckoutPage() {
         <div className="payment-page-heading">
           <span className="eyebrow">CHECKOUT</span>
           <h1>Thanh toán khóa học</h1>
-          <p>Kiểm tra thông tin khóa học trước khi chuyển sang bước thanh toán mô phỏng.</p>
+          <p>Kiểm tra thông tin khóa học và chọn phương thức thanh toán.</p>
         </div>
 
         <div className="checkout-grid">
@@ -192,7 +229,7 @@ export default function PaymentCheckoutPage() {
                 </li>
                 <li>
                   <Icon name="check" size={18} />
-                  Cổng mô phỏng cho phép kiểm tra đầy đủ luồng thanh toán trước khi dùng VNPay.
+                  Các phương thức thử nghiệm không phát sinh thanh toán bằng tiền thật.
                 </li>
               </ul>
             </div>
@@ -230,34 +267,52 @@ export default function PaymentCheckoutPage() {
             </div>
 
             <div className="payment-method-list" role="radiogroup" aria-label="Phương thức thanh toán">
-              <label className="payment-method selected">
-                <input type="radio" name="provider" defaultChecked />
-                <span>
-                  <b>Mock Payment</b>
-                  <small>Thanh toán mô phỏng</small>
-                </span>
-              </label>
-              <label className="payment-method">
-                <input type="radio" name="provider" disabled />
-                <span>
-                  <b>VNPay Sandbox</b>
-                  <small>Sẽ kích hoạt ở tuần 9</small>
-                </span>
-              </label>
+              {methodState.loading && <AppLoading label="Đang tải phương thức thanh toán..." />}
+              {methodState.methods.map(method => (
+                <label
+                  key={method.provider}
+                  className={`payment-method${provider === method.provider ? ' selected' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="provider"
+                    value={method.provider}
+                    checked={provider === method.provider}
+                    disabled={!method.available || submitting}
+                    onChange={() => {
+                      idempotencyKey.current = crypto.randomUUID();
+                      setProvider(method.provider);
+                      setError(null);
+                    }}
+                  />
+                  <span>
+                    <b>{method.label}</b>
+                    <small>{method.description}</small>
+                  </span>
+                </label>
+              ))}
             </div>
 
-            {error && <p className="checkout-error">{getErrorMessage(error)}</p>}
+            {methodState.error && (
+              <ErrorState
+                error={methodState.error}
+                title="Không thể tải phương thức thanh toán"
+                onRetry={retryMethodLoad}
+              />
+            )}
+
+            {error && (
+              <p className="checkout-error" role="alert">
+                {getCheckoutErrorMessage(error)}
+              </p>
+            )}
 
             <button
               className="button button-primary checkout-submit"
               onClick={handleCheckout}
-              disabled={submitting}
+              disabled={submitting || !canCheckout}
             >
-              {submitting
-                ? 'Đang tạo giao dịch...'
-                : error
-                  ? 'Thử lại thanh toán'
-                  : 'Tiếp tục thanh toán'}{' '}
+              {submitting ? 'Đang tạo giao dịch...' : error ? 'Thử lại thanh toán' : 'Tiếp tục thanh toán'}{' '}
               <Icon name="arrow" size={17} />
             </button>
             <Link className="button button-outline checkout-secondary" to={ROUTES.PAYMENT_HISTORY}>
@@ -269,7 +324,9 @@ export default function PaymentCheckoutPage() {
 
             <p className="payment-safe-note">
               <Icon name="shield" size={16} />
-              Bạn sẽ được chuyển sang màn mô phỏng để chọn kết quả thanh toán.
+              {provider === 'VNPAY'
+                ? 'Bạn sẽ được chuyển tới VNPay Sandbox để hoàn tất thanh toán thử nghiệm.'
+                : 'Bạn sẽ được chuyển sang màn mô phỏng để chọn kết quả thanh toán.'}
             </p>
           </aside>
         </div>

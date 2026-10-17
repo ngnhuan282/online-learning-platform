@@ -12,6 +12,7 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT, "Resource conflict"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type"),
+    AI_NOT_AVAILABLE(HttpStatus.NOT_IMPLEMENTED, "AI assistant is not available yet"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
 
     private final HttpStatus status;

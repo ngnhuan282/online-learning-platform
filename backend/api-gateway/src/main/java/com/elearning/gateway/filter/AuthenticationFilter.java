@@ -57,6 +57,8 @@ public class AuthenticationFilter implements WebFilter, Ordered {
             path.startsWith("/swagger-ui/") ||
             publicAuth ||
             (method == HttpMethod.GET &&
+                Set.of("/api/v1/payments/vnpay/return", "/api/v1/payments/vnpay/ipn").contains(path)) ||
+            (method == HttpMethod.GET &&
                 (path.equals("/api/v1/courses") ||
                     path.matches("/api/v1/courses/[^/]+") ||
                     path.matches("/api/v1/courses/[^/]+/sections") ||
@@ -86,7 +88,9 @@ public class AuthenticationFilter implements WebFilter, Ordered {
                 headers.remove("X-User-Id");
                 headers.remove("X-User-Role");
                 headers.remove("X-User-Roles");
-                headers.remove("X-Internal-Service-Token");
+                headers.remove("X-Payment-Client-IP");
+                var remote = exchange.getRequest().getRemoteAddress();
+                if (remote != null) headers.set("X-Payment-Client-IP", remote.getAddress().getHostAddress());
             })
             .build();
         return chain.filter(exchange.mutate().request(request).build());

@@ -37,6 +37,8 @@ management:
 integrations:
   ai:
     api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:}
+    request-timeout-ms: ${AI_REQUEST_TIMEOUT_MS:15000}
 
 logging:
   structured:

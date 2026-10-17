@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -54,6 +55,8 @@ class ApiGatewayApplicationTests {
                         "|" +
                         (exchange.getRequestHeaders().getFirst("Authorization") != null);
                 byte[] bytes = result.getBytes(StandardCharsets.UTF_8);
+                String clientIp = exchange.getRequestHeaders().getFirst("X-Payment-Client-IP");
+                if (clientIp != null) exchange.getResponseHeaders().add("X-Test-Payment-Client-IP", clientIp);
                 exchange.sendResponseHeaders(200, bytes.length);
                 try (var body = exchange.getResponseBody()) {
                     body.write(bytes);
@@ -87,7 +90,7 @@ class ApiGatewayApplicationTests {
     @Autowired
     JsonMapper mapper;
 
-    final HttpClient client = HttpClient.newHttpClient();
+    final HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
     String token(long seconds) {
         return Jwts.builder()
@@ -107,7 +110,8 @@ class ApiGatewayApplicationTests {
                 "spoofed")
                 .header("X-User-Role", "ADMIN")
                 .header("X-User-Roles", "ADMIN,PAYMENT_REPORT_VIEW");
-        request.header("X-Internal-Service-Token", "spoofed-internal-token");
+        request.header("X-Payment-Client-IP", "203.0.113.99");
+        request.timeout(Duration.ofSeconds(15));
         if (token != null)
             request.header("Authorization", "Bearer " + token);
         if (origin != null)
@@ -161,6 +165,8 @@ class ApiGatewayApplicationTests {
         var response = request(path, token(60), "GET", null);
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo(path + "|null|null|null|true");
+        assertThat(response.headers().firstValue("X-Test-Payment-Client-IP"))
+            .isPresent().isNotEqualTo(java.util.Optional.of("203.0.113.99"));
     }
 
     @Test
@@ -171,6 +177,20 @@ class ApiGatewayApplicationTests {
         assertThat(request("/api/v1/auth/private", null, "GET", null).statusCode()).isEqualTo(401);
         assertThat(request("/api/v1/courses", null, "POST", null).statusCode()).isEqualTo(401);
         assertThat(request("/api/v1/courses/1/lessons", null, "GET", null).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void permitsOnlyExactGetVnpayCallbacksWithoutRelaxingPaymentAuth() throws Exception {
+        for (String suffix : new String[] {"return", "ipn"}) {
+            String path = "/api/v1/payments/vnpay/" + suffix;
+            var result = request(path + "?vnp_Amount=1&vnp_SecureHash=invalid", null, "GET", null);
+            assertThat(result.statusCode()).isEqualTo(200);
+            assertThat(result.body()).isEqualTo(path + "|null|null|null|false");
+            assertThat(request(path, null, "POST", null).statusCode()).isEqualTo(401);
+            assertThat(request(path + "/private", null, "GET", null).statusCode()).isEqualTo(401);
+        }
+        assertThat(request("/api/v1/payments/checkout", null, "POST", null).statusCode()).isEqualTo(401);
+        assertThat(request("/api/v1/payments/admin/analytics", null, "GET", null).statusCode()).isEqualTo(401);
     }
 
     @Test

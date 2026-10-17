@@ -1,5 +1,7 @@
 package com.elearning.payment.dto;
 
+import com.elearning.payment.entity.enums.OrderStatus;
+import com.elearning.payment.entity.enums.PaymentProvider;
 import com.elearning.payment.entity.enums.PaymentStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,5 +13,8 @@ public record PaymentHistoryItemResponse(
     String currency,
     String courseTitle,
     Instant createdAt,
-    Instant paidAt
+    Instant paidAt,
+    OrderStatus orderStatus,
+    Instant expiresAt,
+    PaymentProvider provider
 ) {}

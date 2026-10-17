@@ -7,6 +7,7 @@ export const ROUTES = Object.freeze({
   ACCOUNT: '/account',
   ADMIN_PROFILE: '/admin/profile',
   COURSES: '/courses',
+  AI_ASSISTANT: '/ai-assistant',
   CHECKOUT: '/checkout',
   PAYMENT_MOCK: '/payment/mock',
   PAYMENT_RESULT: '/payment/result',

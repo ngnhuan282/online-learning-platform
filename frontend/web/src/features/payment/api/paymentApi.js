@@ -2,21 +2,26 @@ import axiosClient from '../../../shared/apis/axiosClient';
 import { ENDPOINTS } from '../../../shared/apis/endpoints';
 
 export const paymentApi = {
+  getMethods: () => axiosClient.get(`${ENDPOINTS.payments}/methods`),
   createCheckout: payload => axiosClient.post(`${ENDPOINTS.payments}/checkout`, payload),
   getOrder: orderCode => axiosClient.get(`${ENDPOINTS.payments}/orders/${encodeURIComponent(orderCode)}`),
+  retryActivation: orderCode =>
+    axiosClient.post(`${ENDPOINTS.payments}/orders/${encodeURIComponent(orderCode)}/activation`),
   completeMockPayment: (orderCode, payload) =>
     axiosClient.post(`${ENDPOINTS.payments}/mock/orders/${encodeURIComponent(orderCode)}/complete`, payload),
   getHistory: ({ page = 0, size = 10, keyword = '', status = '' } = {}) => {
     const params = { page, size };
     if (keyword.trim()) params.keyword = keyword.trim();
-    if (status) params.status = status;
+    if (status === 'EXPIRED') params.expired = true;
+    else if (status) params.status = status;
     return axiosClient.get(`${ENDPOINTS.payments}/history`, { params });
   },
   getAdminAnalytics: () => axiosClient.get(`${ENDPOINTS.payments}/admin/analytics`),
   getAdminOrders: ({ page = 0, size = 10, keyword = '', status = '' } = {}) => {
     const params = { page, size };
     if (keyword.trim()) params.keyword = keyword.trim();
-    if (status) params.status = status;
+    if (status === 'EXPIRED') params.expired = true;
+    else if (status) params.status = status;
     return axiosClient.get(`${ENDPOINTS.payments}/admin/orders`, { params });
   },
   getAdminOrder: orderCode =>

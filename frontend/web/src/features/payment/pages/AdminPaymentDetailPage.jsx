@@ -15,8 +15,10 @@ import { date, money, number } from '../../admin/utils/adminUtils';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
 import useToast from '../../../shared/hooks/useToast';
 import { paymentApi } from '../api/paymentApi';
+import { getPaymentDisplayStatus } from '../utils/paymentFlow';
 
 const paymentStatuses = {
+  EXPIRED: 'Hết hạn thanh toán',
   PENDING: 'Đang chờ',
   SUCCESS: 'Thành công',
   FAILED: 'Thất bại',
@@ -35,7 +37,7 @@ const eventLabels = {
   CREATED: 'Tạo giao dịch',
   PROVIDER_REQUESTED: 'Gửi sang cổng thanh toán',
   PROVIDER_RETURNED: 'Người dùng quay lại',
-  PROVIDER_CALLBACK: 'Cổng thanh toán callback',
+  PROVIDER_CALLBACK: 'Nhận xác nhận từ cổng thanh toán',
   STATUS_CHANGED: 'Cập nhật trạng thái',
 };
 
@@ -194,7 +196,7 @@ export default function AdminPaymentDetailPage() {
             />
             <StatCard
               title="TRẠNG THÁI THANH TOÁN"
-              value={paymentStatuses[payment?.status] || payment?.status || '—'}
+              value={paymentStatuses[getPaymentDisplayStatus(order)] || payment?.status || '—'}
               detail={`Đơn hàng: ${orderStatuses[order.status] || order.status}`}
               icon={<TaskAlt />}
               tone={statusTone(payment?.status)}
@@ -233,9 +235,21 @@ export default function AdminPaymentDetailPage() {
                   <dt>Hoàn tất lúc</dt>
                   <dd>{displayDate(payment?.paidAt)}</dd>
                 </div>
+                {payment?.provider === 'VNPAY' && (
+                  <div>
+                    <dt>Thời hạn thanh toán</dt>
+                    <dd>{displayDate(order.expiresAt)}</dd>
+                  </div>
+                )}
                 <div>
                   <dt>Cập nhật gần nhất</dt>
-                  <dd>{displayDate(payment?.updatedAt || order.updatedAt)}</dd>
+                  <dd>
+                    {displayDate(
+                      Date.parse(order.updatedAt) > Date.parse(payment?.updatedAt)
+                        ? order.updatedAt
+                        : payment?.updatedAt || order.updatedAt,
+                    )}
+                  </dd>
                 </div>
               </dl>
             </section>
@@ -250,6 +264,12 @@ export default function AdminPaymentDetailPage() {
               {!isAdmin ? (
                 <Alert severity="info">
                   Bạn có thể xem giao dịch. Chỉ tài khoản ADMIN mới được cập nhật trạng thái thanh toán.
+                </Alert>
+              ) : payment?.provider === 'VNPAY' ? (
+                <Alert severity="info">
+                  {getPaymentDisplayStatus(order) === 'EXPIRED'
+                    ? 'Đơn này đã hết hạn thanh toán. Nếu học viên đã thanh toán đúng hạn, kết quả vẫn được cập nhật khi VNPay gửi xác nhận. Không đổi trạng thái thủ công tại đây.'
+                    : 'Trạng thái giao dịch được cập nhật theo xác nhận từ VNPay. Không thể đổi trạng thái hoặc hoàn tiền thủ công tại đây.'}
                 </Alert>
               ) : availableStatuses.length === 0 ? (
                 <Alert severity="success">Giao dịch này đã hoàn tất xử lý.</Alert>
