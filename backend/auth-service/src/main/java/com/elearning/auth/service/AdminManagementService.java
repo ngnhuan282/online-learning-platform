@@ -200,7 +200,7 @@ public class AdminManagementService {
     public void deleteUser(Long id, Long actor) {
         jdbc.queryForList("SELECT id FROM roles ORDER BY id FOR UPDATE");
         if (id.equals(actor)) throw new AppException(ErrorCode.CANNOT_LOCK_SELF);
-        User user = users.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        User user = users.findForUpdate(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         if (user.getDeletedAt() != null) throw new AppException(ErrorCode.USER_NOT_FOUND);
         protectAdmin(user, actor);
         guardLastAdmin(user, true);

@@ -3,6 +3,9 @@ package com.elearning.auth.common.exception;
 import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
+    PASSWORD_RESET_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Password reset email is not available. Please try again later"),
+    PASSWORD_RESET_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many password reset requests. Please try again later"),
+    PASSWORD_RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "The reset link is invalid, expired or already used. Request a new link"),
     GOOGLE_LINK_PASSWORD_INVALID(HttpStatus.BAD_REQUEST, "Current password is incorrect"),
     GOOGLE_LINK_LOCAL_REQUIRED(HttpStatus.BAD_REQUEST, "Linking requires an account with a local password"),
     GOOGLE_LINK_SESSION_INVALID(HttpStatus.CONFLICT, "The initiating session is no longer valid. Sign in and start linking again"),

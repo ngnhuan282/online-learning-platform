@@ -66,7 +66,7 @@ class AiServiceApplicationTests {
     String token(String role, long seconds) {
         return Jwts.builder()
             .subject("test-user")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(120)))
@@ -151,7 +151,7 @@ class AiServiceApplicationTests {
         var key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         String noExpiry = Jwts.builder()
             .subject("u")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", "USER")
             .claim("tokenType", "access")
             .issuedAt(new Date())
@@ -162,7 +162,7 @@ class AiServiceApplicationTests {
         assertThatThrownBy(() -> tokens.validate(wrongIssuer)).isInstanceOf(JwtException.class);
         String wrongType = Jwts.builder()
             .subject("u")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("tokenType", "refresh")
             .signWith(key)
             .compact();

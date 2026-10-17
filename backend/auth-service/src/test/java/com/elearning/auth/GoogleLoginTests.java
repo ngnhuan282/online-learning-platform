@@ -787,7 +787,7 @@ class GoogleLoginTests {
     JsonNode business(String method, String path, Object body, String bearer) throws Exception {
         String[] parts = bearer.split("\\.");
         var claims = JSON.readTree(Base64.getUrlDecoder().decode(parts[1]));
-        assertThat(claims.get("iss").asString()).isEqualTo("learnsphere");
+        assertThat(claims.get("iss").asString()).isEqualTo("sgedu");
         var signer = Mac.getInstance("HmacSHA256");
         signer.init(
             new SecretKeySpec(

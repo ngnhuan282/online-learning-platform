@@ -56,6 +56,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     public String create(Long userId) {
+        users.findForUpdate(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         auth.getCurrentUser(userId.toString()); // Check current account status using existing Auth rules.
         return issue(
             users.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)),
@@ -75,10 +76,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     public Rotation rotate(String rawToken) {
-        // Serialize rotation/revocation on this token, including across Auth instances.
+        String hash = hashRequired(rawToken);
+        var userId = refreshTokens
+            .findUserIdByTokenHash(hash)
+            .orElseThrow(() -> new AppException(ErrorCode.REFRESH_TOKEN_INVALID));
+        // A shared user-first lock order also serializes password reset against rotation/linking.
+        users.findForUpdate(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         var old = check(
             refreshTokens
-                .findForUpdate(hashRequired(rawToken))
+                .findForUpdate(hash)
                 .orElseThrow(() -> new AppException(ErrorCode.REFRESH_TOKEN_INVALID))
         );
         var user = auth.getCurrentUser(old.getUser().getId().toString());
@@ -97,6 +103,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     public void revoke(String rawToken) {
         if (rawToken == null || !rawToken.matches("[A-Za-z0-9_-]{43}")) return;
+        var existing = refreshTokens.findUserIdByTokenHash(hash(rawToken));
+        if (existing.isEmpty()) return;
+        users.findForUpdate(existing.get());
         refreshTokens.findForUpdate(hash(rawToken)).ifPresent(token -> {
             token.revoke();
             // Invalidate pending linking even when logout races with a completed rotation.
@@ -109,6 +118,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         if (rawToken == null || !rawToken.matches("[A-Za-z0-9_-]{43}")) throw new AppException(
             ErrorCode.GOOGLE_LINK_SESSION_INVALID
         );
+        users
+            .findForUpdate(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.GOOGLE_LINK_SESSION_INVALID));
         var token = refreshTokens
             .findForUpdate(hash(rawToken))
             .orElseThrow(() -> new AppException(ErrorCode.GOOGLE_LINK_SESSION_INVALID));

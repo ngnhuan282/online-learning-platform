@@ -6,6 +6,8 @@ export const ENDPOINTS = Object.freeze({
     register: `${API_PREFIX}/auth/register`,
     refresh: `${API_PREFIX}/auth/refresh`,
     logout: `${API_PREFIX}/auth/logout`,
+    forgotPassword: `${API_PREFIX}/auth/forgot-password`,
+    resetPassword: `${API_PREFIX}/auth/reset-password`,
     googleStart: `${API_PREFIX}/auth/google/start`,
     googleExchange: `${API_PREFIX}/auth/google/exchange`,
   },

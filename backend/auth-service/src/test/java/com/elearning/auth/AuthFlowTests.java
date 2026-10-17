@@ -40,6 +40,7 @@ class AuthFlowTests {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("security.jwt.secret", () -> SECRET);
+        registry.add("security.password-reset.mail-enabled", () -> false);
         registry.add("spring.datasource.url", () -> "jdbc:h2:mem:auth_flow;MODE=MySQL;DB_CLOSE_DELAY=-1");
     }
 
@@ -91,6 +92,16 @@ class AuthFlowTests {
         String email = email();
         assertThat(request(REGISTER, registration(email), null).statusCode()).isEqualTo(201);
         return email;
+    }
+
+    @Test
+    void disabledMailReturnsSameUnavailableErrorWithoutIssuingAnyResetTokens() throws Exception {
+        String local = registerUser();
+        for (String email : List.of(local, email())) {
+            error(request("/api/v1/auth/forgot-password", Map.of("email", email), "broken"), 503, "PASSWORD_RESET_UNAVAILABLE");
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM password_reset_tokens", Long.class)).isZero();
+        assertThat(login(local, PASSWORD).statusCode()).isEqualTo(200);
     }
 
     HttpResponse<String> login(String email, String password) throws Exception {
@@ -242,7 +253,7 @@ class AuthFlowTests {
         assertThat(payload.get("expiresIn").asLong()).isEqualTo(900);
         var claims = tokens.validate(payload.get("accessToken").asString());
         assertThat(claims.getSubject()).isEqualTo(payload.get("user").get("id").asString());
-        assertThat(claims.getIssuer()).isEqualTo("learnsphere");
+        assertThat(claims.getIssuer()).isEqualTo("sgedu");
         assertThat(claims.get("tokenType")).isEqualTo("access");
         assertThat(tokens.roles(claims)).containsExactly("USER");
         assertThat(claims.getExpiration().getTime() - claims.getIssuedAt().getTime()).isEqualTo(900000);
@@ -284,7 +295,7 @@ class AuthFlowTests {
         error(request(ME, null, "broken"), 401, "UNAUTHORIZED");
         String expired = Jwts.builder()
             .subject("1")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", "USER")
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(120)))
@@ -332,7 +343,7 @@ class AuthFlowTests {
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
             )
-        ).isEqualTo(8);
+        ).isEqualTo(9);
         assertThat(jdbc.queryForList("SELECT name FROM roles", String.class)).containsExactlyInAnyOrder(
             "USER",
             "ADMIN"

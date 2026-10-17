@@ -54,7 +54,7 @@ export default function HeroSection() {
                 <i />
                 <i />
               </div>
-              <span>learnsphere.vn/english/pronunciation-studio</span>
+              <span>sgedu.vn/english/pronunciation-studio</span>
               <span className="live-badge">
                 <i /> AI Pronunciation Lab
               </span>

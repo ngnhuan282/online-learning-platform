@@ -92,7 +92,7 @@ class ApiGatewayApplicationTests {
     String token(long seconds) {
         return Jwts.builder()
                 .subject("user")
-                .issuer("learnsphere")
+                .issuer("sgedu")
                 .claim("role", "USER")
                 .claim("tokenType", "access")
                 .issuedAt(Date.from(Instant.now().minusSeconds(120)))
@@ -215,6 +215,7 @@ class ApiGatewayApplicationTests {
     @Test
     void permitsCookieAuthEndpointsWithoutValidAccessAndEnablesCredentialCors() throws Exception {
         for (String path : new String[] { "/api/v1/auth/refresh", "/api/v1/auth/logout",
+            "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password",
             "/api/v1/auth/google/start", "/api/v1/auth/google/exchange" }) {
             for (String access : new String[] { null, "broken", token(-60) }) {
                 var response = request(path, access, "POST", "http://localhost:5173");

@@ -34,6 +34,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 "/api/v1/auth/register",
                 "/api/v1/auth/refresh",
                 "/api/v1/auth/logout",
+                "/api/v1/auth/forgot-password",
+                "/api/v1/auth/reset-password",
                 "/api/v1/auth/google/start",
                 "/api/v1/auth/google/exchange"
             ).contains(request.getServletPath())

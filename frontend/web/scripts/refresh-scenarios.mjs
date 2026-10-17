@@ -98,7 +98,7 @@ export default async function refreshScenarios({
   );
 
   const restoreStart = responses.length;
-  await run('sessionStorage.removeItem("learnsphere.accessToken")');
+  await run('sessionStorage.removeItem("sgedu.accessToken")');
   await reload('sessionStorage.length === 1 && document.body.textContent.includes("Nguyễn Auth E2E")');
   assert.equal(await run('sessionStorage.length'), 1);
   const restoreFlow = responses.slice(restoreStart);

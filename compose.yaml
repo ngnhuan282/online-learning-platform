@@ -55,7 +55,7 @@ services:
       SERVER_PORT: "8081"
       LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
-      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ISSUER: ${JWT_ISSUER:-sgedu}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
       AUTH_DB_URL: jdbc:mysql://mysql:3306/auth_db
       AUTH_DB_USERNAME: auth_app
@@ -67,6 +67,14 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8080/api/v1/auth/google/callback/google}
       GOOGLE_FRONTEND_ORIGIN: ${GOOGLE_FRONTEND_ORIGIN:-http://localhost:5173}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      FRONTEND_RESET_URL: ${FRONTEND_RESET_URL:-http://localhost:5173/reset-password}
+      RESET_TOKEN_TTL_MINUTES: ${RESET_TOKEN_TTL_MINUTES:-15}
     depends_on:
       mysql:
         condition: service_healthy
@@ -83,7 +91,7 @@ services:
       SERVER_PORT: "8082"
       LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
-      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ISSUER: ${JWT_ISSUER:-sgedu}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
       COURSE_DB_URL: jdbc:mysql://mysql:3306/course_db
       COURSE_DB_USERNAME: course_app
@@ -128,7 +136,7 @@ services:
       SERVER_PORT: "8083"
       LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
-      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ISSUER: ${JWT_ISSUER:-sgedu}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN to at least 32 random UTF-8 bytes}
       COURSE_SERVICE_URL: http://course-service:8082
@@ -154,7 +162,7 @@ services:
       SERVER_PORT: "8084"
       LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
-      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ISSUER: ${JWT_ISSUER:-sgedu}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN to at least 32 random UTF-8 bytes}
       COURSE_SERVICE_URL: http://course-service:8082
@@ -185,7 +193,7 @@ services:
       SERVER_PORT: "8085"
       LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
-      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ISSUER: ${JWT_ISSUER:-sgedu}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
       AI_DB_URL: jdbc:mysql://mysql:3306/ai_db
       AI_DB_USERNAME: ai_app
@@ -207,7 +215,7 @@ services:
       SERVER_PORT: "8080"
       LOG_FORMAT: ${LOG_FORMAT:-ecs}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random UTF-8 bytes}
-      JWT_ISSUER: ${JWT_ISSUER:-learnsphere}
+      JWT_ISSUER: ${JWT_ISSUER:-sgedu}
       JWT_ACCESS_TOKEN_SECONDS: ${JWT_ACCESS_TOKEN_SECONDS:-900}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       AUTH_SERVICE_URL: http://auth-service:8081

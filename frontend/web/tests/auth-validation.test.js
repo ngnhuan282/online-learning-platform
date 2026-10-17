@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateAuth } from '../src/features/auth/schemas/authValidation.js';
+import { validateAuth, validatePasswordReset } from '../src/features/auth/schemas/authValidation.js';
 
 const registration = password => ({
   fullName: 'Nguyễn Văn A',
@@ -8,6 +8,20 @@ const registration = password => ({
   password,
   confirmPassword: password,
   terms: true,
+});
+
+test('password reset uses registration strength and BCrypt UTF-8 bounds with mandatory confirmation', () => {
+  for (const password of ['weak', 'NoDigitsHere', 'Aa1' + '界'.repeat(24)]) {
+    assert.ok(validatePasswordReset({ newPassword: password, confirmPassword: password }).newPassword);
+  }
+  assert.deepEqual(
+    validatePasswordReset({ newPassword: 'StrongPassword9!', confirmPassword: 'StrongPassword9!' }),
+    {},
+  );
+  assert.ok(validatePasswordReset({ newPassword: 'StrongPassword9!', confirmPassword: '' }).confirmPassword);
+  assert.ok(
+    validatePasswordReset({ newPassword: 'StrongPassword9!', confirmPassword: 'different' }).confirmPassword,
+  );
 });
 
 test('registration requires uppercase, lowercase and a digit', () => {

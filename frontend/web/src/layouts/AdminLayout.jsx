@@ -59,7 +59,7 @@ export default function AdminLayout() {
               <SchoolOutlined />
             </span>
             <span>
-              LearnSphere<small>ENGLISH PLATFORM</small>
+              SGEdu<small>ENGLISH PLATFORM</small>
             </span>
             <b>Admin</b>
           </Link>
@@ -116,7 +116,7 @@ export default function AdminLayout() {
                 />
               </form>
             ) : (
-              <span>LearnSphere Admin</span>
+              <span>SGEdu Admin</span>
             )}
             <div className="admin-profile">
               <AccountMenu profileTo={ROUTES.ADMIN_PROFILE} showDetails />
@@ -127,7 +127,7 @@ export default function AdminLayout() {
           </main>
           <footer className="admin-footer">
             <span>
-              <SchoolOutlined fontSize="small" /> LearnSphere
+              <SchoolOutlined fontSize="small" /> SGEdu
             </span>
             <span>Không gian quản trị hệ thống học tập</span>
             <Link to="/">Về trang học tập ↗</Link>

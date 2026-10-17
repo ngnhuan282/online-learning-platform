@@ -92,7 +92,7 @@ export default function AiTutorSection() {
                 <Icon name="wave" size={22} />
               </span>
               <div>
-                <strong>LearnSphere AI Speaking Coach</strong>
+                <strong>SGEdu AI Speaking Coach</strong>
                 <span>
                   <i /> Đang học: Business Email & Meetings
                 </span>

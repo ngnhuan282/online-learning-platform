@@ -7,6 +7,9 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+    @Query("select token.user.id from RefreshToken token where token.tokenHash = :hash")
+    Optional<Long> findUserIdByTokenHash(@Param("hash") String hash);
+
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

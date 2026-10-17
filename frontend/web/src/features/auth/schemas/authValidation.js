@@ -7,18 +7,32 @@ export function validateAuth(values, mode) {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim()))
     errors.email = 'Địa chỉ email chưa đúng định dạng.';
   else if (values.email.trim().length > 254) errors.email = 'Địa chỉ email tối đa 254 ký tự.';
-  if (!values.password) errors.password = 'Vui lòng nhập mật khẩu.';
-  else if (mode === 'register' && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(values.password)) {
-    errors.password = 'Dùng ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.';
-  }
-  if (new TextEncoder().encode(values.password).length > 72)
-    errors.password = 'Mật khẩu tối đa 72 byte UTF-8.';
+  const passwordError = validatePassword(values.password, mode === 'register');
+  if (passwordError) errors.password = passwordError;
   if (mode === 'register') {
     if (!values.confirmPassword) errors.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
     else if (values.confirmPassword !== values.password)
       errors.confirmPassword = 'Mật khẩu xác nhận chưa khớp.';
     if (!values.terms) errors.terms = 'Bạn cần đồng ý với điều khoản và chính sách bảo mật.';
   }
+  return errors;
+}
+
+function validatePassword(password, strong) {
+  if (new TextEncoder().encode(password ?? '').length > 72) return 'Mật khẩu tối đa 72 byte UTF-8.';
+  if (!password) return 'Vui lòng nhập mật khẩu.';
+  if (strong && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password)) {
+    return 'Dùng ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.';
+  }
+  return '';
+}
+
+export function validatePasswordReset({ newPassword, confirmPassword }) {
+  const errors = {};
+  const error = validatePassword(newPassword, true);
+  if (error) errors.newPassword = error;
+  if (!confirmPassword) errors.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
+  else if (newPassword !== confirmPassword) errors.confirmPassword = 'Mật khẩu xác nhận chưa khớp.';
   return errors;
 }
 
