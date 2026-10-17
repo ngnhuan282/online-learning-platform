@@ -114,7 +114,7 @@ class NotificationIntegrationTests {
     }
 
     private String token(Long user, long seconds) {
-        return Jwts.builder().subject(user.toString()).issuer("learnsphere")
+        return Jwts.builder().subject(user.toString()).issuer("sgedu")
             .claim("role", "USER").claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now())).expiration(Date.from(Instant.now().plusSeconds(seconds)))
             .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256).compact();

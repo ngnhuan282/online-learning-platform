@@ -118,7 +118,7 @@ public class GoogleLinkService {
     }
 
     public Completion complete(Long userId, String rawRefresh, String code, String verifier) {
-        // Consistent lock order: refresh row -> user -> intent -> code -> external identity.
+        // requireSession locks user then refresh; reset/revocation uses the same order.
         String sessionId = refresh.requireSession(userId, rawRefresh);
         var user = lockUser(userId);
         var preview = codes.peekLink(code);

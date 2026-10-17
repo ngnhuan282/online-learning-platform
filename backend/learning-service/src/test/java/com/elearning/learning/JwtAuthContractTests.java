@@ -22,7 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 class JwtAuthContractTests {
 
     final String secret = UUID.randomUUID().toString() + UUID.randomUUID();
-    final JwtTokenProvider tokens = new JwtTokenProvider(secret, "learnsphere", 900);
+    final JwtTokenProvider tokens = new JwtTokenProvider(secret, "sgedu", 900);
 
     @AfterEach
     void clearContext() {
@@ -32,7 +32,7 @@ class JwtAuthContractTests {
     String token(String role, Object roles, Object permissions) {
         return Jwts.builder()
             .subject("42")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("roles", roles)
             .claim("permissions", permissions)

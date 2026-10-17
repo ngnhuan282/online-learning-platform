@@ -20,7 +20,6 @@ import Icon from '../../../shared/components/Icon';
 import PolicyDialog from '../../../shared/components/PolicyDialog';
 import AuthField from './AuthField';
 import SocialAuthButtons from './SocialAuthButtons';
-import ForgotPasswordDialog from './ForgotPasswordDialog';
 import { getPasswordStrength, validateAuth } from '../schemas/authValidation';
 import '../styles/auth.css';
 
@@ -48,7 +47,6 @@ export default function AuthForm({ mode }) {
       : '',
   );
   const [policy, setPolicy] = useState(null);
-  const [forgotOpen, setForgotOpen] = useState(false);
   const noticeRef = useRef(null);
   const strength = getPasswordStrength(values.password);
 
@@ -274,7 +272,7 @@ export default function AuthForm({ mode }) {
                   >
                     Chính sách bảo mật
                   </button>
-                  {' của LearnSphere.'}
+                  {' của SGEdu.'}
                 </span>
               </label>
               {errors.terms && (
@@ -289,9 +287,9 @@ export default function AuthForm({ mode }) {
                 <input type="checkbox" name="remember" checked={values.remember} onChange={update} />
                 <span>Ghi nhớ đăng nhập</span>
               </label>
-              <button type="button" className="auth-inline-link" onClick={() => setForgotOpen(true)}>
+              <Link className="auth-inline-link" to={ROUTES.FORGOT_PASSWORD}>
                 Quên mật khẩu?
-              </button>
+              </Link>
             </div>
           )}
           <button className="button button-primary auth-submit" type="submit" disabled={submitting}>
@@ -318,7 +316,6 @@ export default function AuthForm({ mode }) {
         )}
       </div>
       <PolicyDialog topic={policy} onClose={() => setPolicy(null)} />
-      {forgotOpen && <ForgotPasswordDialog open onClose={() => setForgotOpen(false)} />}
     </section>
   );
 }

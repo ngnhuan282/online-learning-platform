@@ -38,7 +38,7 @@ export default function SiteFooter() {
             </p>
             <div className="social-links">
               <button
-                aria-label="Cộng đồng LearnSphere English"
+                aria-label="Cộng đồng SGEdu English"
                 onClick={() => setInfo('Cộng đồng học viên')}
               >
                 <Icon name="globe" size={18} />
@@ -83,7 +83,7 @@ export default function SiteFooter() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© 2025 LearnSphere English. All rights reserved.</span>
+          <span>© 2025 SGEdu English. All rights reserved.</span>
           <div>
             {bottomPolicies.map(item => (
               <button key={item.topic} onClick={() => setInfo(item.topic)}>

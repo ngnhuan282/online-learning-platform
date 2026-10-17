@@ -210,7 +210,7 @@ PAYMENT_DB_PASSWORD=
 AI_DB_PASSWORD=
 
 JWT_SECRET=
-JWT_ISSUER=learnsphere
+JWT_ISSUER=sgedu
 JWT_ACCESS_TOKEN_SECONDS=900
 INTERNAL_SERVICE_TOKEN=
 
@@ -893,6 +893,9 @@ Google Login và liên kết local cùng email (TV1): [cấu hình OAuth, migrat
 Mặc định tắt; bật bằng `GOOGLE_LOGIN_ENABLED` và cung cấp Google OAuth Web client credentials ở backend.
 Người dùng local liên kết trong Hồ sơ → Phương thức đăng nhập sau khi xác nhận mật khẩu; cả hai cách
 đăng nhập giữ cùng userId. Không tự gộp theo email hoặc xóa database/volume để nâng migration.
+
+Quên/đặt lại mật khẩu bằng Spring Email: [API, migration V9, kiểm thử và hướng dẫn Gmail App Password](docs/auth/PASSWORD_RESET_REPORT.md).
+Mặc định MAIL_ENABLED=false; khi mail chưa cấu hình, forgot-password trả 503 thống nhất và không phát hành token.
 
 Quy tắc phát triển toàn project:
 

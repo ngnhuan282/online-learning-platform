@@ -1,4 +1,4 @@
-# LearnSphere API conventions
+# SGEdu API conventions
 
 All browser API requests go to `VITE_API_URL`, the API Gateway origin. Paths start with `/api/v1`; do not put `/api/v1` in `VITE_API_URL`. Feature APIs reuse `frontend/web/src/shared/apis/axiosClient.js`. Direct microservice URLs and secrets are forbidden in frontend source or environment variables.
 
@@ -158,10 +158,20 @@ The login form also checks the 72-byte limit. Login continues to verify existing
 
 ## Refresh-token contract
 
-Refresh tokens contain 32 SecureRandom bytes encoded as unpadded Base64url. Only the SHA-256 hex hash is stored in `auth_db.refresh_tokens`. Every refresh transaction locks the old token row, verifies expiration/revocation and account status, revokes the old token and inserts a new hash. Multiple sessions are independent. Concurrent use of the same token has one winner; the old token cannot refresh again.
+Refresh tokens contain 32 SecureRandom bytes encoded as unpadded Base64url. Only the SHA-256 hex hash is stored in `auth_db.refresh_tokens`. Every refresh transaction locks the user then the old token row, verifies expiration/revocation and account status, revokes the old token and inserts a new hash. Multiple sessions are independent. Concurrent use of the same token has one winner; the old token cannot refresh again.
 
 Login and refresh set `refresh_token` with HttpOnly, SameSite=Lax, Path=/api/v1/auth and configurable Secure. It is a session cookie (no persistent Max-Age/Expires); server expiration defaults to seven days via REFRESH_TOKEN_EXPIRATION_SECONDS. Production HTTPS should set REFRESH_COOKIE_SECURE=true. No refresh value appears in JSON or JavaScript storage. Logout expires the matching cookie with Max-Age=0 and is idempotent.
 
 The four POST Auth endpoints are public and ignore stale Bearer tokens. Other routes retain existing JWT rules. Gateway CORS allows only configured origins, enables credentials, rejects wildcard origins, and forwards cookies normally. Axios uses withCredentials=true. SameSite=Lax requires frontend/Gateway deployment on the same site; local localhost ports satisfy this.
 
-Refresh authentication failures use 401: REFRESH_TOKEN_MISSING, REFRESH_TOKEN_INVALID, REFRESH_TOKEN_EXPIRED, REFRESH_TOKEN_REVOKED. Disabled/locked accounts retain ACCOUNT_DISABLED/ACCOUNT_LOCKED (403). Failed refresh clears the local token; a temporary `/me` failure without refresh retains it. Explicit retry can retry startup restoration. Refresh never loops automatically; password reset, verification and Remember Me are not implemented. Google OIDC login and linking use this same session machinery as documented above.
+Refresh authentication failures use 401: REFRESH_TOKEN_MISSING, REFRESH_TOKEN_INVALID, REFRESH_TOKEN_EXPIRED, REFRESH_TOKEN_REVOKED. Disabled/locked accounts retain ACCOUNT_DISABLED/ACCOUNT_LOCKED (403). Failed refresh clears the local token; a temporary `/me` failure without refresh retains it. Explicit retry can retry startup restoration. Refresh never loops automatically; verification and Remember Me are not implemented. Google OIDC login and linking use this same session machinery as documented above.
+
+`POST /api/v1/auth/forgot-password` and `POST /api/v1/auth/reset-password` are public only for those exact
+POST paths at Gateway/Auth. Forgot accepts `{email}` and returns the same 200 notice for unknown,
+ineligible and eligible users; 503 PASSWORD_RESET_UNAVAILABLE before token issuance if SMTP is disabled
+or incompletely configured; 429 PASSWORD_RESET_RATE_LIMITED for input-email throttling. A 200 does not
+confirm delivery. Reset accepts `{token,newPassword,confirmPassword}`; validation errors never consume
+the proof. Invalid/expired/used tokens return 400 PASSWORD_RESET_TOKEN_INVALID. Success returns data:null,
+clears the cookie and revokes all refresh sessions and password-bound Google link intents atomically;
+it never logs in or sets a Google-only password. User-first locks serialize reset with refresh/Google LINK.
+See [password reset, mail configuration and demo](../auth/PASSWORD_RESET_REPORT.md).

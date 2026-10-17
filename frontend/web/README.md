@@ -1,4 +1,4 @@
-﻿# LearnSphere Frontend
+﻿# SGEdu Frontend
 
 Giao diện React + Vite triển khai theo ảnh tham chiếu và `../../docs/DESIGN.md`.
 

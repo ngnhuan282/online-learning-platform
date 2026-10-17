@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
 <rect width="640" height="360" fill="#f8fbff"/>
 <rect width="640" height="25" fill="white"/>
-<circle cx="12" cy="12" r="4" fill="#2563eb"/><text x="22" y="15" font-family="Arial" font-size="9" fill="#334155">LearnSphere ? Architecture Studio</text>
+<circle cx="12" cy="12" r="4" fill="#2563eb"/><text x="22" y="15" font-family="Arial" font-size="9" fill="#334155">SGEdu ? Architecture Studio</text>
 <path d="M0 25H640" stroke="#dce5ef"/>
 <text x="24" y="57" font-family="Arial,sans-serif" font-size="18" fill="#16468c" font-weight="bold">MICROSERVICES</text>
 <text x="24" y="74" font-family="Arial,sans-serif" font-size="8" fill="#64748b" font-weight="normal">Event-driven system architecture</text>

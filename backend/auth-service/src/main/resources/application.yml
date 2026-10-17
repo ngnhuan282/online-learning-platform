@@ -15,6 +15,21 @@ server:
     include-stacktrace: never
     include-binding-errors: never
 spring:
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    test-connection: false
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true
+      "[mail.smtp.starttls.required]": true
+      "[mail.smtp.ssl.checkserveridentity]": true
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
   application:
     name: auth-service
   datasource:
@@ -26,6 +41,15 @@ spring:
     hibernate:
       ddl-auto: validate
 security:
+  password-reset:
+    mail-enabled: ${MAIL_ENABLED:false}
+    mail-host: ${spring.mail.host}
+    mail-port: ${spring.mail.port}
+    mail-username: ${spring.mail.username}
+    mail-password: ${spring.mail.password}
+    mail-from: ${MAIL_FROM:}
+    frontend-reset-url: ${FRONTEND_RESET_URL:http://localhost:5173/reset-password}
+    token-ttl-minutes: ${RESET_TOKEN_TTL_MINUTES:15}
   google:
     enabled: ${GOOGLE_LOGIN_ENABLED:false}
     client-id: ${GOOGLE_CLIENT_ID:}
@@ -37,9 +61,13 @@ security:
     cookie-secure: ${REFRESH_COOKIE_SECURE:false}
   jwt:
     secret: ${JWT_SECRET}
-    issuer: ${JWT_ISSUER:learnsphere}
+    issuer: ${JWT_ISSUER:sgedu}
     access-token-seconds: ${JWT_ACCESS_TOKEN_SECONDS:900}
 management:
+  health:
+    # Auth remains available without SMTP. Delivery is gated by MAIL_ENABLED + complete configuration.
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:

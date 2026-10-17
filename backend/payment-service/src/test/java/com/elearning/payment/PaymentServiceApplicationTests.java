@@ -131,7 +131,7 @@ class PaymentServiceApplicationTests {
     String token(long userId, String role, List<String> permissions, long seconds) {
         return Jwts.builder()
             .subject(Long.toString(userId))
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("permissions", permissions)
             .claim("tokenType", "access")
@@ -182,7 +182,7 @@ class PaymentServiceApplicationTests {
         )) {
             String access = Jwts.builder()
                 .subject("123")
-                .issuer("learnsphere")
+                .issuer("sgedu")
                 .claim("role", "USER")
                 .claim("permissions", claim)
                 .claim("tokenType", "access")
@@ -674,7 +674,7 @@ class PaymentServiceApplicationTests {
         var key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         String noExpiry = Jwts.builder()
             .subject("u")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", "USER")
             .claim("tokenType", "access")
             .issuedAt(new Date())
@@ -685,7 +685,7 @@ class PaymentServiceApplicationTests {
         assertThatThrownBy(() -> tokens.validate(wrongIssuer)).isInstanceOf(JwtException.class);
         String wrongType = Jwts.builder()
             .subject("u")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("tokenType", "refresh")
             .signWith(key)
             .compact();

@@ -111,7 +111,7 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = userRepository
-            .findById(targetUserId)
+            .findForUpdate(targetUserId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         if (user.getDeletedAt() != null) throw new AppException(ErrorCode.USER_NOT_FOUND);
 

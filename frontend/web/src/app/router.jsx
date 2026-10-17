@@ -165,6 +165,14 @@ const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('../features/auth/pages/RegisterPage')).default }),
       },
       {
+        path: 'forgot-password',
+        lazy: async () => ({ Component: (await import('../features/auth/pages/ForgotPasswordPage')).default }),
+      },
+      {
+        path: 'reset-password',
+        lazy: async () => ({ Component: (await import('../features/auth/pages/ResetPasswordPage')).default }),
+      },
+      {
         path: 'auth/google/callback',
         lazy: async () => ({
           Component: (await import('../features/auth/pages/GoogleCallbackPage')).default,

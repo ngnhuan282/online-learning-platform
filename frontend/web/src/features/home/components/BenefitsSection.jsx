@@ -33,7 +33,7 @@ export default function BenefitsSection() {
       <div className="container">
         <div className="section-heading centered">
           <span className="eyebrow">LỢI ÍCH VƯỢT TRỘI</span>
-          <h2>Tại sao chọn LearnSphere English?</h2>
+          <h2>Tại sao chọn SGEdu English?</h2>
           <p>
             Môi trường luyện ngôn ngữ hiện đại, kết hợp phương pháp phản xạ khoa học và trợ lý AI thông minh
             24/7.

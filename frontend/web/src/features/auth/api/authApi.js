@@ -2,6 +2,14 @@ import axiosClient, { refreshAccessToken } from '../../../shared/apis/axiosClien
 import { ENDPOINTS } from '../../../shared/apis/endpoints';
 
 export const authApi = {
+  forgotPassword: ({ email }, options = {}) =>
+    axiosClient.post(ENDPOINTS.auth.forgotPassword, { email }, { ...options, skipAuth: true }),
+  resetPassword: ({ token, newPassword, confirmPassword }, options = {}) =>
+    axiosClient.post(
+      ENDPOINTS.auth.resetPassword,
+      { token, newPassword, confirmPassword },
+      { ...options, skipAuth: true },
+    ),
   startGoogleLink: ({ currentPassword, challenge }, options = {}) =>
     axiosClient.post(ENDPOINTS.googleLink.start, { currentPassword, challenge }, options),
   completeGoogleLink: ({ code, verifier }, options = {}) =>

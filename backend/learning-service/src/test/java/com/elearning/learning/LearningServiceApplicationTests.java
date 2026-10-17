@@ -114,7 +114,7 @@ class LearningServiceApplicationTests {
     String token(String role, long seconds) {
         return Jwts.builder()
             .subject("test-user")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(120)))
@@ -146,7 +146,7 @@ class LearningServiceApplicationTests {
     String tokenFor(String role, Long userId) {
         return Jwts.builder()
             .subject(userId.toString())
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(1)))
@@ -196,7 +196,7 @@ class LearningServiceApplicationTests {
         )) {
             String access = Jwts.builder()
                 .subject("123")
-                .issuer("learnsphere")
+                .issuer("sgedu")
                 .claim("role", "USER")
                 .claim("permissions", claim)
                 .claim("tokenType", "access")
@@ -266,7 +266,7 @@ class LearningServiceApplicationTests {
     void freeEnrollmentIsIdempotentForMyCourses() throws Exception {
         String access = Jwts.builder()
             .subject("123")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", "USER")
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(1)))
@@ -320,7 +320,7 @@ class LearningServiceApplicationTests {
     void lessonAccessAndCompletionUpdateCourseProgressForEnrolledUser() throws Exception {
         String access = Jwts.builder()
             .subject("124")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", "USER")
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(1)))
@@ -360,7 +360,7 @@ class LearningServiceApplicationTests {
 
         String otherUser = Jwts.builder()
             .subject("125")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", "USER")
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(1)))
@@ -670,7 +670,7 @@ class LearningServiceApplicationTests {
         var key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         String noExpiry = Jwts.builder()
             .subject("u")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", "USER")
             .claim("tokenType", "access")
             .issuedAt(new Date())
@@ -681,7 +681,7 @@ class LearningServiceApplicationTests {
         assertThatThrownBy(() -> tokens.validate(wrongIssuer)).isInstanceOf(JwtException.class);
         String wrongType = Jwts.builder()
             .subject("u")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("tokenType", "refresh")
             .signWith(key)
             .compact();

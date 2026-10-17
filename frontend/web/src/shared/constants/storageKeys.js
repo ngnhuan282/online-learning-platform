@@ -1,1 +1,1 @@
-export const STORAGE_KEYS = Object.freeze({ ACCESS_TOKEN: 'learnsphere.accessToken' });
+export const STORAGE_KEYS = Object.freeze({ ACCESS_TOKEN: 'sgedu.accessToken' });

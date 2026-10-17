@@ -39,7 +39,7 @@ Luồng liên kết:
    `/link/complete` bằng phiên local. Hint/query không quyết định purpose ở backend.
 7. Một transaction kiểm tra lại user/status, phiên, credential version, tuổi intent/code, purpose,
    verifier, verified email và identity ownership; insert identity + consume code + xóa intent.
-   Thứ tự lock: refresh → user → intent → code → identity.
+   Thứ tự lock hiện tại: user → refresh → intent → code → identity, dùng chung với password reset/revocation.
 8. Trả trạng thái, không trả AuthResponse/JWT/Set-Cookie. Quay về Hồ sơ `#sign-in-methods` và tải lại.
    Hủy/lỗi giữ phiên local; thông báo cố định, không hiển thị lỗi thô provider.
 
@@ -57,7 +57,7 @@ Giữ nguyên V7; thêm **V8__link_google_accounts.sql**:
   nguồn duy nhất; khả năng login mật khẩu dựa vào password_hash có tồn tại hay không.
 - Giữ local hash/profile/role và Google-only password NULL, không sinh mật khẩu mặc định.
   Google-only local login trả `401 GOOGLE_LOGIN_REQUIRED`; đổi password trả `400 LOCAL_PASSWORD_UNAVAILABLE`.
-  Dự án chưa có backend reset password; không thêm luồng reset trong thay đổi này.
+  Local/linked-local có thể [reset password bằng email](PASSWORD_RESET_REPORT.md); Google-only vẫn không tạo password qua luồng này.
 - `refresh_tokens.session_id`: backfill token_hash để cookie cũ còn hợp lệ; login mới tạo ID ngẫu nhiên,
   rotation giữ cùng ID. Raw refresh vẫn chỉ trong cookie HttpOnly, DB chỉ lưu hash.
 - `users.credential_version`, `google_link_intents` và metadata LINK/purpose trên `oauth_login_codes`.

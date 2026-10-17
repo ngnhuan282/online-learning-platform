@@ -46,7 +46,7 @@ class CourseControllerTest {
     String generateToken(String role, List<String> permissions) {
         return Jwts.builder()
             .subject("100")
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("roles", List.of(role))
             .claim("permissions", permissions)
