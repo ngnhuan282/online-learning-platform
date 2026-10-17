@@ -100,6 +100,19 @@ export default function PaymentResultPage() {
   const error = remoteResult.orderCode === orderCode ? remoteResult.error : null;
   const loading = Boolean(orderCode) && remoteResult.orderCode !== orderCode;
 
+  const paymentStatus = order?.payment?.status ?? null;
+  const paymentCourseId = order?.items?.[0]?.courseId ?? null;
+
+  // Kích hoạt quyền học (enroll) vào learning-service khi thanh toán thành công
+  // Đặt trước các early returns để tuân thủ React Rules of Hooks
+  useEffect(() => {
+    if (order && paymentStatus === 'SUCCESS' && paymentCourseId) {
+      learningApi.enroll(paymentCourseId).catch(err => {
+        console.warn('Auto enrollment on payment result page:', err);
+      });
+    }
+  }, [order, paymentStatus, paymentCourseId]);
+
   if (!orderCode) {
     return (
       <section className="payment-page payment-result-page">
@@ -159,13 +172,10 @@ export default function PaymentResultPage() {
     );
   }
 
-  const paymentStatus = order.payment.status;
-  const enrollmentReady = enrollmentState.orderCode === orderCode && enrollmentState.ready;
   const copy = paymentTone(paymentStatus);
   const courseTitle = order.items?.[0]?.courseTitle || 'Khóa học';
-  const paymentCourseId = order.items?.[0]?.courseId;
-  const amount = order.payment.amount ?? order.totalAmount;
-  const provider = order.payment.provider;
+  const amount = order.payment?.amount ?? order.totalAmount;
+  const provider = order.payment?.provider;
   const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = `${ROUTES.PAYMENT_MOCK}?orderCode=${encodeURIComponent(
     order.orderCode,
@@ -200,7 +210,7 @@ export default function PaymentResultPage() {
             </div>
             <div>
               <dt>Số tiền</dt>
-              <dd>{formatCurrency(Number(amount), order.payment.currency || order.currency)}</dd>
+              <dd>{formatCurrency(Number(amount), order.payment?.currency || order.currency)}</dd>
             </div>
             <div>
               <dt>Phương thức</dt>
@@ -209,15 +219,16 @@ export default function PaymentResultPage() {
           </dl>
 
           <div className="result-actions">
-            {paymentStatus === 'SUCCESS' && enrollmentReady ? (
-              <Link className="button button-primary" to="/my-courses">
-                Vào khu học tập <Icon name="arrow" size={17} />
-              </Link>
-            ) : paymentStatus === 'SUCCESS' ? (
-              <button className="button button-primary" onClick={retryResultLoad}>
-                Kiểm tra lại quyền học
-              </button>
-            ) : paymentStatus === 'PENDING' && provider === 'MOCK' && orderCode ? (
+            {paymentStatus === 'SUCCESS' ? (
+              <>
+                <Link className="button button-primary" to={`/learning/${paymentCourseId || 1}`}>
+                  🚀 Vào học ngay <Icon name="arrow" size={17} />
+                </Link>
+                <Link className="button button-outline" to={`/courses/${paymentCourseId || 1}`}>
+                  Xem trang khóa học
+                </Link>
+              </>
+            ) : paymentStatus === 'PENDING' && orderCode ? (
               <Link className="button button-primary" to={resumePaymentUrl}>
                 Tiếp tục thanh toán <Icon name="arrow" size={17} />
               </Link>

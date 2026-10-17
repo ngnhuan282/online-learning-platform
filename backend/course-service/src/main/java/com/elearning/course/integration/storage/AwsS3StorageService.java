@@ -12,6 +12,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -27,6 +29,8 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 
 @Service("awsS3StorageService")
 public class AwsS3StorageService implements StorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(AwsS3StorageService.class);
 
     private final String bucketName;
     private final String region;
@@ -53,6 +57,8 @@ public class AwsS3StorageService implements StorageService {
         Region awsRegion = Region.of(region != null && !region.isBlank() ? region : "ap-southeast-1");
         S3Configuration s3Configuration = S3Configuration.builder()
                 .pathStyleAccessEnabled(this.pathStyleEnabled)
+                .chunkedEncodingEnabled(false)
+                .checksumValidationEnabled(false)
                 .build();
 
         AwsBasicCredentials credentials = null;
@@ -138,8 +144,10 @@ public class AwsS3StorageService implements StorageService {
                     file.getSize(),
                     file.getContentType());
         } catch (IOException e) {
+            log.error("IOException while reading file for S3 upload: ", e);
             throw new AppException(ErrorCode.INTERNAL_ERROR, "Lỗi khi đọc file để upload lên S3: " + e.getMessage());
         } catch (Exception e) {
+            log.error("Exception during S3 putObject to bucket '{}' key '{}': ", bucketName, objectKey, e);
             throw new AppException(ErrorCode.INTERNAL_ERROR, "Lỗi khi upload lên AWS S3: " + e.getMessage());
         }
     }

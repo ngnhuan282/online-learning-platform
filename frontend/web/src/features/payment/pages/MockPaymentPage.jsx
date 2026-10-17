@@ -6,6 +6,7 @@ import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getErrorMessage } from '../../../shared/utils/errorUtils';
 import { paymentApi } from '../api/paymentApi';
+import { learningApi } from '../../learning/api/learningApi';
 import { formatDemoPrice } from '../data/paymentDemo';
 import '../styles/payment.css';
 
@@ -101,6 +102,16 @@ export default function MockPaymentPage() {
               ? 'Học viên hủy thanh toán mô phỏng.'
               : undefined,
       });
+
+      // B9: Tự động kích hoạt quyền học (enroll) vào learning-service khi thanh toán thành công
+      if (status === 'SUCCESS' && item?.courseId) {
+        try {
+          await learningApi.enroll(item.courseId);
+        } catch (enrollErr) {
+          console.warn('Lỗi ghi danh tự động sau thanh toán:', enrollErr);
+        }
+      }
+
       navigate(buildReturnPath(returnUrl, orderCode, status), { replace: true });
     } catch (error) {
       setSubmitError(error);

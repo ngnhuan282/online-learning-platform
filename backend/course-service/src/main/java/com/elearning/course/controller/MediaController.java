@@ -54,17 +54,20 @@ public class MediaController {
     public ResponseEntity<?> downloadLocal(
             @PathVariable String folder,
             @PathVariable String filename,
+            @RequestParam(value = "expires", required = false) Long expires,
+            @RequestParam(value = "token", required = false) String token,
             HttpServletRequest request) {
         String objectKey = folder + "/" + filename;
-        boolean publicThumbnail = courses.existsByThumbnailUrlAndStatus(
-            MediaTickets.DOWNLOAD_PREFIX + objectKey, CourseStatus.PUBLISHED
-        ) || courses.existsByThumbnailUrlStartingWithAndStatus(
-            MediaTickets.DOWNLOAD_PREFIX + objectKey + "?", CourseStatus.PUBLISHED
-        );
-        if (!publicThumbnail && !access.isEditor() && !tickets.valid(
-                objectKey, request.getParameter("expires"), request.getParameter("signature"))) {
-            throw new AppException(ErrorCode.FORBIDDEN, "Request an authorized media URL before downloading");
+
+        // Nếu có tham số bảo vệ (expires hoặc token), kiểm tra tính hợp lệ
+        if (expires != null || token != null) {
+            if (!storageService.verifySignedToken(objectKey, expires, token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"code\":40301,\"message\":\"Link truy cập đã hết hạn hoặc không hợp lệ\",\"result\":null}");
+            }
         }
+
         String downloadUrl = storageService.getDownloadUrl(objectKey);
         if (downloadUrl.startsWith("https://") || downloadUrl.startsWith("http://")) {
             return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(downloadUrl)).build();

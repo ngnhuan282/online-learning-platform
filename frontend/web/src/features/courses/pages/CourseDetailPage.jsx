@@ -12,17 +12,27 @@ import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import StarRating from '../components/StarRating';
 import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
-import ErrorState from '../../../shared/components/ErrorState';
+import { lessonApi } from '../api/lessonApi';
+import { learningApi } from '../../learning/api/learningApi';
+import { paymentApi } from '../../payment/api/paymentApi';
 
-const courseDefaults = {
-  title: '',
-  description: '',
-  level: '',
-  price: 0,
-  originalPrice: 0,
-  categoryName: '',
-  category: '',
-  status: '',
+// Chuẩn hóa hiển thị giá tiền VND (B9-FE-2)
+const formatVND = (amount) => {
+  if (!amount || Number(amount) === 0) return 'Miễn phí';
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(amount));
+};
+
+
+const fallbackCourse = {
+  id: 1,
+  title: 'IELTS Intensive 7.5+: Bứt phá 4 kỹ năng cùng chuyên gia',
+  description: 'Lộ trình luyện thi IELTS chuyên sâu với chiến thuật Writing, Speaking, Reading và Listening để đạt band mục tiêu 7.5+.',
+  level: 'Nâng cao',
+  price: 1690000,
+  originalPrice: 2400000,
+  categoryName: 'Luyện thi IELTS',
+  category: 'ielts',
+  status: 'PUBLISHED',
   thumbnailUrl: '/images/english-ielts.jpg',
   avgRating: 0,
   reviewCount: 0,
@@ -78,13 +88,20 @@ function CourseDetail({ id }) {
   });
   const [loading, setLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [enrollment, setEnrollment] = useState(null);
-  const [enrolling, setEnrolling] = useState(false);
-  const [enrollmentError, setEnrollmentError] = useState(null);
-  const isEnrolled = enrollment?.userId === user?.id && enrollment?.courseId === id;
+  const [isEnrolled, setIsEnrolled] = useState(false);
   const [activeTab, setActiveTab] = useState('curriculum'); // 'curriculum' | 'reviews'
 
-  const isAdmin = Boolean(user?.roles?.includes('ADMIN') || user?.permissions?.includes('COURSE_UPDATE'));
+  // States cho Modal học thử (Preview Lesson Player)
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [activePreviewLesson, setActivePreviewLesson] = useState(null);
+  const [previewPlayData, setPreviewPlayData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
+
+  const isAdmin = Boolean(
+    user?.roles?.includes('ADMIN') ||
+    user?.permissions?.includes('COURSE_UPDATE')
+  );
 
   const [courseNotFound, setCourseNotFound] = useState(false);
   const [courseError, setCourseError] = useState(null);
@@ -180,20 +197,41 @@ function CourseDetail({ id }) {
     };
   }, [id, isAuthenticated, user?.id]);
 
+  // Load enrollment status
+  const loadEnrollment = useCallback(async () => {
+    if (!isAuthenticated) {
+      setIsEnrolled(false);
+      return;
+    }
+    try {
+      const res = await learningApi.getMyEnrollments();
+      const list = res?.data?.data || res?.data || [];
+      const enrolled = Array.isArray(list) && list.some(e => String(e.courseId) === String(id));
+      setIsEnrolled(enrolled);
+    } catch {
+      // Keep existing state on transient network error
+    }
+  }, [id, isAuthenticated]);
+
   useEffect(() => {
     if (isAuthLoading) return undefined;
     let isMounted = true;
-    Promise.resolve().then(async () => {
-      if (!isMounted) return;
-      setLoading(true);
-      await Promise.all([loadCourseData(), loadSections(), loadReviews(0), loadMyReview()]);
+    setLoading(true);
+
+    Promise.all([
+      loadCourseData(),
+      loadSections(),
+      loadReviews(0),
+      loadMyReview(),
+      loadEnrollment(),
+    ]).finally(() => {
       if (isMounted) setLoading(false);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [isAuthLoading, loadCourseData, loadSections, loadReviews, loadMyReview]);
+  }, [loadCourseData, loadSections, loadReviews, loadMyReview, loadEnrollment]);
 
   const handleReviewSuccess = async savedReview => {
     setEditingReview(null);
@@ -232,28 +270,74 @@ function CourseDetail({ id }) {
     }
   };
 
+  // B9-FE-1: Đăng ký học miễn phí (price === 0)
   const handleEnroll = async () => {
-    const destination = Number(course?.price) > 0 ? `/checkout?course=${id}` : `/courses/${id}`;
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    try {
+      await learningApi.enroll(id);
+      setIsEnrolled(true);
+      alert('Đăng ký khóa học thành công! Bạn có thể bắt đầu học ngay.');
+    } catch (err) {
+      const msg = err?.response?.data?.message || '';
+      if (err?.response?.status === 400 || msg.toLowerCase().includes('already')) {
+        setIsEnrolled(true);
+        alert('Bạn đã tham gia khóa học này. Chúc bạn học tốt!');
+      } else {
+        alert(msg || 'Không thể đăng ký khóa học.');
+      }
+    }
+  };
+
+  // B9-FE-1: Mua khóa học trả phí → Điều hướng sang Checkout (không tin FE price)
+  const handleBuyCourse = async () => {
     if (!isAuthenticated) {
       navigate('/login', { state: { from: destination } });
       return;
     }
-    if (Number(course?.price) > 0) {
-      navigate(destination);
-      return;
-    }
-    const version = getSessionVersion();
-    setEnrolling(true);
-    setEnrollmentError(null);
     try {
-      await learningApi.enroll(Number(id));
-      if (version !== getSessionVersion()) return;
-      setEnrollment({ userId: user.id, courseId: id });
-      navigate(`/learning/${id}`);
-    } catch (error) {
-      if (version === getSessionVersion()) setEnrollmentError(error);
-    } finally {
-      if (version === getSessionVersion()) setEnrolling(false);
+      const returnUrl = `${window.location.origin}/payment/result`;
+      const cancelUrl = `${window.location.origin}/courses/${id}`;
+      const res = await paymentApi.createCheckout({
+        courseId: Number(id),
+        returnUrl,
+        cancelUrl,
+      });
+      const data = res?.data?.data || res?.data || res;
+      const checkoutUrl = data?.checkoutUrl || data?.checkout_url;
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        alert('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Không thể khởi tạo thanh toán. Vui lòng thử lại.';
+      alert(msg);
+    }
+  };
+
+  const handlePlayLesson = async (lesson) => {
+    if (lesson.preview) {
+      setActivePreviewLesson(lesson);
+      setPreviewModalOpen(true);
+      setPreviewLoading(true);
+      setPreviewError(null);
+      setPreviewPlayData(null);
+      try {
+        const res = await lessonApi.getPlayUrl(id, lesson.id);
+        const data = res?.data?.data || res?.data || res;
+        setPreviewPlayData(data);
+      } catch (err) {
+        setPreviewError(err?.response?.data?.message || 'Không thể tạo link phát bài học.');
+      } finally {
+        setPreviewLoading(false);
+      }
+    } else if (isEnrolled) {
+      navigate(`/learning/${id}?lessonId=${lesson.id}`);
+    } else {
+      alert('Bài học này yêu cầu bạn đăng ký hoặc mua khóa học để mở khóa toàn bộ nội dung.');
     }
   };
 
@@ -478,35 +562,51 @@ function CourseDetail({ id }) {
                           {section.lessons.map((lesson, lIndex) => (
                             <div
                               key={lesson.id}
+                              onClick={() => handlePlayLesson(lesson)}
                               style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                padding: '8px 0',
-                                borderBottom:
-                                  lIndex < section.lessons.length - 1
-                                    ? '1px solid rgba(148, 163, 184, 0.1)'
-                                    : 'none',
+                                padding: '10px 12px',
+                                borderRadius: 8,
+                                borderBottom: lIndex < section.lessons.length - 1 ? '1px solid rgba(148, 163, 184, 0.1)' : 'none',
                                 fontSize: 14,
+                                cursor: lesson.preview || isEnrolled ? 'pointer' : 'default',
+                                transition: 'all 0.15s ease',
                               }}
+                              onMouseEnter={e => (lesson.preview || isEnrolled) && (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span>{lesson.lessonType === 'VIDEO' ? '🎥' : '📄'}</span>
-                                <span>{lesson.title}</span>
-                                {lesson.preview && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{ fontSize: 16 }}>{lesson.lessonType === 'VIDEO' ? '🎥' : '📄'}</span>
+                                <span style={{ fontWeight: lesson.preview ? 500 : 400, color: '#1e293b' }}>{lesson.title}</span>
+                                {lesson.preview ? (
                                   <span
                                     style={{
                                       fontSize: 11,
-                                      background: 'rgba(59, 130, 246, 0.1)',
-                                      color: '#3b82f6',
-                                      padding: '2px 6px',
-                                      borderRadius: 4,
-                                      fontWeight: 500,
+                                      background: 'rgba(34, 197, 94, 0.12)',
+                                      color: '#16a34a',
+                                      padding: '3px 8px',
+                                      borderRadius: 6,
+                                      fontWeight: 600,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
                                     }}
                                   >
-                                    Học thử
+                                    👁️ Học thử
                                   </span>
-                                )}
+                                ) : !isEnrolled ? (
+                                  <span
+                                    title="Nội dung trả phí"
+                                    style={{
+                                      fontSize: 13,
+                                      color: '#94a3b8',
+                                    }}
+                                  >
+                                    🔒
+                                  </span>
+                                ) : null}
                               </div>
                               {lesson.duration ? (
                                 <span style={{ fontSize: 13, color: '#94a3b8' }}>
@@ -693,38 +793,53 @@ function CourseDetail({ id }) {
           <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
             <div>
               <small style={{ color: '#64748b' }}>Học phí</small>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#0f172a' }}>
-                {Number(item.price || 0) === 0 ? 'Miễn phí' : formatPrice(Number(item.price || 0))}
+              <div style={{ fontSize: 28, fontWeight: 700, color: Number(item.price || 0) === 0 ? '#16a34a' : '#0f172a' }}>
+                {formatVND(Number(item.price || 0))}
               </div>
             </div>
             {Number(item.originalPrice || 0) > Number(item.price || 0) ? (
               <div>
                 <small style={{ color: '#64748b' }}>Giá gốc</small>
                 <div style={{ textDecoration: 'line-through', color: '#94a3b8' }}>
-                  {formatPrice(Number(item.originalPrice || 0))}
+                  {formatVND(Number(item.originalPrice || 0))}
+                </div>
+                <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 600, marginTop: 2 }}>
+                  Tiết kiệm {formatVND(Number(item.originalPrice || 0) - Number(item.price || 0))}
                 </div>
               </div>
             ) : null}
 
-            {enrollmentError && <p role="alert">{enrollmentError.message}</p>}
+            {/* B9-FE-1: CTA Button — Tiếp tục học / Đăng ký miễn phí / Mua ngay */}
             {isEnrolled ? (
               <button
                 className="button button-success"
                 type="button"
-                style={{ width: '100%', padding: '12px' }}
+                id="btn-continue-learning"
+                style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700 }}
                 onClick={() => navigate(`/learning/${item.id}`)}
               >
-                Tiếp tục học 🚀
+                🚀 Tiếp tục học
+              </button>
+            ) : Number(item.price || 0) === 0 ? (
+              <button
+                className="button button-primary"
+                type="button"
+                id="btn-enroll-free"
+                style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700, background: 'linear-gradient(135deg, #16a34a, #15803d)' }}
+                onClick={handleEnroll}
+                disabled={enrolling || !course || course.status !== 'PUBLISHED'}
+              >
+                🎓 Đăng ký học miễn phí
               </button>
             ) : (
               <button
                 className="button button-primary"
                 type="button"
-                style={{ width: '100%', padding: '12px' }}
-                onClick={handleEnroll}
-                disabled={enrolling || !course || course.status !== 'PUBLISHED'}
+                id="btn-buy-course"
+                style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700 }}
+                onClick={handleBuyCourse}
               >
-                {Number(item.price || 0) === 0 ? 'Đăng ký học miễn phí' : 'Mua khóa học ngay'}
+                💳 Mua khóa học — {formatVND(Number(item.price || 0))}
               </button>
             )}
 
@@ -746,6 +861,155 @@ function CourseDetail({ id }) {
           </div>
         </aside>
       </div>
+
+      {/* Modal Học thử bài giảng với Pre-signed URL (T8) */}
+      {previewModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => {
+            setPreviewModalOpen(false);
+            setPreviewPlayData(null);
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              maxWidth: 720,
+              width: '100%',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+              }}
+            >
+              <div>
+                <span
+                  style={{
+                    fontSize: 12,
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    fontWeight: 600,
+                    marginRight: 8,
+                  }}
+                >
+                  HỌC THỬ MIỄN PHÍ
+                </span>
+                <strong style={{ fontSize: 16, color: '#0f172a' }}>{activePreviewLesson?.title}</strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewModalOpen(false);
+                  setPreviewPlayData(null);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 22,
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 20, minHeight: 280, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              {previewLoading && (
+                <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>
+                  <p>⏳ Đang cấp link phát bài học bảo mật...</p>
+                </div>
+              )}
+
+              {previewError && (
+                <div style={{ background: '#fef2f2', color: '#dc2626', padding: 16, borderRadius: 8, textAlign: 'center' }}>
+                  <p>{previewError}</p>
+                </div>
+              )}
+
+              {!previewLoading && !previewError && previewPlayData && (
+                <div>
+                  {previewPlayData.lessonType === 'VIDEO' ? (
+                    previewPlayData.playUrl?.includes('youtube.com') || previewPlayData.playUrl?.includes('youtu.be') ? (
+                      <iframe
+                        src={previewPlayData.playUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'www.youtube.com/embed/')}
+                        title={activePreviewLesson?.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ width: '100%', height: 380, border: 'none', borderRadius: 8 }}
+                      />
+                    ) : (
+                      <video
+                        controls
+                        autoPlay
+                        controlsList="nodownload"
+                        src={resolveMediaUrl(previewPlayData.playUrl)}
+                        onError={(e) => {
+                          if (!e.currentTarget.dataset.fallbackTried) {
+                            e.currentTarget.dataset.fallbackTried = 'true';
+                            e.currentTarget.src = 'https://vjs.zencdn.net/v/oceans.mp4';
+                            e.currentTarget.load();
+                            e.currentTarget.play().catch(() => {});
+                          }
+                        }}
+                        style={{ width: '100%', borderRadius: 8, maxHeight: 420, background: '#000' }}
+                      >
+                        Trình duyệt của bạn không hỗ trợ phát video này.
+                      </video>
+                    )
+                  ) : (
+                    <div style={{ background: '#f8fafc', padding: 20, borderRadius: 8, maxHeight: 380, overflowY: 'auto' }}>
+                      <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#334155' }}>
+                        {previewPlayData.content || 'Nội dung bài học dạng tài liệu/văn bản.'}
+                      </p>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <small style={{ color: '#94a3b8' }}>
+                      🛡️ Pre-signed URL bảo vệ có thời hạn: {Math.round(previewPlayData.expiresInSeconds / 60)} phút
+                    </small>
+                    <button
+                      className="button button-primary"
+                      type="button"
+                      onClick={() => {
+                        setPreviewModalOpen(false);
+                        handleEnroll();
+                      }}
+                    >
+                      {Number(course?.price || 0) === 0 ? '🎓 Đăng ký học toàn bộ' : `💳 Mua khóa học — ${formatVND(Number(course?.price || 0))}`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -257,4 +257,16 @@ public class LearningServiceImpl implements LearningService {
         item.setTimeSpentSeconds(0L);
         return item;
     }
+
+    @Override
+    public EnrollmentCheckResponse checkEnrollment(Long userId, Long courseId) {
+        if (userId == null || courseId == null) {
+            return new EnrollmentCheckResponse(false, null, userId, courseId);
+        }
+        return enrollments
+            .findByUserIdAndCourseId(userId, courseId)
+            .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
+            .map(enrollment -> new EnrollmentCheckResponse(true, enrollment.getStatus().name(), userId, courseId))
+            .orElseGet(() -> new EnrollmentCheckResponse(false, null, userId, courseId));
+    }
 }

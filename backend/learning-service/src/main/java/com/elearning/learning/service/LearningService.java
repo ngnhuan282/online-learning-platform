@@ -23,4 +23,6 @@ public interface LearningService {
     List<NotificationResponse> getNotifications(Long userId);
 
     NotificationResponse markNotificationRead(Long userId, Long notificationId);
+
+    EnrollmentCheckResponse checkEnrollment(Long userId, Long courseId);
 }

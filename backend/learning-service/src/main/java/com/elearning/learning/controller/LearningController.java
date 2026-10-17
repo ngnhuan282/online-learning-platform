@@ -32,6 +32,14 @@ public class LearningController {
         return ApiResponse.success(learning.getMyEnrollments(userId(principal)));
     }
 
+    @GetMapping("/enrollments/check")
+    ApiResponse<EnrollmentCheckResponse> checkEnrollment(
+        @RequestParam Long userId,
+        @RequestParam Long courseId
+    ) {
+        return ApiResponse.success(learning.checkEnrollment(userId, courseId));
+    }
+
     @PostMapping("/enrollments")
     ApiResponse<EnrollmentResponse> enroll(Principal principal, @Valid @RequestBody EnrollRequest request) {
         return ApiResponse.success(learning.enroll(userId(principal), request));

@@ -50,6 +50,9 @@ learning:
   service-url: ${LEARNING_SERVICE_URL:http://localhost:8083}
 
 integrations:
+  learning:
+    url: ${LEARNING_SERVICE_URL:http://localhost:8083}
+    mock-enabled: ${LEARNING_MOCK_ENABLED:false}
   s3:
     region: ${AWS_REGION:ap-southeast-1}
     bucket: ${AWS_S3_BUCKET:}

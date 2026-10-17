@@ -19,4 +19,8 @@ export const lessonApi = {
   /** ADMIN: reorder lessons trong section — body: { items: [{id, orderIndex}] } */
   reorder: (sectionId, items) =>
     axiosClient.put(`${BASE}/sections/${sectionId}/lessons/reorder`, { items }),
+
+  /** PUBLIC/USER: Lấy URL phát bài học (Pre-signed URL có bảo vệ) */
+  getPlayUrl: (courseId, lessonId) =>
+    axiosClient.get(`${API_PREFIX}/courses/${courseId}/lessons/${lessonId}/play-url`),
 };
