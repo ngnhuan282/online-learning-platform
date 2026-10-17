@@ -2,9 +2,10 @@ import axiosClient from '../../../shared/apis/axiosClient';
 import { ENDPOINTS } from '../../../shared/apis/endpoints';
 
 export const learningApi = {
-  getDashboard: () => axiosClient.get(ENDPOINTS.learning.dashboard),
-  getMyEnrollments: () => axiosClient.get(ENDPOINTS.learning.enrollments),
+  getDashboard: options => axiosClient.get(ENDPOINTS.learning.dashboard, options),
+  getMyEnrollments: options => axiosClient.get(ENDPOINTS.learning.enrollments, options),
   enroll: courseId => axiosClient.post(ENDPOINTS.learning.enroll, { courseId }),
+  getLearningCourse: (courseId, options) => axiosClient.get(ENDPOINTS.learning.course(courseId), options),
   getCourseProgress: courseId => axiosClient.get(ENDPOINTS.learning.progress(courseId)),
   accessLesson: (courseId, lessonId) => axiosClient.post(ENDPOINTS.learning.lessonAccess(courseId, lessonId)),
   markLessonComplete: (courseId, lessonId) =>

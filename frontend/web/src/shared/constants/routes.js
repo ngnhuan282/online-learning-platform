@@ -2,6 +2,7 @@ export const ROUTES = Object.freeze({
   HOME: '/',
   NOTIFICATIONS: '/notifications',
   LOGIN: '/login',
+  GOOGLE_CALLBACK: '/auth/google/callback',
   REGISTER: '/register',
   ACCOUNT: '/account',
   ADMIN_PROFILE: '/admin/profile',

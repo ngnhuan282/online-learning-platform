@@ -63,7 +63,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState
+          include: readinessState,coreDependencies
 
 logging:
   structured:

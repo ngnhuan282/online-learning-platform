@@ -4,6 +4,12 @@ All browser API requests go to `VITE_API_URL`, the API Gateway origin. Paths sta
 
 ## Routing
 
+Google OIDC login and linking share the Auth namespace and callback. LOGIN codes issue the usual
+AuthResponse; LINK completion requires the current JWT and initiating refresh session and returns status.
+`POST /api/v1/auth/google/link/start`, `POST /api/v1/auth/google/link/complete` and
+`GET /api/v1/users/me/linked-accounts` are protected at Gateway and Auth.
+See [Google Login and linking contract](../auth/GOOGLE_LOGIN_REPORT.md) for bodies, errors, cookies and configuration.
+
 | Path | Owner | Local port |
 | --- | --- | --- |
 | `/api/v1/auth/**` | Auth Service | 8081 |
@@ -158,4 +164,4 @@ Login and refresh set `refresh_token` with HttpOnly, SameSite=Lax, Path=/api/v1/
 
 The four POST Auth endpoints are public and ignore stale Bearer tokens. Other routes retain existing JWT rules. Gateway CORS allows only configured origins, enables credentials, rejects wildcard origins, and forwards cookies normally. Axios uses withCredentials=true. SameSite=Lax requires frontend/Gateway deployment on the same site; local localhost ports satisfy this.
 
-Refresh authentication failures use 401: REFRESH_TOKEN_MISSING, REFRESH_TOKEN_INVALID, REFRESH_TOKEN_EXPIRED, REFRESH_TOKEN_REVOKED. Disabled/locked accounts retain ACCOUNT_DISABLED/ACCOUNT_LOCKED (403). Failed refresh clears the local token; a temporary `/me` failure without refresh retains it. Explicit retry can retry startup restoration. No automatic refresh loop, password reset, verification, OAuth2 or Remember Me behavior is added.
+Refresh authentication failures use 401: REFRESH_TOKEN_MISSING, REFRESH_TOKEN_INVALID, REFRESH_TOKEN_EXPIRED, REFRESH_TOKEN_REVOKED. Disabled/locked accounts retain ACCOUNT_DISABLED/ACCOUNT_LOCKED (403). Failed refresh clears the local token; a temporary `/me` failure without refresh retains it. Explicit retry can retry startup restoration. Refresh never loops automatically; password reset, verification and Remember Me are not implemented. Google OIDC login and linking use this same session machinery as documented above.

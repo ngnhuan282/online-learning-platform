@@ -1,5 +1,10 @@
 # Tích hợp Auth, Course, Learning và Payment
 
+Bản bổ sung A8/A9 ngày 13/10/2026: [báo cáo và hợp đồng](../deployment/A8_A9_REPORT.md),
+[checklist có minh chứng](A8_A9_ACCEPTANCE.md). Bản mới kiểm tra Published/enrollment trước
+khi cấp private content/media, bật MOCK tường minh, đưa AI sang profile riêng và kiểm tra
+core dependencies trong Gateway readiness. Kết quả ngày 11/10 bên dưới là lịch sử kiểm tra trước đó.
+
 Frontend dùng một `AuthProvider`, `/api/v1/users/me` để lấy user hiện tại và một Axios client qua Gateway.
 Course miễn phí gọi Learning enrollment; Course trả phí chuyển sang `/checkout?course=<id>`.
 Sau thanh toán MOCK thành công, Payment gọi Learning bằng `X-Internal-Service-Token` để tạo enrollment.
@@ -77,7 +82,7 @@ Từ root repo, tạo stack **riêng** để test (tạo user/course và giao d�
 ```powershell
 node infra/scripts/create-integration-env.mjs
 docker compose --env-file .tmp/integration.env -p auth-integration --profile backend up --build -d --wait --wait-timeout 300
-docker compose --env-file .tmp/integration.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -uroot < /seed/05-seed-data.sql'
+docker compose --env-file .tmp/integration.env -p auth-integration exec -T mysql sh -c 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -uroot < /seed/seed-data.sql'
 node infra/scripts/integration-smoke.mjs --demo
 ```
 

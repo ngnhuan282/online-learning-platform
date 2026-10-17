@@ -35,6 +35,12 @@ class LessonServiceTest {
     @Mock
     private SectionRepository sectionRepository;
 
+    @Mock
+    private com.elearning.course.integration.storage.StorageService storageService;
+
+    @Mock
+    private com.elearning.course.integration.learning.EnrollmentClient enrollmentClient;
+
     @InjectMocks
     private LessonService lessonService;
 
@@ -182,5 +188,81 @@ class LessonServiceTest {
         assertThat(lesson.getOrderIndex()).isEqualTo(1);
         assertThat(lesson2.getOrderIndex()).isEqualTo(0);
         verify(lessonRepository).saveAll(any());
+    }
+
+    @Test
+    void getPlayUrl_previewLesson_successWithoutAuth() {
+        lesson.setPreview(true);
+        lesson.setLessonType(LessonType.VIDEO);
+        lesson.setVideoUrl("videos/sample.mp4");
+        when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
+        when(storageService.generatePresignedUrl(eq("videos/sample.mp4"), any())).thenReturn("https://s3.amazonaws.com/signed-url");
+
+        var response = lessonService.getPlayUrl(1L, 100L, null, false);
+
+        assertThat(response).isNotNull();
+        assertThat(response.preview()).isTrue();
+        assertThat(response.playUrl()).isEqualTo("https://s3.amazonaws.com/signed-url");
+    }
+
+    @Test
+    void getPlayUrl_privateLesson_unauthenticated_throwsUnauthorized() {
+        lesson.setPreview(false);
+        when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
+
+        assertThatThrownBy(() -> lessonService.getPlayUrl(1L, 100L, null, false))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UNAUTHORIZED);
+    }
+
+    @Test
+    void getPlayUrl_privateLesson_notEnrolled_throwsForbidden() {
+        lesson.setPreview(false);
+        when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
+        when(enrollmentClient.isEnrolled(42L, 1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> lessonService.getPlayUrl(1L, 100L, 42L, false))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    void getPlayUrl_privateLesson_enrolled_returnsPresignedUrl() {
+        lesson.setPreview(false);
+        lesson.setLessonType(LessonType.VIDEO);
+        lesson.setVideoUrl("videos/private.mp4");
+        when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
+        when(enrollmentClient.isEnrolled(42L, 1L)).thenReturn(true);
+        when(storageService.generatePresignedUrl(eq("videos/private.mp4"), any())).thenReturn("https://s3.amazonaws.com/private-signed-url");
+
+        var response = lessonService.getPlayUrl(1L, 100L, 42L, false);
+
+        assertThat(response).isNotNull();
+        assertThat(response.preview()).isFalse();
+        assertThat(response.playUrl()).isEqualTo("https://s3.amazonaws.com/private-signed-url");
+    }
+
+    @Test
+    void getPlayUrl_privateLesson_admin_bypassesEnrollmentCheck() {
+        lesson.setPreview(false);
+        lesson.setLessonType(LessonType.VIDEO);
+        lesson.setVideoUrl("videos/private.mp4");
+        when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
+        when(storageService.generatePresignedUrl(eq("videos/private.mp4"), any())).thenReturn("https://s3.amazonaws.com/admin-signed-url");
+
+        var response = lessonService.getPlayUrl(1L, 100L, 999L, true);
+
+        assertThat(response).isNotNull();
+        assertThat(response.playUrl()).isEqualTo("https://s3.amazonaws.com/admin-signed-url");
+        verify(enrollmentClient, never()).isEnrolled(anyLong(), anyLong());
+    }
+
+    @Test
+    void getPlayUrl_wrongCourseId_throwsNotFound() {
+        when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
+
+        assertThatThrownBy(() -> lessonService.getPlayUrl(999L, 100L, 42L, false))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
 }

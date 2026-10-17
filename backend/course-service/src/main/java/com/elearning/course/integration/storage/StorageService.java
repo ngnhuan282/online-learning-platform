@@ -16,4 +16,8 @@ public interface StorageService {
     String generatePresignedUrl(String objectKey, Duration duration);
 
     Resource loadAsResource(String objectKey);
+
+    default boolean verifySignedToken(String objectKey, Long expires, String token) {
+        return true;
+    }
 }

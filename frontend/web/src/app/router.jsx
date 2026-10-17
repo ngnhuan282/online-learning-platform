@@ -165,6 +165,12 @@ const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('../features/auth/pages/RegisterPage')).default }),
       },
       {
+        path: 'auth/google/callback',
+        lazy: async () => ({
+          Component: (await import('../features/auth/pages/GoogleCallbackPage')).default,
+        }),
+      },
+      {
         path: 'courses',
         lazy: async () => ({ Component: (await import('../features/courses/pages/CourseListPage')).default }),
       },

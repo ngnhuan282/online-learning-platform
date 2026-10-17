@@ -23,7 +23,7 @@ const resultCopy = {
     tone: 'success',
     eyebrow: 'THANH TOÁN THÀNH CÔNG',
     title: 'Thanh toán thành công',
-    description: 'Giao dịch đã được ghi nhận thành công. Bạn có thể tiếp tục tới khu học tập.',
+    description: 'Giao dịch đã được xác nhận thành công.',
     icon: 'check',
   },
   FAILED: {
@@ -116,11 +116,25 @@ export default function PaymentResultPage() {
   function retryResultLoad() {
     setRemoteResult({ orderCode: null, order: null, error: null });
     setRetryCount(value => value + 1);
+    setEnrollmentState({ orderCode: null, ready: false, error: null });
   }
 
   const order = remoteResult.orderCode === orderCode ? remoteResult.order : null;
   const error = remoteResult.orderCode === orderCode ? remoteResult.error : null;
   const loading = Boolean(orderCode) && remoteResult.orderCode !== orderCode;
+
+  const paymentStatus = order?.payment?.status ?? null;
+  const paymentCourseId = order?.items?.[0]?.courseId ?? null;
+
+  // Kích hoạt quyền học (enroll) vào learning-service khi thanh toán thành công
+  // Đặt trước các early returns để tuân thủ React Rules of Hooks
+  useEffect(() => {
+    if (order && paymentStatus === 'SUCCESS' && paymentCourseId) {
+      learningApi.enroll(paymentCourseId).catch(err => {
+        console.warn('Auto enrollment on payment result page:', err);
+      });
+    }
+  }, [order, paymentStatus, paymentCourseId]);
 
   if (!orderCode) {
     return (
@@ -190,9 +204,8 @@ export default function PaymentResultPage() {
   const paymentStatus = getPaymentDisplayStatus(order);
   const copy = paymentTone(paymentStatus, order.payment.provider);
   const courseTitle = order.items?.[0]?.courseTitle || 'Khóa học';
-  const paymentCourseId = order.items?.[0]?.courseId;
-  const amount = order.payment.amount ?? order.totalAmount;
-  const provider = order.payment.provider;
+  const amount = order.payment?.amount ?? order.totalAmount;
+  const provider = order.payment?.provider;
   const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = getResumePaymentUrl(order, window.location.origin);
   const awaitingActivation =
@@ -244,7 +257,7 @@ export default function PaymentResultPage() {
             </div>
             <div>
               <dt>Số tiền</dt>
-              <dd>{formatCurrency(Number(amount), order.payment.currency || order.currency)}</dd>
+              <dd>{formatCurrency(Number(amount), order.payment?.currency || order.currency)}</dd>
             </div>
             <div>
               <dt>Phương thức</dt>

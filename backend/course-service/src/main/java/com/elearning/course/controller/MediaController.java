@@ -2,6 +2,12 @@ package com.elearning.course.controller;
 
 import com.elearning.course.common.response.ApiResponse;
 import com.elearning.course.dto.MediaUploadResponse;
+import com.elearning.course.common.exception.AppException;
+import com.elearning.course.common.exception.ErrorCode;
+import com.elearning.course.entity.CourseStatus;
+import com.elearning.course.repository.CourseRepository;
+import com.elearning.course.security.CourseContentAccess;
+import com.elearning.course.security.MediaTickets;
 import com.elearning.course.integration.storage.StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -21,6 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class MediaController {
 
     private final StorageService storageService;
+    private final CourseRepository courses;
+    private final CourseContentAccess access;
+    private final MediaTickets tickets;
 
     /**
      * Upload file media (Video, Thumbnail, Document).
@@ -32,7 +41,10 @@ public class MediaController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "folder", defaultValue = "media") String folder) {
         MediaUploadResponse response = storageService.upload(file, folder);
-        return ApiResponse.success(response);
+        return ApiResponse.success(new MediaUploadResponse(
+            response.objectKey(), tickets.signLocalUrl(response.url()), response.fileName(),
+            response.fileSize(), response.contentType()
+        ));
     }
 
     /**
@@ -42,8 +54,20 @@ public class MediaController {
     public ResponseEntity<?> downloadLocal(
             @PathVariable String folder,
             @PathVariable String filename,
+            @RequestParam(value = "expires", required = false) Long expires,
+            @RequestParam(value = "token", required = false) String token,
             HttpServletRequest request) {
         String objectKey = folder + "/" + filename;
+
+        // Nếu có tham số bảo vệ (expires hoặc token), kiểm tra tính hợp lệ
+        if (expires != null || token != null) {
+            if (!storageService.verifySignedToken(objectKey, expires, token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"code\":40301,\"message\":\"Link truy cập đã hết hạn hoặc không hợp lệ\",\"result\":null}");
+            }
+        }
+
         String downloadUrl = storageService.getDownloadUrl(objectKey);
         if (downloadUrl.startsWith("https://") || downloadUrl.startsWith("http://")) {
             return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(downloadUrl)).build();

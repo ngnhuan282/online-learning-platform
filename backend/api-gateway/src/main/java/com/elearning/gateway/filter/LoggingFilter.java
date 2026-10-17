@@ -4,6 +4,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
+import org.springframework.cloud.gateway.route.Route;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
@@ -28,8 +30,9 @@ public class LoggingFilter implements WebFilter, Ordered {
         exchange.getResponse().beforeCommit(() -> {
             // Never log tokens, bodies, query strings or identifying path values.
             log.info(
-                "requestId={} method={} status={} durationMs={}",
+                "requestId={} route={} method={} status={} durationMs={}",
                 requestId,
+                routeName(exchange),
                 exchange.getRequest().getMethod(),
                 exchange.getResponse().getStatusCode(),
                 (System.nanoTime() - start) / 1_000_000
@@ -42,5 +45,10 @@ public class LoggingFilter implements WebFilter, Ordered {
             .headers(headers -> headers.set("X-Request-ID", requestId))
             .build();
         return chain.filter(exchange.mutate().request(request).build());
+    }
+
+    private String routeName(ServerWebExchange exchange) {
+        Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
+        return route == null ? "gateway" : route.getId();
     }
 }

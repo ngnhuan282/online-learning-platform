@@ -118,7 +118,8 @@ public class GlobalExceptionHandler {
                 );
             }
         }
-        log.error("Unhandled server exception", ex);
+        log.error("Unhandled server exception type={} stack={}",
+                ex.getClass().getName(), java.util.Arrays.toString(ex.getStackTrace()));
         return respond(ErrorCode.INTERNAL_ERROR, null, request);
     }
 

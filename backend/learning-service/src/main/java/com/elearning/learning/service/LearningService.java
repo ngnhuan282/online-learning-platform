@@ -14,6 +14,8 @@ public interface LearningService {
 
     List<LessonProgressResponse> getCourseProgress(Long userId, Long courseId);
 
+    LearningCourseResponse getLearningCourse(Long userId, Long courseId);
+
     LessonProgressResponse accessLesson(Long userId, Long courseId, Long lessonId);
 
     LessonProgressResponse markLessonComplete(Long userId, Long courseId, Long lessonId);
@@ -21,4 +23,6 @@ public interface LearningService {
     List<NotificationResponse> getNotifications(Long userId);
 
     NotificationResponse markNotificationRead(Long userId, Long notificationId);
+
+    EnrollmentCheckResponse checkEnrollment(Long userId, Long courseId);
 }

@@ -2,6 +2,7 @@ package com.elearning.auth.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.UUID;
 import lombok.Getter;
 
 @Entity
@@ -20,6 +21,9 @@ public class RefreshToken {
     @Column(name = "token_hash", nullable = false, unique = true, length = 64)
     private String tokenHash;
 
+    @Column(name = "session_id", nullable = false, length = 64)
+    private String sessionId;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
@@ -32,10 +36,15 @@ public class RefreshToken {
     protected RefreshToken() {}
 
     public RefreshToken(User user, String tokenHash, Instant expiresAt) {
+        this(user, tokenHash, expiresAt, UUID.randomUUID().toString());
+    }
+
+    public RefreshToken(User user, String tokenHash, Instant expiresAt, String sessionId) {
         this.user = user;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
         this.createdAt = Instant.now();
+        this.sessionId = sessionId;
     }
 
     public void revoke() {

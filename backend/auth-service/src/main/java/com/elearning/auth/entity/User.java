@@ -21,8 +21,11 @@ public class User {
     @Column(nullable = false, unique = true, length = 254)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 60)
+    @Column(name = "password_hash", length = 60)
     private String passwordHash;
+
+    @Column(name = "credential_version", nullable = false)
+    private long credentialVersion;
 
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
@@ -72,6 +75,7 @@ public class User {
 
     public void updatePassword(String passwordHash) {
         this.passwordHash = passwordHash;
+        this.credentialVersion++;
     }
 
     public void updateStatus(UserStatus status) {

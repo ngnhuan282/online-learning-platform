@@ -27,6 +27,10 @@ const { default: RoleRoute } = await load('routes/RoleRoute.jsx');
 const { default: PermissionRoute } = await load('routes/PermissionRoute.jsx');
 const { default: CourseDetailPage } = await load('features/courses/pages/CourseDetailPage.jsx');
 const { default: AdminRolesPage } = await load('features/admin/pages/AdminRolesPage.jsx');
+const { default: GoogleCallbackPage } = await load('features/auth/pages/GoogleCallbackPage.jsx');
+const { default: SignInMethods } = await load('features/auth/components/SignInMethods.jsx');
+const { startGoogleLogin, startGoogleLink, readGoogleAttempt, loginDestination, googleErrorMessage } =
+  await load('features/auth/utils/googleLogin.js');
 const { ToastContext } = await load('shared/context/ToastContext.jsx');
 const { default: client } = await load('shared/apis/axiosClient.js');
 const { authApi } = await load('features/auth/api/authApi.js');
@@ -91,6 +95,17 @@ test('authApi register sends only backend fields and no bearer token', async () 
   assert.equal(seen.headers.has('Authorization'), false);
 });
 
+test('failed guest restoration invalidates the session only once before public detail requests start', async () => {
+  tokens.clearTokens();
+  tokens.allowSessionRestore();
+  const version = tokens.getSessionVersion();
+  await mount();
+  await flush();
+  assert.equal(auth.isLoading, false);
+  assert.equal(auth.isAuthenticated, false);
+  assert.equal(tokens.getSessionVersion(), version + 1);
+});
+
 test('login establishes user from server and stores only access token; logout clears both', async () => {
   const accessToken = makeToken();
   client.defaults.adapter = async config => {
@@ -110,6 +125,332 @@ test('login establishes user from server and stores only access token; logout cl
   assert.equal(auth.user, null);
   assert.equal(tokens.getAccessToken(), null);
   assert.equal(window.sessionStorage.length, 0);
+});
+
+test('Google uses a browser verifier and the shared Gateway API without bearer credentials', async () => {
+  tokens.setAccessToken(makeToken());
+  let challenge;
+  client.defaults.adapter = async config => {
+    assert.equal(config.url, '/api/v1/auth/google/start');
+    assert.equal(config.headers.has('Authorization'), false);
+    assert.equal(config.withCredentials, true);
+    challenge = JSON.parse(config.data).challenge;
+    return reply(config, {
+      authorizationPath: `/api/v1/auth/google/authorize/google?challenge=${challenge}`,
+    });
+  };
+  const url = await startGoogleLogin('/my-courses');
+  assert.match(challenge, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(url, `http://gateway.test/api/v1/auth/google/authorize/google?challenge=${challenge}`);
+  const attempt = readGoogleAttempt();
+  assert.equal(attempt.from, '/my-courses');
+  assert.notEqual(attempt.verifier, challenge);
+  assert.equal(
+    Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(attempt.verifier))).toString(
+      'base64url',
+    ),
+    challenge,
+  );
+});
+
+test('Google callback exchanges once in StrictMode and establishes the existing Auth session', async () => {
+  const code = 'c'.repeat(43),
+    verifier = 'v'.repeat(43);
+  window.sessionStorage.setItem(
+    'google_login_attempt',
+    JSON.stringify({ verifier, from: '/my-courses', createdAt: Date.now() }),
+  );
+  let exchanges = 0;
+  client.defaults.adapter = async config => {
+    if (config.url.endsWith('/refresh')) return reject(config, 401);
+    assert.equal(config.url, '/api/v1/auth/google/exchange');
+    assert.deepEqual(JSON.parse(config.data), { code, verifier });
+    assert.equal(config.headers.has('Authorization'), false);
+    exchanges++;
+    return reply(config, { accessToken: makeToken(), user });
+  };
+  await mount(
+    h(
+      MemoryRouter,
+      { initialEntries: [`/auth/google/callback?code=${code}`] },
+      h(
+        'div',
+        null,
+        h(Probe),
+        h(
+          Routes,
+          null,
+          h(Route, { path: '/auth/google/callback', element: h(GoogleCallbackPage) }),
+          h(Route, { path: '/my-courses', element: h('p', null, 'Google destination') }),
+        ),
+      ),
+    ),
+    true,
+  );
+  await flush();
+  assert.equal(exchanges, 1);
+  assert.equal(auth.user.fullName, user.fullName);
+  assert.equal(tokens.getAccessToken(), makeToken());
+  assert.match(document.body.textContent, /Google destination/);
+  assert.equal(window.location.search, '');
+  assert.equal(readGoogleAttempt(), null);
+});
+
+test('Google cancellation and missing browser proof show an error without exchanging a code', async () => {
+  for (const query of ['error=GOOGLE_LOGIN_CANCELLED', `code=${'c'.repeat(43)}`]) {
+    let exchanges = 0;
+    client.defaults.adapter = async config => {
+      if (config.url.endsWith('/exchange')) exchanges++;
+      return reject(config, 401);
+    };
+    await mount(
+      h(MemoryRouter, { initialEntries: [`/auth/google/callback?${query}`] }, h(GoogleCallbackPage)),
+    );
+    await flush();
+    assert.equal(exchanges, 0);
+    assert.match(
+      document.body.textContent,
+      query.startsWith('error=') ? /đã hủy/ : /hết hạn hoặc không hợp lệ/,
+    );
+    assert.equal(document.querySelector('a').getAttribute('href'), '/login');
+    await act(async () => root.unmount());
+    root = null;
+  }
+});
+
+test('LINK API keeps bearer authentication, strips untrusted fields and retries after refresh', async () => {
+  const oldToken = makeToken({ marker: 'before' });
+  const newToken = makeToken({ marker: 'rotated' });
+  tokens.setAccessToken(oldToken);
+  let starts = 0;
+  let refreshes = 0;
+  client.defaults.adapter = async config => {
+    if (config.url.endsWith('/refresh')) {
+      refreshes++;
+      return reply(config, { accessToken: newToken });
+    }
+    assert.equal(config.withCredentials, true);
+    if (config.url.endsWith('/link/start')) {
+      starts++;
+      assert.deepEqual(JSON.parse(config.data), {
+        currentPassword: 'CurrentPassword9!',
+        challenge: 'c'.repeat(43),
+      });
+      if (starts === 1) {
+        assert.equal(config.headers.get('Authorization'), `Bearer ${oldToken}`);
+        return reject(config, 401);
+      }
+      assert.equal(config.headers.get('Authorization'), `Bearer ${newToken}`);
+      return reply(config, {});
+    }
+    assert.equal(config.url, '/api/v1/auth/google/link/complete');
+    assert.equal(config.headers.get('Authorization'), `Bearer ${newToken}`);
+    assert.deepEqual(JSON.parse(config.data), { code: 'code', verifier: 'verifier' });
+    return reply(config, { alreadyLinked: false });
+  };
+  await authApi.startGoogleLink({
+    currentPassword: 'CurrentPassword9!',
+    challenge: 'c'.repeat(43),
+    userId: 999,
+    role: 'ADMIN',
+  });
+  await authApi.completeGoogleLink({ code: 'code', verifier: 'verifier', userId: 999 });
+  assert.equal(starts, 2);
+  assert.equal(refreshes, 1);
+});
+
+test('LINK uses separate tab proof and never stores or sends a target user or password in a URL', async () => {
+  tokens.setAccessToken(makeToken());
+  const loginProof = JSON.stringify({ verifier: 'l'.repeat(43), createdAt: Date.now() });
+  window.sessionStorage.setItem('google_login_attempt', loginProof);
+  let challenge;
+  client.defaults.adapter = async config => {
+    assert.equal(config.url, '/api/v1/auth/google/link/start');
+    assert.ok(config.headers.get('Authorization'));
+    const body = JSON.parse(config.data);
+    assert.equal(body.currentPassword, 'PrivatePassword9!');
+    assert.equal('userId' in body, false);
+    challenge = body.challenge;
+    return reply(config, {
+      authorizationPath: `/api/v1/auth/google/authorize/google?challenge=${challenge}`,
+    });
+  };
+  const url = await startGoogleLink('PrivatePassword9!', 1, '/account');
+  assert.equal(url, `http://gateway.test/api/v1/auth/google/authorize/google?challenge=${challenge}`);
+  assert.equal(window.sessionStorage.getItem('google_login_attempt'), loginProof);
+  const attempt = readGoogleAttempt('link');
+  assert.equal(attempt.userId, 1);
+  assert.equal(attempt.from, '/account');
+  assert.equal(JSON.stringify(Object.values(window.sessionStorage)).includes('PrivatePassword9!'), false);
+  assert.equal(
+    Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(attempt.verifier))).toString(
+      'base64url',
+    ),
+    challenge,
+  );
+});
+
+function saveLinkProof(userId = 1) {
+  window.sessionStorage.setItem(
+    'google_link_attempt',
+    JSON.stringify({ verifier: 'v'.repeat(43), userId, from: '/account', createdAt: Date.now() }),
+  );
+  window.sessionStorage.setItem(
+    'google_login_attempt',
+    JSON.stringify({ verifier: 'l'.repeat(43), createdAt: Date.now() }),
+  );
+}
+
+test('LINK callback waits for restored session, completes once in StrictMode and retains the local user', async () => {
+  saveLinkProof();
+  let finishRefresh;
+  const restored = makeToken({ marker: 'restored-local' });
+  let completes = 0;
+  client.defaults.adapter = async config => {
+    if (config.url.endsWith('/refresh'))
+      return new Promise(resolve => {
+        finishRefresh = () => resolve(reply(config, { accessToken: restored, user }));
+      });
+    if (config.url === '/api/v1/users/me') return reply(config, user);
+    assert.equal(config.url, '/api/v1/auth/google/link/complete');
+    assert.equal(config.headers.get('Authorization'), `Bearer ${restored}`);
+    assert.deepEqual(JSON.parse(config.data), { code: 'c'.repeat(43), verifier: 'v'.repeat(43) });
+    completes++;
+    return reply(config, {
+      alreadyLinked: false,
+      linkedAccounts: { passwordEnabled: true, google: { email: user.email } },
+    });
+  };
+  await mount(
+    h(
+      MemoryRouter,
+      { initialEntries: [`/auth/google/callback?flow=link&code=${'c'.repeat(43)}`] },
+      h(
+        'div',
+        null,
+        h(Probe),
+        h(
+          Routes,
+          null,
+          h(Route, { path: '/auth/google/callback', element: h(GoogleCallbackPage) }),
+          h(Route, { path: '/account', element: h(SignInMethods) }),
+        ),
+      ),
+    ),
+    true,
+  );
+  assert.equal(completes, 0);
+  // Status is fetched on the destination page after the link succeeds.
+  const adapter = client.defaults.adapter;
+  client.defaults.adapter = config =>
+    config.url.endsWith('/linked-accounts')
+      ? Promise.resolve(reply(config, { passwordEnabled: true, google: { email: user.email } }))
+      : adapter(config);
+  await act(async () => finishRefresh());
+  await flush();
+  assert.equal(completes, 1);
+  assert.equal(auth.user.id, 1);
+  assert.equal(tokens.getAccessToken(), restored);
+  assert.match(document.body.textContent, /Liên kết Google thành công/);
+  assert.match(document.body.textContent, /Đã liên kết — test@example.com/);
+  assert.equal(readGoogleAttempt('link'), null);
+  assert.ok(readGoogleAttempt());
+});
+
+test('cancelled LINK keeps the local session and returns to Profile without consuming LOGIN proof', async () => {
+  saveLinkProof();
+  const localToken = makeToken();
+  tokens.setAccessToken(localToken);
+  let completes = 0;
+  client.defaults.adapter = async config => {
+    if (config.url === '/api/v1/users/me') return reply(config, user);
+    completes++;
+    return reject(config, 401);
+  };
+  await mount(
+    h(
+      MemoryRouter,
+      { initialEntries: ['/auth/google/callback?flow=link&error=GOOGLE_LOGIN_CANCELLED'] },
+      h('div', null, h(Probe), h(GoogleCallbackPage)),
+    ),
+  );
+  await flush();
+  assert.equal(completes, 0);
+  assert.equal(auth.user.id, 1);
+  assert.equal(tokens.getAccessToken(), localToken);
+  assert.match(document.body.textContent, /đã hủy/);
+  assert.equal(document.querySelector('a').getAttribute('href'), '/account#sign-in-methods');
+  assert.ok(readGoogleAttempt());
+  assert.equal(readGoogleAttempt('link'), null);
+});
+
+test('LINK callback refuses a different restored account without changing that account', async () => {
+  assert.match(googleErrorMessage('GOOGLE_LOGIN_FAILED', 'link'), /thử lại từ Hồ sơ/);
+  assert.match(googleErrorMessage('GOOGLE_LOGIN_CANCELLED', 'link'), /hủy liên kết Google/);
+  saveLinkProof(999);
+  tokens.setAccessToken(makeToken());
+  let completes = 0;
+  client.defaults.adapter = async config => {
+    if (config.url === '/api/v1/users/me') return reply(config, user);
+    completes++;
+    return reply(config, {});
+  };
+  await mount(
+    h(
+      MemoryRouter,
+      { initialEntries: [`/auth/google/callback?flow=link&code=${'c'.repeat(43)}`] },
+      h('div', null, h(Probe), h(GoogleCallbackPage)),
+    ),
+  );
+  await flush();
+  assert.equal(completes, 0);
+  assert.equal(auth.user.id, 1);
+  assert.match(document.body.textContent, /Phiên khởi tạo đã thay đổi/);
+});
+
+test('Profile displays local, linked and Google-only capabilities from the protected status API', async () => {
+  for (const status of [
+    { passwordEnabled: true, google: null },
+    { passwordEnabled: true, google: { email: user.email } },
+    { passwordEnabled: false, google: { email: user.email } },
+  ]) {
+    tokens.setAccessToken(makeToken());
+    client.defaults.adapter = async config => {
+      assert.ok(config.headers.get('Authorization'));
+      if (config.url === '/api/v1/users/me') return reply(config, user);
+      assert.equal(config.url, '/api/v1/users/me/linked-accounts');
+      return reply(config, status);
+    };
+    await mount(h(MemoryRouter, null, h(ProtectedRoute, null, h(SignInMethods))));
+    await flush();
+    const button = [...document.querySelectorAll('button')].find(
+      item => item.textContent === 'Liên kết Google',
+    );
+    assert.equal(!!button, status.passwordEnabled && !status.google);
+    if (status.google) assert.match(document.body.textContent, /Đã liên kết — test@example.com/);
+    if (!status.passwordEnabled)
+      assert.match(document.body.textContent, /Chưa thiết lập; tài khoản sử dụng Google/);
+    await act(async () => root.unmount());
+    root = null;
+  }
+});
+
+test('login redirects and Google error messages reject arbitrary destinations and unknown error values', () => {
+  for (const from of [
+    'https://evil.test',
+    '//evil.test',
+    '/\\evil.test',
+    '/%2f%2fevil.test',
+    '/admin/users',
+    '/login',
+    '/auth/google/callback',
+    '/\n/evil.test',
+  ]) {
+    assert.equal(loginDestination(user, from), '/account');
+  }
+  assert.equal(loginDestination(user, '/courses/42?tab=lessons'), '/courses/42?tab=lessons');
+  assert.equal(typeof googleErrorMessage('__proto__'), 'string');
+  assert.equal(typeof googleErrorMessage('constructor'), 'string');
 });
 
 test('establishSession rejects malformed, expired and mismatched user responses', async () => {

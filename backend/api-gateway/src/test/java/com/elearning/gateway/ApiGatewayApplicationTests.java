@@ -31,12 +31,21 @@ class ApiGatewayApplicationTests {
 
     static final String SECRET = UUID.randomUUID().toString() + UUID.randomUUID();
     static final HttpServer upstream = upstream();
+    static volatile boolean dependencyUp = true;
 
     static HttpServer upstream() {
         try {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/", exchange -> {
-                String result = exchange.getRequestURI().getPath() +
+                if (exchange.getRequestURI().getPath().equals("/actuator/health/readiness")) {
+                    byte[] health = "{\"status\":\"UP\"}".getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(dependencyUp ? 200 : 503, health.length);
+                    try (var body = exchange.getResponseBody()) { body.write(health); }
+                    return;
+                }
+                String result = (exchange.getRequestHeaders().getFirst("X-Internal-Service-Token") == null
+                        ? exchange.getRequestURI().getPath() : "internal-header-was-not-stripped") +
                         "|" +
                         exchange.getRequestHeaders().getFirst("X-User-Id") +
                         "|" +
@@ -119,6 +128,20 @@ class ApiGatewayApplicationTests {
     void startsWithoutBusinessServicesOrDatabase() throws Exception {
         assertThat(request("/actuator/health", null, "GET", null).statusCode()).isEqualTo(200);
         assertThat(request("/v3/api-docs", null, "GET", null).body()).startsWith("/v3/api-docs|");
+    }
+
+    @Test
+    void readinessTracksDependenciesWhileLivenessStaysUpAndDetailsRemainPrivate() throws Exception {
+        assertThat(request("/actuator/health/readiness", null, "GET", null).statusCode()).isEqualTo(200);
+        dependencyUp = false;
+        try {
+            var readiness = request("/actuator/health/readiness", null, "GET", null);
+            assertThat(readiness.statusCode()).isEqualTo(503);
+            assertThat(mapper.readTree(readiness.body()).has("components")).isFalse();
+            assertThat(request("/actuator/health/liveness", null, "GET", null).statusCode()).isEqualTo(200);
+        } finally {
+            dependencyUp = true;
+        }
     }
 
     @Test
@@ -211,7 +234,8 @@ class ApiGatewayApplicationTests {
 
     @Test
     void permitsCookieAuthEndpointsWithoutValidAccessAndEnablesCredentialCors() throws Exception {
-        for (String path : new String[] { "/api/v1/auth/refresh", "/api/v1/auth/logout" }) {
+        for (String path : new String[] { "/api/v1/auth/refresh", "/api/v1/auth/logout",
+            "/api/v1/auth/google/start", "/api/v1/auth/google/exchange" }) {
             for (String access : new String[] { null, "broken", token(-60) }) {
                 var response = request(path, access, "POST", "http://localhost:5173");
                 assertThat(response.statusCode()).isEqualTo(200);
@@ -227,5 +251,29 @@ class ApiGatewayApplicationTests {
         config.setAllowedOrigins(List.of("*"));
         config.setAllowCredentials(true);
         assertThatThrownBy(config::validateAllowCredentials).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void permitsOnlyExactGoogleBrowserEndpointsWithoutJwt() throws Exception {
+        for (String path : List.of(
+            "/api/v1/auth/google/authorize/google",
+            "/api/v1/auth/google/callback/google"
+        )) {
+            var response = request(path, null, "GET", null);
+            assertThat(response.statusCode()).isEqualTo(200);
+            assertThat(response.body()).startsWith(path + "|null|null|null|false");
+            assertThat(request(path, null, "POST", null).statusCode()).isEqualTo(401);
+        }
+        assertThat(request("/api/v1/auth/google/private", null, "GET", null).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void googleLinkAndMethodStatusRequireJwtAtGateway() throws Exception {
+        for (String path : List.of("/api/v1/auth/google/link/start", "/api/v1/auth/google/link/complete",
+            "/api/v1/users/me/linked-accounts")) {
+            String method = path.endsWith("linked-accounts") ? "GET" : "POST";
+            assertThat(request(path, null, method, null).statusCode()).isEqualTo(401);
+            assertThat(request(path, token(60), method, null).statusCode()).isEqualTo(200);
+        }
     }
 }

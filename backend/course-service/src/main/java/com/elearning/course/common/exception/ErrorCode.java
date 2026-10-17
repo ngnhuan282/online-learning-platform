@@ -3,6 +3,7 @@ package com.elearning.course.common.exception;
 import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
+    SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dependent service is unavailable"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Request validation failed"),
     MALFORMED_REQUEST(HttpStatus.BAD_REQUEST, "Malformed request body"),
     BAD_REQUEST(HttpStatus.BAD_REQUEST, "Invalid request"),

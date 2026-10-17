@@ -27,7 +27,8 @@ TABLES = {
     'payment': ['orders', 'order_items', 'payments', 'payment_transactions'],
 }
 password = secrets.token_hex(24)
-environment = dict(os.environ, MYSQL_ROOT_PASSWORD=password, JWT_SECRET=secrets.token_hex(32))
+environment = dict(os.environ, MYSQL_ROOT_PASSWORD=password, JWT_SECRET=secrets.token_hex(32),
+                   INTERNAL_SERVICE_TOKEN=secrets.token_hex(32))
 for service in [*SERVICES, 'ai']:
     environment[service.upper() + '_DB_PASSWORD'] = password
 containers = []
@@ -78,7 +79,7 @@ def wait_until(predicate, description, seconds=150):
 
 
 def seed(check=True):
-    return sql((ROOT / 'infra/mysql/05-seed-data.sql').read_text(encoding='utf-8'), check=check)
+    return sql((ROOT / 'infra/mysql/seed-data.sql').read_text(encoding='utf-8'), check=check)
 
 
 def histories():
@@ -117,7 +118,9 @@ def verify():
     for service, port in SERVICES.items():
         name = RUN + '-' + service
         args = ['run', '-d', '--name', name, '--network', RUN, '--memory', '640m',
-                '-p', f'127.0.0.1::{port}', '-e', 'JWT_SECRET',
+                '-p', f'127.0.0.1::{port}', '-e', 'JWT_SECRET', '-e', 'INTERNAL_SERVICE_TOKEN',
+                '-e', f'COURSE_SERVICE_URL=http://{RUN}-course:8082',
+                '-e', f'LEARNING_SERVICE_URL=http://{RUN}-learning:8083',
                 '-e', f'{service.upper()}_DB_PASSWORD',
                 '-e', f'{service.upper()}_DB_URL=jdbc:mysql://mysql:3306/{service}_db',
                 '--mount', f'type=bind,source={jars[service]},target=/tmp/seed-check.jar,readonly',
@@ -133,47 +136,66 @@ def verify():
     before = histories()
     print('All four services migrated empty schemas and passed Hibernate validation.', flush=True)
 
-    # A collision after auth inserts must roll back work across database boundaries.
-    sql("INSERT INTO course_db.categories (id,name,slug,created_at,updated_at) VALUES (900001,'Existing category','existing-category',NOW(),NOW());")
+    # Existing accounts occupy the old hard-coded IDs. The requested admin is ID 22.
+    sql("""INSERT INTO auth_db.users
+        (id,email,password_hash,full_name,status,created_at,updated_at) VALUES
+        (1,'existing-one@example.com','existing-hash','Existing one','LOCKED',NOW(),NOW()),
+        (2,'existing-two@example.com','existing-hash','Existing two','ACTIVE',NOW(),NOW()),
+        (22,'admin@gmail.com','before-seed-hash','Existing admin profile','LOCKED',NOW(),NOW());""")
+
+    # A category collision must roll back credentials and inserts across databases.
+    sql("INSERT INTO course_db.categories (id,name,slug,created_at,updated_at) VALUES (1,'Existing category','existing-category',NOW(),NOW());")
     failure = seed(check=False)
     assert failure.returncode != 0 and 'Seed ID collision' in failure.stderr
-    assert count('auth_db.users') == 0
+    assert count('auth_db.users') == 3
+    assert count('auth_db.users', "id=22 AND status='LOCKED' AND password_hash='before-seed-hash'") == 1
+    assert count('auth_db.user_roles') == 0
     assert count('course_db.categories', "slug='existing-category'") == 1
-    sql("DELETE FROM course_db.categories WHERE id=900001 AND slug='existing-category';")
+    sql("DELETE FROM course_db.categories WHERE id=1 AND slug='existing-category';")
 
-    # A conflicting natural key must fail, not overwrite or silently skip another user.
-    sql("INSERT INTO auth_db.users (id,email,password_hash,full_name,status,created_at,updated_at) VALUES (42,'demo.dung@example.com','existing-hash','Existing person','LOCKED',NOW(),NOW());")
+    # A conflicting category name at another ID must also abort, without overwriting it.
+    sql("INSERT INTO course_db.categories (id,name,slug,created_at,updated_at) VALUES (42,'Luyện thi IELTS','existing-ielts-category',NOW(),NOW());")
     failure = seed(check=False)
-    assert failure.returncode != 0
-    assert count('auth_db.users') == 1
-    assert count('auth_db.users', "id=42 AND status='LOCKED' AND password_hash='existing-hash'") == 1
-    sql("DELETE FROM auth_db.users WHERE id=42 AND email='demo.dung@example.com';")
-    print('ID and natural-key collisions abort without overwrites; cross-schema rollback passed.', flush=True)
+    assert failure.returncode != 0 and 'Seed natural key collision' in failure.stderr
+    assert count('auth_db.users') == 3
+    assert count('course_db.categories', "id=42 AND slug='existing-ielts-category'") == 1
+    sql("DELETE FROM course_db.categories WHERE id=42 AND slug='existing-ielts-category';")
 
     seed()
-    for service, tables in TABLES.items():
-        for table in tables:
-            assert count(f'{service}_db.{table}') == 5, table
+    expected_counts = {'auth_db.users': 8, 'auth_db.user_roles': 7, 'auth_db.refresh_tokens': 5,
+                       'course_db.categories': 5, 'course_db.courses': 5,
+                       'course_db.sections': 5, 'course_db.lessons': 6}
+    for service in ['learning', 'payment']:
+        expected_counts.update({f'{service}_db.{table}': 5 for table in TABLES[service]})
+    for table, expected in expected_counts.items():
+        assert count(table) == expected, table
     assert count('auth_db.roles') == 2
-    assert count('auth_db.refresh_tokens', 'revoked_at IS NOT NULL AND expires_at < NOW()') == 5
-    # A second run must preserve application edits and unrelated users.
-    sql("UPDATE auth_db.users SET full_name='Edited demo name' WHERE id=900002;")
-    sql("INSERT INTO auth_db.users (id,email,password_hash,full_name,status,created_at,updated_at) VALUES (42,'existing@example.com','existing-hash','Existing person','LOCKED',NOW(),NOW());")
-    seed()
-    assert count('auth_db.users') == 6
-    assert count('auth_db.users', "id=900002 AND full_name='Edited demo name'") == 1
-    assert count('auth_db.users', "id=42 AND status='LOCKED' AND password_hash='existing-hash'") == 1
-    for service, tables in TABLES.items():
-        for table in tables:
-            key = 'user_id' if table == 'user_roles' else 'id'
-            assert count(f'{service}_db.{table}', f'{key} BETWEEN 900001 AND 900005') == 5
-    assert histories() == before, 'Seed must not change Flyway metadata'
-    print('87 fixture rows verified (17 x 5 + 2 roles); rerun preserved data and Flyway history.', flush=True)
+    assert count('auth_db.refresh_tokens', 'revoked_at IS NOT NULL AND expires_at < NOW() AND session_id IS NOT NULL') == 5
+    assert count('auth_db.users', "id=22 AND email='admin@gmail.com' AND full_name='Existing admin profile'") == 1
+    assert count('auth_db.users', "id IN (1,2) AND password_hash='existing-hash'") == 2
 
-    # Payment APIs are explicitly unfinished stubs; verify their fixtures relationally.
-    assert count('payment_db.payment_transactions',
-                 "event_type IN ('CREATED','PROVIDER_REQUESTED','PROVIDER_RETURNED','PROVIDER_CALLBACK','STATUS_CHANGED')") == 5
-    payment_matches = sql('''SELECT COUNT(*) FROM payment_db.orders o
+    # Re-running preserves edited profiles, unrelated users and every row count.
+    sql("UPDATE auth_db.users SET full_name='Edited learner profile' WHERE email='user@gmail.com';")
+    seed()
+    for table, expected in expected_counts.items():
+        assert count(table) == expected, table
+    assert count('auth_db.users', "email='user@gmail.com' AND full_name='Edited learner profile'") == 1
+    assert count('auth_db.users', "id=1 AND status='LOCKED' AND password_hash='existing-hash'") == 1
+    assert histories() == before, 'Seed must not change Flyway metadata'
+
+    # A late payment collision rolls back credential changes and all earlier tables too.
+    sql("UPDATE payment_db.orders SET order_code='existing-unrelated-order' WHERE id=1;")
+    sql("UPDATE auth_db.users SET password_hash='unchanged-on-failure' WHERE email='admin@gmail.com';")
+    failure = seed(check=False)
+    assert failure.returncode != 0 and 'Seed ID collision' in failure.stderr
+    assert count('auth_db.users', "id=22 AND password_hash='unchanged-on-failure'") == 1
+    assert count('payment_db.orders', "id=1 AND order_code='existing-unrelated-order'") == 1
+    sql("UPDATE payment_db.orders SET order_code='ORD-2026-0001' WHERE id=1;")
+    seed()
+    assert histories() == before
+    print('Verified email-based accounts, repeated imports, unrelated-data preservation and cross-database rollback.', flush=True)
+
+    payment_matches = sql("""SELECT COUNT(*) FROM payment_db.orders o
         JOIN payment_db.order_items i ON i.order_id=o.id
         JOIN payment_db.payments p ON p.order_id=o.id
         JOIN payment_db.payment_transactions t ON t.payment_id=p.id
@@ -181,28 +203,37 @@ def verify():
         WHERE o.total_amount=i.final_price AND i.final_price=i.unit_price-i.discount_amount
           AND p.amount=o.total_amount AND t.amount=p.amount
           AND o.status='PAID' AND p.status='SUCCESS' AND t.status='SUCCESS'
-          AND p.provider='MOCK' AND t.provider='MOCK';''')
-    assert int(payment_matches.stdout.strip()) == 5
+          AND p.provider='MOCK' AND t.provider='MOCK';""")
+    assert int(payment_matches.stdout.strip()) == 4
+    assert count('payment_db.payment_transactions', "event_type IN ('CREATED','STATUS_CHANGED')") == 5
+    assert int(sql("""SELECT COUNT(*) FROM learning_db.lesson_progress p
+        JOIN course_db.lessons l ON l.id=p.lesson_id
+        JOIN course_db.sections s ON s.id=l.section_id AND s.course_id=p.course_id;""").stdout.strip()) == 5
 
-    # Real authentication verifies the documented BCrypt passwords and exercises enum mappings.
-    for n, email in enumerate(['demo.admin@example.com', 'demo.an@example.com', 'demo.binh@example.com',
-                               'demo.chi@example.com', 'demo.dung@example.com'], start=1):
-        auth = api('auth', '/api/v1/auth/login', {'email': email, 'password': 'Admin123' if n == 1 else 'User123!'})['data']
+    admin = api('auth', '/api/v1/auth/login', {'email': 'admin@gmail.com', 'password': 'Admin123'})['data']
+    assert admin['user']['id'] == 22
+    assert set(admin['user']['roles']) == {'ADMIN', 'USER'}
+    assert api('course', '/api/v1/admin/courses', token=admin['accessToken'])['success']
+    for email, course_id in [('user@gmail.com', 1), ('tran.thi.b@elearning.com', 2),
+                             ('le.van.c@elearning.com', 3), ('hoang.van.e@elearning.com', 4)]:
+        auth = api('auth', '/api/v1/auth/login', {'email': email,
+                   'password': 'User123' if email == 'user@gmail.com' else 'User123!'})['data']
         token = auth['accessToken']
-        assert auth['user']['roles'] == (['ADMIN'] if n == 1 else ['USER'])
+        assert auth['user']['roles'] == ['USER']
+        assert auth['user']['id'] not in (1, 2, 22)
         assert api('auth', '/api/v1/users/me', token=token)['data']['email'] == email
-        for path in ['/dashboard', '/enrollments/me', f'/quizzes/{900000+n}',
-                     f'/quizzes/{900000+n}/result', f'/progress/courses/{900000+n}', '/notifications']:
-            assert api('learning', '/api/v1/learning' + path, token=token)['success']
-        try:
-            api('payment', '/api/v1/payments/history', token=token)
-        except HTTPError as error:
-            assert error.code == 501
-            assert json.load(error)['code'] == 'FEATURE_NOT_IMPLEMENTED'
-        else:
-            raise AssertionError('Update the verification when Payment APIs are implemented')
-        assert api('course', f'/api/v1/courses/{900000+n}', token=token)['success']
-    print('All five logins and Course/Learning API reads passed; Payment relations verified in SQL (APIs still 501).', flush=True)
+        for path in ['/dashboard', '/enrollments/me', f'/quizzes/{course_id}',
+                     f'/quizzes/{course_id}/result', f'/progress/courses/{course_id}', '/notifications']:
+            assert api('learning', '/api/v1/learning' + path, token=token)['success'], path
+        assert api('payment', '/api/v1/payments/history', token=token)['success']
+        assert api('course', f'/api/v1/courses/{course_id}/sections', token=token)['success']
+    try:
+        api('auth', '/api/v1/auth/login', {'email': 'pham.thi.d@elearning.com', 'password': 'User123!'})
+    except HTTPError as error:
+        assert error.code == 403
+    else:
+        raise AssertionError('The locked sample account must remain locked')
+    print('Five active logins, admin access, real curriculum/progress and payment history passed.', flush=True)
 
 
 try:

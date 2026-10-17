@@ -36,7 +36,7 @@ services:
       - ./infra/mysql/04-learning-migrations.sql:/docker-entrypoint-initdb.d/04-learning-migrations.sql:ro
       - ./infra/mysql/04-payment-migrations.sql:/docker-entrypoint-initdb.d/04-payment-migrations.sql:ro
       # Run explicitly after service migrations; demo accounts are opt-in.
-      - ./infra/mysql/05-seed-data.sql:/seed/05-seed-data.sql:ro
+      - ./infra/mysql/seed-data.sql:/seed/seed-data.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -uroot -Nse "SELECT 1" >/dev/null 2>&1']
       interval: 10s
@@ -62,6 +62,11 @@ services:
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
       REFRESH_TOKEN_EXPIRATION_SECONDS: ${REFRESH_TOKEN_EXPIRATION_SECONDS:-604800}
       REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
+      GOOGLE_LOGIN_ENABLED: ${GOOGLE_LOGIN_ENABLED:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8080/api/v1/auth/google/callback/google}
+      GOOGLE_FRONTEND_ORIGIN: ${GOOGLE_FRONTEND_ORIGIN:-http://localhost:5173}
     depends_on:
       mysql:
         condition: service_healthy
@@ -83,6 +88,7 @@ services:
       COURSE_DB_URL: jdbc:mysql://mysql:3306/course_db
       COURSE_DB_USERNAME: course_app
       COURSE_DB_PASSWORD: ${COURSE_DB_PASSWORD}
+      LEARNING_SERVICE_URL: http://learning-service:8083
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_DIR: /app/uploads
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
@@ -173,7 +179,7 @@ services:
 
   ai-service:
     <<: *backend-defaults
-    profiles: [backend]
+    profiles: [ai]
     build:
       context: .
       dockerfile: infra/docker/service.Dockerfile
@@ -225,8 +231,6 @@ services:
       learning-service:
         condition: service_healthy
       payment-service:
-        condition: service_healthy
-      ai-service:
         condition: service_healthy
 
 volumes:

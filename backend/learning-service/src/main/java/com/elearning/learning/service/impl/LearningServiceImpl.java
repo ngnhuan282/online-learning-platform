@@ -13,7 +13,9 @@ import com.elearning.learning.service.CourseCatalogClient;
 import com.elearning.learning.service.LearningService;
 import com.elearning.learning.service.NotificationService;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,19 +28,22 @@ public class LearningServiceImpl implements LearningService {
     private final QuizAttemptRepository attempts;
     private final NotificationService notifications;
     private final CourseCatalogClient courseCatalog;
+    private final JdbcTemplate jdbc;
 
     public LearningServiceImpl(
         EnrollmentRepository enrollments,
         LessonProgressRepository progress,
         QuizAttemptRepository attempts,
         NotificationService notifications,
-        CourseCatalogClient courseCatalog
+        CourseCatalogClient courseCatalog,
+        JdbcTemplate jdbc
     ) {
         this.enrollments = enrollments;
         this.progress = progress;
         this.attempts = attempts;
         this.notifications = notifications;
         this.courseCatalog = courseCatalog;
+        this.jdbc = jdbc;
     }
 
     @Override
@@ -70,20 +75,16 @@ public class LearningServiceImpl implements LearningService {
     @Override
     @Transactional
     public EnrollmentResponse enroll(Long userId, EnrollRequest request) {
-        var existing = enrollments.findByUserIdAndCourseId(userId, request.courseId());
-        if (existing.isPresent()) {
-            Enrollment enrollment = existing.get();
+        if (enrollments.existsByUserIdAndCourseId(userId, request.courseId())) {
+            Enrollment enrollment = enrollments
+                .findForUpdateByUserIdAndCourseId(userId, request.courseId())
+                .orElseThrow();
             enrollment.setLastAccessedAt(Instant.now());
             return EnrollmentResponse.from(enrollments.save(enrollment));
         }
 
         courseCatalog.requireFreeCourse(request.courseId());
-        var enrollment = new Enrollment();
-        enrollment.setUserId(userId);
-        enrollment.setCourseId(request.courseId());
-        enrollment.setStatus(EnrollmentStatus.ACTIVE);
-        enrollment.setLastAccessedAt(Instant.now());
-        Enrollment saved = enrollments.save(enrollment);
+        Enrollment saved = createEnrollmentIfAbsent(userId, request.courseId(), null);
         notifications.courseEnrolled(userId, request.courseId(), saved.getId());
         return EnrollmentResponse.from(saved);
     }
@@ -92,32 +93,74 @@ public class LearningServiceImpl implements LearningService {
     @Transactional
     public EnrollmentResponse enrollFromPayment(PaymentEnrollmentRequest request) {
         String orderCode = request.orderCode().strip();
-        var existingOrder = enrollments.findBySourceOrderCode(orderCode);
-        if (existingOrder.isPresent()) {
-            Enrollment enrollment = existingOrder.get();
-            if (
-                !enrollment.getUserId().equals(request.userId()) ||
-                !enrollment.getCourseId().equals(request.courseId())
-            ) {
-                throw new AppException(ErrorCode.CONFLICT);
-            }
-            return EnrollmentResponse.from(enrollment);
+        // Keep an immutable order identity even when this user already owns the course.
+        jdbc.update(
+            """
+            INSERT INTO payment_enrollment_receipts (order_code, user_id, course_id)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE order_code = order_code
+            """,
+            orderCode,
+            request.userId(),
+            request.courseId()
+        );
+        var receipt = jdbc.queryForObject(
+            """
+            SELECT order_code, user_id, course_id FROM payment_enrollment_receipts WHERE order_code = ? FOR UPDATE
+            """,
+            (row, index) ->
+                new PaymentReceipt(
+                    row.getString("order_code"),
+                    row.getLong("user_id"),
+                    row.getLong("course_id")
+                ),
+            orderCode
+        );
+        if (
+            receipt == null ||
+            !request.userId().equals(receipt.userId()) ||
+            !request.courseId().equals(receipt.courseId())
+        ) {
+            throw new AppException(ErrorCode.CONFLICT);
         }
-
-        var existingCourse = enrollments.findByUserIdAndCourseId(request.userId(), request.courseId());
-        if (existingCourse.isPresent()) {
-            return EnrollmentResponse.from(existingCourse.get());
+        boolean existingCourse = enrollments.existsByUserIdAndCourseId(request.userId(), request.courseId());
+        Enrollment saved = createEnrollmentIfAbsent(request.userId(), request.courseId(), orderCode);
+        if (saved.getStatus() == EnrollmentStatus.CANCELLED) {
+            throw new AppException(ErrorCode.CONFLICT);
         }
-
-        var enrollment = new Enrollment();
-        enrollment.setUserId(request.userId());
-        enrollment.setCourseId(request.courseId());
-        enrollment.setSourceOrderCode(orderCode);
-        enrollment.setStatus(EnrollmentStatus.ACTIVE);
-        enrollment.setLastAccessedAt(Instant.now());
-        Enrollment saved = enrollments.saveAndFlush(enrollment);
-        notifications.courseEnrolled(request.userId(), request.courseId(), saved.getId());
+        if (!existingCourse) notifications.courseEnrolled(
+            request.userId(),
+            request.courseId(),
+            saved.getId()
+        );
+        notifications.paymentSucceeded(request.userId(), receipt.orderCode());
         return EnrollmentResponse.from(saved);
+    }
+
+    private record PaymentReceipt(String orderCode, Long userId, Long courseId) {}
+
+    private Enrollment createEnrollmentIfAbsent(Long userId, Long courseId, String orderCode) {
+        // The unique user/course key and atomic insert also cover simultaneous free/paid retries.
+        jdbc.update(
+            """
+            INSERT INTO enrollments (user_id, course_id, source_order_code, status, enrolled_at, last_accessed_at)
+            VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON DUPLICATE KEY UPDATE id = id
+            """,
+            userId,
+            courseId,
+            orderCode
+        );
+        return enrollments.findForUpdateByUserIdAndCourseId(userId, courseId).orElseThrow();
+    }
+
+    @Override
+    public LearningCourseResponse getLearningCourse(Long userId, Long courseId) {
+        ensureCourseAccess(userId, courseId);
+        return LearningCourseResponse.from(
+            courseCatalog.getCurriculum(courseId),
+            getCourseProgress(userId, courseId)
+        );
     }
 
     @Override
@@ -133,7 +176,9 @@ public class LearningServiceImpl implements LearningService {
     @Override
     @Transactional
     public LessonProgressResponse accessLesson(Long userId, Long courseId, Long lessonId) {
-        ensureCourseAccess(userId, courseId);
+        Enrollment enrollment = ensureCourseAccessForUpdate(userId, courseId);
+        courseCatalog.getCurriculum(courseId).requireLesson(lessonId);
+        enrollment.setLastAccessedAt(Instant.now());
         LessonProgress item = progress
             .findByUserIdAndCourseIdAndLessonId(userId, courseId, lessonId)
             .orElseGet(() -> createLessonProgress(userId, courseId, lessonId));
@@ -149,15 +194,27 @@ public class LearningServiceImpl implements LearningService {
     @Override
     @Transactional
     public LessonProgressResponse markLessonComplete(Long userId, Long courseId, Long lessonId) {
-        ensureCourseAccess(userId, courseId);
+        Enrollment enrollment = ensureCourseAccessForUpdate(userId, courseId);
+        var curriculum = courseCatalog.getCurriculum(courseId);
+        curriculum.requireLesson(lessonId);
         LessonProgress item = progress
             .findByUserIdAndCourseIdAndLessonId(userId, courseId, lessonId)
             .orElseGet(() -> createLessonProgress(userId, courseId, lessonId));
         boolean firstCompletion = item.getStatus() != ProgressStatus.COMPLETED;
         item.setStatus(ProgressStatus.COMPLETED);
         item.setProgressPercent(100);
-        item.setCompletedAt(Instant.now());
-        var saved = progress.save(item);
+        if (firstCompletion) item.setCompletedAt(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+        var saved = progress.saveAndFlush(item);
+        var summary = LearningCourseResponse.from(curriculum, getCourseProgress(userId, courseId));
+        enrollment.setLastAccessedAt(Instant.now());
+        if (
+            summary.totalLessons() > 0 &&
+            summary.completedLessons() == summary.totalLessons() &&
+            enrollment.getStatus() != EnrollmentStatus.COMPLETED
+        ) {
+            enrollment.setStatus(EnrollmentStatus.COMPLETED);
+            enrollment.setCompletedAt(Instant.now());
+        }
         if (firstCompletion) notifications.lessonCompleted(userId, courseId, lessonId);
         return LessonProgressResponse.from(saved);
     }
@@ -183,6 +240,13 @@ public class LearningServiceImpl implements LearningService {
         }
     }
 
+    private Enrollment ensureCourseAccessForUpdate(Long userId, Long courseId) {
+        return enrollments
+            .findForUpdateByUserIdAndCourseId(userId, courseId)
+            .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
+            .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN));
+    }
+
     private LessonProgress createLessonProgress(Long userId, Long courseId, Long lessonId) {
         var item = new LessonProgress();
         item.setUserId(userId);
@@ -192,5 +256,17 @@ public class LearningServiceImpl implements LearningService {
         item.setProgressPercent(0);
         item.setTimeSpentSeconds(0L);
         return item;
+    }
+
+    @Override
+    public EnrollmentCheckResponse checkEnrollment(Long userId, Long courseId) {
+        if (userId == null || courseId == null) {
+            return new EnrollmentCheckResponse(false, null, userId, courseId);
+        }
+        return enrollments
+            .findByUserIdAndCourseId(userId, courseId)
+            .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
+            .map(enrollment -> new EnrollmentCheckResponse(true, enrollment.getStatus().name(), userId, courseId))
+            .orElseGet(() -> new EnrollmentCheckResponse(false, null, userId, courseId));
     }
 }

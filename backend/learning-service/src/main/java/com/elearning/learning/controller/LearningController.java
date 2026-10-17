@@ -32,17 +32,27 @@ public class LearningController {
         return ApiResponse.success(learning.getMyEnrollments(userId(principal)));
     }
 
-    @PostMapping("/enrollments")
-    ApiResponse<EnrollmentResponse> enroll(
-        Principal principal,
-        @Valid @RequestBody EnrollRequest request
+    @GetMapping("/enrollments/check")
+    ApiResponse<EnrollmentCheckResponse> checkEnrollment(
+        @RequestParam Long userId,
+        @RequestParam Long courseId
     ) {
+        return ApiResponse.success(learning.checkEnrollment(userId, courseId));
+    }
+
+    @PostMapping("/enrollments")
+    ApiResponse<EnrollmentResponse> enroll(Principal principal, @Valid @RequestBody EnrollRequest request) {
         return ApiResponse.success(learning.enroll(userId(principal), request));
     }
 
     @GetMapping("/progress/courses/{courseId}")
     ApiResponse<?> courseProgress(Principal principal, @PathVariable Long courseId) {
         return ApiResponse.success(learning.getCourseProgress(userId(principal), courseId));
+    }
+
+    @GetMapping("/courses/{courseId}")
+    ApiResponse<LearningCourseResponse> learningCourse(Principal principal, @PathVariable Long courseId) {
+        return ApiResponse.success(learning.getLearningCourse(userId(principal), courseId));
     }
 
     @PostMapping("/progress/courses/{courseId}/lessons/{lessonId}/access")

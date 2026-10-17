@@ -21,7 +21,7 @@ npm run dev
 
 Truy cập `http://localhost:5173/login`. Nếu đã chạy seed của dự án, đăng nhập bằng:
 
-- Email: `demo.admin@example.com`
+- Email: `admin@gmail.com`
 - Mật khẩu mẫu: `Admin123`
 
 Admin được chuyển đến `http://localhost:5173/admin`. Tài khoản thường tiếp tục đến `/account`. Tài khoản có vai trò tùy chỉnh chứa `ADMIN_ACCESS` cũng được chuyển đến khu vực admin; menu chỉ hiện các chức năng được cấp quyền.

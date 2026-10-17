@@ -15,6 +15,7 @@ import com.elearning.course.entity.Course;
 import com.elearning.course.entity.Review;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.repository.ReviewRepository;
+import com.elearning.course.security.CourseContentAccess;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -37,6 +38,9 @@ class ReviewServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
+
+    @Mock
+    private com.elearning.course.integration.learning.EnrollmentClient enrollmentClient;
 
     @InjectMocks
     private ReviewService reviewService;
@@ -64,8 +68,10 @@ class ReviewServiceTest {
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(5, "Tuyệt vời!");
 
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(false);
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
+        when(access.canReadPrivate(sampleCourse)).thenReturn(true);
         when(reviewRepository.avgRatingByCourseId(courseId)).thenReturn(5.0);
         when(reviewRepository.countByCourseId(courseId)).thenReturn(1);
 
@@ -84,12 +90,28 @@ class ReviewServiceTest {
     }
 
     @Test
+    void create_notEnrolled_throwsForbidden() {
+        Long courseId = 10L;
+        Long userId = 42L;
+        ReviewRequest request = new ReviewRequest(5, "Tuyệt vời!");
+
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(false);
+
+        assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    }
+
+    @Test
     void create_duplicateReview_throwsConflict() {
         Long courseId = 10L;
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(4, "Khóa học hay");
 
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(true);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
+        when(access.canReadPrivate(sampleCourse)).thenReturn(true);
 
         assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
             .isInstanceOf(AppException.class)
@@ -104,6 +126,7 @@ class ReviewServiceTest {
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(4, "Good");
 
+        when(enrollmentClient.isEnrolled(userId, courseId)).thenReturn(true);
         when(reviewRepository.existsByCourseIdAndUserId(courseId, userId)).thenReturn(false);
         when(courseRepository.findById(courseId)).thenReturn(Optional.empty());
 
@@ -213,6 +236,7 @@ class ReviewServiceTest {
 
         when(reviewRepository.findByCourseIdAndHiddenFalse(eq(courseId), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(rev)));
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
 
         Page<ReviewResponse> page = reviewService.listPublic(courseId, 0, 10);
         assertThat(page.getTotalElements()).isEqualTo(1);

@@ -37,9 +37,10 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } finally {
             // Never log bodies, query strings, credentials or identifying path values.
-            log.debug(
-                "requestId={} method={} status={} durationMs={}",
+            if (!request.getRequestURI().startsWith("/actuator/health")) log.info(
+                "requestId={} route={} method={} status={} durationMs={}",
                 requestId,
+                request.getAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE),
                 request.getMethod(),
                 response.getStatus(),
                 (System.nanoTime() - start) / 1_000_000

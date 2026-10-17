@@ -16,6 +16,9 @@ const gatewayUrl = (import.meta.env.VITE_API_URL?.trim() || globalThis.window?.l
 );
 const axiosClient = axios.create({ baseURL: gatewayUrl, timeout: API_TIMEOUT_MS, withCredentials: true });
 const authPaths = new Set(Object.values(ENDPOINTS.auth));
+// These lists contain only published, public data and never vary by account.
+const isPublicCatalogRequest = config =>
+  config?.method === 'get' && [ENDPOINTS.courses, ENDPOINTS.categories].includes(config.url);
 let refreshFlight = null;
 
 export function refreshAccessToken(options = {}) {
@@ -70,10 +73,16 @@ axiosClient.interceptors.request.use(config => {
   }
   const token = getAccessToken();
   config.sessionVersion ??= getSessionVersion();
-  if (config.sessionVersion !== getSessionVersion())
+  if (!isPublicCatalogRequest(config) && config.sessionVersion !== getSessionVersion())
     throw Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' });
   config.sessionToken = token;
-  if (!config.skipAuth && !authPaths.has(config.url) && token && !isTokenExpired(token)) {
+  if (
+    !isPublicCatalogRequest(config) &&
+    !config.skipAuth &&
+    !authPaths.has(config.url) &&
+    token &&
+    !isTokenExpired(token)
+  ) {
     config.headers.set('Authorization', `Bearer ${token}`);
     config.sessionToken = token;
   } else config.headers.delete('Authorization');
@@ -81,7 +90,7 @@ axiosClient.interceptors.request.use(config => {
 });
 axiosClient.interceptors.response.use(
   response => {
-    if (response.config.sessionVersion !== getSessionVersion()) {
+    if (!isPublicCatalogRequest(response.config) && response.config.sessionVersion !== getSessionVersion()) {
       throw normalizeApiError(Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' }));
     }
     return response.data;
@@ -89,13 +98,14 @@ axiosClient.interceptors.response.use(
   async error => {
     const config = error.config;
     // A response from an ended session must never clear or populate a newer session.
-    if (config && config.sessionVersion !== getSessionVersion()) {
+    if (config && !isPublicCatalogRequest(config) && config.sessionVersion !== getSessionVersion()) {
       return Promise.reject(
         normalizeApiError(Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' })),
       );
     }
     if (
       error.response?.status === 403 &&
+      !isPublicCatalogRequest(config) &&
       ['ACCOUNT_LOCKED', 'ACCOUNT_DISABLED'].includes(error.response?.data?.code)
     ) {
       clearTokens();
@@ -103,6 +113,7 @@ axiosClient.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       config &&
+      !isPublicCatalogRequest(config) &&
       !config.skipAuth &&
       !authPaths.has(config.url) &&
       config.sessionVersion === getSessionVersion()
@@ -124,6 +135,7 @@ axiosClient.interceptors.response.use(
             throw Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' });
           return axiosClient(config);
         } catch (refreshError) {
+          clearTokens();
           return Promise.reject(normalizeApiError(refreshError));
         }
       }

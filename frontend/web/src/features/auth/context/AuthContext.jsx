@@ -82,7 +82,8 @@ export function AuthProvider({ children }) {
         // A failed refresh can clear the token and cancel this effect before its catch runs.
         if (controller.signal.aborted && getAccessToken()) return;
         if ([401, 403, 404].includes(error.status)) {
-          clearTokens();
+          // Refresh already invalidates the session; a second invalidation cancels new guest requests.
+          if (!wasSessionCleared()) clearTokens();
           setLoggedOut(true);
           setSession(null);
           setRestoreState(null);
@@ -102,14 +103,14 @@ export function AuthProvider({ children }) {
     restoreRefresh.current = null;
     setRestoreState(null);
   }, []);
-  const login = useCallback(
-    async values => {
+  const authenticate = useCallback(
+    async requestLogin => {
       if (pendingLogout.current) throw new Error('Vui lòng chờ đăng xuất hoàn tất.');
       const attempt = ++generation.current;
       // Finish any cookie rotation before a new login sets its own session cookie.
       await waitForRefresh();
       if (attempt !== generation.current) throw new Error('Yêu cầu đăng nhập đã bị hủy.');
-      const request = authApi.login(values);
+      const request = requestLogin();
       pendingLogin.current = request;
       let response;
       try {
@@ -122,6 +123,11 @@ export function AuthProvider({ children }) {
       return response.data.user;
     },
     [establishSession],
+  );
+  const login = useCallback(values => authenticate(() => authApi.login(values)), [authenticate]);
+  const completeGoogleLogin = useCallback(
+    values => authenticate(() => authApi.exchangeGoogle(values)),
+    [authenticate],
   );
   const register = useCallback(async values => (await authApi.register(values)).data, []);
   const updateCurrentUser = useCallback(nextUser => {
@@ -179,6 +185,7 @@ export function AuthProvider({ children }) {
       retrySession,
       establishSession,
       login,
+      completeGoogleLogin,
       register,
       updateCurrentUser,
       logout,
@@ -193,6 +200,7 @@ export function AuthProvider({ children }) {
       retrySession,
       establishSession,
       login,
+      completeGoogleLogin,
       register,
       updateCurrentUser,
       logout,

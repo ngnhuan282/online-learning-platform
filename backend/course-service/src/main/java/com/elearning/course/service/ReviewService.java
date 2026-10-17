@@ -8,10 +8,12 @@ import com.elearning.course.entity.Course;
 import com.elearning.course.entity.Review;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.repository.ReviewRepository;
+import com.elearning.course.security.CourseContentAccess;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import com.elearning.course.integration.learning.EnrollmentClient;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -19,10 +21,16 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final CourseRepository courseRepository;
+    private final EnrollmentClient enrollmentClient;
 
-    public ReviewService(ReviewRepository reviewRepository, CourseRepository courseRepository) {
+    public ReviewService(
+        ReviewRepository reviewRepository,
+        CourseRepository courseRepository,
+        EnrollmentClient enrollmentClient
+    ) {
         this.reviewRepository = reviewRepository;
         this.courseRepository = courseRepository;
+        this.enrollmentClient = enrollmentClient;
     }
 
     /**
@@ -30,6 +38,9 @@ public class ReviewService {
      */
     @Transactional(readOnly = true)
     public Page<ReviewResponse> listPublic(Long courseId, int page, int size) {
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        access.requirePublished(course);
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return reviewRepository.findByCourseIdAndHiddenFalse(courseId, pageable)
             .map(ReviewResponse::from);
@@ -174,12 +185,14 @@ public class ReviewService {
     }
 
     /**
-     * Mock enrollment check cho T6: chỉ cần user đã đăng nhập.
-     * TODO T8: gọi Learning Service → GET /api/v1/learning/enrollments/check
+     * Xác thực người dùng đã đăng ký khóa học thông qua Learning Service.
      */
     private void verifyEnrollment(Long userId, Long courseId) {
         if (userId == null) {
             throw new AppException(ErrorCode.FORBIDDEN, "Cần đăng nhập để đánh giá khóa học");
+        }
+        if (!enrollmentClient.isEnrolled(userId, courseId)) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Bạn cần đăng ký khóa học này trước khi viết đánh giá");
         }
     }
 }

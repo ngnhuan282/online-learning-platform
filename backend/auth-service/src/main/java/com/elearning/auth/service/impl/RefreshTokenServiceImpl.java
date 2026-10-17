@@ -17,7 +17,9 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,13 +33,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     private final JwtTokenProvider jwt;
     private final long expirationSeconds;
     private final SecureRandom random = new SecureRandom();
+    private final JdbcTemplate jdbc;
 
     public RefreshTokenServiceImpl(
         RefreshTokenRepository refreshTokens,
         UserRepository users,
         AuthService auth,
         JwtTokenProvider jwt,
-        @Value("${security.refresh.expiration-seconds:604800}") long expirationSeconds
+        @Value("${security.refresh.expiration-seconds:604800}") long expirationSeconds,
+        JdbcTemplate jdbc
     ) {
         if (expirationSeconds <= 0 || expirationSeconds > 31536000) {
             throw new IllegalArgumentException("Refresh lifetime must be 1..31536000 seconds");
@@ -47,12 +51,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         this.auth = auth;
         this.jwt = jwt;
         this.expirationSeconds = expirationSeconds;
+        this.jdbc = jdbc;
     }
 
     @Override
     public String create(Long userId) {
         auth.getCurrentUser(userId.toString()); // Check current account status using existing Auth rules.
-        return issue(users.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)));
+        return issue(
+            users.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)),
+            UUID.randomUUID().toString()
+        );
     }
 
     @Override
@@ -76,7 +84,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         var user = auth.getCurrentUser(old.getUser().getId().toString());
         if (user.roles().isEmpty()) throw new AppException(ErrorCode.ROLE_NOT_FOUND);
         old.revoke();
-        String next = issue(old.getUser());
+        String next = issue(old.getUser(), old.getSessionId());
         var response = new AuthResponse(
             jwt.createAccessToken(user.id().toString(), user.roles(), user.permissions()),
             "Bearer",
@@ -89,14 +97,36 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     public void revoke(String rawToken) {
         if (rawToken == null || !rawToken.matches("[A-Za-z0-9_-]{43}")) return;
-        refreshTokens.findForUpdate(hash(rawToken)).ifPresent(RefreshToken::revoke);
+        refreshTokens.findForUpdate(hash(rawToken)).ifPresent(token -> {
+            token.revoke();
+            // Invalidate pending linking even when logout races with a completed rotation.
+            jdbc.update("DELETE FROM google_link_intents WHERE session_id = ?", token.getSessionId());
+        });
     }
 
-    private String issue(User user) {
+    @Override
+    public String requireSession(Long userId, String rawToken) {
+        if (rawToken == null || !rawToken.matches("[A-Za-z0-9_-]{43}")) throw new AppException(
+            ErrorCode.GOOGLE_LINK_SESSION_INVALID
+        );
+        var token = refreshTokens
+            .findForUpdate(hash(rawToken))
+            .orElseThrow(() -> new AppException(ErrorCode.GOOGLE_LINK_SESSION_INVALID));
+        if (
+            !token.getUser().getId().equals(userId) ||
+            token.getRevokedAt() != null ||
+            !token.getExpiresAt().isAfter(Instant.now())
+        ) throw new AppException(ErrorCode.GOOGLE_LINK_SESSION_INVALID);
+        return token.getSessionId();
+    }
+
+    private String issue(User user, String sessionId) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        refreshTokens.save(new RefreshToken(user, hash(raw), Instant.now().plusSeconds(expirationSeconds)));
+        refreshTokens.save(
+            new RefreshToken(user, hash(raw), Instant.now().plusSeconds(expirationSeconds), sessionId)
+        );
         return raw;
     }
 

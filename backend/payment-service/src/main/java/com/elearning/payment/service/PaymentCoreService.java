@@ -3,8 +3,9 @@ package com.elearning.payment.service;
 import com.elearning.payment.common.exception.AppException;
 import com.elearning.payment.common.exception.ErrorCode;
 import com.elearning.payment.common.response.PageResponse;
+import com.elearning.payment.config.PaymentProviderPolicy;
 import com.elearning.payment.course.CourseSnapshot;
-import com.elearning.payment.course.CourseSnapshotProvider;
+import com.elearning.payment.course.CourseClient;
 import com.elearning.payment.dto.*;
 import com.elearning.payment.entity.CourseOrder;
 import com.elearning.payment.entity.OrderItem;
@@ -192,6 +193,7 @@ public class PaymentCoreService {
 
     @Transactional
     public OrderResponse completeMockPayment(String orderCode, Long userId, MockPaymentRequest request) {
+        providers.requireAvailable(PaymentProvider.MOCK);
         CourseOrder order = orders
             .findLockedByOrderCode(orderCode)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
@@ -283,6 +285,7 @@ public class PaymentCoreService {
         PaymentEventType eventType,
         Instant eventTime
     ) {
+        if (nextStatus == PaymentStatus.SUCCESS) providers.requireAvailable(payment.getProvider());
         if (payment.getStatus() == nextStatus) {
             if (nextStatus == PaymentStatus.SUCCESS) {
                 enrollPaidCourse(order);
