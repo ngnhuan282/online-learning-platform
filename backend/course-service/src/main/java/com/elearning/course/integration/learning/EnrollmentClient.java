@@ -9,6 +9,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Component
 public class EnrollmentClient {
@@ -42,6 +44,10 @@ public class EnrollmentClient {
             return true;
         }
 
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes request)) return false;
+        String authorization = request.getRequest().getHeader("Authorization");
+        if (authorization == null || !authorization.startsWith("Bearer ")) return false;
+
         try {
             var response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -50,6 +56,7 @@ public class EnrollmentClient {
                     .queryParam("courseId", courseId)
                     .build()
                 )
+                .header("Authorization", authorization)
                 .retrieve()
                 .body(new ParameterizedTypeReference<LearningApiResponse<EnrollmentCheckResult>>() {});
 

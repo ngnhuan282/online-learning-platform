@@ -1,221 +1,113 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import LearningNotice from '../components/LearningNotice';
 import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
-import { courseApi } from '../../courses/api/courseApi';
-import { sectionApi } from '../../courses/api/sectionApi';
 import { lessonApi } from '../../courses/api/lessonApi';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import useToast from '../../../shared/hooks/useToast';
+import useLearningResource from '../hooks/useLearningResource';
 import ErrorState from '../../../shared/components/ErrorState';
 import AppLoading from '../../../shared/components/AppLoading';
-import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import '../styles/quiz.css';
 
-const progressValue = item => item?.progressPercent ?? 0;
 const lessonStatus = item => item?.status ?? 'NOT_STARTED';
 
-export default function LearningPage() {
-  const { courseId } = useParams();
+function LearningCoursePage({ courseId }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
-
-  // Course & Curriculum state from course-service
-  const [course, setCourse] = useState(null);
-  const [sections, setSections] = useState([]);
-  const [courseLoading, setCourseLoading] = useState(true);
-
-  // Learning progress state from learning-service
-  const [progressItems, setProgressItems] = useState([]);
-  const [selectedLessonId, setSelectedLessonId] = useState(null);
+  const loadCourse = useCallback(options => learningApi.getLearningCourse(courseId, options), [courseId]);
+  const loadQuizzes = useCallback(() => learningApi.getCourseQuizzes(courseId), [courseId]);
+  const emptyQuizzes = useMemo(() => [], []);
+  const snapshot = useLearningResource(loadCourse, null);
+  const quizzes = useLearningResource(loadQuizzes, emptyQuizzes);
+  const course = snapshot.data;
+  const courseLoading = snapshot.loading;
+  const [changes, setChanges] = useState({});
   const [updatingLessonId, setUpdatingLessonId] = useState(null);
   const [error, setError] = useState(null);
-  const [usingFallback, setUsingFallback] = useState(false);
-
-  // Active lesson play data (pre-signed URL, video/content)
-  const [playData, setPlayData] = useState(null);
-  const [playLoading, setPlayLoading] = useState(false);
-  const [playError, setPlayError] = useState(null);
-
-  // Quizzes state
-  const [courseQuizzes, setCourseQuizzes] = useState([]);
-  const [quizError, setQuizError] = useState(null);
-  const [quizzesLoading, setQuizzesLoading] = useState(true);
-
-  // 1. Load Course details & Sections/Lessons from course-service
-  useEffect(() => {
-    let active = true;
-    setCourseLoading(true);
-
-    Promise.all([
-      courseApi.getById(courseId).catch(() => null),
-      sectionApi.listByCourse(courseId).catch(() => null),
-    ]).then(([courseRes, sectionsRes]) => {
-      if (!active) return;
-      const cData = courseRes?.data?.data || courseRes?.data || courseRes;
-      if (cData) setCourse(cData);
-
-      const sData = sectionsRes?.data?.data || sectionsRes?.data || [];
-      const validSections = Array.isArray(sData) ? sData : [];
-      setSections(validSections);
-
-      // Determine initial lesson to select
-      const allLessons = validSections.flatMap(s => s.lessons || []);
-      const urlLessonId = searchParams.get('lessonId');
-      if (urlLessonId && allLessons.some(l => String(l.id) === String(urlLessonId))) {
-        setSelectedLessonId(Number(urlLessonId));
-      } else if (allLessons.length > 0) {
-        setSelectedLessonId(allLessons[0].id);
-      }
-    }).finally(() => {
-      if (active) setCourseLoading(false);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [courseId, searchParams]);
-
-  // 2. Load Learning Progress from learning-service
-  useEffect(() => {
-    let active = true;
-    learningApi
-      .getCourseProgress(courseId)
-      .then(response => {
-        if (!active) return;
-        const next = response?.data ?? [];
-        setProgressItems(next);
-        setUsingFallback(false);
-      })
-      .catch(err => {
-        if (!active) return;
-        setError(err);
-        setUsingFallback(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [courseId]);
-
-  // 3. Load Course Quizzes
-  useEffect(() => {
-    if (courseLoading || usingFallback) return;
-    let active = true;
-    setQuizzesLoading(true);
-    learningApi
-      .getCourseQuizzes(courseId)
-      .then(response => {
-        if (!active) return;
-        setCourseQuizzes(response.data ?? []);
-        setQuizError(null);
-      })
-      .catch(loadError => {
-        if (!active) return;
-        setCourseQuizzes([]);
-        setQuizError(loadError);
-      })
-      .finally(() => {
-        if (active) setQuizzesLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [courseId, courseLoading, usingFallback]);
-
-  // Flat list of all lessons in this course
-  const allLessons = useMemo(() => {
-    const list = [];
-    sections.forEach(sec => {
-      (sec.lessons || []).forEach(l => {
-        list.push({ ...l, sectionTitle: sec.title });
-      });
-    });
-    return list;
-  }, [sections]);
-
-  // Currently selected lesson object
-  const currentLesson = useMemo(() => {
-    if (!selectedLessonId) return allLessons[0] || null;
-    return allLessons.find(l => String(l.id) === String(selectedLessonId)) || allLessons[0] || null;
-  }, [allLessons, selectedLessonId]);
-
-  // Progress mapping
+  const pending = useRef(false);
+  const usingFallback = false;
+  const sections = useMemo(() => [...(course?.sections ?? [])]
+    .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id)
+    .map(section => ({ ...section, lessons: [...(section.lessons ?? [])]
+      .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id) })), [course?.sections]);
+  const allLessons = useMemo(() => sections.flatMap(section =>
+    section.lessons.map(lesson => ({ ...lesson, sectionTitle: section.title }))), [sections]);
+  const selectedLessonId = searchParams.get('lessonId');
+  const currentLesson = useMemo(() => allLessons.find(lesson =>
+    String(lesson.id) === selectedLessonId) ?? allLessons[0] ?? null, [allLessons, selectedLessonId]);
   const progressByLesson = useMemo(() => {
-    const next = new Map();
-    progressItems.forEach(item => next.set(item.lessonId, item));
-    return next;
-  }, [progressItems]);
-
-  const selectedProgress = currentLesson ? progressByLesson.get(currentLesson.id) : null;
-  const completedCount = allLessons.filter(l => lessonStatus(progressByLesson.get(l.id)) === 'COMPLETED').length;
-  const courseProgress = allLessons.length ? Math.round((completedCount / allLessons.length) * 100) : 0;
-
-  // 4. Load Play URL whenever selected lesson changes
-  const loadPlayUrl = useCallback(async (lessonId) => {
-    if (!lessonId) return;
-    setPlayLoading(true);
-    setPlayError(null);
-    try {
-      const res = await lessonApi.getPlayUrl(courseId, lessonId);
-      const data = res?.data?.data || res?.data || res;
-      setPlayData(data);
-    } catch (err) {
-      const msg = err?.response?.data?.message || 'Không thể tải link phát bài học.';
-      setPlayError(msg);
-      setPlayData(null);
-    } finally {
-      setPlayLoading(false);
-    }
-  }, [courseId]);
-
-  useEffect(() => {
-    if (currentLesson?.id) {
-      loadPlayUrl(currentLesson.id);
-    }
-  }, [currentLesson?.id, loadPlayUrl]);
-
-  function mergeProgress(nextProgress) {
-    setProgressItems(previous => {
-      const exists = previous.some(item => item.lessonId === nextProgress.lessonId);
-      if (exists) {
-        return previous.map(item => (item.lessonId === nextProgress.lessonId ? nextProgress : item));
-      }
-      return [...previous, nextProgress].sort((a, b) => a.lessonId - b.lessonId);
+    const next = new Map((course?.progress ?? []).map(item => [item.lessonId, item]));
+    Object.values(changes).forEach(item => {
+      if (next.get(item.lessonId)?.status !== 'COMPLETED') next.set(item.lessonId, item);
     });
+    return next;
+  }, [course?.progress, changes]);
+  const selectedProgress = progressByLesson.get(currentLesson?.id);
+  const completedCount = allLessons.filter(lesson => lessonStatus(progressByLesson.get(lesson.id)) === 'COMPLETED').length;
+  const courseProgress = allLessons.length ? Math.round(completedCount / allLessons.length * 100) : 0;
+  const courseQuizzes = quizzes.data;
+  const quizzesLoading = quizzes.loading;
+  const quizError = quizzes.error;
+
+  const loadPlayback = useCallback(async () => {
+    if (!currentLesson) return { data: null };
+    // The enrolled curriculum already contains authorized content and signed media URLs.
+    if (currentLesson.videoUrl || currentLesson.lessonType === 'TEXT' || currentLesson.content) {
+      return { data: { ...currentLesson, lessonId: currentLesson.id, playUrl: currentLesson.videoUrl } };
+    }
+    return lessonApi.getPlayUrl(courseId, currentLesson.id);
+  }, [courseId, currentLesson]);
+  const playback = useLearningResource(loadPlayback, null);
+  const playData = playback.data?.lessonId === currentLesson?.id ? playback.data : null;
+  const playLoading = playback.loading;
+  const playError = playback.error?.message;
+  const loadPlayUrl = playback.reload;
+
+  function mergeProgress(progress) {
+    setChanges(previous => ({ ...previous, [progress.lessonId]: progress }));
   }
 
   async function openLesson(lessonId) {
-    setSelectedLessonId(lessonId);
-    setSearchParams({ lessonId: String(lessonId) }, { replace: true });
-
-    if (usingFallback) return;
+    if (pending.current) return;
+    pending.current = true;
     setUpdatingLessonId(lessonId);
+    setError(null);
     try {
       const response = await learningApi.accessLesson(courseId, lessonId);
-      if (response?.data) mergeProgress(response.data);
-    } catch (err) {
-      setError(err);
+      if (response.data) mergeProgress(response.data);
+      setSearchParams({ lessonId: String(lessonId) }, { replace: true });
+    } catch (error) {
+      setError(error);
     } finally {
+      pending.current = false;
       setUpdatingLessonId(null);
     }
   }
 
   async function completeLesson() {
-    if (!currentLesson?.id) return;
+    if (pending.current || !currentLesson) return;
+    pending.current = true;
     setUpdatingLessonId(currentLesson.id);
+    setError(null);
     try {
       const response = await learningApi.markLessonComplete(courseId, currentLesson.id);
-      if (response?.data) mergeProgress(response.data);
+      if (response.data) mergeProgress(response.data);
       toast('Đã đánh dấu hoàn thành bài học.');
-    } catch (err) {
-      setError(err);
+    } catch (error) {
+      setError(error);
     } finally {
-      setBusy(false);
+      pending.current = false;
+      setUpdatingLessonId(null);
     }
   }
+
+  if (snapshot.loading) return <section className="learning-page"><AppLoading label="Đang tải nội dung học..." /></section>;
+  if (snapshot.error || !course) return <section className="learning-page"><ErrorState
+    error={snapshot.error ?? new Error('Không tìm thấy nội dung khóa học.')}
+    title={snapshot.error?.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể mở khóa học'}
+    onRetry={snapshot.reload} /></section>;
 
   return (
     <section className="learning-page">
@@ -288,6 +180,9 @@ export default function LearningPage() {
                         autoPlay
                         controlsList="nodownload"
                         src={resolveMediaUrl(playData.playUrl)}
+                        onPlay={() => {
+                          if (!selectedProgress || selectedProgress.status === 'NOT_STARTED') openLesson(currentLesson.id);
+                        }}
                         onError={(e) => {
                           if (!e.currentTarget.dataset.fallbackTried) {
                             e.currentTarget.dataset.fallbackTried = 'true';
@@ -448,94 +343,12 @@ export default function LearningPage() {
                 <Link className="course-quiz-link" to={`/quizzes/${quiz.id}`} key={quiz.id}>
                   <strong>{quiz.title}</strong>
                   <span>
-                    Tiến độ khóa học — {completed}/{lessons.length} bài
+                    {quiz.timeLimitMinutes ? quiz.timeLimitMinutes + ' phút · ' : ''}Điểm đạt {quiz.passingScore}%
                   </span>
-                  <strong>{percent}%</strong>
-                  <ProgressBar value={percent} />
-                </div>
-                {!selected ? (
-                  <p>Khóa học chưa có bài học.</p>
-                ) : (
-                  <>
-                    <h2>{selected.title}</h2>
-                    <p>{statusLabel(selectedProgress?.status)}</p>
-                    {selected.lessonType === 'VIDEO' && selected.videoUrl && (
-                      <video
-                        key={selected.id}
-                        controls
-                        preload="metadata"
-                        className="learning-video"
-                        src={resolveMediaUrl(selected.videoUrl)}
-                        onPlay={() => {
-                          if (!selectedProgress || selectedProgress.status === 'NOT_STARTED') {
-                            updateLesson(selected);
-                          }
-                        }}
-                      />
-                    )}
-                    {selected.content && <div className="learning-lesson-content">{selected.content}</div>}
-                    {selected.lessonType !== 'VIDEO' && selected.videoUrl && (
-                      <a href={resolveMediaUrl(selected.videoUrl)} target="_blank" rel="noreferrer">
-                        Mở tài liệu bài học
-                      </a>
-                    )}
-                    <button
-                      className="button button-primary"
-                      disabled={busy || selectedProgress?.status === 'COMPLETED'}
-                      onClick={() => updateLesson(selected, true)}
-                    >
-                      {selectedProgress?.status === 'COMPLETED'
-                        ? 'Đã hoàn thành'
-                        : busy
-                          ? 'Đang cập nhật...'
-                          : 'Đánh dấu hoàn thành'}
-                    </button>
-                  </>
-                )}
-              </article>
-              <aside className="lesson-timeline">
-                <h2>Nội dung khóa học</h2>
-                {lessons.map(lesson => (
-                  <button
-                    key={lesson.id}
-                    type="button"
-                    disabled={busy}
-                    className={'lesson-progress-item ' + (lesson.id === selected?.id ? 'is-selected' : '')}
-                    onClick={() => updateLesson(lesson)}
-                  >
-                    <div>
-                      <strong>{lesson.title}</strong>
-                      <span>
-                        {lesson.sectionTitle} · {statusLabel(progressByLesson.get(lesson.id)?.status)}
-                      </span>
-                    </div>
-                    <ProgressBar value={progressByLesson.get(lesson.id)?.progressPercent ?? 0} />
-                  </button>
-                ))}
-              </aside>
+                </Link>
+              ))}
             </div>
-            <section className="course-quiz-section">
-              <h2>Bài kiểm tra</h2>
-              {quizzes.loading && <p>Đang tải quiz...</p>}
-              {quizzes.error && (
-                <ErrorState error={quizzes.error} title="Không thể tải quiz" onRetry={quizzes.reload} />
-              )}
-              {!quizzes.loading && !quizzes.error && quizzes.data.length === 0 && (
-                <p>Khóa học chưa có quiz được xuất bản.</p>
-              )}
-              <div className="course-quiz-list">
-                {quizzes.data.map(quiz => (
-                  <Link className="course-quiz-link" to={'/quizzes/' + quiz.id} key={quiz.id}>
-                    <strong>{quiz.title}</strong>
-                    <span>
-                      {quiz.timeLimitMinutes ? quiz.timeLimitMinutes + ' phút · ' : ''}Điểm đạt{' '}
-                      {quiz.passingScore}%
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          </>
+          </section>
         )}
       </div>
     </section>

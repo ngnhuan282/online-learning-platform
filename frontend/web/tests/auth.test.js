@@ -744,9 +744,7 @@ test('Course uses authenticated Learning for free enrollment and Payment checkou
       ),
     );
     await flush();
-    const button = [...document.querySelectorAll('button')].find(button =>
-      button.textContent.includes(price ? 'Mua khóa học ngay' : 'Đăng ký học miễn phí'),
-    );
+    const button = document.querySelector(price ? '#btn-buy-course' : '#btn-enroll-free');
     assert.ok(button, 'Course enrollment button is present');
     await act(async () => button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })));
     await flush();

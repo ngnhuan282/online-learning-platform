@@ -7,6 +7,7 @@ import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
 import { formatCurrency } from '../../../shared/utils/formatCurrency';
 import { paymentApi } from '../api/paymentApi';
+import { learningApi } from '../../learning/api/learningApi';
 import { getPaymentDisplayStatus, getResumePaymentUrl, needsPaymentRefresh } from '../utils/paymentFlow';
 import '../styles/payment.css';
 
@@ -82,6 +83,7 @@ export default function PaymentResultPage() {
   const [retryCount, setRetryCount] = useState(0);
   const [activating, setActivating] = useState(false);
   const [activationError, setActivationError] = useState(null);
+  const [enrollmentState, setEnrollmentState] = useState({ orderCode: null, ready: false, error: null });
 
   useEffect(() => {
     if (!orderCode) return;
@@ -93,6 +95,20 @@ export default function PaymentResultPage() {
         const response = await paymentApi.getOrder(orderCode);
         if (!active) return;
         setRemoteResult({ orderCode, order: response.data, error: null });
+        if (response.data.payment?.status === 'SUCCESS' && response.data.payment.provider === 'MOCK') {
+          try {
+            const enrollments = await learningApi.getMyEnrollments();
+            if (active) setEnrollmentState({
+              orderCode,
+              ready: enrollments.data.some(item =>
+                String(item.courseId) === String(response.data.items?.[0]?.courseId) &&
+                ['ACTIVE', 'COMPLETED'].includes(item.status)),
+              error: null,
+            });
+          } catch (error) {
+            if (active) setEnrollmentState({ orderCode, ready: false, error });
+          }
+        }
         attempts += 1;
         if (needsPaymentRefresh(response.data) && attempts < 6) {
           timer = setTimeout(loadResult, 3000);
@@ -123,18 +139,7 @@ export default function PaymentResultPage() {
   const error = remoteResult.orderCode === orderCode ? remoteResult.error : null;
   const loading = Boolean(orderCode) && remoteResult.orderCode !== orderCode;
 
-  const paymentStatus = order?.payment?.status ?? null;
   const paymentCourseId = order?.items?.[0]?.courseId ?? null;
-
-  // Kích hoạt quyền học (enroll) vào learning-service khi thanh toán thành công
-  // Đặt trước các early returns để tuân thủ React Rules of Hooks
-  useEffect(() => {
-    if (order && paymentStatus === 'SUCCESS' && paymentCourseId) {
-      learningApi.enroll(paymentCourseId).catch(err => {
-        console.warn('Auto enrollment on payment result page:', err);
-      });
-    }
-  }, [order, paymentStatus, paymentCourseId]);
 
   if (!orderCode) {
     return (
@@ -208,8 +213,10 @@ export default function PaymentResultPage() {
   const provider = order.payment?.provider;
   const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = getResumePaymentUrl(order, window.location.origin);
-  const awaitingActivation =
-    paymentStatus === 'SUCCESS' && provider === 'VNPAY' && order.payment.enrollmentReady === false;
+  const enrollmentReady = provider === 'VNPAY'
+    ? order.payment.enrollmentReady === true
+    : enrollmentState.orderCode === orderCode && enrollmentState.ready;
+  const awaitingActivation = paymentStatus === 'SUCCESS' && !enrollmentReady;
 
   async function retryActivation() {
     if (activating) return;
@@ -240,11 +247,14 @@ export default function PaymentResultPage() {
           <h1>{copy.title}</h1>
           <p>
             {awaitingActivation
-              ? 'Thanh toán đã thành công. Khóa học đang được kích hoạt, bạn không cần thanh toán lại.'
+              ? 'Thanh toán đã thành công. Đang chờ quyền học được đồng bộ, bạn không cần thanh toán lại.'
               : copy.description}
           </p>
           {error && <ErrorState error={error} title="Chưa thể cập nhật kết quả" onRetry={retryResultLoad} />}
           {activationError && <ErrorState error={activationError} title="Đang chờ kích hoạt khóa học" />}
+          {awaitingActivation && enrollmentState.error && (
+            <p role="status">Chưa kiểm tra được quyền học. Vui lòng kiểm tra lại.</p>
+          )}
 
           <dl className="result-details">
             <div>
@@ -267,8 +277,8 @@ export default function PaymentResultPage() {
 
           <div className="result-actions">
             {awaitingActivation ? (
-              <button className="button button-primary" onClick={retryActivation} disabled={activating}>
-                {activating ? 'Đang kích hoạt...' : 'Thử kích hoạt khóa học'}{' '}
+              <button className="button button-primary" onClick={provider === 'VNPAY' ? retryActivation : retryResultLoad} disabled={activating}>
+                {activating ? 'Đang kích hoạt...' : provider === 'VNPAY' ? 'Thử kích hoạt khóa học' : 'Kiểm tra lại quyền học'}{' '}
                 <RefreshOutlined sx={{ fontSize: 17 }} />
               </button>
             ) : paymentStatus === 'SUCCESS' ? (

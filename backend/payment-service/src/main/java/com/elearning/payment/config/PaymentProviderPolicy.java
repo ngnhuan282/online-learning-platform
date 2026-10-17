@@ -29,4 +29,8 @@ public class PaymentProviderPolicy {
         // The owner has not supplied a signed checkout/callback implementation in this repository.
         throw new AppException(ErrorCode.FEATURE_NOT_IMPLEMENTED);
     }
+
+    public boolean isMockEnabled() {
+        return mockEnabled;
+    }
 }

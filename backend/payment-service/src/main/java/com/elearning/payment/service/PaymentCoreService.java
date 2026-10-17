@@ -5,7 +5,7 @@ import com.elearning.payment.common.exception.ErrorCode;
 import com.elearning.payment.common.response.PageResponse;
 import com.elearning.payment.config.PaymentProviderPolicy;
 import com.elearning.payment.course.CourseSnapshot;
-import com.elearning.payment.course.CourseClient;
+import com.elearning.payment.course.CourseSnapshotProvider;
 import com.elearning.payment.dto.*;
 import com.elearning.payment.entity.CourseOrder;
 import com.elearning.payment.entity.OrderItem;
@@ -47,6 +47,7 @@ public class PaymentCoreService {
     private final CourseSnapshotProvider courses;
     private final LearningEnrollmentClient learning;
     private final VnpayGateway vnpay;
+    private final PaymentProviderPolicy providers;
 
     public PaymentCoreService(
         CourseOrderRepository orders,
@@ -54,7 +55,8 @@ public class PaymentCoreService {
         PaymentTransactionRepository transactions,
         CourseSnapshotProvider courses,
         LearningEnrollmentClient learning,
-        VnpayGateway vnpay
+        VnpayGateway vnpay,
+        PaymentProviderPolicy providers
     ) {
         this.orders = orders;
         this.payments = payments;
@@ -62,12 +64,14 @@ public class PaymentCoreService {
         this.courses = courses;
         this.learning = learning;
         this.vnpay = vnpay;
+        this.providers = providers;
     }
 
     @Transactional
     public CheckoutResponse createCheckout(CheckoutRequest request, Long userId, String clientIp) {
         PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
         if (provider == PaymentProvider.VNPAY) vnpay.requireAvailable();
+        else providers.requireAvailable(provider);
         String idempotencyKey = request.idempotencyKey().strip();
         CourseOrder existingOrder = orders.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
         if (existingOrder != null) {

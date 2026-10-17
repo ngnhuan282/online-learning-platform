@@ -13,7 +13,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import com.elearning.course.integration.learning.EnrollmentClient;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -21,16 +20,16 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final CourseRepository courseRepository;
-    private final EnrollmentClient enrollmentClient;
+    private final CourseContentAccess access;
 
     public ReviewService(
         ReviewRepository reviewRepository,
         CourseRepository courseRepository,
-        EnrollmentClient enrollmentClient
+        CourseContentAccess access
     ) {
         this.reviewRepository = reviewRepository;
         this.courseRepository = courseRepository;
-        this.enrollmentClient = enrollmentClient;
+        this.access = access;
     }
 
     /**
@@ -191,7 +190,9 @@ public class ReviewService {
         if (userId == null) {
             throw new AppException(ErrorCode.FORBIDDEN, "Cần đăng nhập để đánh giá khóa học");
         }
-        if (!enrollmentClient.isEnrolled(userId, courseId)) {
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        if (!access.canReadPrivate(course)) {
             throw new AppException(ErrorCode.FORBIDDEN, "Bạn cần đăng ký khóa học này trước khi viết đánh giá");
         }
     }

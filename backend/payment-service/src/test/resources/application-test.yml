@@ -7,6 +7,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+payment:
+  mock-enabled: true
 integrations:
   internal-service-token: test-internal-service-token-1234567890
   vnpay:

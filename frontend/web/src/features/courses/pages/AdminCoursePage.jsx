@@ -88,7 +88,7 @@ export default function AdminCoursePage() {
     }
   };
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async (options = {}) => {
     try {
       const response = await categoryApi.list(options);
       if (options.signal?.aborted) return;

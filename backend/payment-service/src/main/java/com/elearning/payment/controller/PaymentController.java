@@ -2,6 +2,7 @@ package com.elearning.payment.controller;
 
 import com.elearning.payment.common.response.ApiResponse;
 import com.elearning.payment.common.response.PageResponse;
+import com.elearning.payment.config.PaymentProviderPolicy;
 import com.elearning.payment.dto.*;
 import com.elearning.payment.entity.enums.PaymentProvider;
 import com.elearning.payment.entity.enums.PaymentStatus;
@@ -31,19 +32,22 @@ public class PaymentController {
     private final AuthenticatedUser user;
     private final VnpayGateway vnpay;
     private final PaidCourseActivationService activation;
+    private final PaymentProviderPolicy providers;
 
     public PaymentController(
         PaymentCoreService payments,
         PaymentAnalyticsService analytics,
         AuthenticatedUser user,
         VnpayGateway vnpay,
-        PaidCourseActivationService activation
+        PaidCourseActivationService activation,
+        PaymentProviderPolicy providers
     ) {
         this.payments = payments;
         this.analytics = analytics;
         this.user = user;
         this.vnpay = vnpay;
         this.activation = activation;
+        this.providers = providers;
     }
 
     @PostMapping("/checkout")
@@ -64,8 +68,8 @@ public class PaymentController {
                 new PaymentMethodResponse(
                     PaymentProvider.MOCK,
                     "Thanh toán mô phỏng",
-                    true,
-                    "Không phát sinh thanh toán thật"
+                    providers.isMockEnabled(),
+                    providers.isMockEnabled() ? "Không phát sinh thanh toán thật" : "Chưa khả dụng"
                 ),
                 new PaymentMethodResponse(
                     PaymentProvider.VNPAY,

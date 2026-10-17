@@ -124,7 +124,7 @@ class VnpayIntegrationTests {
     String token(long userId, String role) {
         return Jwts.builder()
             .subject(Long.toString(userId))
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now().minusSeconds(1)))

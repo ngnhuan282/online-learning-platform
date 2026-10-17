@@ -106,7 +106,7 @@ class LearningFlowIntegrationTests {
     private String token(long user, String role) {
         return Jwts.builder()
             .subject(Long.toString(user))
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("tokenType", "access")
             .issuedAt(Date.from(Instant.now()))

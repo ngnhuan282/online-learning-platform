@@ -59,13 +59,16 @@ public class MediaController {
             HttpServletRequest request) {
         String objectKey = folder + "/" + filename;
 
-        // Nếu có tham số bảo vệ (expires hoặc token), kiểm tra tính hợp lệ
-        if (expires != null || token != null) {
-            if (!storageService.verifySignedToken(objectKey, expires, token)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body("{\"code\":40301,\"message\":\"Link truy cập đã hết hạn hoặc không hợp lệ\",\"result\":null}");
-            }
+        boolean publicThumbnail = courses.existsByThumbnailUrlAndStatus(
+            MediaTickets.DOWNLOAD_PREFIX + objectKey, CourseStatus.PUBLISHED
+        ) || courses.existsByThumbnailUrlStartingWithAndStatus(
+            MediaTickets.DOWNLOAD_PREFIX + objectKey + "?", CourseStatus.PUBLISHED
+        );
+        // Curriculum/upload URLs and the play endpoint use different signing formats.
+        boolean signed = tickets.valid(objectKey, request.getParameter("expires"), request.getParameter("signature"))
+            || (token != null && storageService.verifySignedToken(objectKey, expires, token));
+        if (!publicThumbnail && !access.isEditor() && !signed) {
+            throw new AppException(ErrorCode.FORBIDDEN, "Request an authorized media URL before downloading");
         }
 
         String downloadUrl = storageService.getDownloadUrl(objectKey);

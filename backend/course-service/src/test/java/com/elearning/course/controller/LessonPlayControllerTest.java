@@ -58,7 +58,7 @@ class LessonPlayControllerTest {
     String generateToken(String userId, String role) {
         return Jwts.builder()
             .subject(userId)
-            .issuer("learnsphere")
+            .issuer("sgedu")
             .claim("role", role)
             .claim("roles", List.of(role))
             .claim("tokenType", "access")

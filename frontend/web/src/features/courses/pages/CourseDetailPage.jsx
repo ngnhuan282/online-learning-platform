@@ -4,7 +4,6 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { courseApi } from '../api/courseApi';
 import { sectionApi } from '../api/sectionApi';
 import { reviewApi } from '../api/reviewApi';
-import { formatPrice } from '../data/demoCourses';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import useAuth from '../../auth/hooks/useAuth';
 import { learningApi } from '../../learning/api/learningApi';
@@ -13,8 +12,7 @@ import StarRating from '../components/StarRating';
 import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
 import { lessonApi } from '../api/lessonApi';
-import { learningApi } from '../../learning/api/learningApi';
-import { paymentApi } from '../../payment/api/paymentApi';
+import ErrorState from '../../../shared/components/ErrorState';
 
 // Chuẩn hóa hiển thị giá tiền VND (B9-FE-2)
 const formatVND = (amount) => {
@@ -23,16 +21,15 @@ const formatVND = (amount) => {
 };
 
 
-const fallbackCourse = {
-  id: 1,
-  title: 'IELTS Intensive 7.5+: Bứt phá 4 kỹ năng cùng chuyên gia',
-  description: 'Lộ trình luyện thi IELTS chuyên sâu với chiến thuật Writing, Speaking, Reading và Listening để đạt band mục tiêu 7.5+.',
-  level: 'Nâng cao',
-  price: 1690000,
-  originalPrice: 2400000,
-  categoryName: 'Luyện thi IELTS',
-  category: 'ielts',
-  status: 'PUBLISHED',
+const courseDefaults = {
+  title: '',
+  description: '',
+  level: '',
+  price: 0,
+  originalPrice: 0,
+  categoryName: '',
+  category: '',
+  status: '',
   thumbnailUrl: '/images/english-ielts.jpg',
   avgRating: 0,
   reviewCount: 0,
@@ -88,7 +85,11 @@ function CourseDetail({ id }) {
   });
   const [loading, setLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [enrollment, setEnrollment] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState(null);
+  const isEnrolled =
+    isAuthenticated && enrollment?.userId === user?.id && enrollment?.courseId === id;
   const [activeTab, setActiveTab] = useState('curriculum'); // 'curriculum' | 'reviews'
 
   // States cho Modal học thử (Preview Lesson Player)
@@ -197,41 +198,25 @@ function CourseDetail({ id }) {
     };
   }, [id, isAuthenticated, user?.id]);
 
-  // Load enrollment status
-  const loadEnrollment = useCallback(async () => {
-    if (!isAuthenticated) {
-      setIsEnrolled(false);
-      return;
-    }
-    try {
-      const res = await learningApi.getMyEnrollments();
-      const list = res?.data?.data || res?.data || [];
-      const enrolled = Array.isArray(list) && list.some(e => String(e.courseId) === String(id));
-      setIsEnrolled(enrolled);
-    } catch {
-      // Keep existing state on transient network error
-    }
-  }, [id, isAuthenticated]);
-
   useEffect(() => {
     if (isAuthLoading) return undefined;
     let isMounted = true;
-    setLoading(true);
-
-    Promise.all([
-      loadCourseData(),
-      loadSections(),
-      loadReviews(0),
-      loadMyReview(),
-      loadEnrollment(),
-    ]).finally(() => {
+    Promise.resolve().then(async () => {
+      if (!isMounted) return;
+      setLoading(true);
+      await Promise.all([
+        loadCourseData(),
+        loadSections(),
+        loadReviews(0),
+        loadMyReview(),
+      ]);
       if (isMounted) setLoading(false);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [loadCourseData, loadSections, loadReviews, loadMyReview, loadEnrollment]);
+  }, [isAuthLoading, loadCourseData, loadSections, loadReviews, loadMyReview]);
 
   const handleReviewSuccess = async savedReview => {
     setEditingReview(null);
@@ -272,50 +257,32 @@ function CourseDetail({ id }) {
 
   // B9-FE-1: Đăng ký học miễn phí (price === 0)
   const handleEnroll = async () => {
+    if (enrolling) return;
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
+    setEnrolling(true);
+    setEnrollmentError(null);
     try {
-      await learningApi.enroll(id);
-      setIsEnrolled(true);
-      alert('Đăng ký khóa học thành công! Bạn có thể bắt đầu học ngay.');
+      await learningApi.enroll(Number(id));
+      setEnrollment({ userId: user.id, courseId: id });
+      navigate(`/learning/${encodeURIComponent(id)}`);
     } catch (err) {
-      const msg = err?.response?.data?.message || '';
-      if (err?.response?.status === 400 || msg.toLowerCase().includes('already')) {
-        setIsEnrolled(true);
-        alert('Bạn đã tham gia khóa học này. Chúc bạn học tốt!');
-      } else {
-        alert(msg || 'Không thể đăng ký khóa học.');
-      }
+      setEnrollmentError(err);
+    } finally {
+      setEnrolling(false);
     }
   };
 
   // B9-FE-1: Mua khóa học trả phí → Điều hướng sang Checkout (không tin FE price)
   const handleBuyCourse = async () => {
+    const destination = `/checkout?course=${encodeURIComponent(id)}`;
     if (!isAuthenticated) {
       navigate('/login', { state: { from: destination } });
       return;
     }
-    try {
-      const returnUrl = `${window.location.origin}/payment/result`;
-      const cancelUrl = `${window.location.origin}/courses/${id}`;
-      const res = await paymentApi.createCheckout({
-        courseId: Number(id),
-        returnUrl,
-        cancelUrl,
-      });
-      const data = res?.data?.data || res?.data || res;
-      const checkoutUrl = data?.checkoutUrl || data?.checkout_url;
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-      } else {
-        alert('Không thể khởi tạo phiên thanh toán. Vui lòng thử lại.');
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.message || 'Không thể khởi tạo thanh toán. Vui lòng thử lại.';
-      alert(msg);
-    }
+    navigate(destination);
   };
 
   const handlePlayLesson = async (lesson) => {
@@ -390,6 +357,7 @@ function CourseDetail({ id }) {
 
   return (
     <main className="container" style={{ padding: '32px 0 80px' }}>
+      {enrollmentError && <ErrorState error={enrollmentError} title="Không thể đăng ký khóa học" onRetry={handleEnroll} />}
       <div
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}
       >
