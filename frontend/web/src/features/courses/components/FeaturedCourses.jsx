@@ -7,9 +7,11 @@ import useCourseCatalog from '../hooks/useCourseCatalog';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
-  { id: 'certificates', label: 'IELTS & Chứng chỉ' },
-  { id: 'communication', label: 'Giao tiếp & IT' },
   { id: 'free', label: 'Miễn phí' },
+  { id: 'paid', label: 'Có phí' },
+  { id: 'beginner', label: 'Cơ bản' },
+  { id: 'intermediate', label: 'Trung cấp' },
+  { id: 'advanced', label: 'Nâng cao' },
 ];
 
 export default function FeaturedCourses() {
@@ -28,21 +30,30 @@ export default function FeaturedCourses() {
   const filter = params.get('filter') || 'all';
   let filteredCourses = courses.filter(course => {
     const selectedCategoryName = categories.find(item => String(item.id) === String(category))?.name;
-    return (
-      (!category ||
-        String(course.categoryId) === String(category) ||
-        course.category === selectedCategoryName) &&
-      (!query ||
-        normalizeSearch(`${course.title} ${course.description} ${course.keywords}`).includes(
-          normalizeSearch(query),
-        )) &&
-      (filter !== 'free' || course.price === 0) &&
-      (!['certificates', 'communication'].includes(filter) || course.group === filter)
-    );
+    const price = Number(course.price || 0);
+    const level = String(course.level || '').toUpperCase();
+
+    const matchesCategory =
+      !category ||
+      String(course.categoryId) === String(category) ||
+      course.category === selectedCategoryName ||
+      course.categoryName === selectedCategoryName;
+
+    const matchesQuery =
+      !query ||
+      normalizeSearch(`${course.title || ''} ${course.description || ''} ${course.keywords || ''}`).includes(
+        normalizeSearch(query),
+      );
+
+    let matchesFilter = true;
+    if (filter === 'free') matchesFilter = price === 0;
+    else if (filter === 'paid') matchesFilter = price > 0;
+    else if (filter === 'beginner') matchesFilter = level === 'BEGINNER';
+    else if (filter === 'intermediate') matchesFilter = level === 'INTERMEDIATE';
+    else if (filter === 'advanced') matchesFilter = level === 'ADVANCED';
+
+    return matchesCategory && matchesQuery && matchesFilter;
   });
-  if (filter === 'popular') filteredCourses = [...filteredCourses].sort((a, b) => b.students - a.students);
-  if (filter === 'newest')
-    filteredCourses = [...filteredCourses].sort((a, b) => b.date.localeCompare(a.date));
   function setFilter(value) {
     const next = new URLSearchParams(params);
     if (value === 'all') next.delete('filter');

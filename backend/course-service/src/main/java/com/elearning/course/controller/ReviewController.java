@@ -90,6 +90,35 @@ public class ReviewController {
     // ── Admin ────────────────────────────────────────────
 
     /**
+     * Admin: xem danh sách review toàn hệ thống hoặc theo courseId.
+     */
+    @GetMapping("/admin/reviews")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_VIEW')")
+    public ApiResponse<PageResponse<ReviewResponse>> listAdmin(
+        @RequestParam(required = false) Long courseId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        Page<ReviewResponse> result = (courseId != null)
+            ? reviewService.listAll(courseId, page, size)
+            : reviewService.listAll(page, size);
+        return ApiResponse.success(PageResponse.from(result));
+    }
+
+    /**
+     * Admin: cập nhật trạng thái ẩn/hiện review.
+     */
+    @PatchMapping("/admin/reviews/{reviewId}/visibility")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_UPDATE')")
+    public ApiResponse<ReviewResponse> updateVisibility(
+        @PathVariable Long reviewId,
+        @RequestBody java.util.Map<String, Boolean> body
+    ) {
+        boolean hidden = body != null && Boolean.TRUE.equals(body.get("hidden"));
+        return ApiResponse.success(reviewService.setVisibility(reviewId, hidden));
+    }
+
+    /**
      * Admin: danh sách tất cả review (kể cả ẩn) của khóa học.
      */
     @GetMapping("/admin/courses/{courseId}/reviews")

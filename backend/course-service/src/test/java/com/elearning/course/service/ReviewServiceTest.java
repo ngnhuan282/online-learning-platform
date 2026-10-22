@@ -211,14 +211,56 @@ class ReviewServiceTest {
         existing.setHidden(false);
 
         when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(existing));
+        when(reviewRepository.avgRatingByCourseId(courseId)).thenReturn(4.5);
+        when(reviewRepository.countByCourseId(courseId)).thenReturn(2);
 
         ReviewResponse hiddenRes = reviewService.hide(courseId, reviewId);
         assertThat(hiddenRes.hidden()).isTrue();
         assertThat(existing.isHidden()).isTrue();
+        verify(courseRepository, times(1)).save(sampleCourse);
 
         ReviewResponse shownRes = reviewService.show(courseId, reviewId);
         assertThat(shownRes.hidden()).isFalse();
         assertThat(existing.isHidden()).isFalse();
+        verify(courseRepository, times(2)).save(sampleCourse);
+    }
+
+    @Test
+    void setVisibility_success() {
+        Long reviewId = 100L;
+        Review existing = new Review();
+        existing.setId(reviewId);
+        existing.setCourse(sampleCourse);
+        existing.setHidden(false);
+
+        when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(existing));
+        when(reviewRepository.avgRatingByCourseId(sampleCourse.getId())).thenReturn(4.0);
+        when(reviewRepository.countByCourseId(sampleCourse.getId())).thenReturn(1);
+
+        ReviewResponse res = reviewService.setVisibility(reviewId, true);
+        assertThat(res.hidden()).isTrue();
+        assertThat(existing.isHidden()).isTrue();
+
+        ReviewResponse res2 = reviewService.setVisibility(reviewId, false);
+        assertThat(res2.hidden()).isFalse();
+        assertThat(existing.isHidden()).isFalse();
+    }
+
+    @Test
+    void listAll_allCourses_success() {
+        Review rev = new Review();
+        rev.setId(1L);
+        rev.setCourse(sampleCourse);
+        rev.setUserId(42L);
+        rev.setRating(5);
+        rev.setHidden(false);
+
+        when(reviewRepository.findAll(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(rev)));
+
+        Page<ReviewResponse> page = reviewService.listAll(0, 10);
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getContent().get(0).courseTitle()).isEqualTo("Spring Boot Masterclass");
     }
 
     @Test

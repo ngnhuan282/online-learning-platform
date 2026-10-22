@@ -101,21 +101,23 @@ public class GlobalExceptionHandler {
             int status = framework.getStatusCode().value();
             if (status < 500) {
                 log.warn("Request rejected status={} exception={}", status, ex.getClass().getSimpleName());
-                return ResponseEntity.status(status).body(
-                    new ApiError(
-                        false,
-                        switch (status) {
-                            case 404 -> "NOT_FOUND";
-                            case 405 -> "METHOD_NOT_ALLOWED";
-                            case 415 -> "UNSUPPORTED_MEDIA_TYPE";
-                            default -> "BAD_REQUEST";
-                        },
-                        "Request could not be processed",
-                        null,
-                        Instant.now(),
-                        request.getRequestURI()
-                    )
-                );
+                return ResponseEntity.status(status)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(
+                        new ApiError(
+                            false,
+                            switch (status) {
+                                case 404 -> "NOT_FOUND";
+                                case 405 -> "METHOD_NOT_ALLOWED";
+                                case 415 -> "UNSUPPORTED_MEDIA_TYPE";
+                                default -> "BAD_REQUEST";
+                            },
+                            "Request could not be processed",
+                            null,
+                            Instant.now(),
+                            request.getRequestURI()
+                        )
+                    );
             }
         }
         log.error("Unhandled server exception type={} stack={}",
@@ -129,6 +131,8 @@ public class GlobalExceptionHandler {
         HttpServletRequest request
     ) {
         log.warn("Request rejected code={}", code);
-        return ResponseEntity.status(code.status()).body(ApiError.of(code, errors, request.getRequestURI()));
+        return ResponseEntity.status(code.status())
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .body(ApiError.of(code, errors, request.getRequestURI()));
     }
 }

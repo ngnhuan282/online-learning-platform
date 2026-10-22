@@ -126,6 +126,18 @@ const router = createBrowserRouter([
         ],
       },
       {
+        path: 'reviews',
+        element: <PermissionRoute permission="COURSE_VIEW" />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/courses/pages/AdminReviewPage')).default,
+            }),
+          },
+        ],
+      },
+      {
         path: 'users',
         element: (
           <PermissionRoute permission="USER_VIEW">

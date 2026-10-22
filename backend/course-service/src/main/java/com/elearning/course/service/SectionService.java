@@ -69,6 +69,14 @@ public class SectionService {
     @Transactional
     public void reorder(Long courseId, ReorderRequest request) {
         findCourse(courseId);
+        if (request != null && request.items() != null) {
+            java.util.Set<Integer> seen = new java.util.HashSet<>();
+            for (ReorderRequest.Item item : request.items()) {
+                if (!seen.add(item.orderIndex())) {
+                    throw new AppException(ErrorCode.BAD_REQUEST, "Thứ tự chương học không được trùng lặp");
+                }
+            }
+        }
         List<Section> all = sections.findByCourseIdOrderByOrderIndexAsc(courseId);
         Map<Long, Section> byId = all.stream().collect(Collectors.toMap(Section::getId, s -> s));
 

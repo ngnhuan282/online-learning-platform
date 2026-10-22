@@ -17,5 +17,7 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgress, 
         Long lessonId
     );
 
+    Optional<LessonProgress> findByUserIdAndLessonId(Long userId, Long lessonId);
+
     long countByUserIdAndStatus(Long userId, ProgressStatus status);
 }

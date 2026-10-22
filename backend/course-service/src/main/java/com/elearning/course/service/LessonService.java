@@ -17,12 +17,16 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class LessonService {
+
+    private static final Logger log = LoggerFactory.getLogger(LessonService.class);
 
     private final LessonRepository lessons;
     private final SectionRepository sections;
@@ -69,6 +73,14 @@ public class LessonService {
     @Transactional
     public void reorder(Long sectionId, ReorderRequest request) {
         findSection(sectionId);
+        if (request != null && request.items() != null) {
+            java.util.Set<Integer> seen = new java.util.HashSet<>();
+            for (ReorderRequest.Item item : request.items()) {
+                if (!seen.add(item.orderIndex())) {
+                    throw new AppException(ErrorCode.BAD_REQUEST, "Thứ tự bài học không được trùng lặp");
+                }
+            }
+        }
         List<Lesson> all = lessons.findBySectionIdOrderByOrderIndexAsc(sectionId);
         Map<Long, Lesson> byId = all.stream().collect(Collectors.toMap(Lesson::getId, l -> l));
 
@@ -141,6 +153,7 @@ public class LessonService {
 
         // 2. Bài học riêng tư: yêu cầu đăng nhập
         if (currentUserId == null) {
+            log.warn("Unauthorized access attempt: userId=anonymous, lessonId={}, reason=NOT_LOGGED_IN", lessonId);
             throw new AppException(ErrorCode.UNAUTHORIZED, "Vui lòng đăng nhập để xem bài học này");
         }
 
@@ -151,6 +164,7 @@ public class LessonService {
         }
 
         if (!hasAccess) {
+            log.warn("Unauthorized access attempt: userId={}, lessonId={}, reason=NOT_ENROLLED", currentUserId, lessonId);
             throw new AppException(ErrorCode.FORBIDDEN, "Bạn cần đăng ký khóa học này để xem nội dung bài học");
         }
 

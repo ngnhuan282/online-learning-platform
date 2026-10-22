@@ -15,7 +15,9 @@ export function buildLessonPayload(form = {}) {
   return {
     title,
     lessonType: form.lessonType ?? 'VIDEO',
-    videoUrl: form.lessonType === 'VIDEO' ? String(form.videoUrl ?? '').trim() : null,
+    videoUrl: ['VIDEO', 'DOCUMENT'].includes(form.lessonType)
+      ? String(form.videoUrl ?? '').trim() || null
+      : null,
     content: String(form.content ?? '').trim() || null,
     duration: Number(form.duration) || 0,
     orderIndex: Number(form.orderIndex) || 0,

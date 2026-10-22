@@ -56,6 +56,16 @@ public class ReviewService {
     }
 
     /**
+     * Admin: danh sách tất cả review toàn hệ thống.
+     */
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> listAll(int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return reviewRepository.findAll(pageable)
+            .map(ReviewResponse::from);
+    }
+
+    /**
      * User tạo review. Chỉ 1 review / user / course.
      */
     @Transactional
@@ -124,6 +134,19 @@ public class ReviewService {
     }
 
     /**
+     * Admin thay đổi trạng thái ẩn/hiện review.
+     */
+    @Transactional
+    public ReviewResponse setVisibility(Long reviewId, boolean hidden) {
+        Review review = reviewRepository.findById(reviewId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Không tìm thấy đánh giá"));
+        review.setHidden(hidden);
+        reviewRepository.save(review);
+        recalculateRating(review.getCourse());
+        return ReviewResponse.from(review);
+    }
+
+    /**
      * Admin ẩn review vi phạm.
      */
     @Transactional
@@ -131,6 +154,7 @@ public class ReviewService {
         Review review = findByCourseAndId(courseId, reviewId);
         review.setHidden(true);
         reviewRepository.save(review);
+        recalculateRating(review.getCourse());
         return ReviewResponse.from(review);
     }
 
@@ -142,6 +166,7 @@ public class ReviewService {
         Review review = findByCourseAndId(courseId, reviewId);
         review.setHidden(false);
         reviewRepository.save(review);
+        recalculateRating(review.getCourse());
         return ReviewResponse.from(review);
     }
 

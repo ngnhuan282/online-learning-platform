@@ -49,6 +49,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/learning/enrollments/check")
                     .permitAll()
+                    .requestMatchers("/error")
+                    .permitAll()
                     .anyRequest()
                     .authenticated()
             )
