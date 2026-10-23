@@ -5,6 +5,7 @@ import Icon from './Icon';
 import useAuth from '../../features/auth/hooks/useAuth';
 import AccountMenu from './AccountMenu';
 import NotificationBell from '../../features/learning/components/NotificationBell';
+import { ROUTES } from '../constants/routes';
 
 export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,6 +42,14 @@ export default function SiteHeader() {
               </Link>
               <Link className={pathname === '/payment/history' ? 'active' : ''} to="/payment/history">
                 Thanh toán
+              </Link>
+              <Link
+                className={pathname === ROUTES.AI_ASSISTANT ? 'active' : ''}
+                aria-current={pathname === ROUTES.AI_ASSISTANT ? 'page' : undefined}
+                to={ROUTES.AI_ASSISTANT}
+                onClick={() => setMenuOpen(false)}
+              >
+                Trợ lý AI
               </Link>
             </>
           )}

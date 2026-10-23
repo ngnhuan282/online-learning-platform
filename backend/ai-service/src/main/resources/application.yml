@@ -40,7 +40,14 @@ integrations:
     model: ${AI_MODEL:}
     request-timeout-ms: ${AI_REQUEST_TIMEOUT_MS:15000}
 
+course:
+  service-url: ${COURSE_SERVICE_URL:http://localhost:8082}
+learning:
+  service-url: ${LEARNING_SERVICE_URL:http://localhost:8083}
+
 logging:
+  level:
+    org.springframework.web: INFO
   structured:
     format:
       console: ${LOG_FORMAT:ecs}

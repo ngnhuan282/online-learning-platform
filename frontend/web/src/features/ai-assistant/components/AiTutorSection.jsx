@@ -40,7 +40,6 @@ const replies = [
 export default function AiTutorSection() {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
-  const inputRef = useRef(null);
   const chatRef = useRef(null);
   function sendMessage(event) {
     event.preventDefault();
@@ -77,16 +76,10 @@ export default function AiTutorSection() {
                 </li>
               ))}
             </ul>
-            <button
-              className="button button-primary"
-              onClick={() => {
-                inputRef.current?.focus();
-                inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }}
-            >
+            <Link className="button button-primary" to={ROUTES.AI_ASSISTANT}>
               <Icon name="mic" size={18} />
-              Luyện nói với AI ngay
-            </button>
+              Học với trợ lý AI
+            </Link>
             <Link className="button button-outline" to={ROUTES.AI_ASSISTANT}>
               Mở trợ lý AI
               <Icon name="arrow" size={18} />
@@ -167,7 +160,6 @@ export default function AiTutorSection() {
             </div>
             <form className="chat-form" onSubmit={sendMessage}>
               <input
-                ref={inputRef}
                 aria-label="Câu hỏi luyện tiếng Anh cho trợ lý AI"
                 placeholder="Thử hỏi: ‘Can you give me an example for…’"
                 value={question}

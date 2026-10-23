@@ -1,6 +1,8 @@
 ﻿import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
+import { Link } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
+import { ROUTES } from '../../../shared/constants/routes';
 
 const waveform = [
   12, 20, 14, 28, 36, 18, 25, 42, 30, 16, 24, 38, 48, 26, 18, 32, 44, 22, 14, 30, 40, 24, 18, 34, 46, 28, 16,
@@ -27,9 +29,9 @@ export default function HeroSection() {
             <a href="#courses" className="button button-primary">
               Khám phá khóa học <Icon name="arrow" size={18} />
             </a>
-            <a href="#ai-tutor" className="button button-outline">
-              <Icon name="mic" size={18} /> Luyện nói với AI
-            </a>
+            <Link to={ROUTES.AI_ASSISTANT} className="button button-outline">
+              <Icon name="language" size={18} /> Trợ lý AI
+            </Link>
           </div>
           <div className="hero-stats">
             <div>
@@ -122,17 +124,17 @@ export default function HeroSection() {
               Tiếp tục luyện nói <Icon name="arrow" size={14} />
             </button>
           </div>
-          <a href="#ai-tutor" className="tutor-status">
+          <Link to={ROUTES.AI_ASSISTANT} className="tutor-status">
             <span className="ai-icon">
               <Icon name="wave" size={25} />
             </span>
             <span>
               <strong>
-                AI Speech Coach <i />
+                Trợ lý học tập AI <i />
               </strong>
-              <small>Chấm ngữ điệu & chỉnh âm chuẩn IPA 24/7</small>
+              <small>Giải thích bài học và luyện tập</small>
             </span>
-          </a>
+          </Link>
         </div>
       </div>
       <Dialog
@@ -171,10 +173,14 @@ export default function HeroSection() {
               <strong>Tình huống:</strong> Bạn vừa tham gia một dự án mới. Hãy hỏi đồng nghiệp về các mốc thời
               gian và công việc cần hoàn thành.
             </p>
-            <a href="#ai-tutor" className="button button-primary" onClick={() => setPreviewOpen(false)}>
+            <Link
+              to={ROUTES.AI_ASSISTANT}
+              className="button button-primary"
+              onClick={() => setPreviewOpen(false)}
+            >
               <Icon name="mic" size={18} />
               Thử luyện hội thoại
-            </a>
+            </Link>
             <p className="demo-note">
               Nội dung và điểm phát âm trên màn hình là minh họa. Video, ghi âm và chấm phát âm chưa được kết
               nối.

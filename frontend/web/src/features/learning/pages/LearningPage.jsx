@@ -9,6 +9,8 @@ import useToast from '../../../shared/hooks/useToast';
 import useLearningResource from '../hooks/useLearningResource';
 import ErrorState from '../../../shared/components/ErrorState';
 import AppLoading from '../../../shared/components/AppLoading';
+import { ROUTES } from '../../../shared/constants/routes';
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import '../styles/quiz.css';
 
 const lessonStatus = item => item?.status ?? 'NOT_STARTED';
@@ -104,10 +106,17 @@ function LearningCoursePage({ courseId }) {
   }
 
   if (snapshot.loading) return <section className="learning-page"><AppLoading label="Đang tải nội dung học..." /></section>;
-  if (snapshot.error || !course) return <section className="learning-page"><ErrorState
-    error={snapshot.error ?? new Error('Không tìm thấy nội dung khóa học.')}
-    title={snapshot.error?.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể mở khóa học'}
-    onRetry={snapshot.reload} /></section>;
+  if (snapshot.error || !course) return (
+    <section className="learning-page">
+      <div className="learning-shell">
+        <ErrorState
+          error={snapshot.error ?? new Error('Không tìm thấy nội dung khóa học.')}
+          title={snapshot.error?.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể mở khóa học'}
+          onRetry={snapshot.reload}
+        />
+      </div>
+    </section>
+  );
 
   return (
     <section className="learning-page">
@@ -130,6 +139,9 @@ function LearningCoursePage({ courseId }) {
             </h1>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <Link className="button button-outline" to={`${ROUTES.AI_ASSISTANT}?courseId=${encodeURIComponent(courseId)}${currentLesson ? `&lessonId=${encodeURIComponent(currentLesson.id)}` : ''}`}>
+              <AutoAwesomeOutlined fontSize="small" /> Trợ lý AI
+            </Link>
             <Link className="button button-outline" to="/my-courses">
               Khóa học của tôi
             </Link>

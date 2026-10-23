@@ -206,6 +206,8 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-}
       AI_REQUEST_TIMEOUT_MS: ${AI_REQUEST_TIMEOUT_MS:-15000}
+      COURSE_SERVICE_URL: http://course-service:8082
+      LEARNING_SERVICE_URL: http://learning-service:8083
     depends_on:
       mysql:
         condition: service_healthy
