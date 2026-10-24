@@ -9,6 +9,7 @@ import {
   AdminPanelSettingsOutlined,
   MenuBookOutlined,
   QuizOutlined,
+  NotificationsOutlined,
   HistoryOutlined,
   Menu,
   Search,
@@ -39,6 +40,7 @@ const menu = [
   },
   { to: '/admin/courses', label: 'Khóa học Tiếng Anh', icon: MenuBookOutlined, permission: 'COURSE_VIEW' },
   { to: ROUTES.ADMIN_QUIZZES, label: 'Quản lý quiz', icon: QuizOutlined, permission: 'ADMIN_ACCESS', adminOnly: true },
+  { to: ROUTES.ADMIN_NOTIFICATIONS, label: 'Thông báo', icon: NotificationsOutlined, permission: 'ADMIN_ACCESS', adminOnly: true },
   { to: '/admin/audit', label: 'Nhật ký quản trị', icon: HistoryOutlined, permission: 'AUDIT_VIEW' },
 ];
 

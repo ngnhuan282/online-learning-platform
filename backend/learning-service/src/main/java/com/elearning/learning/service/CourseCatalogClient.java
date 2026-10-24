@@ -12,7 +12,11 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -30,6 +34,16 @@ public class CourseCatalogClient {
             .requestInterceptor((request, body, execution) -> {
                 String requestId = MDC.get("requestId");
                 if (requestId != null) request.getHeaders().set("X-Request-ID", requestId);
+                var authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication != null && authentication.isAuthenticated()
+                    && !(authentication instanceof AnonymousAuthenticationToken)
+                    && RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+                    String authorization = attributes.getRequest().getHeader("Authorization");
+                    if (authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                        // Course verifies the same caller before returning private content and media tickets.
+                        request.getHeaders().set("Authorization", authorization);
+                    }
+                }
                 return execution.execute(request, body);
             })
             .requestFactory(requestFactory)
@@ -58,6 +72,10 @@ public class CourseCatalogClient {
                 .get()
                 .uri("/api/v1/courses/{id}/sections", courseId)
                 .retrieve()
+                .onStatus(status -> status.value() == 401 || status.value() == 403, (request, result) -> {
+                    throw new AppException(result.getStatusCode().value() == 401
+                        ? ErrorCode.UNAUTHORIZED : ErrorCode.FORBIDDEN);
+                })
                 .onStatus(
                     status -> status.value() == 404,
                     (request, result) -> {
@@ -142,6 +160,10 @@ public class CourseCatalogClient {
                 .get()
                 .uri("/api/v1/courses/{id}", courseId)
                 .retrieve()
+                .onStatus(status -> status.value() == 401 || status.value() == 403, (request, result) -> {
+                    throw new AppException(result.getStatusCode().value() == 401
+                        ? ErrorCode.UNAUTHORIZED : ErrorCode.FORBIDDEN);
+                })
                 .onStatus(
                     status -> status.value() == 404,
                     (request, result) -> {
