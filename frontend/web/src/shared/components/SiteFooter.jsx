@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Brand from './Brand';
 import Icon from './Icon';
 import PolicyDialog from './PolicyDialog';
+import { ROUTES } from '../constants/routes';
 
 const footerPolicies = [
   { label: 'Chính sách bảo mật', topic: 'Privacy Policy' },
@@ -37,18 +38,15 @@ export default function SiteFooter() {
               tế cùng giáo viên bản ngữ và gia sư AI chấm phát âm 24/7.
             </p>
             <div className="social-links">
-              <button
-                aria-label="Cộng đồng SGEdu English"
-                onClick={() => setInfo('Cộng đồng học viên')}
-              >
+              <button aria-label="Cộng đồng SGEdu English" onClick={() => setInfo('Cộng đồng học viên')}>
                 <Icon name="globe" size={18} />
               </button>
               <a href="/#courses" aria-label="Khóa học tiếng Anh">
                 <Icon name="book" size={18} />
               </a>
-              <a href="/#ai-tutor" aria-label="Luyện tiếng Anh cùng trợ lý AI">
+              <Link to={ROUTES.AI_ASSISTANT} aria-label="Luyện tiếng Anh cùng trợ lý AI">
                 <Icon name="headset" size={18} />
-              </a>
+              </Link>
             </div>
           </div>
           <div className="footer-column">
@@ -62,7 +60,7 @@ export default function SiteFooter() {
           <div className="footer-column">
             <h3>Nền tảng</h3>
             <a href="/#benefits">Về chúng tôi</a>
-            <a href="/#ai-tutor">Trợ lý AI Speaking</a>
+            <Link to={ROUTES.AI_ASSISTANT}>Trợ lý AI</Link>
             <button onClick={() => setInfo('Kiểm tra trình độ')}>Kiểm tra trình độ</button>
             <button onClick={() => setInfo('Cộng đồng học viên')}>Cộng đồng học viên</button>
             <button onClick={() => setInfo('Contact Support')}>Hỗ trợ học viên</button>

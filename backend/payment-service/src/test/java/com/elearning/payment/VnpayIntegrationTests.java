@@ -203,7 +203,9 @@ class VnpayIntegrationTests {
 
     String signed(Map<String, String> fields) throws Exception {
         String query = query(fields);
-        return query + "&vnp_SecureHash=" + sign(query);
+        var signatureFields = new TreeMap<>(fields);
+        signatureFields.values().removeIf(value -> value == null || value.isEmpty());
+        return query + "&vnp_SecureHash=" + sign(query(signatureFields));
     }
 
     String ipn(String query) throws Exception {
@@ -472,6 +474,31 @@ class VnpayIntegrationTests {
         assertThat(transactions.count()).isEqualTo(count);
         assertThat(order(code).get("payment").get("status").asString()).isEqualTo("PENDING");
         then(learning).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void invalidSuccessTransactionNumbersCannotConfirmOrActivateCourse() throws Exception {
+        String code = checkout().get("orderCode").asString();
+        long count = transactions.count();
+        for (String transactionNumber : new String[] { null, "", "0", "-1", "abc", "1234567890123456" }) {
+            var fields = callback(code, "00", "00");
+            if (transactionNumber == null) {
+                fields.remove("vnp_TransactionNo");
+            } else {
+                fields.put("vnp_TransactionNo", transactionNumber);
+            }
+            // Sign the invalid data so this exercises transaction validation, not only checksum checks.
+            assertThat(ipn(signed(fields))).isEqualTo("99");
+            JsonNode unchanged = order(code);
+            assertThat(unchanged.get("payment").get("status").asString()).isEqualTo("PENDING");
+            assertThat(unchanged.get("payment").get("enrollmentReady").asBoolean()).isFalse();
+            assertThat(transactions.count()).isEqualTo(count);
+        }
+        then(learning).shouldHaveNoInteractions();
+        assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
+        assertThat(order(code).get("payment").get("status").asString()).isEqualTo("SUCCESS");
+        assertThat(transactions.count()).isEqualTo(count + 1);
+        then(learning).should(times(1)).enroll(code, 71L, 101L);
     }
 
     @Test
