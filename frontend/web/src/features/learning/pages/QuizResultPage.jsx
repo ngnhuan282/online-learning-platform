@@ -9,12 +9,15 @@ import { learningApi } from '../api/learningApi';
 import useLearningResource from '../hooks/useLearningResource';
 import '../styles/quiz.css';
 
-export default function QuizResultPage() {
-  const { attemptId, quizId } = useParams();
-  const loadReview = useCallback(async () => {
-    const selectedAttemptId = attemptId ?? (await learningApi.getQuizResult(quizId)).data.attemptId;
-    return learningApi.getQuizReview(selectedAttemptId);
-  }, [attemptId, quizId]);
+function QuizResult({ attemptId, quizId }) {
+  const loadReview = useCallback(
+    async ({ signal }) => {
+      const selectedAttemptId = attemptId ?? (await learningApi.getQuizResult(quizId)).data.attemptId;
+      signal.throwIfAborted();
+      return learningApi.getQuizReview(selectedAttemptId);
+    },
+    [attemptId, quizId],
+  );
   const { data, error, loading, reload } = useLearningResource(loadReview, null);
   const result = data && (!attemptId || String(data.attemptId) === attemptId) ? data : null;
   const correctCount = result?.questions.filter(question => question.correct).length ?? 0;
@@ -35,7 +38,13 @@ export default function QuizResultPage() {
         </div>
 
         {loading && !result && <p>Đang tải kết quả...</p>}
-        {error && <ErrorState error={error} title="Không thể tải kết quả quiz" onRetry={reload} />}
+        {error && (
+          <ErrorState
+            error={error}
+            title={error.status === 403 ? 'Bạn không có quyền xem kết quả này' : 'Không thể tải kết quả quiz'}
+            onRetry={reload}
+          />
+        )}
 
         {result && (
           <>
@@ -102,4 +111,9 @@ export default function QuizResultPage() {
       </div>
     </section>
   );
+}
+
+export default function QuizResultPage() {
+  const { attemptId, quizId } = useParams();
+  return <QuizResult key={`${attemptId}:${quizId}`} attemptId={attemptId} quizId={quizId} />;
 }

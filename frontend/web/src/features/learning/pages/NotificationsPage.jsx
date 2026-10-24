@@ -8,7 +8,12 @@ import { NOTIFICATION_CATEGORIES } from '../utils/notificationStream';
 import '../styles/notifications.css';
 
 export default function NotificationsPage() {
-  const { userId, revision, summary, markAllRead, refresh } = useNotifications();
+  const notifications = useNotifications();
+  return <NotificationsContent key={notifications.userId ?? 'anonymous'} notifications={notifications} />;
+}
+
+function NotificationsContent({ notifications }) {
+  const { userId, revision, summary, markAllRead, refresh } = notifications;
   const [category, setCategory] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(0);
@@ -30,7 +35,12 @@ export default function NotificationsPage() {
     }
     Promise.resolve().then(() => {
       if (controller.signal.aborted) return;
-      setState(previous => ({ ...previous, loading: true, error: null }));
+      setState(previous => ({
+        data: previous.query === query ? previous.data : null,
+        query,
+        loading: true,
+        error: null,
+      }));
     });
     learningApi
       .getNotificationFeed(
@@ -46,7 +56,7 @@ export default function NotificationsPage() {
         setState({ data, loading: false, error: null, query });
       })
       .catch(error => {
-        if (!controller.signal.aborted) setState(previous => ({ ...previous, loading: false, error }));
+        if (!controller.signal.aborted) setState({ data: null, query, loading: false, error });
       });
     return () => controller.abort();
   }, [userId, page, category, unreadOnly, revision, retry, query]);
@@ -117,7 +127,7 @@ export default function NotificationsPage() {
             Tải lại
           </button>
         </div>
-        {state.error && <ErrorState error={state.error} onRetry={reload} />}
+        {state.query === query && state.error && <ErrorState error={state.error} onRetry={reload} />}
         {actionError && (
           <ErrorState error={actionError} title="Không thể đánh dấu đã đọc" onRetry={readAll} />
         )}

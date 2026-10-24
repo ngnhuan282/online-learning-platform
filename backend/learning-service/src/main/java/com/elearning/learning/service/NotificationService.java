@@ -4,6 +4,8 @@ import com.elearning.learning.common.exception.AppException;
 import com.elearning.learning.common.exception.ErrorCode;
 import com.elearning.learning.common.response.PageResponse;
 import com.elearning.learning.dto.NotificationEventRequest;
+import com.elearning.learning.dto.AdminNotificationRequest;
+import com.elearning.learning.dto.AdminNotificationResponse;
 import com.elearning.learning.dto.NotificationResponse;
 import com.elearning.learning.dto.NotificationSummaryResponse;
 import com.elearning.learning.entity.enums.NotificationCategory;
@@ -68,6 +70,35 @@ public class NotificationService {
         return PageResponse.from(
             notifications.findFeed(userId, types, unreadOnly, pageable).map(NotificationResponse::from)
         );
+    }
+
+    public PageResponse<AdminNotificationResponse> adminFeed(
+        Long userId, int page, int size, NotificationCategory category, boolean unreadOnly
+    ) {
+        if ((userId != null && userId <= 0) || page < 0 || size < 1 || size > 100) {
+            throw new AppException(ErrorCode.BAD_REQUEST);
+        }
+        List<NotificationType> types = Arrays.stream(NotificationType.values())
+            .filter(type -> category == null || type.category() == category).toList();
+        var pageable = PageRequest.of(page, size, Sort.by(
+            Sort.Order.desc("createdAt"), Sort.Order.desc("id")
+        ));
+        return PageResponse.from(
+            notifications.findAdminFeed(userId, types, unreadOnly, pageable).map(AdminNotificationResponse::from)
+        );
+    }
+
+    @Transactional
+    public NotificationResponse sendSystem(AdminNotificationRequest request) {
+        String title = request.title().strip();
+        String body = request.body().strip();
+        var saved = create(request.userId(), NotificationType.SYSTEM, "admin:system:" + request.eventId(),
+            title, body, "/notifications");
+        // A retry may reuse its identity, but must not silently replace an earlier message.
+        if (!saved.title().equals(title) || !saved.body().equals(body)) {
+            throw new AppException(ErrorCode.CONFLICT);
+        }
+        return saved;
     }
 
     @Transactional

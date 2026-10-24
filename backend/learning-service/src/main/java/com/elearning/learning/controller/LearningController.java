@@ -34,10 +34,15 @@ public class LearningController {
 
     @GetMapping("/enrollments/check")
     ApiResponse<EnrollmentCheckResponse> checkEnrollment(
+        Principal principal,
         @RequestParam Long userId,
         @RequestParam Long courseId
     ) {
-        return ApiResponse.success(learning.checkEnrollment(userId, courseId));
+        Long currentUserId = userId(principal);
+        if (!currentUserId.equals(userId)) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+        return ApiResponse.success(learning.checkEnrollment(currentUserId, courseId));
     }
 
     @PostMapping("/enrollments")

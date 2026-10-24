@@ -11,6 +11,7 @@ import com.elearning.learning.repository.EnrollmentRepository;
 import com.elearning.learning.repository.QuizAttemptRepository;
 import com.elearning.learning.repository.QuizRepository;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,7 +68,7 @@ public class QuizService {
     @Transactional
     public AdminQuizResponse create(QuizDefinitionRequest request) {
         validateDefinition(request);
-        courseCatalog.requireExistingCourse(request.courseId());
+        validateCourseReference(request.courseId(), request.lessonId());
         Quiz quiz = new Quiz();
         applyDefinition(quiz, request);
         return AdminQuizResponse.from(quizzes.saveAndFlush(quiz));
@@ -75,12 +76,12 @@ public class QuizService {
 
     @Transactional
     public AdminQuizResponse update(Long id, QuizDefinitionRequest request) {
-        Quiz quiz = findAdminQuiz(id);
+        Quiz quiz = findAdminQuizForUpdate(id);
         if (quiz.getPublished() || attempts.existsByQuizId(id)) {
             throw new AppException(ErrorCode.CONFLICT);
         }
         validateDefinition(request);
-        courseCatalog.requireExistingCourse(request.courseId());
+        validateCourseReference(request.courseId(), request.lessonId());
         quiz.getQuestions().clear();
         quizzes.flush();
         applyDefinition(quiz, request);
@@ -89,16 +90,16 @@ public class QuizService {
 
     @Transactional
     public AdminQuizResponse publish(Long id) {
-        Quiz quiz = findAdminQuiz(id);
-        if (quiz.getQuestions().isEmpty()) throw new AppException(ErrorCode.CONFLICT);
-        courseCatalog.requireExistingCourse(quiz.getCourseId());
+        Quiz quiz = findAdminQuizForUpdate(id);
+        validateScorableQuiz(quiz);
+        validateCourseReference(quiz.getCourseId(), quiz.getLessonId());
         quiz.setPublished(true);
         return AdminQuizResponse.from(quizzes.save(quiz));
     }
 
     @Transactional
     public void deleteDraft(Long id) {
-        Quiz quiz = findAdminQuiz(id);
+        Quiz quiz = findAdminQuizForUpdate(id);
         if (quiz.getPublished() || attempts.existsByQuizId(id)) {
             throw new AppException(ErrorCode.CONFLICT);
         }
@@ -111,7 +112,7 @@ public class QuizService {
             .filter(item -> item.getPublished())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         ensureEnrolledForUpdate(userId, quiz.getCourseId());
-        if (quiz.getQuestions().isEmpty()) throw new AppException(ErrorCode.CONFLICT);
+        validateScorableQuiz(quiz);
 
         var current = attempts.findTopByUserIdAndQuizIdOrderByIdDesc(userId, quizId);
         if (current.isPresent() && current.get().getStatus() == AttemptStatus.IN_PROGRESS
@@ -123,6 +124,7 @@ public class QuizService {
         attempt.setQuiz(quiz);
         attempt.setUserId(userId);
         attempt.setCourseId(quiz.getCourseId());
+        attempt.setStartedAt(Instant.now().truncatedTo(ChronoUnit.SECONDS));
         return QuizResultResponse.from(attempts.save(attempt));
     }
 
@@ -134,6 +136,7 @@ public class QuizService {
         Quiz quiz = quizzes.findWithQuestionsById(attempt.getQuiz().getId())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         ensureEnrolled(userId, quiz.getCourseId());
+        validateScorableQuiz(quiz);
         Instant now = Instant.now();
         if (expired(attempt, quiz, now)) throw new AppException(ErrorCode.CONFLICT);
 
@@ -210,6 +213,20 @@ public class QuizService {
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
+    private Quiz findAdminQuizForUpdate(Long id) {
+        // Lock the root before loading children so publish/update/delete see one definition.
+        return quizzes.findForUpdateById(id)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+    }
+
+    private void validateCourseReference(Long courseId, Long lessonId) {
+        if (lessonId == null) {
+            courseCatalog.requireExistingCourse(courseId);
+        } else {
+            courseCatalog.getCurriculum(courseId).requireLesson(lessonId);
+        }
+    }
+
     private void ensureEnrolled(Long userId, Long courseId) {
         if (enrollments.findByUserIdAndCourseId(userId, courseId)
             .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED).isEmpty()) {
@@ -226,7 +243,27 @@ public class QuizService {
 
     private boolean expired(QuizAttempt attempt, Quiz quiz, Instant now) {
         return quiz.getTimeLimitMinutes() != null
-            && now.isAfter(attempt.getStartedAt().plusSeconds(quiz.getTimeLimitMinutes() * 60L));
+            && !now.isBefore(attempt.getStartedAt().plusSeconds(quiz.getTimeLimitMinutes() * 60L));
+    }
+
+    private void validateScorableQuiz(Quiz quiz) {
+        if (quiz.getQuestions().isEmpty() || quiz.getPassingScore() == null
+            || quiz.getPassingScore() < 0 || quiz.getPassingScore() > 100
+            || (quiz.getTimeLimitMinutes() != null && quiz.getTimeLimitMinutes() <= 0)) {
+            throw new AppException(ErrorCode.CONFLICT);
+        }
+        for (QuizQuestion question : quiz.getQuestions()) {
+            if (question.getQuestionType() == null || question.getQuestionType() == QuestionType.TEXT
+                || question.getPoints() == null || question.getPoints() <= 0
+                || question.getOptions().size() < 2) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
+            long correct = question.getOptions().stream()
+                .filter(option -> Boolean.TRUE.equals(option.getCorrect())).count();
+            if (correct == 0 || (question.getQuestionType() == QuestionType.SINGLE_CHOICE && correct != 1)) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
+        }
     }
 
     private void validateDefinition(QuizDefinitionRequest request) {

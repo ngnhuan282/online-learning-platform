@@ -42,7 +42,47 @@ Vietnamese with the project's UTC+7 timezone.
 | QUIZ_RESULT_AVAILABLE | LEARNING | Successfully graded attempt |
 | ENROLLMENT | COURSE | Existing legacy rows |
 | PROGRESS / QUIZ | LEARNING | Existing legacy rows |
-| SYSTEM | SYSTEM | Existing legacy rows |
+| SYSTEM | SYSTEM | Existing legacy rows or an ADMIN message to one recipient |
+
+## Admin API
+
+`/api/v1/learning/admin/notifications` requires the existing JWT with the `ADMIN`
+role. A USER JWT receives 403; missing authentication receives 401. The admin UI
+is `/admin/notifications` and uses the same Gateway/Axios client as the user UI.
+
+- `GET` returns `ApiResponse<PageResponse<AdminNotificationResponse>>`. Filters:
+  optional positive `userId`, optional `category`, `unreadOnly=false`, `page=0`,
+  `size=20` (1–100). Sorting remains `createdAt DESC, id DESC`.
+  Each entry contains the user response fields plus its recipient `userId`.
+- `POST` accepts the following body and returns 201 with
+  `ApiResponse<NotificationResponse>`:
+
+  ```json
+  {
+    "eventId": "b99dba41-1692-47b3-a63f-980f3ca07c31",
+    "userId": 123,
+    "title": "Lịch bảo trì hệ thống",
+    "body": "Vui lòng lưu bài làm trước thời gian bảo trì."
+  }
+  ```
+
+  `eventId` follows the receiver's 1–128 character rule; `userId` must be positive.
+  Title and body are required, trimmed, and limited to 255 and 1000 characters.
+  The server always chooses `type=SYSTEM`, `category=SYSTEM`, and the relative
+  `actionUrl=/notifications`; the caller cannot create payment/learning outcomes
+  or supply another destination.
+- The event key is `admin:system:<eventId>` and is unique per recipient. Retrying
+  the same message returns 201 with the original ID and read state. Reusing that
+  identity with different title/body returns 409. The UI keeps the same eventId
+  after a transport failure and creates another only after editing or a successful send.
+- New messages participate in the existing local transaction and recipient SSE
+  after commit. Rollback stores no message and publishes no change.
+- The first version sends to one explicitly entered ID. It does not query Auth's
+  database to validate/list accounts, broadcast, schedule, or introduce new roles
+  and permissions. Admins cannot edit/delete business notifications or mark the
+  recipient's messages as read through these admin endpoints.
+
+This reuses the current SYSTEM type and notification table; no migration is needed.
 
 ## Server-to-server receiver
 
@@ -155,3 +195,10 @@ NOTIFICATION_TEST_MYSQL_PASSWORD=<test_database_password>
 Then run `mvnw.cmd -B -Dtest=NotificationIntegrationTests test`.
 With these variables the test uses MySQL, Flyway and `ddl-auto=validate`.
 Never point this suite at a shared development or production database.
+
+`C11NotificationIntegrationTests` additionally checks ADMIN authorization,
+recipient/category/unread pagination, payload/filter validation, SYSTEM-only
+send, retry/conflict/read preservation, concurrent requests and rollback.
+`frontend/web/tests/notifications.test.js` checks split SSE frames and UTF-8,
+abort cleanup, safe links, StrictMode stream cleanup, logout/account isolation,
+summary/read races, user filters and stable admin-send retry identities.

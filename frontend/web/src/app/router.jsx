@@ -92,6 +92,16 @@ const router = createBrowserRouter([
       },
       { path: 'course', element: <Navigate to="/admin/courses" replace /> },
       {
+        path: 'notifications',
+        element: <RoleRoute roles={['ADMIN']} />,
+        children: [{
+          index: true,
+          lazy: async () => ({
+            Component: (await import('../features/learning/pages/AdminNotificationsPage')).default,
+          }),
+        }],
+      },
+      {
         path: 'quizzes',
         element: <RoleRoute roles={['ADMIN']} />,
         children: [{
