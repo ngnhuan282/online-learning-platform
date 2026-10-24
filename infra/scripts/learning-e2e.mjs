@@ -10,7 +10,8 @@ assert.ok(
 );
 const base = process.env.LEARNING_E2E_BASE_URL || 'http://localhost:18080';
 const demo = process.argv.includes('--demo');
-const email = process.env.LEARNING_E2E_ADMIN_EMAIL || (demo ? 'demo.admin@example.com' : null);
+const c11 = process.argv.includes('--c11');
+const email = process.env.LEARNING_E2E_ADMIN_EMAIL || (demo ? 'admin@gmail.com' : null);
 const password = process.env.LEARNING_E2E_ADMIN_PASSWORD || (demo ? 'Admin123' : null);
 assert.ok(email && password, 'Set LEARNING_E2E_ADMIN_EMAIL/PASSWORD or seed the test stack and use --demo.');
 const marker = randomUUID();
@@ -44,6 +45,7 @@ async function learner(name) {
 }
 const user = await learner('owner');
 const stranger = await learner('stranger');
+const owner = await api('/users/me', { token: user });
 const categories = await api('/categories');
 assert.ok(categories.length, 'Seed categories before running this scenario.');
 
@@ -88,6 +90,10 @@ async function fixture(price) {
 const free = await fixture(0);
 const paid = await fixture(100000);
 const freeId = free.course.id;
+if (c11) {
+  const publicSections = await api('/courses/' + freeId + '/sections');
+  assert.equal(publicSections[0].lessons[0].content, null, 'Private text is hidden from guests');
+}
 await api('/learning/courses/' + freeId, { token: stranger, status: 403 });
 const enrollments = await Promise.all(
   Array.from({ length: 4 }, () =>
@@ -120,6 +126,9 @@ for (const lesson of free.lessons) {
 const learned = await api('/learning/courses/' + freeId, { token: user });
 assert.equal(learned.totalLessons, 2);
 assert.equal(learned.progressPercent, 100);
+if (c11) {
+  assert.equal(learned.sections[0].lessons[0].content, 'Nội dung kiểm thử');
+}
 const my = await api('/learning/enrollments/me', { token: user });
 assert.equal(my.find(item => item.courseId === freeId).status, 'COMPLETED');
 report.checks.push(
@@ -221,7 +230,8 @@ try {
   await waitEvent('notifications-changed', index);
   const owned = await api('/learning/enrollments/me', { token: user });
   assert.equal(owned.filter(item => item.courseId === paid.course.id).length, 1);
-  await api('/learning/courses/' + paid.course.id, { token: user });
+  const paidLearning = await api('/learning/courses/' + paid.course.id, { token: user });
+  if (c11) assert.equal(paidLearning.sections[0].lessons[0].content, 'Nội dung kiểm thử');
   await api('/learning/courses/' + paid.course.id, { token: stranger, status: 403 });
   const payments = await api('/learning/notifications/feed?category=PAYMENT', { token: user });
   assert.equal(payments.totalElements, 1);
@@ -232,6 +242,56 @@ try {
   );
   const courseNotifications = await api('/learning/notifications/feed?category=COURSE', { token: user });
   assert.equal(courseNotifications.totalElements, 2);
+  if (c11) {
+    const notificationPath = '/learning/admin/notifications';
+    await api(notificationPath, { status: 401 });
+    await api(notificationPath, { token: user, status: 403 });
+    const message = {
+      eventId: 'C11-' + marker,
+      userId: owner.id,
+      title: 'Thông báo hệ thống C11',
+      body: 'Nội dung dành riêng cho học viên kiểm thử.',
+    };
+    await api(notificationPath, { method: 'POST', token: user, body: message, status: 403 });
+    const beforeMessage = events.length;
+    const copies = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        api(notificationPath, { method: 'POST', token: admin, body: message, status: 201 }),
+      ),
+    );
+    assert.equal(new Set(copies.map(item => item.id)).size, 1);
+    assert.equal(copies[0].type, 'SYSTEM');
+    assert.equal(copies[0].actionUrl, '/notifications');
+    await waitEvent('notifications-changed', beforeMessage);
+    await api(notificationPath, {
+      method: 'POST',
+      token: admin,
+      body: { ...message, body: 'Conflicting payload' },
+      status: 409,
+    });
+    const adminFeed = await api(notificationPath + '?userId=' + owner.id + '&category=SYSTEM', {
+      token: admin,
+    });
+    assert.equal(adminFeed.totalElements, 1);
+    assert.equal(adminFeed.content[0].userId, owner.id);
+    await api('/learning/notifications/' + copies[0].id + '/read', {
+      method: 'PATCH',
+      token: stranger,
+      status: 404,
+    });
+    const read = await api('/learning/notifications/' + copies[0].id + '/read', {
+      method: 'PATCH',
+      token: user,
+    });
+    const readAgain = await api('/learning/notifications/' + copies[0].id + '/read', {
+      method: 'PATCH',
+      token: user,
+    });
+    assert.equal(readAgain.readAt, read.readAt);
+    report.checks.push(
+      'C11: private free/paid content delegated with caller JWT; ADMIN-only SYSTEM message, concurrent retry, recipient isolation, SSE and idempotent read.',
+    );
+  }
   const outsider = await api('/learning/notifications/summary', { token: stranger });
   assert.equal(outsider.unreadCount, 0);
   await api('/learning/notifications/read-all', { method: 'PATCH', token: user });
@@ -245,8 +305,13 @@ try {
     if (error.name !== 'AbortError') throw error;
   });
 }
-await mkdir('.tmp/learning-e2e', { recursive: true });
-await writeFile('.tmp/learning-e2e/results.json', JSON.stringify(report, null, 2) + '\n');
+const output = c11 ? '.tmp/c11-e2e' : '.tmp/learning-e2e';
+await mkdir(output, { recursive: true });
+await writeFile(output + '/results.json', JSON.stringify(report, null, 2) + '\n');
 console.log(
-  'PASS: Learning weeks 8-9 through Gateway; report .tmp/learning-e2e/results.json (MOCK provider).',
+  'PASS: Learning ' +
+    (c11 ? 'C11' : 'weeks 8-9') +
+    ' through Gateway; report ' +
+    output +
+    '/results.json (MOCK provider).',
 );

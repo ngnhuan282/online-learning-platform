@@ -37,4 +37,7 @@ export const learningApi = {
     }),
   markNotificationRead: notificationId =>
     axiosClient.patch(ENDPOINTS.learning.notificationRead(notificationId)),
+  getAdminNotifications: (params, options = {}) =>
+    axiosClient.get(ENDPOINTS.learning.adminNotifications, { ...options, params }),
+  sendSystemNotification: payload => axiosClient.post(ENDPOINTS.learning.adminNotifications, payload),
 };

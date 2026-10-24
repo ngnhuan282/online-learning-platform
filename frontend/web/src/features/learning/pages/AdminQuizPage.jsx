@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, FormControlLabel, MenuItem, TextField } from '@mui/material';
-import { Add, DeleteOutlined, SaveOutlined, PublishOutlined } from '@mui/icons-material';
+import Add from '@mui/icons-material/Add';
+import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
+import SaveOutlined from '@mui/icons-material/SaveOutlined';
+import PublishOutlined from '@mui/icons-material/PublishOutlined';
 import { learningApi } from '../api/learningApi';
 import { courseApi } from '../../courses/api/courseApi';
 import ErrorState from '../../../shared/components/ErrorState';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import '../styles/quiz.css';
 
 const blankOption = () => ({ optionText: '', correct: false });
@@ -26,18 +30,54 @@ const blankQuiz = () => ({
 
 const definitionPayload = form => ({
   ...form,
+  title: form.title.trim(),
+  description: form.description.trim(),
   courseId: Number(form.courseId),
   lessonId: form.lessonId ? Number(form.lessonId) : null,
   passingScore: Number(form.passingScore),
   timeLimitMinutes: form.timeLimitMinutes ? Number(form.timeLimitMinutes) : null,
   questions: form.questions.map(question => ({
     ...question,
+    questionText: question.questionText.trim(),
     points: Number(question.points),
+    options: question.options.map(option => ({ ...option, optionText: option.optionText.trim() })),
   })),
 });
 
+function definitionError(form) {
+  const positiveInteger = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
+  if (!positiveInteger(form.courseId)) return 'Mã khóa học phải là số nguyên dương.';
+  if (form.lessonId && !positiveInteger(form.lessonId)) return 'Mã bài học phải là số nguyên dương.';
+  if (!form.title.trim()) return 'Vui lòng nhập tên quiz.';
+  if (
+    !Number.isInteger(Number(form.passingScore)) ||
+    form.passingScore === '' ||
+    Number(form.passingScore) < 0 ||
+    Number(form.passingScore) > 100
+  ) {
+    return 'Điểm đạt phải là số nguyên từ 0 đến 100.';
+  }
+  if (form.timeLimitMinutes && !positiveInteger(form.timeLimitMinutes)) {
+    return 'Giới hạn thời gian phải là số phút nguyên dương.';
+  }
+  for (const [index, question] of form.questions.entries()) {
+    if (!question.questionText.trim()) return `Vui lòng nhập nội dung câu ${index + 1}.`;
+    if (!positiveInteger(question.points)) return `Điểm câu ${index + 1} phải là số nguyên dương.`;
+    if (question.options.length < 2 || question.options.some(option => !option.optionText.trim())) {
+      return `Câu ${index + 1} cần ít nhất hai đáp án có nội dung.`;
+    }
+    const correct = question.options.filter(option => option.correct).length;
+    if (!correct || (question.questionType === 'SINGLE_CHOICE' && correct !== 1)) {
+      return `Câu ${index + 1} cần ${question.questionType === 'SINGLE_CHOICE' ? 'đúng một' : 'ít nhất một'} đáp án đúng.`;
+    }
+  }
+  return null;
+}
+
 export default function AdminQuizPage() {
   const editorRef = useRef(null);
+  const mounted = useRef(false);
+  const pending = useRef(false);
   const [quizzes, setQuizzes] = useState([]);
   const [courses, setCourses] = useState([]);
   const [form, setForm] = useState(blankQuiz);
@@ -49,41 +89,88 @@ export default function AdminQuizPage() {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [listError, setListError] = useState(null);
+  const [courseError, setCourseError] = useState(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([learningApi.getAdminQuizzes(), courseApi.adminList({ page: 0, size: 100 })])
+    mounted.current = true;
+    Promise.resolve()
+      .then(() => {
+        if (!active) return [];
+        setLoading(true);
+        setListError(null);
+        setCourseError(null);
+        return Promise.allSettled([
+          learningApi.getAdminQuizzes(),
+          courseApi.adminList({ page: 0, size: 100 }),
+        ]);
+      })
       .then(([quizResult, courseResult]) => {
         if (!active) return;
         if (quizResult.status === 'fulfilled') setQuizzes(quizResult.value.data ?? []);
-        else setError(quizResult.reason);
+        else setListError(quizResult.reason);
         if (courseResult.status === 'fulfilled') {
-          setCourses(courseResult.value.data?.content ?? []);
-        }
+          const data = courseResult.value.data;
+          setCourses(data?.items ?? data?.content ?? (Array.isArray(data) ? data : []));
+        } else setCourseError(courseResult.reason);
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => {
       active = false;
+      mounted.current = false;
     };
-  }, []);
+  }, [retry]);
 
-  function startNew() {
+  function beginAction() {
+    pending.current = true;
+    const session = getSessionVersion();
+    setBusy(true);
+    setError(null);
+    setMessage('');
+    return () => mounted.current && session === getSessionVersion();
+  }
+
+  function endAction(active) {
+    pending.current = false;
+    if (active()) setBusy(false);
+  }
+
+  async function reloadQuizzes(active) {
+    try {
+      const response = await learningApi.getAdminQuizzes();
+      if (active()) {
+        setQuizzes(response.data ?? []);
+        setListError(null);
+      }
+    } catch (loadError) {
+      if (active()) setListError(loadError);
+    }
+  }
+
+  function resetEditor() {
     setEditingId(null);
     setPublished(false);
     setForm(blankQuiz());
     setSavedForm(null);
     setError(null);
     setMessage('');
+    setConfirmDelete(false);
+  }
+
+  function startNew() {
+    if (!pending.current) resetEditor();
   }
 
   async function selectQuiz(id) {
-    setBusy(true);
-    setError(null);
-    setMessage('');
+    if (pending.current) return;
+    const active = beginAction();
     try {
       const { data } = await learningApi.getAdminQuiz(id);
+      if (!active()) return;
       setEditingId(data.id);
       setPublished(data.published);
       const nextForm = {
@@ -106,9 +193,9 @@ export default function AdminQuizPage() {
       setForm(nextForm);
       setSavedForm(JSON.stringify(nextForm));
     } catch (loadError) {
-      setError(loadError);
+      if (active()) setError(loadError);
     } finally {
-      setBusy(false);
+      endAction(active);
     }
   }
 
@@ -131,61 +218,71 @@ export default function AdminQuizPage() {
 
   async function save(event) {
     event.preventDefault();
-    if (busy || published) return;
-    setBusy(true);
-    setError(null);
-    setMessage('');
+    if (pending.current || published) return;
+    const validation = definitionError(form);
+    if (validation) {
+      setError(new Error(validation));
+      return;
+    }
+    if (!editorRef.current?.reportValidity()) return;
+    const active = beginAction();
     try {
       const response = editingId
         ? await learningApi.updateQuiz(editingId, definitionPayload(form))
         : await learningApi.createQuiz(definitionPayload(form));
+      if (!active()) return;
       setEditingId(response.data.id);
       setSavedForm(JSON.stringify(form));
-      setQuizzes((await learningApi.getAdminQuizzes()).data ?? []);
       setMessage('Đã lưu bản nháp quiz.');
+      await reloadQuizzes(active);
     } catch (saveError) {
-      setError(saveError);
+      if (active()) setError(saveError);
     } finally {
-      setBusy(false);
+      endAction(active);
     }
   }
 
   async function publish() {
-    if (!editingId || busy || published) return;
+    if (!editingId || pending.current || published) return;
+    const validation = definitionError(form);
+    if (validation) {
+      setError(new Error(validation));
+      return;
+    }
     if (!editorRef.current?.reportValidity()) return;
-    setBusy(true);
-    setError(null);
-    setMessage('');
+    const active = beginAction();
     try {
       if (JSON.stringify(form) !== savedForm) {
         await learningApi.updateQuiz(editingId, definitionPayload(form));
+        if (!active()) return;
         setSavedForm(JSON.stringify(form));
       }
       await learningApi.publishQuiz(editingId);
+      if (!active()) return;
       setPublished(true);
-      setQuizzes((await learningApi.getAdminQuizzes()).data ?? []);
       setMessage('Quiz đã xuất bản. Học viên đã ghi danh có thể làm bài.');
+      await reloadQuizzes(active);
     } catch (publishError) {
-      setError(publishError);
+      if (active()) setError(publishError);
     } finally {
-      setBusy(false);
+      endAction(active);
     }
   }
 
   async function deleteDraft() {
-    if (!editingId || busy || published) return;
-    setBusy(true);
-    setError(null);
+    if (!editingId || pending.current || published) return;
+    const active = beginAction();
     try {
       await learningApi.deleteQuiz(editingId);
-      setQuizzes((await learningApi.getAdminQuizzes()).data ?? []);
-      startNew();
+      if (!active()) return;
+      resetEditor();
       setMessage('Đã xóa bản nháp quiz.');
+      await reloadQuizzes(active);
     } catch (deleteError) {
-      setError(deleteError);
+      if (active()) setError(deleteError);
     } finally {
-      setBusy(false);
-      setConfirmDelete(false);
+      endAction(active);
+      if (active()) setConfirmDelete(false);
     }
   }
 
@@ -196,17 +293,31 @@ export default function AdminQuizPage() {
           <p>Học tập</p>
           <h1>Quản lý quiz</h1>
         </div>
-        <Button variant="outlined" startIcon={<Add />} onClick={startNew}>
+        <Button variant="outlined" startIcon={<Add />} onClick={startNew} disabled={busy}>
           Quiz mới
         </Button>
       </div>
       {error && <ErrorState error={error} title="Không thể xử lý quiz" />}
+      {listError && (
+        <ErrorState
+          error={listError}
+          title="Không thể tải danh sách quiz"
+          onRetry={busy ? undefined : () => setRetry(value => value + 1)}
+        />
+      )}
+      {courseError && (
+        <ErrorState
+          error={courseError}
+          title="Không thể tải danh sách khóa học; bạn có thể nhập mã khóa học"
+          onRetry={busy ? undefined : () => setRetry(value => value + 1)}
+        />
+      )}
       {message && <Alert severity="success">{message}</Alert>}
       <div className="quiz-admin-layout">
         <aside className="quiz-admin-list" aria-busy={loading}>
           <h2>Danh sách quiz</h2>
           {loading && <p>Đang tải...</p>}
-          {!loading && quizzes.length === 0 && <p>Chưa có quiz.</p>}
+          {!loading && !listError && quizzes.length === 0 && <p>Chưa có quiz.</p>}
           {quizzes.map(quiz => (
             <button
               key={quiz.id}
@@ -235,6 +346,7 @@ export default function AdminQuizPage() {
               value={form.courseId}
               onChange={event => setForm({ ...form, courseId: event.target.value })}
               required
+              slotProps={{ htmlInput: { min: 1, step: 1 } }}
               disabled={published || busy}
             >
               {courses.map(course => (
@@ -403,6 +515,7 @@ export default function AdminQuizPage() {
             <div className="quiz-editor-actions">
               <Button
                 startIcon={<Add />}
+                disabled={busy}
                 onClick={() => setForm({ ...form, questions: [...form.questions, blankQuestion()] })}
               >
                 Thêm câu hỏi
