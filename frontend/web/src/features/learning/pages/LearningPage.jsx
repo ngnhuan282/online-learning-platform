@@ -18,6 +18,8 @@ import AppLoading from '../../../shared/components/AppLoading';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import { AUTH_CHANGED_EVENT, API_PREFIX } from '../../../shared/constants/appConstants';
 import { youtubeEmbedUrl } from '../utils/lessonMedia';
+import { ROUTES } from '../../../shared/constants/routes';
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import '../styles/quiz.css';
 
 const lessonStatus = item => item?.status ?? 'NOT_STARTED';
@@ -176,8 +178,27 @@ function LearningCoursePage({ courseId }) {
           title={course.title || `Khóa học #${courseId}`}
           description="Học theo từng bài, lưu tiến độ và kiểm tra kiến thức."
         >
+          {course.level && (
+            <span
+              style={{
+                fontSize: 12,
+                background: '#f1f5f9',
+                padding: '2px 8px',
+                borderRadius: 4,
+                color: '#475569',
+              }}
+            >
+              {course.level}
+            </span>
+          )}
           <Link className="button button-outline" to={`/courses/${courseId}`}>
             Chi tiết khóa học
+          </Link>
+          <Link
+            className="button button-outline"
+            to={`${ROUTES.AI_ASSISTANT}?courseId=${encodeURIComponent(courseId)}${currentLesson ? `&lessonId=${encodeURIComponent(currentLesson.id)}` : ''}`}
+          >
+            <AutoAwesomeOutlined fontSize="small" /> Trợ lý AI
           </Link>
           <Link className="button button-primary" to="/my-courses">
             Khóa học của tôi
