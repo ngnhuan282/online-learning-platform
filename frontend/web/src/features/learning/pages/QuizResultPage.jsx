@@ -5,6 +5,7 @@ import HighlightOff from '@mui/icons-material/HighlightOff';
 import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import ErrorState from '../../../shared/components/ErrorState';
 import ProgressBar from '../components/ProgressBar';
+import LearningHeader from '../components/LearningHeader';
 import { learningApi } from '../api/learningApi';
 import useLearningResource from '../hooks/useLearningResource';
 import '../styles/quiz.css';
@@ -25,17 +26,16 @@ function QuizResult({ attemptId, quizId }) {
   return (
     <section className="learning-page">
       <div className="learning-shell quiz-result-shell" aria-busy={loading}>
-        <div className="learning-page-header">
-          <div>
-            <p>Kết quả bài kiểm tra</p>
-            <h1>{result?.quizTitle ?? 'Kết quả quiz'}</h1>
-          </div>
+        <LearningHeader
+          title={result?.quizTitle ?? 'Kết quả quiz'}
+          description="Kết quả bài kiểm tra và đáp án của lượt làm này."
+        >
           {result?.courseId && (
             <Link className="button button-outline" to={`/learning/${result.courseId}`}>
               Quay lại khóa học
             </Link>
           )}
-        </div>
+        </LearningHeader>
 
         {loading && !result && <p>Đang tải kết quả...</p>}
         {error && (

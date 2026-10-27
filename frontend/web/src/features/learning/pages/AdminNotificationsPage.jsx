@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import useAuth from '../../auth/hooks/useAuth';
 import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
+import LearningHeader from '../components/LearningHeader';
 import { formatDate } from '../../../shared/utils/formatDate';
 import { learningApi } from '../api/learningApi';
 import { NOTIFICATION_CATEGORIES, notificationCategory } from '../utils/notificationStream';
@@ -116,13 +117,12 @@ function AdminNotificationsContent() {
   const current = state.query === query && !recipientInvalid;
   const data = current ? state.data : null;
   return (
-    <section className="admin-notifications">
-      <div className="learning-page-header">
-        <div>
-          <p>Notification Center</p>
-          <h1>Quản lý thông báo</h1>
-        </div>
-      </div>
+    <section className="admin-notifications learning-admin-workspace">
+      <LearningHeader
+        title="Quản lý thông báo"
+        description="Gửi thông báo hệ thống và tra cứu lịch sử theo người nhận."
+        navigation={false}
+      />
       <form className="notification-compose" onSubmit={send}>
         <h2>Gửi thông báo hệ thống</h2>
         <p>
