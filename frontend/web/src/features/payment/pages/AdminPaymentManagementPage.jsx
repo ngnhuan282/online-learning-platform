@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Button, IconButton, MenuItem, Pagination, TextField, Tooltip } from '@mui/material';
+import { Alert, Button, IconButton, MenuItem, Pagination, TextField, Tooltip, Skeleton } from '@mui/material';
 import {
   AccountBalanceWalletOutlined,
   CancelOutlined,
@@ -15,6 +15,7 @@ import { PageHeading, StatCard, LoadState } from '../../admin/components/AdminUi
 import { date, money, number } from '../../admin/utils/adminUtils';
 import { paymentApi } from '../api/paymentApi';
 import { getPaymentDisplayStatus } from '../utils/paymentFlow';
+import '../styles/payment-admin.css';
 
 const statuses = {
   PENDING: 'Đang chờ',
@@ -44,7 +45,13 @@ export default function AdminPaymentManagementPage() {
   const size = [10, 20, 50].includes(Number(params.get('size'))) ? Number(params.get('size')) : 10;
   const [searchDraft, setSearchDraft] = useState({ source: keyword, value: keyword });
   const query = searchDraft.source === keyword ? searchDraft.value : keyword;
-  const [state, setState] = useState({ loading: true, data: null, stats: null, error: null });
+  const [state, setState] = useState({
+    loading: true,
+    data: null,
+    stats: null,
+    error: null,
+    statsError: null,
+  });
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
@@ -59,6 +66,7 @@ export default function AdminPaymentManagementPage() {
         data: ordersResult.status === 'fulfilled' ? ordersResult.value.data : null,
         stats: statsResult.status === 'fulfilled' ? statsResult.value.data : null,
         error: ordersResult.status === 'rejected' ? ordersResult.reason : null,
+        statsError: statsResult.status === 'rejected' ? statsResult.reason : null,
       });
     });
     return () => {
@@ -78,10 +86,11 @@ export default function AdminPaymentManagementPage() {
 
   const rows = state.data?.content || [];
   const stats = state.stats;
-  const failedCount = Number(stats?.failedPayments ?? 0);
+  const failedCount = stats?.failedPayments;
 
   return (
-    <>
+    <div className="workspace-scope admin-payment-workspace">
+      <span className="workspace-kicker">Quản trị thanh toán</span>
       <PageHeading
         title="Quản lý giao dịch thanh toán"
         description="Theo dõi, tra cứu và xử lý trạng thái các giao dịch thanh toán của học viên."
@@ -99,30 +108,35 @@ export default function AdminPaymentManagementPage() {
         </Button>
       </PageHeading>
 
-      <div className="admin-stats">
+      {state.statsError && !state.loading && (
+        <Alert severity="warning">
+          Chưa tải được số liệu tổng quan. Danh sách giao dịch vẫn có thể tra cứu. Chọn Làm mới để thử lại.
+        </Alert>
+      )}
+      <div className="admin-stats" aria-busy={state.loading}>
         <StatCard
           title="TỔNG GIAO DỊCH"
-          value={number(stats?.totalOrders)}
+          value={state.loading ? <Skeleton width="65%" /> : number(stats?.totalOrders)}
           detail="Tất cả giao dịch đã được tạo"
           icon={<AccountBalanceWalletOutlined />}
         />
         <StatCard
           title="ĐANG CHỜ"
-          value={number(stats?.pendingPayments)}
+          value={state.loading ? <Skeleton width="50%" /> : number(stats?.pendingPayments)}
           detail={`${money(stats?.pendingAmount)} chưa hoàn tất`}
           icon={<HourglassTopOutlined />}
           tone="amber"
         />
         <StatCard
           title="THÀNH CÔNG"
-          value={money(stats?.grossRevenue)}
+          value={state.loading ? <Skeleton width="85%" /> : money(stats?.grossRevenue)}
           detail={`${number(stats?.successfulPayments)} giao dịch đã thanh toán`}
           icon={<TaskAlt />}
           tone="green"
         />
         <StatCard
           title="CẦN THEO DÕI"
-          value={number(failedCount)}
+          value={state.loading ? <Skeleton width="50%" /> : number(failedCount)}
           detail="Giao dịch thất bại hoặc đã hủy"
           icon={<CancelOutlined />}
           tone="red"
@@ -268,6 +282,6 @@ export default function AdminPaymentManagementPage() {
           </div>
         </section>
       )}
-    </>
+    </div>
   );
 }

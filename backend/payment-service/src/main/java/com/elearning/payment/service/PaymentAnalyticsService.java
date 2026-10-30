@@ -2,7 +2,6 @@ package com.elearning.payment.service;
 
 import com.elearning.payment.dto.PaymentAnalyticsResponse;
 import com.elearning.payment.entity.OrderItem;
-import com.elearning.payment.entity.Payment;
 import com.elearning.payment.entity.enums.PaymentStatus;
 import com.elearning.payment.repository.CourseOrderRepository;
 import com.elearning.payment.repository.PaymentRepository;
@@ -66,16 +65,11 @@ public class PaymentAnalyticsService {
             .map(day -> {
                 Instant start = day.atStartOfDay().toInstant(ZoneOffset.UTC);
                 Instant end = day.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-                List<Payment> dayPayments = payments.findByCreatedAtBetween(start, end);
-                BigDecimal amount = dayPayments
-                    .stream()
-                    .filter(payment -> payment.getStatus() == PaymentStatus.SUCCESS)
-                    .map(Payment::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal amount = payments.sumSuccessfulAmountPaidBetween(start, end);
                 return new PaymentAnalyticsResponse.RevenuePoint(
                     CHART_LABEL.format(day),
-                    amount,
-                    dayPayments.size()
+                    amount == null ? BigDecimal.ZERO : amount,
+                    payments.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(start, end)
                 );
             })
             .toList();

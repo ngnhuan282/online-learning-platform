@@ -98,13 +98,16 @@ export default function PaymentResultPage() {
         if (response.data.payment?.status === 'SUCCESS' && response.data.payment.provider === 'MOCK') {
           try {
             const enrollments = await learningApi.getMyEnrollments();
-            if (active) setEnrollmentState({
-              orderCode,
-              ready: enrollments.data.some(item =>
-                String(item.courseId) === String(response.data.items?.[0]?.courseId) &&
-                ['ACTIVE', 'COMPLETED'].includes(item.status)),
-              error: null,
-            });
+            if (active)
+              setEnrollmentState({
+                orderCode,
+                ready: enrollments.data.some(
+                  item =>
+                    String(item.courseId) === String(response.data.items?.[0]?.courseId) &&
+                    ['ACTIVE', 'COMPLETED'].includes(item.status),
+                ),
+                error: null,
+              });
           } catch (error) {
             if (active) setEnrollmentState({ orderCode, ready: false, error });
           }
@@ -143,7 +146,7 @@ export default function PaymentResultPage() {
 
   if (!orderCode) {
     return (
-      <section className="payment-page payment-result-page">
+      <section className="workspace-scope payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
             <ErrorState
@@ -172,7 +175,7 @@ export default function PaymentResultPage() {
 
   if (orderCode && loading) {
     return (
-      <section className="payment-page payment-result-page">
+      <section className="workspace-scope payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
             <AppLoading label="Đang tải kết quả thanh toán..." />
@@ -185,7 +188,7 @@ export default function PaymentResultPage() {
   if (orderCode && error && !order) {
     const forbidden = error.status === 403 || error.code === 'FORBIDDEN';
     return (
-      <section className="payment-page payment-result-page">
+      <section className="workspace-scope payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
             <ErrorState
@@ -213,9 +216,10 @@ export default function PaymentResultPage() {
   const provider = order.payment?.provider;
   const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = getResumePaymentUrl(order, window.location.origin);
-  const enrollmentReady = provider === 'VNPAY'
-    ? order.payment.enrollmentReady === true
-    : enrollmentState.orderCode === orderCode && enrollmentState.ready;
+  const enrollmentReady =
+    provider === 'VNPAY'
+      ? order.payment.enrollmentReady === true
+      : enrollmentState.orderCode === orderCode && enrollmentState.ready;
   const awaitingActivation = paymentStatus === 'SUCCESS' && !enrollmentReady;
 
   async function retryActivation() {
@@ -237,7 +241,7 @@ export default function PaymentResultPage() {
   }
 
   return (
-    <section className="payment-page payment-result-page">
+    <section className="workspace-scope payment-page payment-result-page">
       <div className="container payment-result-container">
         <article className={`payment-panel result-card ${copy.tone}`}>
           <span className={`result-icon ${copy.tone}`}>
@@ -277,8 +281,16 @@ export default function PaymentResultPage() {
 
           <div className="result-actions">
             {awaitingActivation ? (
-              <button className="button button-primary" onClick={provider === 'VNPAY' ? retryActivation : retryResultLoad} disabled={activating}>
-                {activating ? 'Đang kích hoạt...' : provider === 'VNPAY' ? 'Thử kích hoạt khóa học' : 'Kiểm tra lại quyền học'}{' '}
+              <button
+                className="button button-primary"
+                onClick={provider === 'VNPAY' ? retryActivation : retryResultLoad}
+                disabled={activating}
+              >
+                {activating
+                  ? 'Đang kích hoạt...'
+                  : provider === 'VNPAY'
+                    ? 'Thử kích hoạt khóa học'
+                    : 'Kiểm tra lại quyền học'}{' '}
                 <RefreshOutlined sx={{ fontSize: 17 }} />
               </button>
             ) : paymentStatus === 'SUCCESS' ? (

@@ -439,6 +439,15 @@ test('conversation groups follow local calendar boundaries and preserve loaded o
   assert.deepEqual(groupConversations([], now), []);
 });
 
+test('a truncated answer keeps its text and explains the limit when history is reopened', async () => {
+  aiApi.getMessages = async () =>
+    page([{ ...message(2, 'AI', 'An unfinished explanation'), truncated: true }]);
+  await render('/ai-assistant?conversationId=1');
+  assert.match(document.querySelector('.ai-assistant-markdown').textContent, /An unfinished explanation/);
+  assert.match(document.querySelector('.ai-assistant-truncated').textContent, /chưa đầy đủ/);
+  assert.match(document.querySelector('.ai-assistant-truncated').textContent, /Tiếp tục phần còn lại/);
+});
+
 test('prompt starters fill the draft without calling the provider, and new conversation clears saved messages', async () => {
   let calls = 0;
   aiApi.sendMessage = async () => {
@@ -448,9 +457,7 @@ test('prompt starters fill the draft without calling the provider, and new conve
   await render('/ai-assistant?conversationId=1');
   await act(async () => document.querySelector('button[aria-label="Hội thoại mới"]').click());
   assert.equal(document.querySelector('.ai-assistant-message'), null);
-  await act(async () =>
-    [...document.querySelectorAll('button')].find(button => button.textContent === 'Ôn ngữ pháp').click(),
-  );
+  await act(async () => document.querySelector('button[aria-label="Ôn ngữ pháp"]').click());
   assert.match(document.querySelector('textarea:not([aria-hidden])').value, /hiện tại hoàn thành/);
   assert.equal(calls, 0);
 });

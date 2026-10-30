@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AppLoading from '../../../shared/components/AppLoading';
+import Skeleton from '@mui/material/Skeleton';
 import ErrorState from '../../../shared/components/ErrorState';
 import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -55,6 +56,13 @@ export default function PaymentCheckoutPage() {
           throw new Error('Không thể tải phương thức thanh toán. Vui lòng thử lại.');
         }
         setMethodState({ loading: false, methods: response.data, error: null });
+        setProvider(
+          current =>
+            response.data.find(method => method.provider === current && method.available)?.provider ??
+            response.data.find(method => method.provider === 'VNPAY' && method.available)?.provider ??
+            response.data.find(method => method.available)?.provider ??
+            '',
+        );
       })
       .catch(fetchError => {
         if (active) {
@@ -107,7 +115,7 @@ export default function PaymentCheckoutPage() {
 
   if (!validCourseId) {
     return (
-      <section className="payment-page payment-checkout-page">
+      <section className="workspace-scope payment-page payment-checkout-page">
         <div className="container checkout-state-panel">
           <ErrorState error={unavailableCourseError()} title="Chưa chọn khóa học" />
           <Link className="button button-primary" to={ROUTES.COURSES}>
@@ -121,9 +129,17 @@ export default function PaymentCheckoutPage() {
   const loading = courseState.courseId !== courseId;
   if (loading) {
     return (
-      <section className="payment-page payment-checkout-page">
+      <section className="workspace-scope payment-page payment-checkout-page">
         <div className="container checkout-state-panel">
-          <AppLoading label="Đang tải thông tin khóa học..." />
+          <div
+            className="payment-panel workspace-skeleton"
+            role="status"
+            aria-label="Đang tải thông tin khóa học"
+          >
+            <Skeleton variant="rounded" height={240} />
+            <Skeleton height={48} />
+            <Skeleton width="70%" height={32} />
+          </div>
         </div>
       </section>
     );
@@ -131,7 +147,7 @@ export default function PaymentCheckoutPage() {
 
   if (courseState.error || !courseState.course) {
     return (
-      <section className="payment-page payment-checkout-page">
+      <section className="workspace-scope payment-page payment-checkout-page">
         <div className="container checkout-state-panel">
           <ErrorState
             error={courseState.error}
@@ -178,13 +194,30 @@ export default function PaymentCheckoutPage() {
   };
 
   return (
-    <section className="payment-page payment-checkout-page">
+    <section className="workspace-scope payment-page payment-checkout-page">
       <div className="container">
-        <div className="payment-page-heading">
-          <span className="eyebrow">CHECKOUT</span>
-          <h1>Thanh toán khóa học</h1>
-          <p>Kiểm tra thông tin khóa học và chọn phương thức thanh toán.</p>
+        <div className="checkout-heading-row">
+          <div className="payment-page-heading">
+            <span className="workspace-kicker">Sẵn sàng cho bài học tiếp theo</span>
+            <h1>Thanh toán khóa học</h1>
+            <p>Kiểm tra thông tin khóa học và chọn phương thức thanh toán.</p>
+          </div>
+          <Link className="button button-outline checkout-back" to={`${ROUTES.COURSES}/${course.id}`}>
+            <span aria-hidden="true">←</span> Quay lại khóa học
+          </Link>
         </div>
+
+        <ol className="checkout-steps" aria-label="Các bước thanh toán">
+          <li className="is-current" aria-current="step">
+            <span>1</span> Kiểm tra đơn hàng
+          </li>
+          <li>
+            <span>2</span> Thanh toán qua VNPay
+          </li>
+          <li>
+            <span>3</span> Bắt đầu học
+          </li>
+        </ol>
 
         <div className="checkout-grid">
           <article className="payment-panel checkout-course-panel">
@@ -268,30 +301,45 @@ export default function PaymentCheckoutPage() {
 
             <div className="payment-method-list" role="radiogroup" aria-label="Phương thức thanh toán">
               {methodState.loading && <AppLoading label="Đang tải phương thức thanh toán..." />}
-              {methodState.methods.map(method => (
-                <label
-                  key={method.provider}
-                  className={`payment-method${provider === method.provider ? ' selected' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="provider"
-                    value={method.provider}
-                    checked={provider === method.provider}
-                    disabled={!method.available || submitting}
-                    onChange={() => {
-                      idempotencyKey.current = crypto.randomUUID();
-                      setProvider(method.provider);
-                      setError(null);
-                    }}
-                  />
-                  <span>
-                    <b>{method.label}</b>
-                    <small>{method.description}</small>
-                  </span>
-                </label>
-              ))}
+              {methodState.methods
+                .filter(method => method.provider !== 'MOCK' || method.available)
+                .map(method => (
+                  <label
+                    key={method.provider}
+                    className={`payment-method${provider === method.provider ? ' selected' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="provider"
+                      value={method.provider}
+                      checked={provider === method.provider}
+                      disabled={!method.available || submitting}
+                      onChange={() => {
+                        idempotencyKey.current = crypto.randomUUID();
+                        setProvider(method.provider);
+                        setError(null);
+                      }}
+                    />
+                    <span>
+                      <b>{method.label}</b>
+                      <small>{method.description}</small>
+                    </span>
+                    {method.provider === 'VNPAY' && (
+                      <span className="payment-provider-mark" aria-hidden="true">
+                        VN<span>Pay</span>
+                      </span>
+                    )}
+                  </label>
+                ))}
             </div>
+
+            {!methodState.loading &&
+              !methodState.error &&
+              !methodState.methods.some(method => method.available) && (
+                <p className="checkout-error" role="status">
+                  Hiện chưa có phương thức thanh toán khả dụng. Vui lòng thử lại sau.
+                </p>
+              )}
 
             {methodState.error && (
               <ErrorState
@@ -318,7 +366,7 @@ export default function PaymentCheckoutPage() {
             <Link className="button button-outline checkout-secondary" to={ROUTES.PAYMENT_HISTORY}>
               Xem lịch sử thanh toán
             </Link>
-            <Link className="button button-outline checkout-secondary" to={ROUTES.COURSES}>
+            <Link className="checkout-other-link" to={ROUTES.COURSES}>
               Chọn khóa học khác
             </Link>
 

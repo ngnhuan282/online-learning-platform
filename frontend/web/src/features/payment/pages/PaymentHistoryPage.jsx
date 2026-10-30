@@ -109,11 +109,11 @@ export default function PaymentHistoryPage() {
   const hasFilters = Boolean(searchQuery || statusFilter);
 
   return (
-    <section className="payment-page payment-history-page">
+    <section className="workspace-scope payment-page payment-history-page">
       <div className="container">
         <div className="payment-page-heading admin-heading">
           <div>
-            <span className="eyebrow">PAYMENT HISTORY</span>
+            <span className="workspace-kicker">Giao dịch của bạn</span>
             <h1>Lịch sử thanh toán</h1>
             <p>Theo dõi các giao dịch thanh toán khóa học của bạn.</p>
           </div>
@@ -129,6 +129,7 @@ export default function PaymentHistoryPage() {
               value={keyword}
               onChange={event => setKeyword(event.target.value)}
               placeholder="Tìm theo mã đơn hoặc khóa học..."
+              aria-label="Tìm theo mã đơn hoặc khóa học"
             />
             <button className="button button-primary" type="submit">
               <Icon name="search" size={15} /> Tìm kiếm
@@ -157,6 +158,13 @@ export default function PaymentHistoryPage() {
         </div>
 
         <article className="payment-panel transaction-panel">
+          <div className="payment-table-heading">
+            <div>
+              <h2>Tất cả giao dịch</h2>
+              <p>{hasFilters ? 'Kết quả theo bộ lọc hiện tại' : 'Lịch sử mua khóa học của bạn'}</p>
+            </div>
+            {!loading && !error && <span className="payment-count-badge">{totalElements} giao dịch</span>}
+          </div>
           {loading ? (
             <AppLoading label="Đang tải lịch sử thanh toán..." />
           ) : error ? (

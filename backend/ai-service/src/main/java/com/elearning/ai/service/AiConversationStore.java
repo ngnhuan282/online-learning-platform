@@ -130,8 +130,8 @@ public class AiConversationStore {
         var conversation = locked(userId, id);
         if (!leaseId.equals(conversation.getActiveRequestId())) throw new AppException(ErrorCode.CONFLICT);
         var saved = List.of(
-            saveMessage(id, requestId, "USER", question),
-            saveMessage(id, requestId, "AI", reply.content())
+            saveMessage(id, requestId, "USER", question, false),
+            saveMessage(id, requestId, "AI", reply.content(), reply.truncated())
         );
         conversation.setActiveRequestId(null);
         conversation.setActiveUntil(null);
@@ -139,7 +139,14 @@ public class AiConversationStore {
         if (DEFAULT_TITLE.equals(conversation.getTitle())) {
             conversation.setTitle(question.substring(0, Math.min(100, question.length())));
         }
-        usage(userId, id, model, "SUCCESS", reply.inputTokens(), reply.outputTokens());
+        usage(
+            userId,
+            id,
+            model,
+            reply.truncated() ? "TRUNCATED" : "SUCCESS",
+            reply.inputTokens(),
+            reply.outputTokens()
+        );
         return saved;
     }
 
@@ -159,12 +166,19 @@ public class AiConversationStore {
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
-    private MessageResponse saveMessage(Long id, String requestId, String sender, String content) {
+    private MessageResponse saveMessage(
+        Long id,
+        String requestId,
+        String sender,
+        String content,
+        boolean truncated
+    ) {
         var message = new AiMessage();
         message.setConversationId(id);
         message.setRequestId(requestId);
         message.setSender(sender);
         message.setContent(content);
+        message.setTruncated(truncated);
         message.setCreatedAt(Instant.now());
         return MessageResponse.from(messages.save(message));
     }

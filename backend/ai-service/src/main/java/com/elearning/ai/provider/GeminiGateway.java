@@ -116,7 +116,8 @@ public class GeminiGateway {
             return new Reply(
                 text,
                 Math.max(0, usage.path("promptTokenCount").asInt(0)),
-                Math.max(0, usage.path("candidatesTokenCount").asInt(0))
+                Math.max(0, usage.path("candidatesTokenCount").asInt(0)),
+                "MAX_TOKENS".equals(reason)
             );
         } catch (ResourceAccessException exception) {
             for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
@@ -133,5 +134,9 @@ public class GeminiGateway {
         }
     }
 
-    public record Reply(String content, int inputTokens, int outputTokens) {}
+    public record Reply(String content, int inputTokens, int outputTokens, boolean truncated) {
+        public Reply(String content, int inputTokens, int outputTokens) {
+            this(content, inputTokens, outputTokens, false);
+        }
+    }
 }

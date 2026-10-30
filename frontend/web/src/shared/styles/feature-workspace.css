@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
+/* Scoped to Payment, AI and the dashboard content. The shared app shell keeps its theme. */
+.workspace-scope {
+  --workspace-ink: #18243a;
+  --workspace-muted: #65738a;
+  --workspace-line: #e4e9f0;
+  --workspace-surface: #f7f9fc;
+  --workspace-curve: cubic-bezier(0.22, 1, 0.36, 1);
+  color: var(--workspace-ink);
+  font-family: 'Manrope', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.workspace-scope
+  :is(
+    h1,
+    h2,
+    h3,
+    h4,
+    button,
+    input,
+    textarea,
+    select,
+    .MuiTypography-root,
+    .MuiButtonBase-root,
+    .MuiInputBase-root,
+    .MuiFormLabel-root,
+    .MuiChip-root,
+    .MuiAlert-root
+  ) {
+  font-family: inherit;
+}
+
+.workspace-scope :is(h1, h2, h3, h4) {
+  color: var(--workspace-ink);
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.workspace-scope p {
+  text-wrap: pretty;
+}
+
+.workspace-scope .MuiButton-root {
+  border-radius: 8px;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  padding: 8px 12px;
+}
+
+.workspace-scope .MuiOutlinedInput-root {
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.workspace-scope .MuiOutlinedInput-notchedOutline {
+  border-color: #d7dfe9;
+}
+
+.workspace-scope .MuiAlert-root {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.workspace-scope
+  :is(
+    a,
+    button,
+    input:not(.MuiInputBase-input),
+    textarea:not(.MuiInputBase-input),
+    select:not(.MuiInputBase-input)
+  ):focus-visible {
+  outline: 3px solid #93b8ff;
+  outline-offset: 4px;
+}
+
+.workspace-scope .workspace-kicker {
+  display: block;
+  margin-bottom: 8px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-scope .workspace-skeleton {
+  padding: 24px;
+}
+
+.workspace-scope .workspace-skeleton .MuiSkeleton-root {
+  border-radius: 8px;
+  background-color: #edf1f6;
+}
+
+.workspace-scope .workspace-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #52637a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workspace-scope .workspace-text-link:hover {
+  color: #2563eb;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-scope *,
+  .workspace-scope *::before,
+  .workspace-scope *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

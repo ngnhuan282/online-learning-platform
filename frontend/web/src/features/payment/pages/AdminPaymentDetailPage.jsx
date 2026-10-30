@@ -16,6 +16,7 @@ import ConfirmDialog from '../../../shared/components/ConfirmDialog';
 import useToast from '../../../shared/hooks/useToast';
 import { paymentApi } from '../api/paymentApi';
 import { getPaymentDisplayStatus } from '../utils/paymentFlow';
+import '../styles/payment-admin.css';
 
 const paymentStatuses = {
   EXPIRED: 'Hết hạn thanh toán',
@@ -126,6 +127,7 @@ export default function AdminPaymentDetailPage() {
 
   const order = state.data?.order;
   const payment = order?.payment;
+  const isVnpay = payment?.provider === 'VNPAY';
   const transactions = state.data?.transactions || [];
   const availableStatuses = state.data?.availableStatuses || [];
   const selectedStatus = availableStatuses.includes(form.status) ? form.status : availableStatuses[0] || '';
@@ -171,7 +173,8 @@ export default function AdminPaymentDetailPage() {
   }
 
   return (
-    <>
+    <div className="workspace-scope admin-payment-workspace admin-payment-detail-workspace">
+      <span className="workspace-kicker">Chi tiết thanh toán</span>
       <PageHeading
         title="Chi tiết giao dịch thanh toán"
         description={orderCode ? `Theo dõi toàn bộ thông tin xử lý của giao dịch ${orderCode}.` : ''}
@@ -210,7 +213,9 @@ export default function AdminPaymentDetailPage() {
             />
           </div>
 
-          <div className="admin-payment-detail-grid">
+          <div
+            className={`admin-payment-detail-grid${isVnpay ? ' admin-payment-detail-grid--readonly' : ''}`}
+          >
             <section className="admin-card">
               <div className="admin-card-heading">
                 <div>
@@ -254,61 +259,57 @@ export default function AdminPaymentDetailPage() {
               </dl>
             </section>
 
-            <section className="admin-card">
-              <div className="admin-card-heading">
-                <div>
-                  <h2>Cập nhật trạng thái</h2>
-                  <p>Chọn trạng thái tiếp theo phù hợp với giao dịch này.</p>
+            {!isVnpay && (
+              <section className="admin-card">
+                <div className="admin-card-heading">
+                  <div>
+                    <h2>Cập nhật trạng thái</h2>
+                    <p>Chọn trạng thái tiếp theo phù hợp với giao dịch này.</p>
+                  </div>
                 </div>
-              </div>
-              {!isAdmin ? (
-                <Alert severity="info">
-                  Bạn có thể xem giao dịch. Chỉ tài khoản ADMIN mới được cập nhật trạng thái thanh toán.
-                </Alert>
-              ) : payment?.provider === 'VNPAY' ? (
-                <Alert severity="info">
-                  {getPaymentDisplayStatus(order) === 'EXPIRED'
-                    ? 'Đơn này đã hết hạn thanh toán. Nếu học viên đã thanh toán đúng hạn, kết quả vẫn được cập nhật khi VNPay gửi xác nhận. Không đổi trạng thái thủ công tại đây.'
-                    : 'Trạng thái giao dịch được cập nhật theo xác nhận từ VNPay. Không thể đổi trạng thái hoặc hoàn tiền thủ công tại đây.'}
-                </Alert>
-              ) : availableStatuses.length === 0 ? (
-                <Alert severity="success">Giao dịch này đã hoàn tất xử lý.</Alert>
-              ) : (
-                <form className="admin-status-form" onSubmit={submitStatusUpdate}>
-                  <LoadState error={mutationError} />
-                  <TextField
-                    select
-                    required
-                    label="Trạng thái mới"
-                    value={selectedStatus}
-                    onChange={event => setForm(current => ({ ...current, status: event.target.value }))}
-                  >
-                    {availableStatuses.map(status => (
-                      <MenuItem key={status} value={status}>
-                        {paymentStatuses[status] || status}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  {needsFailureReason && (
+                {!isAdmin ? (
+                  <Alert severity="info">
+                    Bạn có thể xem giao dịch. Chỉ tài khoản ADMIN mới được cập nhật trạng thái thanh toán.
+                  </Alert>
+                ) : availableStatuses.length === 0 ? (
+                  <Alert severity="success">Giao dịch này đã hoàn tất xử lý.</Alert>
+                ) : (
+                  <form className="admin-status-form" onSubmit={submitStatusUpdate}>
+                    <LoadState error={mutationError} />
                     <TextField
-                      multiline
-                      minRows={3}
-                      label="Lý do thất bại/hủy"
-                      value={form.note}
-                      onChange={event => setForm(current => ({ ...current, note: event.target.value }))}
-                      placeholder="Ví dụ: học viên hủy giao dịch hoặc thanh toán không thành công..."
-                    />
-                  )}
-                  <Button variant="contained" type="submit" startIcon={<SaveOutlined />} disabled={busy}>
-                    {busy
-                      ? 'Đang cập nhật...'
-                      : needsRefundConfirmation
-                        ? 'Tiếp tục hoàn tiền'
-                        : 'Cập nhật trạng thái'}
-                  </Button>
-                </form>
-              )}
-            </section>
+                      select
+                      required
+                      label="Trạng thái mới"
+                      value={selectedStatus}
+                      onChange={event => setForm(current => ({ ...current, status: event.target.value }))}
+                    >
+                      {availableStatuses.map(status => (
+                        <MenuItem key={status} value={status}>
+                          {paymentStatuses[status] || status}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    {needsFailureReason && (
+                      <TextField
+                        multiline
+                        minRows={3}
+                        label="Lý do thất bại/hủy"
+                        value={form.note}
+                        onChange={event => setForm(current => ({ ...current, note: event.target.value }))}
+                        placeholder="Ví dụ: học viên hủy giao dịch hoặc thanh toán không thành công..."
+                      />
+                    )}
+                    <Button variant="contained" type="submit" startIcon={<SaveOutlined />} disabled={busy}>
+                      {busy
+                        ? 'Đang cập nhật...'
+                        : needsRefundConfirmation
+                          ? 'Tiếp tục hoàn tiền'
+                          : 'Cập nhật trạng thái'}
+                    </Button>
+                  </form>
+                )}
+              </section>
+            )}
           </div>
 
           <section className="admin-card">
@@ -391,6 +392,6 @@ export default function AdminPaymentDetailPage() {
         onClose={() => setStatusConfirmOpen(false)}
         onConfirm={updateStatus}
       />
-    </>
+    </div>
   );
 }

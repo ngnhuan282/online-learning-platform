@@ -27,6 +27,9 @@ public class AiMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(nullable = false)
+    private boolean truncated;
+
     @Column(nullable = false, length = 64)
     private String requestId;
 
