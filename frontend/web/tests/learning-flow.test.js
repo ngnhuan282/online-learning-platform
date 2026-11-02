@@ -26,9 +26,11 @@ const { default: QuizResultPage } = await load('features/learning/pages/QuizResu
 const { default: PaymentResultPage } = await load('features/payment/pages/PaymentResultPage.jsx');
 const { learningApi } = await load('features/learning/api/learningApi.js');
 const { paymentApi } = await load('features/payment/api/paymentApi.js');
+const { lessonApi } = await load('features/courses/api/lessonApi.js');
 const { ToastContext } = await load('shared/context/ToastContext.jsx');
 const { NotificationsContext } = await load('features/learning/context/NotificationsContext.jsx');
-const originals = [learningApi, paymentApi].map(api => [api, { ...api }]);
+const { clearTokens } = await load('shared/utils/tokenUtils.js');
+const originals = [learningApi, paymentApi, lessonApi].map(api => [api, { ...api }]);
 const cache = createCache({ key: 'learning-flow-test' });
 let root;
 let navigate;
@@ -212,9 +214,7 @@ test('focus refresh keeps server completion after an earlier local lesson access
   learningApi.getLearningCourse = async () => ({
     data: {
       ...course(),
-      progress: completedElsewhere
-        ? [{ lessonId: 42101, status: 'COMPLETED', progressPercent: 100 }]
-        : [],
+      progress: completedElsewhere ? [{ lessonId: 42101, status: 'COMPLETED', progressPercent: 100 }] : [],
     },
   });
   learningApi.getCourseQuizzes = async () => ({ data: [] });
@@ -294,4 +294,113 @@ test('quiz result failure remains visible after removing demo fallbacks', async 
   await render('/quizzes/attempts/100/result');
   assert.match(document.body.textContent, /Không thể tải kết quả quiz/);
   assert.ok(button('Thử lại'));
+});
+
+test('video failure stays visible and retry obtains a new authorized curriculum instead of demo media', async () => {
+  let loads = 0;
+  learningApi.getLearningCourse = async () => {
+    const snapshot = course();
+    snapshot.sections[0].lessons[0] = {
+      ...snapshot.sections[0].lessons[0],
+      lessonType: 'VIDEO',
+      videoUrl: '/api/v1/media/download/private.mp4?ticket=' + ++loads,
+    };
+    return { data: snapshot };
+  };
+  learningApi.getCourseQuizzes = async () => ({ data: [] });
+  await render('/learning/42');
+  const original = document.querySelector('video').src;
+  await act(async () => document.querySelector('video').dispatchEvent(new dom.window.Event('error')));
+  assert.match(document.body.textContent, /Không thể phát bài học/);
+  assert.equal(document.querySelector('video').src, original);
+  assert.doesNotMatch(document.querySelector('video').src, /BigBuckBunny|googleapis/);
+  await act(async () => button('Thử lại').click());
+  assert.equal(loads, 2);
+  assert.notEqual(document.querySelector('video').src, original);
+});
+
+test('ending the session discards a pending lesson response and hides the previous learner content', async () => {
+  let finish;
+  let allowed = true;
+  learningApi.getLearningCourse = async () => {
+    if (!allowed) throw Object.assign(new Error('Enrollment is required'), { status: 403 });
+    return { data: course() };
+  };
+  learningApi.getCourseQuizzes = async () => ({ data: [] });
+  learningApi.markLessonComplete = () =>
+    new Promise(resolve => {
+      finish = resolve;
+    });
+  await render('/learning/42');
+  await act(async () => button('Đánh dấu hoàn thành').click());
+  await act(async () => {
+    allowed = false;
+    clearTokens();
+  });
+  await act(async () => finish({ data: { lessonId: 42101, status: 'COMPLETED', progressPercent: 100 } }));
+  assert.match(document.body.textContent, /Bạn chưa có quyền học khóa này/);
+  assert.equal(document.querySelector('.lesson-stage'), null);
+  assert.doesNotMatch(document.body.textContent, /Nội dung thật/);
+});
+
+test('ending the session prevents a previous My Courses request from restoring old enrollments', async () => {
+  let finish;
+  learningApi.getMyEnrollments = () =>
+    new Promise(resolve => {
+      finish = resolve;
+    });
+  await render('/my-courses');
+  await act(async () => {
+    learningApi.getMyEnrollments = async () => ({ data: [] });
+    clearTokens();
+  });
+  await act(async () => finish({ data: [{ id: 1, courseId: 42, status: 'ACTIVE' }] }));
+  assert.equal(document.querySelectorAll('.my-course-card').length, 0);
+  assert.match(document.body.textContent, /Bạn chưa ghi danh khóa học nào/);
+});
+
+test('video object keys are resolved through the existing Course playback API', async () => {
+  const snapshot = course();
+  snapshot.sections[0].lessons[0] = {
+    ...snapshot.sections[0].lessons[0],
+    lessonType: 'VIDEO',
+    videoUrl: 'videos/private-lesson.mp4',
+  };
+  const calls = [];
+  learningApi.getLearningCourse = async () => ({ data: snapshot });
+  learningApi.getCourseQuizzes = async () => ({ data: [] });
+  lessonApi.getPlayUrl = async (courseId, lessonId) => {
+    calls.push([courseId, lessonId]);
+    return {
+      data: {
+        lessonId,
+        lessonType: 'VIDEO',
+        playUrl: 'https://media.example.test/private-lesson.mp4?signature=test',
+      },
+    };
+  };
+  await render('/learning/42');
+  assert.deepEqual(calls, [['42', 42101]]);
+  assert.equal(
+    document.querySelector('video').src,
+    'https://media.example.test/private-lesson.mp4?signature=test',
+  );
+});
+
+test('document lessons expose their authorized download URL through the Gateway', async () => {
+  const snapshot = course();
+  snapshot.sections[0].lessons[0] = {
+    ...snapshot.sections[0].lessons[0],
+    lessonType: 'DOCUMENT',
+    videoUrl: '/api/v1/media/download/documents/lesson.pdf?ticket=test',
+  };
+  learningApi.getLearningCourse = async () => ({ data: snapshot });
+  learningApi.getCourseQuizzes = async () => ({ data: [] });
+  await render('/learning/42');
+  const link = [...document.querySelectorAll('.lesson-stage a')].find(item =>
+    item.textContent.includes('Mở tài liệu bài học'),
+  );
+  assert.ok(link);
+  assert.equal(link.href, 'http://gateway.test/api/v1/media/download/documents/lesson.pdf?ticket=test');
+  assert.equal(link.target, '_blank');
 });

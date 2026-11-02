@@ -34,6 +34,15 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         @Param("unreadOnly") boolean unreadOnly, Pageable pageable
     );
 
+    @Query("""
+        select n from Notification n where (:userId is null or n.userId = :userId)
+        and n.type in :types and (:unreadOnly = false or n.readAt is null)
+        """)
+    Page<Notification> findAdminFeed(
+        @Param("userId") Long userId, @Param("types") List<NotificationType> types,
+        @Param("unreadOnly") boolean unreadOnly, Pageable pageable
+    );
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Notification n set n.readAt = :now where n.userId = :userId and n.readAt is null")
     int markAllRead(@Param("userId") Long userId, @Param("now") Instant now);

@@ -161,6 +161,35 @@ class LearningFlowIntegrationTests {
     }
 
     @Test
+    void enrollmentCheckRequiresTheSameJwtOwnerAndIgnoresForgedIdentityHeaders() throws Exception {
+        long owner = USERS.incrementAndGet();
+        long stranger = USERS.incrementAndGet();
+        String ownerCheck = BASE + "/enrollments/check?userId=" + owner + "&courseId=801";
+        String strangerCheck = BASE + "/enrollments/check?userId=" + stranger + "&courseId=801";
+        assertThat(send("GET", ownerCheck, null, null, null, null).statusCode()).isEqualTo(401);
+        assertThat(send("GET", ownerCheck, null, null, "X-User-Id", Long.toString(owner)).statusCode())
+            .isEqualTo(401);
+        var unenrolled = data(send("GET", ownerCheck, token(owner, "USER"), null, null, null));
+        assertThat(unenrolled.get("enrolled").asBoolean()).isFalse();
+        assertThat(unenrolled.get("userId").asLong()).isEqualTo(owner);
+        assertThat(unenrolled.get("courseId").asLong()).isEqualTo(801);
+        assertThat(unenrolled.get("status").isNull()).isTrue();
+
+        data(api("POST", "/enrollments", owner, "{\"courseId\":801}"));
+        // Course forwards the caller's JWT with these existing query parameters.
+        var enrolled = data(send("GET", ownerCheck, token(owner, "USER"), null,
+            "X-Request-ID", "course-enrollment-check-c11"));
+        assertThat(enrolled.get("enrolled").asBoolean()).isTrue();
+        assertThat(enrolled.get("status").asString()).isEqualTo("ACTIVE");
+        assertThat(send("GET", ownerCheck, token(stranger, "USER"), null,
+            "X-User-Id", Long.toString(owner)).statusCode()).isEqualTo(403);
+        assertThat(send("GET", strangerCheck, token(owner, "USER"), null,
+            "X-User-Id", Long.toString(stranger)).statusCode()).isEqualTo(403);
+        assertThat(send("GET", ownerCheck, token(stranger, "ADMIN"), null, null, null).statusCode())
+            .isEqualTo(403);
+    }
+
+    @Test
     void coreFlowUsesActualCurriculumCompletesEnrollmentAndGradesQuiz() throws Exception {
         long user = USERS.incrementAndGet();
         assertThat(api("GET", "/courses/801", user, null).statusCode()).isEqualTo(403);
@@ -395,6 +424,53 @@ class LearningFlowIntegrationTests {
                 INTERNAL_TOKEN
             ).statusCode()
         ).isEqualTo(400);
+    }
+
+    @Test
+    void cancelledFreeAndPaidEnrollmentsCannotRestoreOrUseLearningAccess() throws Exception {
+        long user = USERS.incrementAndGet();
+        data(api("POST", "/enrollments", user, "{\"courseId\":801}"));
+        String order = "CANCELLED-" + user;
+        data(paid(order, user, 802));
+        transaction.executeWithoutResult(status -> {
+            for (long course : new long[] {801, 802}) {
+                var enrollment = enrollments.findByUserIdAndCourseId(user, course).orElseThrow();
+                enrollment.setStatus(EnrollmentStatus.CANCELLED);
+                enrollments.save(enrollment);
+            }
+        });
+        assertThat(api("POST", "/enrollments", user, "{\"courseId\":801}").statusCode()).isEqualTo(409);
+        assertThat(paid(order, user, 802).statusCode()).isEqualTo(409);
+        assertThat(paid("NEW-" + order, user, 802).statusCode()).isEqualTo(409);
+        for (long course : new long[] {801, 802}) {
+            long lesson = course == 801 ? 8101 : 8201;
+            assertThat(api("GET", "/courses/" + course, user, null).statusCode()).isEqualTo(403);
+            assertThat(api("GET", "/progress/courses/" + course, user, null).statusCode()).isEqualTo(403);
+            assertThat(api("GET", "/courses/" + course + "/quizzes", user, null).statusCode()).isEqualTo(403);
+            assertThat(api("POST", "/progress/courses/" + course + "/lessons/" + lesson + "/access", user, null)
+                .statusCode()).isEqualTo(403);
+            assertThat(api("PATCH", "/progress/courses/" + course + "/lessons/" + lesson + "/complete", user, null)
+                .statusCode()).isEqualTo(403);
+        }
+        assertThat(notifications.countByUserIdAndReadAtIsNull(user)).isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM payment_enrollment_receipts WHERE order_code = ?", Long.class, "NEW-" + order
+        )).isZero();
+    }
+
+    @Test
+    void everyExternalPaymentStatusIsNotificationOnlyAndCannotEnrollTheRecipient() throws Exception {
+        for (String type : List.of("PAYMENT_SUCCESS", "PAYMENT_FAILED", "PAYMENT_CANCELLED", "PAYMENT_REFUNDED")) {
+            long user = USERS.incrementAndGet();
+            String body = """
+                {"eventId":"C11-%d","userId":%d,"type":"%s","orderCode":"C11-ORDER-%d"}
+                """.formatted(user, user, type, user);
+            data(send("POST", "/internal/v1/notifications/events", null, body, "X-Notification-Key", EVENT_KEY));
+            data(send("POST", "/internal/v1/notifications/events", null, body, "X-Notification-Key", EVENT_KEY));
+            assertThat(enrollments.findByUserIdAndCourseId(user, 802L)).isEmpty();
+            assertThat(api("GET", "/courses/802", user, null).statusCode()).isEqualTo(403);
+            assertThat(notifications.countByUserIdAndReadAtIsNull(user)).isEqualTo(1);
+        }
     }
 
     private static HttpServer courseServer() {

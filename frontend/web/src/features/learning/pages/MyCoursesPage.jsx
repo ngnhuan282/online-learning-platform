@@ -16,16 +16,17 @@ export default function MyCoursesPage() {
     EMPTY_ENROLLMENTS,
     notifications.revision,
   );
-  const [details, setDetails] = useState({});
+  const [details, setDetails] = useState({ enrollments: null, values: {} });
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
     Promise.allSettled(
       data.map(enrollment =>
         enrollment.status === 'CANCELLED'
           ? Promise.resolve(null)
-          : learningApi.getLearningCourse(enrollment.courseId),
+          : learningApi.getLearningCourse(enrollment.courseId, { signal: controller.signal }),
       ),
     ).then(results => {
       if (!active) return;
@@ -33,16 +34,15 @@ export default function MyCoursesPage() {
       const next = {};
       results.forEach((result, index) => {
         next[data[index].courseId] =
-          result.status === 'fulfilled'
-            ? { course: result.value?.data }
-            : { error: result.reason };
+          result.status === 'fulfilled' ? { course: result.value?.data } : { error: result.reason };
       });
 
-      setDetails(next);
+      setDetails({ enrollments: data, values: next });
     });
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, [data]);
 
@@ -61,9 +61,7 @@ export default function MyCoursesPage() {
 
         {loading && <AppLoading label="Đang tải khóa học đã ghi danh..." />}
 
-        {error && (
-          <ErrorState error={error} title="Không thể tải khóa học của tôi" onRetry={reload} />
-        )}
+        {error && <ErrorState error={error} title="Không thể tải khóa học của tôi" onRetry={reload} />}
 
         {!loading && !error && data.length === 0 && (
           <p>
@@ -73,7 +71,7 @@ export default function MyCoursesPage() {
 
         <div className="my-course-grid" aria-busy={loading}>
           {data.map(enrollment => {
-            const detail = details[enrollment.courseId];
+            const detail = details.enrollments === data ? details.values[enrollment.courseId] : null;
             const title = detail?.course?.title || enrollment.course?.title;
             const description = detail?.course?.description || enrollment.course?.description;
 
@@ -106,13 +104,9 @@ export default function MyCoursesPage() {
                 )}
 
                 <div className="my-course-meta">
-                  <span>
-                    Ghi danh: {new Date(enrollment.enrolledAt).toLocaleDateString('vi-VN')}
-                  </span>
+                  <span>Ghi danh: {new Date(enrollment.enrolledAt).toLocaleDateString('vi-VN')}</span>
                   {enrollment.lastAccessedAt && (
-                    <span>
-                      Truy cập: {new Date(enrollment.lastAccessedAt).toLocaleDateString('vi-VN')}
-                    </span>
+                    <span>Truy cập: {new Date(enrollment.lastAccessedAt).toLocaleDateString('vi-VN')}</span>
                   )}
                 </div>
 

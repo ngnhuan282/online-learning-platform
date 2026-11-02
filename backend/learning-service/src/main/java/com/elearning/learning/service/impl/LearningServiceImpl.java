@@ -79,6 +79,9 @@ public class LearningServiceImpl implements LearningService {
             Enrollment enrollment = enrollments
                 .findForUpdateByUserIdAndCourseId(userId, request.courseId())
                 .orElseThrow();
+            if (enrollment.getStatus() == EnrollmentStatus.CANCELLED) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
             enrollment.setLastAccessedAt(Instant.now());
             return EnrollmentResponse.from(enrollments.save(enrollment));
         }

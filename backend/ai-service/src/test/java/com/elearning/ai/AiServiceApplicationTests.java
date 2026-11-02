@@ -66,7 +66,7 @@ class AiServiceApplicationTests {
 
     String token(String role, long seconds) {
         return Jwts.builder()
-            .subject("test-user")
+            .subject("1")
             .issuer("sgedu")
             .claim("role", role)
             .claim("tokenType", "access")
@@ -110,23 +110,27 @@ class AiServiceApplicationTests {
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode capabilities = mapper.readTree(response.body()).get("data");
         assertThat(capabilities.get("available").asBoolean()).isFalse();
-        assertThat(capabilities.get("historyAvailable").asBoolean()).isFalse();
+        assertThat(capabilities.get("historyAvailable").asBoolean()).isTrue();
         assertThat(capabilities.get("maxMessageLength").asInt()).isEqualTo(4000);
         assertThat(response.body()).doesNotContain("test-ai-key-never-exposed", "apiKey", "providerUrl");
     }
 
     @Test
-    void failsClosedForConversationAndMessageSkeletons() throws Exception {
+    void historyWorksWithoutAProviderButGenerationFailsClosed() throws Exception {
         String conversations = "/api/v1/ai/conversations";
         String messages = conversations + "/1/messages";
         for (String path : List.of(conversations, messages)) {
             error(request(path, null, null), 401, "UNAUTHORIZED", path);
-            error(request(path, token("USER", 60), null), 501, "AI_NOT_AVAILABLE", path);
         }
-        error(request(conversations, token("USER", 60), "{}"), 501, "AI_NOT_AVAILABLE", conversations);
+        var created = request(conversations, token("USER", 60), "{}");
+        assertThat(created.statusCode()).isEqualTo(200);
+        long id = mapper.readTree(created.body()).path("data").path("id").asLong();
+        messages = conversations + "/" + id + "/messages";
+        assertThat(request(conversations, token("USER", 60), null).statusCode()).isEqualTo(200);
+        assertThat(request(messages, token("USER", 60), null).statusCode()).isEqualTo(200);
         error(
             request(messages, token("USER", 60), "{\"content\":\"Explain this lesson\"}"),
-            501,
+            503,
             "AI_NOT_AVAILABLE",
             messages
         );
