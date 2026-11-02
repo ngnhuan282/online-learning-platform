@@ -302,7 +302,7 @@ function LearningCoursePage({ courseId }) {
                           if (!selectedProgress || selectedProgress.status === 'NOT_STARTED')
                             openLesson(currentLesson.id);
                         }}
-                        onError={() => setMediaError({ lessonId: currentLesson.id })}
+                        onError={() => setMediaError({ lessonId: currentLesson.id, url: playData.playUrl })}
                         style={{
                           width: '100%',
                           maxHeight: 460,
@@ -435,14 +435,29 @@ function LearningCoursePage({ courseId }) {
                 </div>
               )}
               {mediaError?.lessonId === currentLesson?.id && (
-                <ErrorState
-                  error={new Error('Không thể phát video. Hãy tải lại nội dung để nhận liên kết mới.')}
-                  title="Không thể phát bài học"
-                  onRetry={() => {
-                    setMediaError(null);
-                    snapshot.reload();
-                  }}
-                />
+                <div style={{ marginTop: 16 }}>
+                  <ErrorState
+                    error={new Error('Không thể tải video từ máy chủ lưu trữ (Supabase Storage / S3). Có thể dự án Supabase đang tạm dừng hoặc tệp media chưa được tải lên.')}
+                    title="Không thể phát bài học"
+                    onRetry={() => {
+                      setMediaError(null);
+                      snapshot.reload();
+                    }}
+                  />
+                  {mediaError.url && (
+                    <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+                      <a
+                        href={resolveMediaUrl(mediaError.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="button button-soft"
+                        style={{ fontSize: 13, textDecoration: 'none' }}
+                      >
+                        🔗 Mở liên kết video trực tiếp
+                      </a>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

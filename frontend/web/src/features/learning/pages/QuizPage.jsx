@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Button, Checkbox, FormControlLabel, Radio } from '@mui/material';
 import ErrorState from '../../../shared/components/ErrorState';
+import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
 import useAuth from '../../auth/hooks/useAuth';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import { clearQuizDraft, quizDraftKey, readQuizDraft, writeQuizDraft } from '../utils/quizDraft';
 import '../styles/quiz.css';
+
+const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 function remainingSeconds(attempt, quiz) {
   if (!quiz.timeLimitMinutes) return null;
@@ -149,20 +152,51 @@ function QuizWorkspace({ quizId, userId }) {
     }
   }
 
+  const answeredCount = useMemo(() => {
+    return Object.values(answers).filter(ids => ids && ids.length > 0).length;
+  }, [answers]);
+
+  const totalQuestions = quiz?.questions?.length || 0;
+  const progressPercent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
   return (
     <section className="learning-page">
       <div className="learning-shell quiz-workspace">
-        <div className="learning-page-header">
-          <div>
-            <p>Quiz</p>
-            <h1>{quiz?.title ?? `Quiz #${quizId}`}</h1>
+        {/* Header Card */}
+        <div className="quiz-header-card">
+          <div className="quiz-header-nav">
+            <span className="quiz-tag-badge">📝 Bài kiểm tra đánh giá năng lực</span>
+            {quiz && (
+              <Link
+                className="button button-soft"
+                to={`/learning/${quiz.courseId}`}
+                style={{ fontSize: 13, textDecoration: 'none', padding: '6px 14px' }}
+              >
+                ← Quay lại khóa học
+              </Link>
+            )}
           </div>
+
+          <h1 className="quiz-header-title">{quiz?.title ?? `Quiz #${quizId}`}</h1>
+          {quiz?.description && <p className="quiz-header-desc">{quiz.description}</p>}
+
           {quiz && (
-            <Link className="button button-outline" to={`/learning/${quiz.courseId}`}>
-              Quay lại khóa học
-            </Link>
+            <div className="quiz-overview-badges quiz-overview">
+              <span className="quiz-stat-pill">
+                📋 <strong>{totalQuestions}</strong> câu hỏi
+              </span>
+              <span className="quiz-stat-pill is-pass">
+                🎯 Điểm đạt: <strong>{quiz.passingScore}%</strong>
+              </span>
+              {quiz.timeLimitMinutes && (
+                <span className="quiz-stat-pill is-timer">
+                  ⏱️ Thời gian: <strong>{quiz.timeLimitMinutes} phút</strong>
+                </span>
+              )}
+            </div>
           )}
         </div>
+
         {error && (
           <ErrorState
             error={error}
@@ -172,71 +206,131 @@ function QuizWorkspace({ quizId, userId }) {
             onRetry={!quiz ? () => setRetry(value => value + 1) : undefined}
           />
         )}
-        {loading && <p>Đang tải quiz...</p>}
+
+        {loading && <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>Đang tải bài kiểm tra...</p>}
+
         {quiz && (
           <>
-            <div className="quiz-overview">
-              {quiz.description && <p>{quiz.description}</p>}
-              <span>{quiz.questions.length} câu hỏi</span>
-              <span>Điểm đạt: {quiz.passingScore}%</span>
-              {quiz.timeLimitMinutes && <span>Thời gian: {quiz.timeLimitMinutes} phút</span>}
-            </div>
             {!attempt || remaining === 0 ? (
-              <div className="quiz-start">
-                {remaining === 0 && <Alert severity="warning">Đã hết thời gian làm bài.</Alert>}
-                <Button variant="contained" onClick={start} disabled={busy}>
+              <div className="quiz-start-hero quiz-start">
+                <span className="quiz-start-icon">🎯</span>
+                <h3>Sẵn sàng làm bài kiểm tra?</h3>
+                <p>
+                  Hãy đọc kỹ từng câu hỏi và chọn câu trả lời đúng nhất. Hệ thống sẽ lưu nháp câu trả lời của bạn trong suốt quá trình làm bài.
+                </p>
+                {remaining === 0 && (
+                  <Alert severity="warning" style={{ marginBottom: 20, textAlign: 'left' }}>
+                    Đã hết thời gian làm bài ở lượt trước. Hãy bắt đầu một lượt làm bài mới.
+                  </Alert>
+                )}
+                <Button
+                  variant="contained"
+                  onClick={start}
+                  disabled={busy}
+                  className="quiz-start-btn"
+                >
                   {remaining === 0 ? 'Làm lượt mới' : 'Bắt đầu làm bài'}
                 </Button>
               </div>
             ) : (
               <form onSubmit={submit} className="quiz-taking-form">
-                <div className="quiz-taking-toolbar">
-                  <span>
-                    Đã trả lời: {Object.values(answers).filter(ids => ids.length).length}/
-                    {quiz.questions.length}
-                  </span>
-                  {remaining != null && (
-                    <strong aria-live="polite">
-                      Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
-                    </strong>
-                  )}
+                {/* Sticky Progress & Timer Bar */}
+                <div className="quiz-taking-sticky-bar">
+                  <div className="quiz-taking-toolbar">
+                    <span className="quiz-progress-text">
+                      📊 Đã trả lời: <strong>{answeredCount}/{totalQuestions}</strong> câu ({progressPercent}%)
+                    </span>
+                    {remaining != null && (
+                      <span className="quiz-timer-clock" aria-live="polite">
+                        ⏱️ Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
+                  <ProgressBar value={progressPercent} />
                 </div>
-                {quiz.questions.map((question, index) => (
-                  <fieldset className="quiz-taking-question" key={question.id} disabled={busy}>
-                    <legend>
-                      Câu {index + 1} · {question.points} điểm
-                    </legend>
-                    <h2>{question.questionText}</h2>
-                    <p>
-                      {question.questionType === 'MULTIPLE_CHOICE'
-                        ? 'Chọn các đáp án đúng'
-                        : 'Chọn một đáp án'}
-                    </p>
-                    {question.options.map(option => (
-                      <FormControlLabel
-                        key={option.id}
-                        className="quiz-taking-option"
-                        label={option.optionText}
-                        control={
-                          question.questionType === 'MULTIPLE_CHOICE' ? (
-                            <Checkbox
-                              checked={(answers[question.id] ?? []).includes(option.id)}
-                              onChange={event => choose(question, option.id, event.target.checked)}
-                            />
-                          ) : (
-                            <Radio
-                              checked={(answers[question.id] ?? []).includes(option.id)}
-                              onChange={() => choose(question, option.id, true)}
-                            />
-                          )
-                        }
-                      />
-                    ))}
-                  </fieldset>
-                ))}
-                <Button type="submit" variant="contained" disabled={busy || remaining === 0}>
-                  {busy ? 'Đang nộp...' : 'Nộp bài'}
-                </Button>
+
+                {/* Questions List */}
+                {quiz.questions.map((question, index) => {
+                  const selectedOptions = answers[question.id] ?? [];
+                  const isAnswered = selectedOptions.length > 0;
+
+                  return (
+                    <div
+                      className="quiz-taking-question"
+                      key={question.id}
+                      style={{
+                        borderColor: isAnswered ? '#93c5fd' : '#e2e8f0',
+                      }}
+                    >
+                      <div className="quiz-question-header">
+                        <span className="quiz-question-number">Câu {index + 1}</span>
+                        <span className="quiz-question-points">{question.points} điểm</span>
+                      </div>
+
+                      <h2 className="quiz-question-title">{question.questionText}</h2>
+                      <div className="quiz-question-hint">
+                        {question.questionType === 'MULTIPLE_CHOICE'
+                          ? '☑️ Chọn các đáp án đúng (có thể chọn nhiều)'
+                          : '🔘 Chọn một đáp án đúng nhất'}
+                      </div>
+
+                      <div className="quiz-options-group">
+                        {question.options.map((option, optIdx) => {
+                          const isSelected = selectedOptions.includes(option.id);
+                          const letter = OPTION_LETTERS[optIdx % OPTION_LETTERS.length];
+
+                          return (
+                            <label
+                              key={option.id}
+                              className={`quiz-taking-option ${isSelected ? 'is-selected' : ''}`}
+                            >
+                              <div className="quiz-option-content">
+                                <span className="quiz-option-letter">{letter}</span>
+                                <span className="quiz-option-text">{option.optionText}</span>
+                              </div>
+                              <FormControlLabel
+                                style={{ margin: 0 }}
+                                label=""
+                                control={
+                                  question.questionType === 'MULTIPLE_CHOICE' ? (
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onChange={event => choose(question, option.id, event.target.checked)}
+                                      color="primary"
+                                    />
+                                  ) : (
+                                    <Radio
+                                      checked={isSelected}
+                                      onChange={() => choose(question, option.id, true)}
+                                      color="primary"
+                                    />
+                                  )
+                                }
+                              />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Bottom Submit Area */}
+                <div className="quiz-submit-box">
+                  <p className="quiz-submit-hint">
+                    {answeredCount < totalQuestions
+                      ? `⚠️ Bạn mới hoàn thành ${answeredCount}/${totalQuestions} câu hỏi. Hãy kiểm tra lại trước khi nộp.`
+                      : '🎉 Bạn đã trả lời tất cả các câu hỏi! Sẵn sàng nộp bài.'}
+                  </p>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={busy || remaining === 0}
+                    className="quiz-submit-btn"
+                  >
+                    {busy ? 'Đang nộp bài...' : '🚀 Nộp bài'}
+                  </Button>
+                </div>
               </form>
             )}
           </>
