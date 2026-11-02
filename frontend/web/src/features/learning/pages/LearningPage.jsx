@@ -338,11 +338,11 @@ function LearningCoursePage({ courseId }) {
                           <a
                             href={resolveMediaUrl(playData.playUrl || currentLesson?.videoUrl)}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="button button-primary"
                             style={{ padding: '8px 16px', fontSize: 13, textDecoration: 'none' }}
                           >
-                            ⬇️ Mở / Tải tài liệu
+                            Mở tài liệu bài học
                           </a>
                         )}
                       </div>
@@ -449,7 +449,7 @@ function LearningCoursePage({ courseId }) {
                       <a
                         href={resolveMediaUrl(mediaError.url)}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                         className="button button-soft"
                         style={{ fontSize: 13, textDecoration: 'none' }}
                       >
@@ -571,7 +571,7 @@ function LearningCoursePage({ courseId }) {
                             <a
                               href={resolveMediaUrl(res.downloadUrl)}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="button button-soft"
                               style={{ padding: '4px 12px', fontSize: 12, textDecoration: 'none' }}
                             >
@@ -712,3 +712,4 @@ export default function LearningPage() {
   const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
   return <LearningCoursePage key={courseId + ':' + session} courseId={courseId} />;
 }
+
