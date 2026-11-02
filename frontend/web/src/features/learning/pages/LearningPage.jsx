@@ -11,6 +11,8 @@ import useLearningResource from '../hooks/useLearningResource';
 import ErrorState from '../../../shared/components/ErrorState';
 import AppLoading from '../../../shared/components/AppLoading';
 import { ROUTES } from '../../../shared/constants/routes';
+import { API_PREFIX, AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import '../styles/quiz.css';
 
