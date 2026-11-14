@@ -183,8 +183,9 @@ public class LearningServiceImpl implements LearningService {
         courseCatalog.getCurriculum(courseId).requireLesson(lessonId);
         enrollment.setLastAccessedAt(Instant.now());
         LessonProgress item = progress
-            .findByUserIdAndCourseIdAndLessonId(userId, courseId, lessonId)
+            .findByUserIdAndLessonId(userId, lessonId)
             .orElseGet(() -> createLessonProgress(userId, courseId, lessonId));
+        item.setCourseId(courseId);
         if (item.getStatus() == ProgressStatus.NOT_STARTED) {
             item.setStatus(ProgressStatus.IN_PROGRESS);
         }
@@ -201,8 +202,9 @@ public class LearningServiceImpl implements LearningService {
         var curriculum = courseCatalog.getCurriculum(courseId);
         curriculum.requireLesson(lessonId);
         LessonProgress item = progress
-            .findByUserIdAndCourseIdAndLessonId(userId, courseId, lessonId)
+            .findByUserIdAndLessonId(userId, lessonId)
             .orElseGet(() -> createLessonProgress(userId, courseId, lessonId));
+        item.setCourseId(courseId);
         boolean firstCompletion = item.getStatus() != ProgressStatus.COMPLETED;
         item.setStatus(ProgressStatus.COMPLETED);
         item.setProgressPercent(100);

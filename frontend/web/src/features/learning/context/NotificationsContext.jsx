@@ -24,9 +24,8 @@ const subscribeToSession = callback => {
 export const NotificationsContext = createContext(null);
 
 export function NotificationsProvider({ children }) {
-  const { user, isLoggingOut } = useAuth();
-  const userId = !isLoggingOut ? (user?.id ?? null) : null;
-  const sessionVersion = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
+  const { user, isLoggingOut, isAuthenticated } = useAuth();
+  const userId = !isLoggingOut && isAuthenticated ? (user?.id ?? null) : null;
   const [state, setState] = useState(initialState);
   const [revision, setRevision] = useState(0);
   const reload = useRef(() => {});
@@ -80,6 +79,10 @@ export function NotificationsProvider({ children }) {
       } catch (error) {
         if (!active()) return;
         setState(previous => ({ ...previous, loading: false, error }));
+        if (error?.status === 401 || error?.response?.status === 401) {
+          dirty = false;
+          return;
+        }
       } finally {
         loading = false;
         if (dirty && active()) {
@@ -119,7 +122,10 @@ export function NotificationsProvider({ children }) {
         if (active() && error.code !== 'ERR_CANCELED') {
           setState(previous => (previous.userId === userId ? { ...previous, error } : previous));
         }
-      } finally {
+        // Do not reconnect if unauthorized (401)
+        if (error?.status === 401 || error?.response?.status === 401) {
+          return;
+        }
         scheduleReconnect();
       }
     }

@@ -15,9 +15,11 @@ import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 
 const filters = [
   { id: 'all', label: 'Tất cả' },
-  { id: 'certificates', label: 'IELTS & Chứng chỉ' },
-  { id: 'communication', label: 'Giao tiếp & IT' },
   { id: 'free', label: 'Miễn phí' },
+  { id: 'paid', label: 'Có phí' },
+  { id: 'beginner', label: 'Cơ bản (Beginner)' },
+  { id: 'intermediate', label: 'Trung cấp (Intermediate)' },
+  { id: 'advanced', label: 'Nâng cao (Advanced)' },
 ];
 
 const numericCourseId = course => {
@@ -113,21 +115,33 @@ function CourseListPage() {
       const matchesCategory =
         !category ||
         String(course.categoryId) === String(category) ||
+        course.categoryName === selectedCategoryName ||
         course.category === selectedCategoryName;
+
       const matchesQuery =
         !query ||
-        normalizeSearch(`${course.title} ${course.description} ${course.keywords}`).includes(
+        normalizeSearch(`${course.title || ''} ${course.description || ''} ${course.categoryName || ''} ${course.keywords || ''}`).includes(
           normalizeSearch(query),
         );
-      const matchesFree = filter !== 'free' || course.price === 0;
-      const matchesGroup = !['certificates', 'communication'].includes(filter) || course.group === filter;
-      return matchesCategory && matchesQuery && matchesFree && matchesGroup;
+
+      const price = Number(course.price || 0);
+      const level = String(course.level || '').toUpperCase();
+      let matchesFilter = true;
+      if (filter === 'free') matchesFilter = price === 0;
+      else if (filter === 'paid') matchesFilter = price > 0;
+      else if (filter === 'beginner') matchesFilter = level === 'BEGINNER';
+      else if (filter === 'intermediate') matchesFilter = level === 'INTERMEDIATE';
+      else if (filter === 'advanced') matchesFilter = level === 'ADVANCED';
+
+      return matchesCategory && matchesQuery && matchesFilter;
     });
 
-    if (filter === 'popular') return [...next].sort((a, b) => b.students - a.students);
-    if (filter === 'newest') return [...next].sort((a, b) => b.date.localeCompare(a.date));
+    const sort = params.get('sort') || '';
+    if (sort === 'rating_desc') return [...next].sort((a, b) => Number(b.avgRating || 0) - Number(a.avgRating || 0));
+    if (sort === 'price_asc') return [...next].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    if (sort === 'price_desc') return [...next].sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
     return next;
-  }, [categories, category, courses, filter, query]);
+  }, [categories, category, courses, filter, query, params]);
 
   function updateFilters(next) {
     const paramsObj = new URLSearchParams(params);
@@ -195,7 +209,7 @@ function CourseListPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 28px' }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 20px' }}>
         <input
           value={keyword}
           onChange={event => setKeyword(event.target.value)}
@@ -211,15 +225,41 @@ function CourseListPage() {
         <select
           value={category}
           onChange={event => updateFilters({ category: event.target.value })}
-          style={{ minWidth: 220, padding: '12px 16px', borderRadius: 10, border: '1px solid #dfe3ea' }}
+          style={{ minWidth: 200, padding: '12px 16px', borderRadius: 10, border: '1px solid #dfe3ea', background: '#fff' }}
         >
-          <option value="">Tất cả danh mục</option>
+          <option value="">Tất cả danh mục ({categories.length})</option>
           {categories.map(item => (
             <option key={item.id} value={item.id}>
               {item.name}
             </option>
           ))}
         </select>
+        <select
+          value={params.get('sort') || ''}
+          onChange={event => updateFilters({ sort: event.target.value })}
+          style={{ minWidth: 180, padding: '12px 16px', borderRadius: 10, border: '1px solid #dfe3ea', background: '#fff' }}
+        >
+          <option value="">Sắp xếp: Mặc định</option>
+          <option value="rating_desc">⭐ Đánh giá cao nhất</option>
+          <option value="price_asc">💵 Giá: Thấp đến cao</option>
+          <option value="price_desc">💵 Giá: Cao đến thấp</option>
+        </select>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <span style={{ fontSize: 13, color: '#64748b' }}>
+          Hiển thị <strong>{filteredCourses.length}</strong> khóa học phù hợp
+        </span>
+        {(Boolean(category) || Boolean(query) || (Boolean(filter) && filter !== 'all') || Boolean(params.get('sort'))) && (
+          <button
+            type="button"
+            className="button button-soft"
+            style={{ fontSize: 12, padding: '4px 10px' }}
+            onClick={() => setParams(new URLSearchParams())}
+          >
+            ✕ Xóa tất cả bộ lọc
+          </button>
+        )}
       </div>
 
       {categoryError && <ErrorState error={categoryError} title="Không thể tải danh mục" onRetry={retry} />}

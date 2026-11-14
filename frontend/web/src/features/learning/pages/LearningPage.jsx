@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useEffect, useSyncExternalStore } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
 import PlayCircleOutline from '@mui/icons-material/PlayCircleOutlineOutlined';
@@ -10,6 +10,7 @@ import LearningNotice from '../components/LearningNotice';
 import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
 import { lessonApi } from '../../courses/api/lessonApi';
+import { mediaApi } from '../../courses/api/mediaApi';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import useToast from '../../../shared/hooks/useToast';
 import useLearningResource from '../hooks/useLearningResource';
@@ -109,6 +110,34 @@ function LearningCoursePage({ courseId }) {
   function mergeProgress(progress) {
     setChanges(previous => ({ ...previous, [progress.lessonId]: progress }));
   }
+
+  const [lessonResources, setLessonResources] = useState([]);
+  const [loadingResources, setLoadingResources] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (currentLesson?.id) {
+      setLoadingResources(true);
+      mediaApi
+        .listResources(currentLesson.id)
+        .then(res => {
+          if (!active) return;
+          const data = res?.data?.data ?? res?.data ?? [];
+          setLessonResources(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          if (active) setLessonResources([]);
+        })
+        .finally(() => {
+          if (active) setLoadingResources(false);
+        });
+    } else {
+      setLessonResources([]);
+    }
+    return () => {
+      active = false;
+    };
+  }, [currentLesson?.id]);
 
   async function openLesson(lessonId) {
     if (pending.current) return;
@@ -232,46 +261,133 @@ function LearningCoursePage({ courseId }) {
                   </button>
                 </div>
               ) : playData ? (
-                playData.lessonType === 'VIDEO' ? (
-                  embedUrl ? (
-                    <iframe
-                      key={embedUrl}
-                      src={embedUrl}
-                      title={currentLesson?.title || 'Bài học'}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <video
-                      key={currentLesson.id}
-                      controls
-                      autoPlay
-                      controlsList="nodownload"
-                      src={resolveMediaUrl(playData.playUrl)}
-                      onPlay={() => {
-                        if (!selectedProgress || selectedProgress.status === 'NOT_STARTED')
-                          openLesson(currentLesson.id);
+                <div>
+                  {playData.lessonType === 'VIDEO' ? (
+                    playData.playUrl?.includes('youtube.com') || playData.playUrl?.includes('youtu.be') ? (
+                      <iframe
+                        src={playData.playUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'www.youtube.com/embed/')}
+                        title={currentLesson?.title || 'Bài học'}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ width: '100%', height: 440, border: 'none', borderRadius: 8 }}
+                      />
+                    ) : (
+                      <video
+                        controls
+                        autoPlay
+                        controlsList="nodownload"
+                        src={resolveMediaUrl(playData.playUrl)}
+                        onPlay={() => {
+                          if (!selectedProgress || selectedProgress.status === 'NOT_STARTED') openLesson(currentLesson.id);
+                        }}
+                        onError={(e) => {
+                          if (!e.currentTarget.dataset.fallbackTried) {
+                            e.currentTarget.dataset.fallbackTried = 'true';
+                            e.currentTarget.src = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+                            e.currentTarget.load();
+                            e.currentTarget.play().catch(() => {});
+                          }
+                        }}
+                        style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 8, display: 'block' }}
+                      >
+                        Trình duyệt của bạn không hỗ trợ phát video này.
+                      </video>
+                    )
+                  ) : playData.lessonType === 'DOCUMENT' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          background: '#f8fafc',
+                          padding: '14px 18px',
+                          borderRadius: 10,
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 24 }}>📄</span>
+                          <div>
+                            <strong style={{ fontSize: 15, color: '#0f172a' }}>Tài liệu bài học: {currentLesson?.title}</strong>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>Định dạng văn bản / PDF học tập</div>
+                          </div>
+                        </div>
+                        {(playData.playUrl || currentLesson?.videoUrl) && (
+                          <a
+                            href={resolveMediaUrl(playData.playUrl || currentLesson?.videoUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="button button-primary"
+                            style={{ padding: '8px 16px', fontSize: 13, textDecoration: 'none' }}
+                          >
+                            ⬇️ Mở / Tải tài liệu
+                          </a>
+                        )}
+                      </div>
+
+                      {(playData.playUrl || currentLesson?.videoUrl)?.toLowerCase().includes('.pdf') ? (
+                        <iframe
+                          src={resolveMediaUrl(playData.playUrl || currentLesson?.videoUrl)}
+                          title={currentLesson?.title || 'Tài liệu PDF'}
+                          style={{ width: '100%', height: 520, border: '1px solid #cbd5e1', borderRadius: 8 }}
+                        />
+                      ) : null}
+
+                      {currentLesson?.content && (
+                        <div style={{ background: '#f8fafc', padding: 20, borderRadius: 8, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#334155' }}>
+                          {currentLesson.content}
+                        </div>
+                      )}
+                    </div>
+                  ) : playData.lessonType === 'QUIZ' ? (
+                    <div
+                      style={{
+                        background: '#f0fdf4',
+                        padding: '40px 24px',
+                        borderRadius: 12,
+                        border: '1px solid #bbf7d0',
+                        textAlign: 'center',
                       }}
-                      onError={() => setMediaError({ lessonId: currentLesson.id })}
                     >
-                      Trình duyệt của bạn không hỗ trợ phát video này.
-                    </video>
-                  )
-                ) : (
-                  <div className="learning-document">
-                    <h3>
-                      <DescriptionOutlined fontSize="small" aria-hidden="true" />
-                      Tài liệu bài giảng
-                    </h3>
-                    {playData.lessonType === 'DOCUMENT' && isMediaUrl(playData.playUrl) && (
-                      <a href={resolveMediaUrl(playData.playUrl)} target="_blank" rel="noopener noreferrer">
-                        Mở tài liệu bài học
-                      </a>
-                    )}
-                    <div className="learning-document-content">
-                      {playData.content ||
-                        currentLesson?.content ||
-                        'Chưa có nội dung văn bản cho bài học này.'}
+                      <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>✅</span>
+                      <h3 style={{ margin: '0 0 10px', color: '#166534', fontSize: 22 }}>
+                        Bài kiểm tra: {currentLesson?.title}
+                      </h3>
+                      <p style={{ color: '#15803d', fontSize: 14, maxWidth: 500, margin: '0 auto 24px', lineHeight: 1.5 }}>
+                        Hãy thực hiện bài kiểm tra này để củng cố kiến thức và ghi nhận tiến độ khóa học của bạn.
+                      </p>
+                      {(() => {
+                        const qId = currentLesson?.content?.match(/^\d+$/)
+                          ? currentLesson.content
+                          : courseQuizzes.find(q => q.title === currentLesson?.title)?.id || currentLesson?.content;
+                        return qId ? (
+                          <Link
+                            to={`/quizzes/${qId}`}
+                            className="button button-primary"
+                            style={{
+                              padding: '12px 28px',
+                              fontSize: 16,
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                            }}
+                          >
+                            🚀 Bắt đầu làm bài Quiz ngay
+                          </Link>
+                        ) : (
+                          <p style={{ color: '#64748b', fontSize: 13 }}>Chưa liên kết bài quiz cụ thể.</p>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div style={{ background: '#f8fafc', padding: 24, borderRadius: 8, border: '1px solid #e2e8f0', minHeight: 240 }}>
+                      <h4 style={{ margin: '0 0 12px', color: '#0f172a' }}>📝 Nội dung bài học lý thuyết</h4>
+                      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: '#334155', fontSize: 15 }}>
+                        {playData.content || currentLesson?.content || 'Chưa có nội dung văn bản cho bài học này.'}
+                      </div>
                     </div>
                   </div>
                 )
@@ -344,7 +460,62 @@ function LearningCoursePage({ courseId }) {
                     <p>{currentLesson.content}</p>
                   </div>
                 )}
-              </>
+
+                {/* Attached Lesson Resources */}
+                <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #e2e8f0' }}>
+                  <h4 style={{ margin: '0 0 12px', fontSize: 15, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    📎 Tài liệu đính kèm ({lessonResources.length})
+                  </h4>
+
+                  {loadingResources ? (
+                    <p style={{ fontSize: 13, color: '#64748b' }}>Đang tải danh sách tài liệu...</p>
+                  ) : lessonResources.length === 0 ? (
+                    <p style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+                      Bài học này không có tệp đính kèm thêm.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {lessonResources.map(res => (
+                        <div
+                          key={res.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 14px',
+                            background: '#f8fafc',
+                            borderRadius: 8,
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 20 }}>
+                              {res.resourceType === 'PDF' ? '📕' : res.resourceType === 'VIDEO' ? '🎬' : '📄'}
+                            </span>
+                            <div>
+                              <strong style={{ fontSize: 14, color: '#1e293b' }}>{res.title}</strong>
+                              <div style={{ fontSize: 12, color: '#64748b' }}>
+                                {res.fileName} {res.fileSize ? `• ${(res.fileSize / 1024 / 1024).toFixed(2)} MB` : ''}
+                              </div>
+                            </div>
+                          </div>
+                          {res.downloadUrl && (
+                            <a
+                              href={resolveMediaUrl(res.downloadUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="button button-soft"
+                              style={{ padding: '4px 12px', fontSize: 12, textDecoration: 'none' }}
+                            >
+                              ⬇️ Tải tài liệu
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </article>
 
@@ -360,39 +531,66 @@ function LearningCoursePage({ courseId }) {
                 <p>Khóa học này chưa có bài giảng nào.</p>
               </div>
             )}
-            {sections.map((section, sIndex) => (
-              <section key={section.id || sIndex}>
-                <h3 className="learning-curriculum-title">
-                  Chương {sIndex + 1}: {section.title}
-                </h3>
-                {(section.lessons || []).map((item, lIndex) => {
-                  const isSelected = item.id === currentLesson?.id;
-                  const isDone = lessonStatus(progressByLesson.get(item.id)) === 'COMPLETED';
-                  const LessonIcon = item.lessonType === 'VIDEO' ? PlayCircleOutline : DescriptionOutlined;
-                  return (
-                    <button
-                      key={item.id}
-                      className={`lesson-progress-item ${isSelected ? 'is-selected' : ''}`}
-                      onClick={() => openLesson(item.id)}
-                      type="button"
-                      disabled={updatingLessonId != null}
-                      aria-current={isSelected ? 'step' : undefined}
-                      aria-label={`${lIndex + 1}. ${item.title}${isDone ? ', đã hoàn thành' : ''}`}
-                    >
-                      <LessonIcon fontSize="small" aria-hidden="true" />
-                      <div>
-                        <strong>
-                          {lIndex + 1}. {item.title}
-                        </strong>
-                        {item.duration ? <small>{Math.round(item.duration / 60)} phút</small> : null}
-                        {item.preview && <small>Học thử</small>}
-                      </div>
-                      {isDone && <CheckCircleOutline fontSize="small" aria-hidden="true" />}
-                    </button>
-                  );
-                })}
-              </section>
-            ))}
+
+            <div style={{ display: 'grid', gap: 16 }}>
+              {sections.map((section, sIndex) => (
+                <div key={section.id || sIndex} style={{ border: '1px solid #f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
+                  {/* Section Title */}
+                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
+                    Chương {sIndex + 1}: {section.title}
+                  </div>
+
+                  {/* Lessons list inside section */}
+                  <div style={{ display: 'grid', gap: 1, background: '#f1f5f9' }}>
+                    {(section.lessons || []).map((item, lIndex) => {
+                      const isSelected = item.id === currentLesson?.id;
+                      const isDone = lessonStatus(progressByLesson.get(item.id)) === 'COMPLETED';
+
+                      return (
+                        <button
+                          key={item.id}
+                          className={`lesson-progress-item ${isSelected ? 'is-selected' : ''}`}
+                          onClick={() => openLesson(item.id)}
+                          type="button"
+                          style={{
+                            background: isSelected ? '#eff6ff' : '#ffffff',
+                            borderColor: isSelected ? '#3b82f6' : 'transparent',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            padding: '12px 14px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 10,
+                            borderRadius: 0,
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                              <span style={{ fontSize: 14 }}>
+                                {item.lessonType === 'VIDEO' ? '🎬' : item.lessonType === 'DOCUMENT' ? '📄' : item.lessonType === 'QUIZ' ? '✅' : '📝'}
+                              </span>
+                              <strong style={{ fontSize: 13, color: isSelected ? '#1d4ed8' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {lIndex + 1}. {item.title}
+                              </strong>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#64748b' }}>
+                              {item.duration ? <span>{Math.round(item.duration / 60)} phút</span> : null}
+                              {item.preview ? <span style={{ color: '#16a34a', fontWeight: 600 }}>Học thử</span> : null}
+                            </div>
+                          </div>
+
+                          <span style={{ fontSize: 16 }}>
+                            {isDone ? '✅' : isSelected ? '▶️' : '⚪'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </aside>
         </div>
 

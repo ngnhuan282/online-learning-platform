@@ -22,15 +22,27 @@ export const reviewApi = {
   delete: (courseId, reviewId) =>
     axiosClient.delete(`${API_PREFIX}/courses/${courseId}/reviews/${reviewId}`),
 
-  /** Admin: danh sách tất cả review (kể cả ẩn) */
-  adminList: (courseId, params = {}) =>
-    axiosClient.get(`${API_PREFIX}/admin/courses/${courseId}/reviews`, { params }),
+  /** Admin: danh sách tất cả review toàn hệ thống hoặc theo courseId */
+  adminList: (courseId, params = {}) => {
+    if (courseId) {
+      return axiosClient.get(`${API_PREFIX}/admin/reviews`, { params: { courseId, ...params } });
+    }
+    return axiosClient.get(`${API_PREFIX}/admin/reviews`, { params });
+  },
+
+  /** Admin: danh sách tất cả review toàn hệ thống */
+  adminListAll: (params = {}) =>
+    axiosClient.get(`${API_PREFIX}/admin/reviews`, { params }),
+
+  /** Admin: cập nhật trạng thái ẩn/hiện review */
+  updateVisibility: (reviewId, hidden) =>
+    axiosClient.patch(`${API_PREFIX}/admin/reviews/${reviewId}/visibility`, { hidden }),
 
   /** Admin: ẩn review */
   hide: (courseId, reviewId) =>
-    axiosClient.put(`${API_PREFIX}/admin/courses/${courseId}/reviews/${reviewId}/hide`),
+    axiosClient.patch(`${API_PREFIX}/admin/reviews/${reviewId}/visibility`, { hidden: true }),
 
   /** Admin: bỏ ẩn review */
   show: (courseId, reviewId) =>
-    axiosClient.put(`${API_PREFIX}/admin/courses/${courseId}/reviews/${reviewId}/show`),
+    axiosClient.patch(`${API_PREFIX}/admin/reviews/${reviewId}/visibility`, { hidden: false }),
 };

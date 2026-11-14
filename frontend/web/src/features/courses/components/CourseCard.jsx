@@ -26,6 +26,12 @@ export default function CourseCard({
           loading="lazy"
           width="640"
           height="360"
+          onError={event => {
+            const fallback = course.fallbackImage || '/images/english-ielts.jpg';
+            if (event.currentTarget.src !== fallback) {
+              event.currentTarget.src = fallback;
+            }
+          }}
         />
         <span className="course-badges">
           <span>{course.tag}</span>
