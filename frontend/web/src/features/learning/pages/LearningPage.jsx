@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
 import PlayCircleOutline from '@mui/icons-material/PlayCircleOutlineOutlined';
@@ -20,6 +20,8 @@ import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import { AUTH_CHANGED_EVENT, API_PREFIX } from '../../../shared/constants/appConstants';
 import { youtubeEmbedUrl } from '../utils/lessonMedia';
 import { ROUTES } from '../../../shared/constants/routes';
+import { API_PREFIX, AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import '../styles/quiz.css';
 
@@ -280,13 +282,13 @@ function LearningCoursePage({ courseId }) {
                         onPlay={() => {
                           if (!selectedProgress || selectedProgress.status === 'NOT_STARTED') openLesson(currentLesson.id);
                         }}
-                        onError={(e) => {
-                          if (!e.currentTarget.dataset.fallbackTried) {
-                            e.currentTarget.dataset.fallbackTried = 'true';
-                            e.currentTarget.src = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-                            e.currentTarget.load();
-                            e.currentTarget.play().catch(() => {});
-                          }
+                        onError={() => setMediaError({ lessonId: currentLesson.id, url: playData.playUrl })}
+                        style={{
+                          width: '100%',
+                          maxHeight: 460,
+                          background: '#000',
+                          borderRadius: 8,
+                          display: 'block',
                         }}
                         style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 8, display: 'block' }}
                       >
@@ -317,11 +319,11 @@ function LearningCoursePage({ courseId }) {
                           <a
                             href={resolveMediaUrl(playData.playUrl || currentLesson?.videoUrl)}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="button button-primary"
                             style={{ padding: '8px 16px', fontSize: 13, textDecoration: 'none' }}
                           >
-                            ⬇️ Mở / Tải tài liệu
+                            Mở tài liệu bài học
                           </a>
                         )}
                       </div>
@@ -385,6 +387,13 @@ function LearningCoursePage({ courseId }) {
                   ) : (
                     <div style={{ background: '#f8fafc', padding: 24, borderRadius: 8, border: '1px solid #e2e8f0', minHeight: 240 }}>
                       <h4 style={{ margin: '0 0 12px', color: '#0f172a' }}>📝 Nội dung bài học lý thuyết</h4>
+                      {playData.lessonType === 'DOCUMENT' && isMediaUrl(playData.playUrl) && (
+                        <div style={{ marginBottom: 12 }}>
+                          <a href={resolveMediaUrl(playData.playUrl)} target="_blank" rel="noopener noreferrer">
+                            Mở tài liệu bài học
+                          </a>
+                        </div>
+                      )}
                       <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: '#334155', fontSize: 15 }}>
                         {playData.content || currentLesson?.content || 'Chưa có nội dung văn bản cho bài học này.'}
                       </div>
@@ -397,15 +406,30 @@ function LearningCoursePage({ courseId }) {
                   <p>Chọn một bài học từ danh sách để bắt đầu học.</p>
                 </div>
               )}
-              {mediaError && mediaError.lessonId === currentLesson?.id && (
-                <ErrorState
-                  error={new Error('Không thể phát video. Hãy tải lại nội dung để nhận liên kết mới.')}
-                  title="Không thể phát bài học"
-                  onRetry={() => {
-                    setMediaError(null);
-                    snapshot.reload();
-                  }}
-                />
+              {mediaError?.lessonId === currentLesson?.id && (
+                <div style={{ marginTop: 16 }}>
+                  <ErrorState
+                    error={new Error('Không thể tải video từ máy chủ lưu trữ (Supabase Storage / S3). Có thể dự án Supabase đang tạm dừng hoặc tệp media chưa được tải lên.')}
+                    title="Không thể phát bài học"
+                    onRetry={() => {
+                      setMediaError(null);
+                      snapshot.reload();
+                    }}
+                  />
+                  {mediaError.url && (
+                    <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+                      <a
+                        href={resolveMediaUrl(mediaError.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="button button-soft"
+                        style={{ fontSize: 13, textDecoration: 'none' }}
+                      >
+                        🔗 Mở liên kết video trực tiếp
+                      </a>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -503,7 +527,7 @@ function LearningCoursePage({ courseId }) {
                             <a
                               href={resolveMediaUrl(res.downloadUrl)}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="button button-soft"
                               style={{ padding: '4px 12px', fontSize: 12, textDecoration: 'none' }}
                             >
@@ -627,3 +651,4 @@ export default function LearningPage() {
   const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
   return <LearningCoursePage key={courseId + ':' + session} courseId={courseId} />;
 }
+

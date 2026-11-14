@@ -89,10 +89,23 @@ function ReviewsManager({ initialCourseId }) {
   const handleToggleHide = async review => {
     setActionLoading(review.id);
     try {
-      await reviewApi.updateVisibility(review.id, !review.hidden);
+      const activeCourseId = selectedCourseId || initialCourseId || review.courseId;
+      if (!review.hidden) {
+        if (typeof reviewApi.hide === 'function') {
+          await reviewApi.hide(activeCourseId, review.id);
+        } else {
+          await reviewApi.updateVisibility(review.id, true);
+        }
+      } else {
+        if (typeof reviewApi.show === 'function') {
+          await reviewApi.show(activeCourseId, review.id);
+        } else {
+          await reviewApi.updateVisibility(review.id, false);
+        }
+      }
       await loadData(pagination.page, selectedCourseId);
     } catch (err) {
-      alert(err?.response?.data?.message || 'Thao tác thất bại');
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') { window.alert(err?.response?.data?.message || 'Thao tác thất bại'); } else { console.error(err?.response?.data?.message || 'Thao tác thất bại'); }
     } finally {
       setActionLoading(null);
     }
@@ -383,3 +396,4 @@ function ReviewsManager({ initialCourseId }) {
     </section>
   );
 }
+

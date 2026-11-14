@@ -25,7 +25,8 @@ export const NotificationsContext = createContext(null);
 
 export function NotificationsProvider({ children }) {
   const { user, isLoggingOut, isAuthenticated } = useAuth();
-  const userId = !isLoggingOut && isAuthenticated ? (user?.id ?? null) : null;
+  const userId = !isLoggingOut && isAuthenticated !== false ? (user?.id ?? null) : null;
+  const sessionVersion = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
   const [state, setState] = useState(initialState);
   const [revision, setRevision] = useState(0);
   const reload = useRef(() => {});
@@ -208,3 +209,4 @@ export function NotificationsProvider({ children }) {
   );
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }
+
