@@ -9,6 +9,7 @@ import com.elearning.payment.entity.enums.PaymentStatus;
 import com.elearning.payment.learning.PaidCourseActivationService;
 import com.elearning.payment.security.AuthenticatedUser;
 import com.elearning.payment.service.PaymentAnalyticsService;
+import com.elearning.payment.service.PaymentCheckoutService;
 import com.elearning.payment.service.PaymentCoreService;
 import com.elearning.payment.vnpay.VnpayGateway;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class PaymentController {
 
     private final PaymentCoreService payments;
+    private final PaymentCheckoutService checkout;
     private final PaymentAnalyticsService analytics;
     private final AuthenticatedUser user;
     private final VnpayGateway vnpay;
@@ -40,7 +42,8 @@ public class PaymentController {
         AuthenticatedUser user,
         VnpayGateway vnpay,
         PaidCourseActivationService activation,
-        PaymentProviderPolicy providers
+        PaymentProviderPolicy providers,
+        PaymentCheckoutService checkout
     ) {
         this.payments = payments;
         this.analytics = analytics;
@@ -48,6 +51,7 @@ public class PaymentController {
         this.vnpay = vnpay;
         this.activation = activation;
         this.providers = providers;
+        this.checkout = checkout;
     }
 
     @PostMapping("/checkout")
@@ -58,7 +62,7 @@ public class PaymentController {
         String clientIp = httpRequest.getHeader("X-Payment-Client-IP");
         if (clientIp == null || !clientIp.matches("[0-9a-fA-F:.]{3,45}")) clientIp =
             httpRequest.getRemoteAddr();
-        return ApiResponse.success(payments.createCheckout(request, user.userId(), clientIp));
+        return ApiResponse.success(checkout.createCheckout(request, user.userId(), clientIp));
     }
 
     @GetMapping("/methods")

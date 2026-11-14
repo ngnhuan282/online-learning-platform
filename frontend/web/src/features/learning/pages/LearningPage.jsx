@@ -1,5 +1,11 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
+import PlayCircleOutline from '@mui/icons-material/PlayCircleOutlineOutlined';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import CheckCircleOutline from '@mui/icons-material/CheckCircleOutlineOutlined';
+import AccessTimeOutlined from '@mui/icons-material/AccessTimeOutlined';
+import LearningHeader from '../components/LearningHeader';
 import LearningNotice from '../components/LearningNotice';
 import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
@@ -10,9 +16,20 @@ import useToast from '../../../shared/hooks/useToast';
 import useLearningResource from '../hooks/useLearningResource';
 import ErrorState from '../../../shared/components/ErrorState';
 import AppLoading from '../../../shared/components/AppLoading';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
+import { AUTH_CHANGED_EVENT, API_PREFIX } from '../../../shared/constants/appConstants';
+import { youtubeEmbedUrl } from '../utils/lessonMedia';
+import { ROUTES } from '../../../shared/constants/routes';
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import '../styles/quiz.css';
 
 const lessonStatus = item => item?.status ?? 'NOT_STARTED';
+const isMediaUrl = value =>
+  typeof value === 'string' && (/^https?:\/\//i.test(value) || value.startsWith(`${API_PREFIX}/media/`));
+const subscribeToSession = callback => {
+  window.addEventListener(AUTH_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(AUTH_CHANGED_EVENT, callback);
+};
 
 function LearningCoursePage({ courseId }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,17 +44,38 @@ function LearningCoursePage({ courseId }) {
   const [changes, setChanges] = useState({});
   const [updatingLessonId, setUpdatingLessonId] = useState(null);
   const [error, setError] = useState(null);
+  const [mediaError, setMediaError] = useState(null);
   const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const usingFallback = false;
-  const sections = useMemo(() => [...(course?.sections ?? [])]
-    .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id)
-    .map(section => ({ ...section, lessons: [...(section.lessons ?? [])]
-      .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id) })), [course?.sections]);
-  const allLessons = useMemo(() => sections.flatMap(section =>
-    section.lessons.map(lesson => ({ ...lesson, sectionTitle: section.title }))), [sections]);
+  const sections = useMemo(
+    () =>
+      [...(course?.sections ?? [])]
+        .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id)
+        .map(section => ({
+          ...section,
+          lessons: [...(section.lessons ?? [])].sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id),
+        })),
+    [course?.sections],
+  );
+  const allLessons = useMemo(
+    () =>
+      sections.flatMap(section =>
+        section.lessons.map(lesson => ({ ...lesson, sectionTitle: section.title })),
+      ),
+    [sections],
+  );
   const selectedLessonId = searchParams.get('lessonId');
-  const currentLesson = useMemo(() => allLessons.find(lesson =>
-    String(lesson.id) === selectedLessonId) ?? allLessons[0] ?? null, [allLessons, selectedLessonId]);
+  const currentLesson = useMemo(
+    () => allLessons.find(lesson => String(lesson.id) === selectedLessonId) ?? allLessons[0] ?? null,
+    [allLessons, selectedLessonId],
+  );
   const progressByLesson = useMemo(() => {
     const next = new Map((course?.progress ?? []).map(item => [item.lessonId, item]));
     Object.values(changes).forEach(item => {
@@ -46,8 +84,10 @@ function LearningCoursePage({ courseId }) {
     return next;
   }, [course?.progress, changes]);
   const selectedProgress = progressByLesson.get(currentLesson?.id);
-  const completedCount = allLessons.filter(lesson => lessonStatus(progressByLesson.get(lesson.id)) === 'COMPLETED').length;
-  const courseProgress = allLessons.length ? Math.round(completedCount / allLessons.length * 100) : 0;
+  const completedCount = allLessons.filter(
+    lesson => lessonStatus(progressByLesson.get(lesson.id)) === 'COMPLETED',
+  ).length;
+  const courseProgress = allLessons.length ? Math.round((completedCount / allLessons.length) * 100) : 0;
   const courseQuizzes = quizzes.data;
   const quizzesLoading = quizzes.loading;
   const quizError = quizzes.error;
@@ -55,9 +95,10 @@ function LearningCoursePage({ courseId }) {
   const loadPlayback = useCallback(async () => {
     if (!currentLesson) return { data: null };
     // The enrolled curriculum already contains authorized content and signed media URLs.
-    if (currentLesson.videoUrl || currentLesson.lessonType === 'TEXT' || currentLesson.content) {
+    if (currentLesson.lessonType === 'TEXT' || isMediaUrl(currentLesson.videoUrl)) {
       return { data: { ...currentLesson, lessonId: currentLesson.id, playUrl: currentLesson.videoUrl } };
     }
+    // Opaque storage keys are resolved by Course; the browser cannot play them directly.
     return lessonApi.getPlayUrl(courseId, currentLesson.id);
   }, [courseId, currentLesson]);
   const playback = useLearningResource(loadPlayback, null);
@@ -103,12 +144,14 @@ function LearningCoursePage({ courseId }) {
     pending.current = true;
     setUpdatingLessonId(lessonId);
     setError(null);
+    const session = getSessionVersion();
     try {
       const response = await learningApi.accessLesson(courseId, lessonId);
+      if (!mounted.current || session !== getSessionVersion()) return;
       if (response.data) mergeProgress(response.data);
       setSearchParams({ lessonId: String(lessonId) }, { replace: true });
     } catch (error) {
-      setError(error);
+      if (mounted.current && session === getSessionVersion()) setError(error);
     } finally {
       pending.current = false;
       setUpdatingLessonId(null);
@@ -120,75 +163,100 @@ function LearningCoursePage({ courseId }) {
     pending.current = true;
     setUpdatingLessonId(currentLesson.id);
     setError(null);
+    const session = getSessionVersion();
     try {
       const response = await learningApi.markLessonComplete(courseId, currentLesson.id);
+      if (!mounted.current || session !== getSessionVersion()) return;
       if (response.data) mergeProgress(response.data);
       toast('Đã đánh dấu hoàn thành bài học.');
     } catch (error) {
-      setError(error);
+      if (mounted.current && session === getSessionVersion()) setError(error);
     } finally {
       pending.current = false;
       setUpdatingLessonId(null);
     }
   }
 
-  if (snapshot.loading) return <section className="learning-page"><AppLoading label="Đang tải nội dung học..." /></section>;
-  if (snapshot.error || !course) return <section className="learning-page"><ErrorState
-    error={snapshot.error ?? new Error('Không tìm thấy nội dung khóa học.')}
-    title={snapshot.error?.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể mở khóa học'}
-    onRetry={snapshot.reload} /></section>;
+  if (snapshot.loading || snapshot.error || !course) {
+    return (
+      <section className="learning-page">
+        <div className="learning-shell">
+          <LearningHeader title="Không gian học tập" />
+          {snapshot.loading ? (
+            <AppLoading label="Đang tải nội dung học..." />
+          ) : (
+            <ErrorState
+              error={snapshot.error ?? new Error('Không tìm thấy nội dung khóa học.')}
+              title={
+                snapshot.error?.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể mở khóa học'
+              }
+              onRetry={snapshot.reload}
+            />
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  const embedUrl = youtubeEmbedUrl(playData?.playUrl);
 
   return (
     <section className="learning-page">
       <div className="learning-shell learning-studio">
-        {/* Header with real Course title & navigation */}
-        <div className="learning-page-header">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <Link to={`/courses/${courseId}`} style={{ color: '#2563eb', fontSize: 13, textDecoration: 'none', fontWeight: 600 }}>
-                ← Quay lại trang chi tiết
-              </Link>
-              {course?.level && (
-                <span style={{ fontSize: 12, background: '#f1f5f9', padding: '2px 8px', borderRadius: 4, color: '#475569' }}>
-                  {course.level}
-                </span>
-              )}
-            </div>
-            <h1 style={{ fontSize: 24, margin: 0, color: '#0f172a' }}>
-              {course?.title || `Khóa học #${courseId}`}
-            </h1>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <Link className="button button-outline" to="/my-courses">
-              Khóa học của tôi
-            </Link>
-          </div>
-        </div>
+        <LearningHeader
+          title={course.title || `Khóa học #${courseId}`}
+          description="Học theo từng bài, lưu tiến độ và kiểm tra kiến thức."
+        >
+          {course.level && (
+            <span
+              style={{
+                fontSize: 12,
+                background: '#f1f5f9',
+                padding: '2px 8px',
+                borderRadius: 4,
+                color: '#475569',
+              }}
+            >
+              {course.level}
+            </span>
+          )}
+          <Link className="button button-outline" to={`/courses/${courseId}`}>
+            Chi tiết khóa học
+          </Link>
+          <Link
+            className="button button-outline"
+            to={`${ROUTES.AI_ASSISTANT}?courseId=${encodeURIComponent(courseId)}${currentLesson ? `&lessonId=${encodeURIComponent(currentLesson.id)}` : ''}`}
+          >
+            <AutoAwesomeOutlined fontSize="small" /> Trợ lý AI
+          </Link>
+          <Link className="button button-primary" to="/my-courses">
+            Khóa học của tôi
+          </Link>
+        </LearningHeader>
 
         <LearningNotice error={error} usingFallback={usingFallback} />
 
         <div className="learning-studio-grid" aria-busy={courseLoading}>
-          {/* Main Stage: Video / Content Player */}
-          <article className="lesson-stage" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            {/* Progress Bar Header */}
+          <article className="lesson-stage">
             <div className="course-progress-summary">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Tiến độ hoàn thành: {completedCount}/{allLessons.length} bài học</span>
-                <strong style={{ fontSize: 20 }}>{courseProgress}%</strong>
+              <div className="learning-progress-heading">
+                <span>
+                  Tiến độ hoàn thành: {completedCount}/{allLessons.length} bài học
+                </span>
+                <strong>{courseProgress}%</strong>
               </div>
               <ProgressBar value={courseProgress} />
             </div>
 
-            {/* Video / Content Display */}
-            <div style={{ margin: '16px 0 24px' }}>
+            <div className="learning-media">
               {playLoading ? (
-                <div style={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', borderRadius: 8, color: '#94a3b8' }}>
-                  <p>⏳ Đang cấp link phát bài giảng bảo mật...</p>
+                <div className="learning-media-placeholder" role="status">
+                  <AppLoading label="Đang tải bài giảng..." />
                 </div>
               ) : playError ? (
-                <div style={{ padding: 24, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', textAlign: 'center' }}>
-                  <p style={{ fontWeight: 600 }}>{playError}</p>
-                  <button className="button button-primary" style={{ marginTop: 12 }} onClick={() => loadPlayUrl(currentLesson?.id)}>
+                <div className="learning-media-placeholder is-error" role="alert">
+                  <p>{playError}</p>
+                  <button className="button button-primary" type="button" onClick={loadPlayUrl}>
                     Thử lại
                   </button>
                 </div>
@@ -321,56 +389,75 @@ function LearningCoursePage({ courseId }) {
                         {playData.content || currentLesson?.content || 'Chưa có nội dung văn bản cho bài học này.'}
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )
               ) : (
-                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', borderRadius: 8, color: '#64748b' }}>
-                  <p>Chọn một bài học từ danh sách bên phải để bắt đầu học.</p>
+                <div className="learning-media-placeholder">
+                  <AutoStoriesOutlined aria-hidden="true" />
+                  <p>Chọn một bài học từ danh sách để bắt đầu học.</p>
                 </div>
+              )}
+              {mediaError && mediaError.lessonId === currentLesson?.id && (
+                <ErrorState
+                  error={new Error('Không thể phát video. Hãy tải lại nội dung để nhận liên kết mới.')}
+                  title="Không thể phát bài học"
+                  onRetry={() => {
+                    setMediaError(null);
+                    snapshot.reload();
+                  }}
+                />
               )}
             </div>
 
-            {/* Lesson Title & Completion Controls */}
             {currentLesson && (
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14 }}>
+              <>
+                <div className="learning-lesson-footer">
                   <div>
                     {currentLesson.sectionTitle && (
-                      <span style={{ fontSize: 13, color: '#2563eb', fontWeight: 600 }}>
-                        {currentLesson.sectionTitle}
-                      </span>
+                      <span className="learning-lesson-section">{currentLesson.sectionTitle}</span>
                     )}
-                    <h2 style={{ fontSize: 22, margin: '4px 0 8px', color: '#0f172a' }}>
-                      {currentLesson.title}
-                    </h2>
-                    <div style={{ display: 'flex', gap: 14, fontSize: 13, color: '#64748b' }}>
+                    <h2>{currentLesson.title}</h2>
+                    <div className="learning-lesson-meta">
                       {currentLesson.duration ? (
-                        <span>⏱️ Thời lượng: {Math.round(currentLesson.duration / 60)} phút</span>
+                        <span>
+                          <AccessTimeOutlined fontSize="small" aria-hidden="true" />
+                          {Math.round(currentLesson.duration / 60)} phút
+                        </span>
                       ) : null}
                       <span>
-                        Trạng thái: <strong>{lessonStatus(selectedProgress) === 'COMPLETED' ? '✅ Đã hoàn thành' : '⏳ Đang học'}</strong>
+                        Trạng thái:{' '}
+                        <strong>
+                          {lessonStatus(selectedProgress) === 'COMPLETED'
+                            ? 'Đã hoàn thành'
+                            : lessonStatus(selectedProgress) === 'IN_PROGRESS'
+                              ? 'Đang học'
+                              : 'Chưa bắt đầu'}
+                        </strong>
                       </span>
                     </div>
                   </div>
-
                   <button
                     className={`button ${lessonStatus(selectedProgress) === 'COMPLETED' ? 'button-outline' : 'button-primary'}`}
-                    disabled={updatingLessonId === currentLesson.id || lessonStatus(selectedProgress) === 'COMPLETED'}
+                    type="button"
+                    disabled={updatingLessonId != null || lessonStatus(selectedProgress) === 'COMPLETED'}
                     onClick={completeLesson}
-                    style={{ minWidth: 160 }}
                   >
-                    {lessonStatus(selectedProgress) === 'COMPLETED'
-                      ? '✓ Đã hoàn thành'
-                      : updatingLessonId === currentLesson.id
-                        ? 'Đang cập nhật...'
-                        : 'Đánh dấu hoàn thành'}
+                    {lessonStatus(selectedProgress) === 'COMPLETED' ? (
+                      <>
+                        <CheckCircleOutline fontSize="small" aria-hidden="true" />
+                        Đã hoàn thành
+                      </>
+                    ) : updatingLessonId === currentLesson.id ? (
+                      'Đang cập nhật...'
+                    ) : (
+                      'Đánh dấu hoàn thành'
+                    )}
                   </button>
                 </div>
-
                 {currentLesson.content && playData?.lessonType === 'VIDEO' && (
-                  <div style={{ marginTop: 20, padding: 16, background: '#f8fafc', borderRadius: 8, fontSize: 14, color: '#475569' }}>
-                    <h4 style={{ margin: '0 0 8px', color: '#1e293b' }}>Ghi chú bài giảng:</h4>
-                    <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{currentLesson.content}</p>
+                  <div className="learning-lesson-notes">
+                    <h3>Ghi chú bài giảng</h3>
+                    <p>{currentLesson.content}</p>
                   </div>
                 )}
 
@@ -432,12 +519,17 @@ function LearningCoursePage({ courseId }) {
             )}
           </article>
 
-          {/* Curriculum Sidebar: Real Sections & Lessons created by Admin */}
-          <aside className="lesson-timeline" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }}>
-            <h2 style={{ fontSize: 18, marginBottom: 16 }}>Nội dung khóa học</h2>
-
+          <aside className="lesson-timeline" aria-label="Nội dung khóa học">
+            <div className="lesson-timeline-heading">
+              <h2>Nội dung khóa học</h2>
+              <p>
+                {sections.length} chương, {allLessons.length} bài học
+              </p>
+            </div>
             {sections.length === 0 && !courseLoading && (
-              <p style={{ color: '#64748b', fontSize: 14 }}>Khóa học này chưa có bài giảng nào.</p>
+              <div className="learning-empty">
+                <p>Khóa học này chưa có bài giảng nào.</p>
+              </div>
             )}
 
             <div style={{ display: 'grid', gap: 16 }}>
@@ -502,21 +594,23 @@ function LearningCoursePage({ courseId }) {
           </aside>
         </div>
 
-        {/* Quizzes Section (TV3) */}
         {!usingFallback && (
-          <section className="course-quiz-section" style={{ marginTop: 32 }}>
+          <section className="course-quiz-section">
             <h2>Bài kiểm tra & Đánh giá năng lực</h2>
-            {quizzesLoading && <p>Đang tải quiz...</p>}
-            {quizError && <ErrorState error={quizError} title="Không thể tải quiz" />}
+            {quizzesLoading && <p role="status">Đang tải quiz...</p>}
+            {quizError && (
+              <ErrorState error={quizError} title="Không thể tải quiz" onRetry={quizzes.reload} />
+            )}
             {!quizzesLoading && !quizError && courseQuizzes.length === 0 && (
-              <p style={{ color: '#64748b' }}>Khóa học chưa có quiz được xuất bản.</p>
+              <p>Khóa học chưa có quiz được xuất bản.</p>
             )}
             <div className="course-quiz-list">
               {courseQuizzes.map(quiz => (
                 <Link className="course-quiz-link" to={`/quizzes/${quiz.id}`} key={quiz.id}>
                   <strong>{quiz.title}</strong>
                   <span>
-                    {quiz.timeLimitMinutes ? quiz.timeLimitMinutes + ' phút · ' : ''}Điểm đạt {quiz.passingScore}%
+                    {quiz.timeLimitMinutes ? quiz.timeLimitMinutes + ' phút — ' : ''}Điểm đạt{' '}
+                    {quiz.passingScore}%
                   </span>
                 </Link>
               ))}
@@ -530,5 +624,6 @@ function LearningCoursePage({ courseId }) {
 
 export default function LearningPage() {
   const { courseId } = useParams();
-  return <LearningCoursePage key={courseId} courseId={courseId} />;
+  const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
+  return <LearningCoursePage key={courseId + ':' + session} courseId={courseId} />;
 }

@@ -20,5 +20,9 @@ public class AiProviderProperties {
 
     @Min(1000)
     @Max(60000)
-    private int requestTimeoutMs = 15000;
+    private int requestTimeoutMs = 60000;
+
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.isBlank() && model != null && model.matches("[a-zA-Z0-9._-]{1,100}");
+    }
 }

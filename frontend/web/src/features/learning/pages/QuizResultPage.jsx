@@ -5,16 +5,20 @@ import HighlightOff from '@mui/icons-material/HighlightOff';
 import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import ErrorState from '../../../shared/components/ErrorState';
 import ProgressBar from '../components/ProgressBar';
+import LearningHeader from '../components/LearningHeader';
 import { learningApi } from '../api/learningApi';
 import useLearningResource from '../hooks/useLearningResource';
 import '../styles/quiz.css';
 
-export default function QuizResultPage() {
-  const { attemptId, quizId } = useParams();
-  const loadReview = useCallback(async () => {
-    const selectedAttemptId = attemptId ?? (await learningApi.getQuizResult(quizId)).data.attemptId;
-    return learningApi.getQuizReview(selectedAttemptId);
-  }, [attemptId, quizId]);
+function QuizResult({ attemptId, quizId }) {
+  const loadReview = useCallback(
+    async ({ signal }) => {
+      const selectedAttemptId = attemptId ?? (await learningApi.getQuizResult(quizId)).data.attemptId;
+      signal.throwIfAborted();
+      return learningApi.getQuizReview(selectedAttemptId);
+    },
+    [attemptId, quizId],
+  );
   const { data, error, loading, reload } = useLearningResource(loadReview, null);
   const result = data && (!attemptId || String(data.attemptId) === attemptId) ? data : null;
   const correctCount = result?.questions.filter(question => question.correct).length ?? 0;
@@ -22,20 +26,25 @@ export default function QuizResultPage() {
   return (
     <section className="learning-page">
       <div className="learning-shell quiz-result-shell" aria-busy={loading}>
-        <div className="learning-page-header">
-          <div>
-            <p>Kết quả bài kiểm tra</p>
-            <h1>{result?.quizTitle ?? 'Kết quả quiz'}</h1>
-          </div>
+        <LearningHeader
+          title={result?.quizTitle ?? 'Kết quả quiz'}
+          description="Kết quả bài kiểm tra và đáp án của lượt làm này."
+        >
           {result?.courseId && (
             <Link className="button button-outline" to={`/learning/${result.courseId}`}>
               Quay lại khóa học
             </Link>
           )}
-        </div>
+        </LearningHeader>
 
         {loading && !result && <p>Đang tải kết quả...</p>}
-        {error && <ErrorState error={error} title="Không thể tải kết quả quiz" onRetry={reload} />}
+        {error && (
+          <ErrorState
+            error={error}
+            title={error.status === 403 ? 'Bạn không có quyền xem kết quả này' : 'Không thể tải kết quả quiz'}
+            onRetry={reload}
+          />
+        )}
 
         {result && (
           <>
@@ -102,4 +111,9 @@ export default function QuizResultPage() {
       </div>
     </section>
   );
+}
+
+export default function QuizResultPage() {
+  const { attemptId, quizId } = useParams();
+  return <QuizResult key={`${attemptId}:${quizId}`} attemptId={attemptId} quizId={quizId} />;
 }

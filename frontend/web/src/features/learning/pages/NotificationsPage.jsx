@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
+import LearningHeader from '../components/LearningHeader';
 import { learningApi } from '../api/learningApi';
 import useNotifications from '../hooks/useNotifications';
 import NotificationItem from '../components/NotificationItem';
@@ -8,7 +9,12 @@ import { NOTIFICATION_CATEGORIES } from '../utils/notificationStream';
 import '../styles/notifications.css';
 
 export default function NotificationsPage() {
-  const { userId, revision, summary, markAllRead, refresh } = useNotifications();
+  const notifications = useNotifications();
+  return <NotificationsContent key={notifications.userId ?? 'anonymous'} notifications={notifications} />;
+}
+
+function NotificationsContent({ notifications }) {
+  const { userId, revision, summary, markAllRead, refresh } = notifications;
   const [category, setCategory] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(0);
@@ -30,7 +36,12 @@ export default function NotificationsPage() {
     }
     Promise.resolve().then(() => {
       if (controller.signal.aborted) return;
-      setState(previous => ({ ...previous, loading: true, error: null }));
+      setState(previous => ({
+        data: previous.query === query ? previous.data : null,
+        query,
+        loading: true,
+        error: null,
+      }));
     });
     learningApi
       .getNotificationFeed(
@@ -46,7 +57,7 @@ export default function NotificationsPage() {
         setState({ data, loading: false, error: null, query });
       })
       .catch(error => {
-        if (!controller.signal.aborted) setState(previous => ({ ...previous, loading: false, error }));
+        if (!controller.signal.aborted) setState({ data: null, query, loading: false, error });
       });
     return () => controller.abort();
   }, [userId, page, category, unreadOnly, revision, retry, query]);
@@ -70,11 +81,14 @@ export default function NotificationsPage() {
   return (
     <section className="learning-page">
       <div className="learning-shell">
-        <div className="learning-page-header">
-          <div>
-            <p>Notifications</p>
-            <h1>Thông báo của bạn</h1>
-          </div>
+        <LearningHeader
+          title="Thông báo của bạn"
+          description={
+            summary.unreadCount == null
+              ? 'Cập nhật về khóa học, thanh toán và kết quả học tập.'
+              : `${summary.unreadCount} thông báo chưa đọc. Theo dõi các cập nhật mới tại đây.`
+          }
+        >
           <button
             className="button button-outline"
             type="button"
@@ -83,7 +97,7 @@ export default function NotificationsPage() {
           >
             {updating ? 'Đang cập nhật...' : 'Đánh dấu tất cả đã đọc'}
           </button>
-        </div>
+        </LearningHeader>
         <div className="notification-filters">
           <label>
             Loại thông báo
@@ -117,7 +131,7 @@ export default function NotificationsPage() {
             Tải lại
           </button>
         </div>
-        {state.error && <ErrorState error={state.error} onRetry={reload} />}
+        {state.query === query && state.error && <ErrorState error={state.error} onRetry={reload} />}
         {actionError && (
           <ErrorState error={actionError} title="Không thể đánh dấu đã đọc" onRetry={readAll} />
         )}

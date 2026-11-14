@@ -18,18 +18,24 @@ class CourseSnapshotProviderTests {
         server.createContext("/api/v1/courses/", exchange -> {
             String id = exchange.getRequestURI().getPath().replace("/api/v1/courses/", "");
             int status = switch (id) {
-                case "42", "43", "44" -> 200;
+                case "42", "43", "44", "45", "46" -> 200;
                 case "404" -> 404;
                 default -> 503;
             };
             String courseStatus = "43".equals(id) ? "DRAFT" : "PUBLISHED";
             long price = "44".equals(id) ? 0 : 790000;
+            String originalPrice = switch (id) {
+                case "45" -> ",\"originalPrice\":990000";
+                case "46" -> ",\"originalPrice\":690000";
+                default -> "";
+            };
             String body = String.format(
                 "{\"success\":true,\"data\":{\"id\":%s,\"title\":\"Business English\"," +
-                "\"price\":%d,\"status\":\"%s\"}}",
+                    "\"price\":%d,\"status\":\"%s\"%s}}",
                 id,
                 price,
-                courseStatus
+                courseStatus,
+                originalPrice
             );
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -49,6 +55,17 @@ class CourseSnapshotProviderTests {
             assertThat(course.title()).isEqualTo("Business English");
             assertThat(course.price()).isEqualByComparingTo("790000");
             assertThat(course.currency()).isEqualTo("VND");
+            assertThat(course.originalPrice()).isEqualByComparingTo("790000");
+            assertThat(course.discountAmount()).isZero();
+
+            var discounted = provider.requirePurchasableCourse(45L);
+            assertThat(discounted.price()).isEqualByComparingTo("790000");
+            assertThat(discounted.originalPrice()).isEqualByComparingTo("990000");
+            assertThat(discounted.discountAmount()).isEqualByComparingTo("200000");
+
+            var inconsistentOriginal = provider.requirePurchasableCourse(46L);
+            assertThat(inconsistentOriginal.originalPrice()).isEqualByComparingTo("790000");
+            assertThat(inconsistentOriginal.discountAmount()).isZero();
 
             assertError(provider, 43L, ErrorCode.CONFLICT);
             assertError(provider, 44L, ErrorCode.CONFLICT);
@@ -59,11 +76,7 @@ class CourseSnapshotProviderTests {
         }
     }
 
-    private void assertError(
-        CourseSnapshotProvider provider,
-        Long courseId,
-        ErrorCode expected
-    ) {
+    private void assertError(CourseSnapshotProvider provider, Long courseId, ErrorCode expected) {
         assertThatThrownBy(() -> provider.requirePurchasableCourse(courseId))
             .isInstanceOf(AppException.class)
             .extracting("errorCode")

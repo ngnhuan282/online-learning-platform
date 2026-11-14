@@ -1,17 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Button, Checkbox, FormControlLabel, Radio } from '@mui/material';
 import ErrorState from '../../../shared/components/ErrorState';
+import LearningHeader from '../components/LearningHeader';
 import { learningApi } from '../api/learningApi';
 import useAuth from '../../auth/hooks/useAuth';
+import { getSessionVersion } from '../../../shared/utils/tokenUtils';
+import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
 import { clearQuizDraft, quizDraftKey, readQuizDraft, writeQuizDraft } from '../utils/quizDraft';
 import '../styles/quiz.css';
 
-export default function QuizPage() {
-  const { quizId } = useParams();
+const subscribeToSession = callback => {
+  window.addEventListener(AUTH_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(AUTH_CHANGED_EVENT, callback);
+};
+
+function remainingSeconds(attempt, quiz) {
+  if (!quiz.timeLimitMinutes) return null;
+  const deadline = new Date(attempt.startedAt).getTime() + quiz.timeLimitMinutes * 60000;
+  return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+}
+
+function QuizWorkspace({ quizId, userId }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const draftKey = quizDraftKey(user?.id, quizId);
+  const draftKey = quizDraftKey(userId, quizId);
+  const mounted = useRef(false);
+  const pending = useRef(false);
   const [quiz, setQuiz] = useState(null);
   const [attempt, setAttempt] = useState(null);
   const [answers, setAnswers] = useState({});
@@ -19,11 +33,24 @@ export default function QuizPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
-    learningApi
-      .getQuiz(quizId)
+    Promise.resolve()
+      .then(() => {
+        if (!active) return undefined;
+        setLoading(true);
+        setError(null);
+        return learningApi.getQuiz(quizId);
+      })
       .then(response => {
         if (active) {
           setQuiz(response.data);
@@ -41,12 +68,11 @@ export default function QuizPage() {
     return () => {
       active = false;
     };
-  }, [quizId]);
+  }, [quizId, retry]);
 
   useEffect(() => {
     if (!attempt || !quiz?.timeLimitMinutes) return undefined;
-    const deadline = new Date(attempt.startedAt).getTime() + quiz.timeLimitMinutes * 60000;
-    const tick = () => setRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    const tick = () => setRemaining(remainingSeconds(attempt, quiz));
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
@@ -62,17 +88,23 @@ export default function QuizPage() {
   }, [draftKey, remaining]);
 
   async function start() {
+    if (pending.current || !quiz) return;
+    pending.current = true;
+    const session = getSessionVersion();
+    const active = () => mounted.current && session === getSessionVersion();
     setBusy(true);
     setError(null);
     try {
       const response = await learningApi.startQuiz(quizId);
+      if (!active()) return;
       setAnswers(readQuizDraft(draftKey, response.data.attemptId, quiz));
       setAttempt(response.data);
-      setRemaining(null);
+      setRemaining(remainingSeconds(response.data, quiz));
     } catch (startError) {
-      setError(startError);
+      if (active()) setError(startError);
     } finally {
-      setBusy(false);
+      pending.current = false;
+      if (active()) setBusy(false);
     }
   }
 
@@ -84,14 +116,22 @@ export default function QuizPage() {
       const current = previous[question.id] ?? [];
       return {
         ...previous,
-        [question.id]: checked ? [...current, optionId] : current.filter(id => id !== optionId),
+        [question.id]: checked ? [...new Set([...current, optionId])] : current.filter(id => id !== optionId),
       };
     });
   }
 
   async function submit(event) {
     event.preventDefault();
-    if (!attempt || busy || remaining === 0) return;
+    if (!attempt || pending.current || remaining === 0) return;
+    if (remainingSeconds(attempt, quiz) === 0) {
+      setRemaining(0);
+      clearQuizDraft(draftKey);
+      return;
+    }
+    pending.current = true;
+    const session = getSessionVersion();
+    const active = () => mounted.current && session === getSessionVersion();
     setBusy(true);
     setError(null);
     try {
@@ -102,30 +142,42 @@ export default function QuizPage() {
           optionIds,
         })),
       );
+      if (!active()) return;
       clearQuizDraft(draftKey);
       navigate(`/quizzes/attempts/${response.data.attemptId}/result`);
     } catch (submitError) {
-      setError(submitError);
+      if (active()) {
+        setError(submitError);
+        if (remainingSeconds(attempt, quiz) === 0) setRemaining(0);
+      }
     } finally {
-      setBusy(false);
+      pending.current = false;
+      if (active()) setBusy(false);
     }
   }
 
   return (
     <section className="learning-page">
       <div className="learning-shell quiz-workspace">
-        <div className="learning-page-header">
-          <div>
-            <p>Quiz</p>
-            <h1>{quiz?.title ?? `Quiz #${quizId}`}</h1>
-          </div>
+        <LearningHeader
+          title={quiz?.title ?? `Quiz #${quizId}`}
+          description="Kiểm tra kiến thức và theo dõi kết quả sau khi nộp bài."
+        >
           {quiz && (
             <Link className="button button-outline" to={`/learning/${quiz.courseId}`}>
               Quay lại khóa học
             </Link>
           )}
-        </div>
-        {error && <ErrorState error={error} title="Không thể xử lý bài kiểm tra" />}
+        </LearningHeader>
+        {error && (
+          <ErrorState
+            error={error}
+            title={
+              error.status === 403 ? 'Bạn chưa có quyền làm bài kiểm tra này' : 'Không thể xử lý bài kiểm tra'
+            }
+            onRetry={!quiz ? () => setRetry(value => value + 1) : undefined}
+          />
+        )}
         {loading && <p>Đang tải quiz...</p>}
         {quiz && (
           <>
@@ -150,7 +202,7 @@ export default function QuizPage() {
                     {quiz.questions.length}
                   </span>
                   {remaining != null && (
-                    <strong aria-live="polite">
+                    <strong role="timer" aria-label="Thời gian còn lại">
                       Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
                     </strong>
                   )}
@@ -179,6 +231,7 @@ export default function QuizPage() {
                             />
                           ) : (
                             <Radio
+                              name={`question-${question.id}`}
                               checked={(answers[question.id] ?? []).includes(option.id)}
                               onChange={() => choose(question, option.id, true)}
                             />
@@ -198,4 +251,11 @@ export default function QuizPage() {
       </div>
     </section>
   );
+}
+
+export default function QuizPage() {
+  const { quizId } = useParams();
+  const { user } = useAuth();
+  const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
+  return <QuizWorkspace key={`${user?.id}:${quizId}:${session}`} quizId={quizId} userId={user?.id} />;
 }

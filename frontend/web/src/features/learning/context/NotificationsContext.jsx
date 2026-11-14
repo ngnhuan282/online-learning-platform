@@ -1,11 +1,24 @@
-import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import useAuth from '../../auth/hooks/useAuth';
 import { learningApi } from '../api/learningApi';
 import { consumeNotificationStream } from '../utils/notificationStream';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
+import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
 
 const emptySummary = Object.freeze({ unreadCount: null, notifications: [] });
 const initialState = { userId: null, summary: emptySummary, loading: false, error: null };
+const subscribeToSession = callback => {
+  window.addEventListener(AUTH_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(AUTH_CHANGED_EVENT, callback);
+};
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const NotificationsContext = createContext(null);
@@ -17,6 +30,7 @@ export function NotificationsProvider({ children }) {
   const [revision, setRevision] = useState(0);
   const reload = useRef(() => {});
   const generation = useRef(0);
+  const mutationVersion = useRef(0);
 
   useEffect(() => {
     const current = ++generation.current;
@@ -30,7 +44,7 @@ export function NotificationsProvider({ children }) {
       return undefined;
     }
     const controller = new AbortController();
-    const version = getSessionVersion();
+    const version = sessionVersion;
     let debounce;
     let reconnect;
     let loading = false;
@@ -46,6 +60,7 @@ export function NotificationsProvider({ children }) {
         return;
       }
       loading = true;
+      const startedMutation = mutationVersion.current;
       setState(previous => ({
         userId,
         summary: previous.userId === userId ? previous.summary : emptySummary,
@@ -55,6 +70,10 @@ export function NotificationsProvider({ children }) {
       try {
         const { data } = await learningApi.getNotificationSummary({ signal: controller.signal });
         if (!active()) return;
+        if (startedMutation !== mutationVersion.current) {
+          dirty = true;
+          return;
+        }
         setState({ userId, summary: data, loading: false, error: null });
         setRevision(value => value + 1);
       } catch (error) {
@@ -126,7 +145,7 @@ export function NotificationsProvider({ children }) {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
     };
-  }, [userId]);
+  }, [userId, sessionVersion]);
 
   const refresh = useCallback(() => reload.current(), []);
   const markRead = useCallback(
@@ -135,18 +154,39 @@ export function NotificationsProvider({ children }) {
       const current = generation.current;
       const response = await learningApi.markNotificationRead(id);
       if (version === getSessionVersion() && current === generation.current) {
+        mutationVersion.current++;
+        setState(previous => {
+          if (previous.userId !== userId) return previous;
+          const notification = response.data;
+          const unreadPreview = previous.summary.notifications.some(item => item.id === id && !item.read);
+          return {
+            ...previous,
+            error: null,
+            summary: {
+              ...previous.summary,
+              unreadCount:
+                unreadPreview && previous.summary.unreadCount != null
+                  ? Math.max(0, previous.summary.unreadCount - 1)
+                  : previous.summary.unreadCount,
+              notifications: previous.summary.notifications.map(item =>
+                item.id === id ? notification : item,
+              ),
+            },
+          };
+        });
         setRevision(value => value + 1);
         refresh();
       }
       return response;
     },
-    [refresh],
+    [userId, refresh],
   );
   const markAllRead = useCallback(async () => {
     const version = getSessionVersion();
     const current = generation.current;
     const response = await learningApi.markAllNotificationsRead();
     if (version === getSessionVersion() && current === generation.current) {
+      mutationVersion.current++;
       setState({ userId, summary: response.data, loading: false, error: null });
       setRevision(value => value + 1);
       refresh();

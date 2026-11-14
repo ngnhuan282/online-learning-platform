@@ -49,6 +49,7 @@ export const ENDPOINTS = Object.freeze({
     notificationsReadAll: `${API_PREFIX}/learning/notifications/read-all`,
     notificationStream: `${API_PREFIX}/learning/notifications/stream`,
     notificationRead: notificationId => `${API_PREFIX}/learning/notifications/${notificationId}/read`,
+    adminNotifications: `${API_PREFIX}/learning/admin/notifications`,
   },
   payments: `${API_PREFIX}/payments`,
   ai: `${API_PREFIX}/ai`,
