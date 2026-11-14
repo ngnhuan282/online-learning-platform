@@ -189,7 +189,8 @@ class CourseServiceTest {
 
         courseService.delete(10L);
 
-        verify(courseRepository).delete(course);
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.ARCHIVED);
+        org.mockito.Mockito.verify(courseRepository, org.mockito.Mockito.never()).delete(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

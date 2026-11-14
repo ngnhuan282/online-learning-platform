@@ -84,9 +84,13 @@ async function mount(data, search = '?orderCode=LS-PAY-TEST-1', adapter, Compone
   });
 }
 
-test('only trusted provider checkout URLs can redirect, without production hosts or unsafe schemes', () => {
+test('only approved sandbox or production provider URLs can redirect, without unsafe schemes or lookalike hosts', () => {
   const origin = 'http://localhost:5173';
   assert.equal(readCheckoutRedirect('/payment/mock?orderCode=x', 'MOCK', origin).origin, origin);
+  assert.equal(
+    readCheckoutRedirect('https://pay.vnpay.vn/vpcpay.html?vnp_TxnRef=live', 'VNPAY', origin).hostname,
+    'pay.vnpay.vn',
+  );
   assert.equal(
     readCheckoutRedirect(order().payment.checkoutUrl, 'VNPAY', origin).hostname,
     'sandbox.vnpayment.vn',
@@ -96,6 +100,8 @@ test('only trusted provider checkout URLs can redirect, without production hosts
     'https://untrusted.test/payment',
     'https://sandbox.vnpayment.vn/other',
     'https://sandbox.vnpayment.vn@untrusted.test/paymentv2/vpcpay.html',
+    'https://pay.vnpay.vn.untrusted.test/vpcpay.html',
+    'http://pay.vnpay.vn/vpcpay.html',
   ]) {
     assert.throws(() => readCheckoutRedirect(url, 'VNPAY', origin), /Không thể mở/);
   }

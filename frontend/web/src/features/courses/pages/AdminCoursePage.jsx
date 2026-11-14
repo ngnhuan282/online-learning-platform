@@ -268,7 +268,7 @@ export default function AdminCoursePage() {
     setMutationError(null);
     try {
       await courseApi.delete(id);
-      setCourses(prev => prev.filter(item => String(item.id) !== String(id)));
+      setCourses(prev => prev.map(item => String(item.id) === String(id) ? { ...item, status: 'ARCHIVED' } : item));
     } catch (error) {
       setMutationError(error);
     } finally {
@@ -548,7 +548,7 @@ export default function AdminCoursePage() {
                           <button
                             className="button button-soft"
                             type="button"
-                            title="Xóa khóa học"
+                            title="Lưu trữ khóa học (giữ dữ liệu)"
                             disabled={submitting || deletingId !== null || Boolean(loadError)}
                             onClick={() => handleDelete(course.id)}
                             style={{ padding: '5px 11px', fontSize: 12, color: '#e53e3e', borderColor: '#fed7d7' }}

@@ -53,7 +53,22 @@ public class UserServiceImpl implements UserService {
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         requireActive(user);
         user.updateProfile(request.fullName().trim());
+        if (request.avatarUrl() != null && !request.avatarUrl().isBlank()) {
+            try {
+                var uri = java.net.URI.create(request.avatarUrl());
+                if (uri.getHost() == null || uri.getUserInfo() != null) throw new IllegalArgumentException();
+            } catch (IllegalArgumentException invalid) {
+                throw new AppException(ErrorCode.BAD_REQUEST);
+            }
+        }
+        if (request.avatarUrl() != null || request.phone() != null || request.dateOfBirth() != null || request.biography() != null) {
+            user.updateProfileDetails(clean(request.avatarUrl()), clean(request.phone()), request.dateOfBirth(), clean(request.biography()));
+        }
         return UserResponse.from(user);
+    }
+
+    private String clean(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     @Override

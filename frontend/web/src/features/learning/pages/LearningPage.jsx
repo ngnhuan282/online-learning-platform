@@ -1,8 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
-import PlayCircleOutline from '@mui/icons-material/PlayCircleOutlineOutlined';
-import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
 import CheckCircleOutline from '@mui/icons-material/CheckCircleOutlineOutlined';
 import AccessTimeOutlined from '@mui/icons-material/AccessTimeOutlined';
 import LearningHeader from '../components/LearningHeader';
@@ -20,8 +18,6 @@ import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import { AUTH_CHANGED_EVENT, API_PREFIX } from '../../../shared/constants/appConstants';
 import { youtubeEmbedUrl } from '../utils/lessonMedia';
 import { ROUTES } from '../../../shared/constants/routes';
-import { API_PREFIX, AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
-import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import '../styles/quiz.css';
 
@@ -97,7 +93,7 @@ function LearningCoursePage({ courseId }) {
   const loadPlayback = useCallback(async () => {
     if (!currentLesson) return { data: null };
     // The enrolled curriculum already contains authorized content and signed media URLs.
-    if (currentLesson.lessonType === 'TEXT' || isMediaUrl(currentLesson.videoUrl)) {
+    if (['TEXT', 'QUIZ'].includes(currentLesson.lessonType) || isMediaUrl(currentLesson.videoUrl)) {
       return { data: { ...currentLesson, lessonId: currentLesson.id, playUrl: currentLesson.videoUrl } };
     }
     // Opaque storage keys are resolved by Course; the browser cannot play them directly.
@@ -113,33 +109,16 @@ function LearningCoursePage({ courseId }) {
     setChanges(previous => ({ ...previous, [progress.lessonId]: progress }));
   }
 
-  const [lessonResources, setLessonResources] = useState([]);
-  const [loadingResources, setLoadingResources] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    if (currentLesson?.id) {
-      setLoadingResources(true);
-      mediaApi
-        .listResources(currentLesson.id)
-        .then(res => {
-          if (!active) return;
-          const data = res?.data?.data ?? res?.data ?? [];
-          setLessonResources(Array.isArray(data) ? data : []);
-        })
-        .catch(() => {
-          if (active) setLessonResources([]);
-        })
-        .finally(() => {
-          if (active) setLoadingResources(false);
-        });
-    } else {
-      setLessonResources([]);
-    }
-    return () => {
-      active = false;
-    };
-  }, [currentLesson?.id]);
+  const resourceLessonId = currentLesson?.id;
+  const loadResources = useCallback(async () => {
+    if (!resourceLessonId) return { data: [] };
+    const response = await mediaApi.listResources(resourceLessonId);
+    const data = response?.data?.data ?? response?.data ?? [];
+    return { data: Array.isArray(data) ? data : [] };
+  }, [resourceLessonId]);
+  const resources = useLearningResource(loadResources, emptyQuizzes);
+  const lessonResources = resources.data;
+  const loadingResources = resources.loading;
 
   async function openLesson(lessonId) {
     if (pending.current) return;
@@ -265,9 +244,10 @@ function LearningCoursePage({ courseId }) {
               ) : playData ? (
                 <div>
                   {playData.lessonType === 'VIDEO' ? (
-                    playData.playUrl?.includes('youtube.com') || playData.playUrl?.includes('youtu.be') ? (
+                    embedUrl ? (
                       <iframe
-                        src={playData.playUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'www.youtube.com/embed/')}
+                        key={embedUrl}
+                        src={embedUrl}
                         title={currentLesson?.title || 'Bài học'}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
@@ -275,6 +255,7 @@ function LearningCoursePage({ courseId }) {
                       />
                     ) : (
                       <video
+                        key={currentLesson.id}
                         controls
                         autoPlay
                         controlsList="nodownload"
@@ -290,7 +271,6 @@ function LearningCoursePage({ courseId }) {
                           borderRadius: 8,
                           display: 'block',
                         }}
-                        style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 8, display: 'block' }}
                       >
                         Trình duyệt của bạn không hỗ trợ phát video này.
                       </video>
@@ -387,26 +367,19 @@ function LearningCoursePage({ courseId }) {
                   ) : (
                     <div style={{ background: '#f8fafc', padding: 24, borderRadius: 8, border: '1px solid #e2e8f0', minHeight: 240 }}>
                       <h4 style={{ margin: '0 0 12px', color: '#0f172a' }}>📝 Nội dung bài học lý thuyết</h4>
-                      {playData.lessonType === 'DOCUMENT' && isMediaUrl(playData.playUrl) && (
-                        <div style={{ marginBottom: 12 }}>
-                          <a href={resolveMediaUrl(playData.playUrl)} target="_blank" rel="noopener noreferrer">
-                            Mở tài liệu bài học
-                          </a>
-                        </div>
-                      )}
                       <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: '#334155', fontSize: 15 }}>
                         {playData.content || currentLesson?.content || 'Chưa có nội dung văn bản cho bài học này.'}
                       </div>
                     </div>
-                  </div>
-                )
+                  )}
+                </div>
               ) : (
                 <div className="learning-media-placeholder">
                   <AutoStoriesOutlined aria-hidden="true" />
                   <p>Chọn một bài học từ danh sách để bắt đầu học.</p>
                 </div>
               )}
-              {mediaError?.lessonId === currentLesson?.id && (
+              {mediaError && mediaError.lessonId === currentLesson?.id && (
                 <div style={{ marginTop: 16 }}>
                   <ErrorState
                     error={new Error('Không thể tải video từ máy chủ lưu trữ (Supabase Storage / S3). Có thể dự án Supabase đang tạm dừng hoặc tệp media chưa được tải lên.')}
@@ -539,7 +512,7 @@ function LearningCoursePage({ courseId }) {
                     </div>
                   )}
                 </div>
-              </div>
+              </>
             )}
           </article>
 
@@ -576,6 +549,9 @@ function LearningCoursePage({ courseId }) {
                           className={`lesson-progress-item ${isSelected ? 'is-selected' : ''}`}
                           onClick={() => openLesson(item.id)}
                           type="button"
+                          disabled={updatingLessonId != null}
+                          aria-current={isSelected ? 'step' : undefined}
+                          aria-label={`${lIndex + 1}. ${item.title}${isDone ? ', đã hoàn thành' : ''}`}
                           style={{
                             background: isSelected ? '#eff6ff' : '#ffffff',
                             borderColor: isSelected ? '#3b82f6' : 'transparent',

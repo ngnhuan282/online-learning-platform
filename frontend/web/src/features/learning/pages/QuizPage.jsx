@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useSyncExternalStore } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Button, Checkbox, FormControlLabel, Radio } from '@mui/material';
 import ErrorState from '../../../shared/components/ErrorState';
@@ -11,6 +11,11 @@ import { clearQuizDraft, quizDraftKey, readQuizDraft, writeQuizDraft } from '../
 import '../styles/quiz.css';
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
+const subscribeToSession = callback => {
+  window.addEventListener(AUTH_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(AUTH_CHANGED_EVENT, callback);
+};
 
 function remainingSeconds(attempt, quiz) {
   if (!quiz.timeLimitMinutes) return null;

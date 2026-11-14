@@ -22,11 +22,17 @@ public class CategoryService {
     }
 
     public List<CategoryResponse> list() {
+        return adminList().stream().filter(CategoryResponse::active).toList();
+    }
+
+    public List<CategoryResponse> adminList() {
         return categories.findAll(Sort.by(Sort.Direction.ASC, "name")).stream().map(CategoryResponse::from).toList();
     }
 
     public CategoryResponse get(Long id) {
-        return CategoryResponse.from(findCategory(id));
+        Category category = findCategory(id);
+        if (!category.isActive()) throw new AppException(ErrorCode.NOT_FOUND);
+        return CategoryResponse.from(category);
     }
 
     @Transactional
@@ -40,6 +46,7 @@ public class CategoryService {
         category.setName(normalized);
         category.setSlug(slug);
         category.setDescription(request.description() == null ? null : request.description().trim());
+        if (request.active() != null) category.setActive(request.active());
         return CategoryResponse.from(categories.save(category));
     }
 
@@ -54,13 +61,14 @@ public class CategoryService {
         category.setName(normalized);
         category.setSlug(slug);
         category.setDescription(request.description() == null ? null : request.description().trim());
+        if (request.active() != null) category.setActive(request.active());
         return CategoryResponse.from(categories.save(category));
     }
 
     @Transactional
     public void delete(Long id) {
         Category category = findCategory(id);
-        categories.delete(category);
+        category.setActive(false);
     }
 
     private Category findCategory(Long id) {

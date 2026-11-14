@@ -107,8 +107,21 @@ for (const Component of [FeaturedCourses, CourseListPage]) {
       return { data: { content: [course(page + 1)], totalPages: 2 } };
     };
     await act(async () => document.querySelector('[role=alert] button').click());
-    assert.deepEqual(pages, [0, 1]);
-    assert.equal(document.querySelectorAll('.course-card').length, 2);
+    if (Component === CourseListPage) {
+      assert.deepEqual(pages, [0]);
+      assert.equal(document.querySelectorAll('.course-card').length, 1);
+      const next = [...document.querySelectorAll('button')].find(
+        button => button.textContent === 'Trang sau',
+      );
+      assert.ok(next);
+      await act(async () => next.click());
+      assert.deepEqual(pages, [0, 1]);
+      assert.match(document.body.textContent, /Database course 2/);
+      assert.doesNotMatch(document.body.textContent, /Database course 1/);
+    } else {
+      assert.deepEqual(pages, [0, 1]);
+      assert.equal(document.querySelectorAll('.course-card').length, 2);
+    }
     assert.equal(document.querySelector('[role=alert]'), null);
   });
 }

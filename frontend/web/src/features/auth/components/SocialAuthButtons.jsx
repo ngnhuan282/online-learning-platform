@@ -1,5 +1,3 @@
-import GitHub from '@mui/icons-material/GitHub';
-
 function GoogleIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
@@ -32,10 +30,6 @@ export default function SocialAuthButtons({ registering, onSelect, disabled, goo
               ? 'Đăng ký với Google'
               : 'Đăng nhập bằng Google'}
         </span>
-      </button>
-      <button type="button" disabled={disabled} onClick={() => onSelect('GitHub')}>
-        <GitHub style={{ fontSize: 22 }} />
-        <span>{registering ? 'Đăng ký với GitHub' : 'GitHub'}</span>
       </button>
     </div>
   );

@@ -10,6 +10,7 @@ import com.elearning.course.entity.CourseLevel;
 import com.elearning.course.service.CourseService;
 import jakarta.validation.Valid;
 import java.util.Locale;
+import java.math.BigDecimal;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -31,10 +32,16 @@ public class CourseController {
         @RequestParam(required = false) String keyword,
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false) String level,
-        @RequestParam(defaultValue = "newest") String sort
+        @RequestParam(defaultValue = "newest") String sort,
+        @RequestParam(required = false) BigDecimal minPrice,
+        @RequestParam(required = false) BigDecimal maxPrice,
+        @RequestParam(required = false) Double minRating,
+        @RequestParam(required = false) String pricing
     ) {
         CourseLevel parsedLevel = parseLevel(level);
-        Page<CourseResponse> result = courses.list(page, size, keyword, categoryId, parsedLevel, sort);
+        Page<CourseResponse> result = minPrice == null && maxPrice == null && minRating == null && pricing == null
+            ? courses.list(page, size, keyword, categoryId, parsedLevel, sort)
+            : courses.list(page, size, keyword, categoryId, parsedLevel, sort, minPrice, maxPrice, minRating, pricing);
         return ApiResponse.success(PageResponse.from(result));
     }
 
@@ -65,6 +72,12 @@ public class CourseController {
         @Valid @RequestBody CourseRequest request
     ) {
         return ApiResponse.success(courses.update(id, request));
+    }
+
+    @GetMapping("/admin/courses/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_VIEW')")
+    public ApiResponse<CourseResponse> adminGet(@PathVariable Long id) {
+        return ApiResponse.success(courses.adminGet(id));
     }
 
     @DeleteMapping("/admin/courses/{id}")

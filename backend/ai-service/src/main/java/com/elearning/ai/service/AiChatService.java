@@ -16,19 +16,22 @@ public class AiChatService {
     private final AiProviderProperties properties;
     private final GeminiGateway provider;
     private final LearningContextClient context;
+    private final AiUsageLimiter usage;
 
     public AiChatService(
         AiConversationStore store,
         AiPreparationService capabilities,
         AiProviderProperties properties,
         GeminiGateway provider,
-        LearningContextClient context
+        LearningContextClient context,
+        AiUsageLimiter usage
     ) {
         this.store = store;
         this.capabilities = capabilities;
         this.properties = properties;
         this.provider = provider;
         this.context = context;
+        this.usage = usage;
     }
 
     public ConversationResponse create(Long userId, CreateConversationRequest request, String authorization) {
@@ -50,6 +53,7 @@ public class AiChatService {
         var reservation = store.reserve(userId, id, requestId, question);
         if (!reservation.cached().isEmpty()) return reservation.cached();
         try {
+            usage.consume(userId);
             var reply = provider.generate(reservation.history(), question, reference.text());
             return store.finish(
                 userId,

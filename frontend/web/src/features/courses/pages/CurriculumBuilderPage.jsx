@@ -30,7 +30,7 @@ export default function CurriculumBuilderPage() {
     let active = true;
     if (courseId) {
       courseApi
-        .getById(courseId)
+        .adminGetById(courseId)
         .then(res => {
           if (!active) return;
           const data = res?.data?.data ?? res?.data ?? res;

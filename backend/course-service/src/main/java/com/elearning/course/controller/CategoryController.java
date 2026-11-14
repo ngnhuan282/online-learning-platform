@@ -35,6 +35,12 @@ public class CategoryController {
         return ApiResponse.success(categories.create(request));
     }
 
+    @GetMapping("/admin/categories")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('COURSE_VIEW')")
+    public ApiResponse<List<CategoryResponse>> adminList() {
+        return ApiResponse.success(categories.adminList());
+    }
+
     @PutMapping("/admin/categories/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('CATEGORY_UPDATE')")
     public ApiResponse<CategoryResponse> update(

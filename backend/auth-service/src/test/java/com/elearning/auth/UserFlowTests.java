@@ -117,6 +117,33 @@ class UserFlowTests {
     }
 
     @Test
+    void profileDetailsPersistAndInvalidFieldsDoNotChangeStoredData() throws Exception {
+        User user = createUser("profile-" + UUID.randomUUID() + "@test.com", "ProfileTest123!", "Profile User", false);
+        String token = tokenFor(user);
+        String body = """
+            {"fullName":"Updated Profile","avatarUrl":"https://media.test/avatar.png","phone":"+84 912345678",
+             "dateOfBirth":"2000-01-02","biography":"Learning Java","roles":["ADMIN"]}
+            """;
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/users/me"))
+            .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
+            .PUT(HttpRequest.BodyPublishers.ofString(body)).build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(200);
+        var data = mapper.readTree(response.body()).get("data");
+        assertThat(data.get("phone").asString()).isEqualTo("+84 912345678");
+        assertThat(data.get("dateOfBirth").asString()).isEqualTo("2000-01-02");
+        assertThat(data.get("biography").asString()).isEqualTo("Learning Java");
+        assertThat(data.get("roles").toString()).doesNotContain("ADMIN");
+        for (String invalid : List.of("\"avatarUrl\":\"javascript:alert(1)\"", "\"dateOfBirth\":\"2999-01-01\"", "\"phone\":\"not-a-phone\"")) {
+            var rejected = HttpRequest.newBuilder(request.uri()).header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString("{\"fullName\":\"Invalid Name\"," + invalid + "}")).build();
+            assertThat(client.send(rejected, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(400);
+        }
+        assertThat(users.findById(user.getId()).orElseThrow().getFullName()).isEqualTo("Updated Profile");
+        assertThat(users.findById(user.getId()).orElseThrow().getDateOfBirth()).isEqualTo(java.time.LocalDate.of(2000, 1, 2));
+    }
+
+    @Test
     void userCanChangePasswordAndFailsWithWrongOldPassword() throws Exception {
         String oldPass = "OldPassword123!";
         String newPass = "NewPassword456!";

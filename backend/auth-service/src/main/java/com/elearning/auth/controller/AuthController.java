@@ -43,7 +43,7 @@ public class AuthController {
         HttpServletResponse response
     ) {
         var result = auth.login(request);
-        response.addHeader(HttpHeaders.SET_COOKIE, cookies.issue(refreshTokens.create(result.user().id())));
+        response.addHeader(HttpHeaders.SET_COOKIE, cookies.issue(refreshTokens.create(result.user().id(), request.rememberMe()), request.rememberMe()));
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         return ApiResponse.success(result);
     }
@@ -52,7 +52,7 @@ public class AuthController {
     @Operation(summary = "Rotate refresh token", description = "Requires the refresh_token HttpOnly cookie, rotates it and returns a new access token. Missing, invalid, expired or revoked cookies return 401.")
     public ApiResponse<AuthResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
         var result = refreshTokens.rotate(refreshCookie(request));
-        response.addHeader(HttpHeaders.SET_COOKIE, cookies.issue(result.rawToken()));
+        response.addHeader(HttpHeaders.SET_COOKIE, cookies.issue(result.rawToken(), result.persistent()));
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         return ApiResponse.success(result.auth());
     }

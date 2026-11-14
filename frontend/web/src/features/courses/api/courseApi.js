@@ -3,6 +3,7 @@ import { ENDPOINTS } from '../../../shared/apis/endpoints';
 import { API_PREFIX } from '../../../shared/constants/appConstants';
 
 export const courseApi = {
+  adminGetById: id => axiosClient.get(`${ENDPOINTS.adminCourses}/${id}`),
   adminList: (params = {}, options = {}) => axiosClient.get(ENDPOINTS.adminCourses, { ...options, params }),
   list: (params = {}, options = {}) => axiosClient.get(ENDPOINTS.courses, { ...options, params }),
   categories: (options = {}) => axiosClient.get(ENDPOINTS.categories, options),

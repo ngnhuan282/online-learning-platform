@@ -161,6 +161,24 @@ class RefreshTokenTests {
     }
 
     @Test
+    void rememberedLoginPersistsOnlyHttpOnlyRefreshCookieAcrossRotationAndLogout() throws Exception {
+        String email = createUser();
+        var remembered = post("login", Map.of("email", email, "password", PASSWORD, "rememberMe", true), null);
+        assertThat(remembered.statusCode()).isEqualTo(200);
+        assertThat(remembered.headers().firstValue("Set-Cookie").orElseThrow()).contains("Max-Age=604800", "HttpOnly", "SameSite=Lax");
+        assertThat(refreshTokens.findByTokenHash(hash(raw(remembered))).orElseThrow().isPersistent()).isTrue();
+        var rotated = post("refresh", Map.of(), raw(remembered));
+        assertThat(rotated.statusCode()).isEqualTo(200);
+        assertThat(rotated.headers().firstValue("Set-Cookie").orElseThrow()).contains("Max-Age=604800");
+        assertThat(refreshTokens.findByTokenHash(hash(raw(rotated))).orElseThrow().isPersistent()).isTrue();
+        assertThat(rotated.body()).doesNotContain(raw(rotated));
+        assertThat(post("logout", Map.of(), raw(rotated)).statusCode()).isEqualTo(200);
+        error(post("refresh", Map.of(), raw(rotated)), 401, "REFRESH_TOKEN_REVOKED", raw(rotated));
+        var normal = login(email);
+        assertThat(normal.headers().firstValue("Set-Cookie").orElseThrow()).doesNotContain("Max-Age", "Expires");
+    }
+
+    @Test
     void missingMalformedUnknownAndBodyTokensAreRejected() throws Exception {
         error(post("refresh", Map.of(), null), 401, "REFRESH_TOKEN_MISSING", null);
         error(post("refresh", Map.of(), "broken"), 401, "REFRESH_TOKEN_INVALID", "broken");

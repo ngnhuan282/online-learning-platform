@@ -4,6 +4,22 @@ File seed chính là [`seed-data.sql`](seed-data.sql), thay cho file ở thư m�
 `05-seed-data.sql` và script `seed.ps1` trước đây. Chạy sau khi Auth, Course, Learning,
 Payment đã hoàn tất Flyway. Seed dùng các bảng hiện có; schema vẫn do migration quản lý.
 
+## Nâng cấp quyền migration cho AI trên volume cũ
+
+AI hiện dùng Flyway để lưu hội thoại và tin nhắn. Nếu volume MySQL được tạo từ
+bản cũ, tài khoản `ai_app` có thể thiếu quyền DDL và service không khởi động được
+với lỗi `CREATE command denied` cho `flyway_schema_history`. Tại root repo, chạy:
+
+```powershell
+docker compose cp infra/mysql/04-ai-migrations.sql mysql:/tmp/04-ai-migrations.sql
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot < /tmp/04-ai-migrations.sql'
+docker compose --profile backend up -d --wait ai-service
+```
+
+Script chỉ bổ sung quyền `CREATE`, `ALTER`, `INDEX`, `REFERENCES` trên `ai_db` cho
+`ai_app`; giữ nguyên mật khẩu, bảng và dữ liệu. Volume mới tự áp dụng script qua
+Compose. Không cần xóa volume hoặc chạy Flyway repair.
+
 ## Chạy seed bằng PowerShell
 
 Tại thư mục gốc dự án, khởi động backend nếu chưa chạy:

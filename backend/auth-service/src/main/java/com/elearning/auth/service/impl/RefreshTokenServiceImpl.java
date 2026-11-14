@@ -56,11 +56,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     public String create(Long userId) {
+        return create(userId, false);
+    }
+
+    @Override
+    public String create(Long userId, boolean persistent) {
         users.findForUpdate(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         auth.getCurrentUser(userId.toString()); // Check current account status using existing Auth rules.
         return issue(
             users.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)),
-            UUID.randomUUID().toString()
+            UUID.randomUUID().toString(), persistent
         );
     }
 
@@ -90,14 +95,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         var user = auth.getCurrentUser(old.getUser().getId().toString());
         if (user.roles().isEmpty()) throw new AppException(ErrorCode.ROLE_NOT_FOUND);
         old.revoke();
-        String next = issue(old.getUser(), old.getSessionId());
+        String next = issue(old.getUser(), old.getSessionId(), old.isPersistent());
         var response = new AuthResponse(
             jwt.createAccessToken(user.id().toString(), user.roles(), user.permissions()),
             "Bearer",
             jwt.getAccessTokenSeconds(),
             user
         );
-        return new Rotation(next, response);
+        return new Rotation(next, response, old.isPersistent());
     }
 
     @Override
@@ -132,12 +137,12 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return token.getSessionId();
     }
 
-    private String issue(User user, String sessionId) {
+    private String issue(User user, String sessionId, boolean persistent) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         refreshTokens.save(
-            new RefreshToken(user, hash(raw), Instant.now().plusSeconds(expirationSeconds), sessionId)
+            new RefreshToken(user, hash(raw), Instant.now().plusSeconds(expirationSeconds), sessionId, persistent)
         );
         return raw;
     }

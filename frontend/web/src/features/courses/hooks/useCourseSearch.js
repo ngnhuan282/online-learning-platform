@@ -7,6 +7,13 @@ import { useState, useEffect } from 'react';
 export function useCourseSearch(initialKeyword = '', delay = 300) {
   const [keyword, setKeyword] = useState(initialKeyword);
   const [debouncedKeyword, setDebouncedKeyword] = useState(initialKeyword);
+  const [previousKeyword, setPreviousKeyword] = useState(initialKeyword);
+
+  if (previousKeyword !== initialKeyword) {
+    setPreviousKeyword(initialKeyword);
+    setKeyword(initialKeyword);
+    setDebouncedKeyword(initialKeyword);
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -92,7 +92,14 @@ public class AuthenticationFilter implements WebFilter, Ordered {
                 headers.remove("X-User-Roles");
                 headers.remove("X-Payment-Client-IP");
                 var remote = exchange.getRequest().getRemoteAddress();
-                if (remote != null) headers.set("X-Payment-Client-IP", remote.getAddress().getHostAddress());
+                if (remote != null) {
+                    // ForwardedHeaderTransformer may expose an unresolved address even for a numeric IP.
+                    String address =
+                        remote.getAddress() == null
+                            ? remote.getHostString()
+                            : remote.getAddress().getHostAddress();
+                    if (address.matches("[0-9a-fA-F:.]{3,45}")) headers.set("X-Payment-Client-IP", address);
+                }
             })
             .build();
         return chain.filter(exchange.mutate().request(request).build());

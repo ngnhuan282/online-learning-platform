@@ -37,7 +37,7 @@ function ReviewsManager({ initialCourseId }) {
       setLoading(true);
       setError(null);
 
-      const fetchCourse = courseIdToFetch ? courseApi.getById(courseIdToFetch).catch(() => null) : Promise.resolve(null);
+      const fetchCourse = courseIdToFetch ? courseApi.adminGetById(courseIdToFetch).catch(() => null) : Promise.resolve(null);
       const fetchReviews = reviewApi.adminList(courseIdToFetch || undefined, { page, size: 10 });
 
       return Promise.all([fetchCourse, fetchReviews])
@@ -75,7 +75,9 @@ function ReviewsManager({ initialCourseId }) {
 
   useEffect(() => {
     let active = true;
-    loadData(0, selectedCourseId, () => active);
+    Promise.resolve().then(() => {
+      if (active) return loadData(0, selectedCourseId, () => active);
+    });
     return () => {
       active = false;
     };

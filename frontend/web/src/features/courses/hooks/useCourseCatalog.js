@@ -4,7 +4,9 @@ import { categoryApi } from '../api/categoryApi';
 import { normalizeCourseList } from '../utils/courseForm';
 import { normalizeCategoryList, toCourseCard } from '../utils/courseCatalog';
 
-export default function useCourseCatalog() {
+export default function useCourseCatalog(queryParams = null) {
+  const queryKey = queryParams == null ? null : JSON.stringify(queryParams);
+  const [pagination, setPagination] = useState({ page: 0, totalPages: 0, totalElements: 0 });
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,19 @@ export default function useCourseCatalog() {
       setLoading(true);
       setError(null);
       try {
+        const filters = queryKey == null ? null : JSON.parse(queryKey);
+        if (filters) {
+          const response = await courseApi.list(filters, options);
+          if (controller.signal.aborted) return;
+          const payload = response?.data?.data ?? response?.data ?? response;
+          setCourses(normalizeCourseList(response).map(toCourseCard));
+          setPagination({
+            page: payload?.page ?? filters.page ?? 0,
+            totalPages: payload?.totalPages ?? 1,
+            totalElements: payload?.totalElements ?? normalizeCourseList(response).length,
+          });
+          return;
+        }
         const items = [];
         let page = 0;
         let totalPages = 1;
@@ -54,7 +69,15 @@ export default function useCourseCatalog() {
     loadCourses();
     loadCategories();
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, queryKey]);
 
-  return { courses, categories, loading, error, categoryError, retry: () => setAttempt(value => value + 1) };
+  return {
+    courses,
+    categories,
+    pagination,
+    loading,
+    error,
+    categoryError,
+    retry: () => setAttempt(value => value + 1),
+  };
 }

@@ -47,8 +47,6 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/internal/v1/learning/enrollments")
                     .permitAll()
-                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/learning/enrollments/check")
-                    .permitAll()
                     .requestMatchers("/error")
                     .permitAll()
                     .anyRequest()

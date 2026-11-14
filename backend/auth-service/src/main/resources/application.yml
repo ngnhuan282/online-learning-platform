@@ -40,6 +40,11 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+app:
+  bootstrap-admin:
+    enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
 security:
   password-reset:
     mail-enabled: ${MAIL_ENABLED:false}

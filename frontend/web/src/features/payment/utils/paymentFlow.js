@@ -19,7 +19,8 @@ export function readCheckoutRedirect(value, provider, origin) {
   const url = new URL(value, origin);
   const trusted =
     provider === 'VNPAY'
-      ? url.origin === 'https://sandbox.vnpayment.vn' && url.pathname === '/paymentv2/vpcpay.html'
+      ? (url.origin === 'https://sandbox.vnpayment.vn' && url.pathname === '/paymentv2/vpcpay.html') ||
+        (url.origin === 'https://pay.vnpay.vn' && url.pathname === '/vpcpay.html')
       : url.origin === origin && url.pathname === ROUTES.PAYMENT_MOCK;
   if (!trusted || url.username || url.password) {
     throw new Error('Không thể mở cổng thanh toán. Vui lòng thử lại sau.');

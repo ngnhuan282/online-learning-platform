@@ -12,12 +12,9 @@ import com.elearning.course.repository.CategoryRepository;
 import com.elearning.course.repository.CourseRepository;
 import com.elearning.course.security.CourseContentAccess;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -50,24 +47,21 @@ public class CourseService {
         CourseLevel level,
         String sort
     ) {
-        Sort sortSpec = resolveSort(sort);
-        Pageable pageable = PageRequest.of(page, size, sortSpec);
+        return list(page, size, keyword, categoryId, level, sort, null, null, null, null);
+    }
 
-        if (keyword == null || keyword.isBlank()) {
-            Page<Course> result = applyFilters(categoryId, level, pageable);
-            return result.map(CourseResponse::from);
+    public Page<CourseResponse> list(int page, int size, String keyword, Long categoryId, CourseLevel level,
+        String sort, BigDecimal minPrice, BigDecimal maxPrice, Double minRating, String pricing) {
+        if ((minPrice != null && minPrice.signum() < 0) || (maxPrice != null && maxPrice.signum() < 0)
+            || (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0)
+            || (minRating != null && (!Double.isFinite(minRating) || minRating < 0 || minRating > 5))
+            || (pricing != null && !List.of("free", "paid").contains(pricing))) {
+            throw new AppException(ErrorCode.BAD_REQUEST);
         }
-
-        String query = keyword.trim().toLowerCase(Locale.ROOT);
-        List<Course> filtered = applyFilters(categoryId, level, Pageable.unpaged()).getContent().stream()
-            .filter(course -> matchesKeyword(course, query))
-            .sorted(resolveComparator(sortSpec))
-            .toList();
-
-        int fromIndex = Math.min(page * size, filtered.size());
-        int toIndex = Math.min(fromIndex + size, filtered.size());
-        List<Course> pageContent = filtered.subList(fromIndex, toIndex);
-        return new PageImpl<>(pageContent.stream().map(CourseResponse::from).toList(), pageable, filtered.size());
+        String query = keyword == null || keyword.isBlank() ? null : keyword.strip().toLowerCase(Locale.ROOT);
+        if (query != null && query.length() > 200) throw new AppException(ErrorCode.BAD_REQUEST);
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)), resolveSort(sort).and(Sort.by("id")));
+        return courses.search(query, categoryId, level, minPrice, maxPrice, minRating, pricing, pageable).map(CourseResponse::from);
     }
 
     public Page<CourseResponse> adminList(int page, int size) {
@@ -86,6 +80,10 @@ public class CourseService {
         Course course = findCourse(id);
         access.requirePublished(course);
         return CourseResponse.from(course);
+    }
+
+    public CourseResponse adminGet(Long id) {
+        return CourseResponse.from(findCourse(id));
     }
 
     @Transactional
@@ -139,29 +137,7 @@ public class CourseService {
     @Transactional
     public void delete(Long id) {
         Course course = findCourse(id);
-        courses.delete(course);
-    }
-
-    private Page<Course> applyFilters(Long categoryId, CourseLevel level, Pageable pageable) {
-        if (categoryId != null && level != null) {
-            return courses.findByStatusAndCategoryIdAndLevel(CourseStatus.PUBLISHED, categoryId, level, pageable);
-        }
-        if (categoryId != null) {
-            return courses.findByStatusAndCategoryId(CourseStatus.PUBLISHED, categoryId, pageable);
-        }
-        if (level != null) {
-            return courses.findByStatusAndLevel(CourseStatus.PUBLISHED, level, pageable);
-        }
-        return courses.findByStatus(CourseStatus.PUBLISHED, pageable);
-    }
-
-    private boolean matchesKeyword(Course course, String query) {
-        String title = course.getTitle() == null ? "" : course.getTitle().toLowerCase(Locale.ROOT);
-        String description = course.getDescription() == null ? "" : course.getDescription().toLowerCase(Locale.ROOT);
-        String categoryName = course.getCategory() == null || course.getCategory().getName() == null
-            ? ""
-            : course.getCategory().getName().toLowerCase(Locale.ROOT);
-        return title.contains(query) || description.contains(query) || categoryName.contains(query);
+        course.setStatus(CourseStatus.ARCHIVED);
     }
 
     private Sort resolveSort(String sort) {
@@ -171,21 +147,12 @@ public class CourseService {
             case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
             case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
             case "title_asc" -> Sort.by(Sort.Direction.ASC, "title");
+            case "rating_desc" -> Sort.by(Sort.Direction.DESC, "avgRating");
+            case "price,asc" -> Sort.by(Sort.Direction.ASC, "price");
+            case "price,desc" -> Sort.by(Sort.Direction.DESC, "price");
+            case "createdat,asc" -> Sort.by(Sort.Direction.ASC, "createdAt");
             default -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
-    }
-
-    private Comparator<Course> resolveComparator(Sort sort) {
-        String property = sort.isSorted() ? sort.toList().getFirst().getProperty() : "createdAt";
-        Sort.Direction direction = sort.isSorted() ? sort.toList().getFirst().getDirection() : Sort.Direction.DESC;
-
-        Comparator<Course> comparator = switch (property) {
-            case "price" -> Comparator.comparing(course -> course.getPrice() == null ? BigDecimal.ZERO : course.getPrice());
-            case "title" -> Comparator.comparing(course -> course.getTitle() == null ? "" : course.getTitle());
-            default -> Comparator.comparing(course -> course.getCreatedAt() == null ? java.time.Instant.EPOCH : course.getCreatedAt());
-        };
-
-        return direction == Sort.Direction.ASC ? comparator : comparator.reversed();
     }
 
     private Course findCourse(Long id) {

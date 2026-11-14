@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { after, afterEach, test } from 'node:test';
+import { after, afterEach, beforeEach, test } from 'node:test';
 import { JSDOM } from 'jsdom';
 import { act, createElement as h } from 'react';
 import { CacheProvider } from '@emotion/react';
@@ -33,7 +33,11 @@ const { sectionApi } = await load('features/courses/api/sectionApi.js');
 const { courseApi } = await load('features/courses/api/courseApi.js');
 const { categoryApi } = await load('features/courses/api/categoryApi.js');
 const { reviewApi } = await load('features/courses/api/reviewApi.js');
-const originals = [mediaApi, sectionApi, courseApi, categoryApi, reviewApi].map(api => [api, { ...api }]);
+const { learningApi } = await load('features/learning/api/learningApi.js');
+const originals = [mediaApi, sectionApi, courseApi, categoryApi, reviewApi, learningApi].map(api => [
+  api,
+  { ...api },
+]);
 const cache = createCache({ key: 'course-test' });
 const user = { id: 1, roles: ['ADMIN'], permissions: ['COURSE_VIEW', 'COURSE_CREATE', 'COURSE_UPDATE'] };
 let root;
@@ -56,6 +60,11 @@ async function changeValue(selector, value) {
     element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   });
 }
+
+beforeEach(() => {
+  learningApi.getAdminQuizzes = async () => ({ data: [] });
+  courseApi.list = async () => ({ data: { items: [] } });
+});
 
 afterEach(async () => {
   await act(async () => root?.unmount());
@@ -83,6 +92,27 @@ test('lesson form keeps edits during rerenders and resets when another lesson is
   assert.equal(document.querySelector('#lesson-title').value, 'Second lesson');
   assert.equal(document.querySelector('#lesson-type').value, 'VIDEO');
   assert.equal(document.querySelector('#lesson-duration').value, '120');
+});
+
+test('lesson quiz picker only offers quizzes belonging to the current course', async () => {
+  learningApi.getAdminQuizzes = async () => ({
+    data: [
+      { id: 21, courseId: 42, title: 'Current course quiz', passingScore: 70 },
+      { id: 22, courseId: 43, title: 'Other course quiz', passingScore: 70 },
+    ],
+  });
+  const initialLesson = { lessonType: 'QUIZ' };
+  const dialog = courseId => h(AddLessonDialog, { courseId, initialLesson, onCancel() {}, onConfirm() {} });
+  await render(dialog(42));
+  assert.deepEqual(
+    [...document.querySelectorAll('#lesson-quiz-picker option')].map(option => option.value),
+    ['', '21'],
+  );
+  await render(dialog(43));
+  assert.deepEqual(
+    [...document.querySelectorAll('#lesson-quiz-picker option')].map(option => option.value),
+    ['', '22'],
+  );
 });
 
 test('review drafts survive rerenders and reset when switching between edit and create', async () => {
@@ -211,7 +241,7 @@ test('admin reviews reset on course navigation and moderation still reloads the 
   const courses = new Map();
   const reviews = new Map();
   const actions = [];
-  courseApi.getById = id => new Promise(resolve => courses.set(id, resolve));
+  courseApi.adminGetById = id => new Promise(resolve => courses.set(id, resolve));
   reviewApi.adminList = id => new Promise(resolve => reviews.set(id, resolve));
   reviewApi.hide = async (courseId, reviewId) => {
     actions.push([courseId, reviewId]);

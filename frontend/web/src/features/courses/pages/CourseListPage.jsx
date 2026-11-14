@@ -9,7 +9,7 @@ import CourseCard from '../components/CourseCard';
 import ErrorState from '../../../shared/components/ErrorState';
 import useCourseCatalog from '../hooks/useCourseCatalog';
 import { learningApi } from '../../learning/api/learningApi';
-import { formatPrice, normalizeSearch } from '../data/demoCourses';
+import { formatPrice } from '../data/demoCourses';
 import useCourseSearch from '../hooks/useCourseSearch';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 
@@ -30,7 +30,29 @@ const numericCourseId = course => {
 function CourseListPage() {
   const { user, isAuthenticated } = useAuth();
   const toast = useToast();
-  const { courses, categories, loading, error, categoryError, retry } = useCourseCatalog();
+  const [params, setParams] = useSearchParams();
+  const query = params.get('q') || '';
+  const category = params.get('category') || '';
+  const filter = params.get('filter') || 'all';
+  const catalogParams = useMemo(
+    () => ({
+      page: Math.max(0, Number.parseInt(params.get('page'), 10) || 0),
+      size: 12,
+      keyword: params.get('q') || undefined,
+      categoryId: params.get('category') || undefined,
+      level: ['beginner', 'intermediate', 'advanced'].includes(params.get('filter'))
+        ? params.get('filter').toUpperCase()
+        : undefined,
+      pricing: ['free', 'paid'].includes(params.get('filter')) ? params.get('filter') : undefined,
+      sort: params.get('sort') || 'newest',
+      minPrice: params.get('minPrice') || undefined,
+      maxPrice: params.get('maxPrice') || undefined,
+      minRating: params.get('minRating') || undefined,
+    }),
+    [params],
+  );
+  const { courses, categories, pagination, loading, error, categoryError, retry } =
+    useCourseCatalog(catalogParams);
   const [selected, setSelected] = useState(null);
   const [enrollmentState, setEnrollmentState] = useState(null);
   const enrolledCourseIds =
@@ -45,7 +67,6 @@ function CourseListPage() {
   );
   const [enrollingCourseId, setEnrollingCourseId] = useState(null);
   const [enrollError, setEnrollError] = useState('');
-  const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
   // Search with debounce — keeps input responsive, updates URL after 300ms
@@ -54,12 +75,13 @@ function CourseListPage() {
 
   // Sync debounced keyword → URL param
   useEffect(() => {
+    if (debouncedKeyword === (params.get('q') || '')) return;
     const paramsObj = new URLSearchParams(params);
     if (debouncedKeyword) paramsObj.set('q', debouncedKeyword);
     else paramsObj.delete('q');
+    if (debouncedKeyword !== (params.get('q') || '')) paramsObj.delete('page');
     setParams(paramsObj, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedKeyword]);
+  }, [debouncedKeyword, params, setParams]);
 
   function selectCourse(course) {
     if (course?.id) {
@@ -96,9 +118,6 @@ function CourseListPage() {
     };
   }, [isAuthenticated, user?.id, setEnrolledCourseIds]);
 
-  const query = debouncedKeyword;
-  const category = params.get('category') || '';
-  const filter = params.get('filter') || 'all';
   const selectedCourseId = selected ? numericCourseId(selected) : null;
   const selectedIsEnrolled = selectedCourseId ? enrolledCourseIds.has(selectedCourseId) : false;
   const selectedEnrollLabel = !selectedCourseId
@@ -109,42 +128,11 @@ function CourseListPage() {
         ? 'Đang ghi danh...'
         : 'Ghi danh miễn phí';
 
-  const filteredCourses = useMemo(() => {
-    const selectedCategoryName = categories.find(item => String(item.id) === String(category))?.name;
-    const next = courses.filter(course => {
-      const matchesCategory =
-        !category ||
-        String(course.categoryId) === String(category) ||
-        course.categoryName === selectedCategoryName ||
-        course.category === selectedCategoryName;
-
-      const matchesQuery =
-        !query ||
-        normalizeSearch(`${course.title || ''} ${course.description || ''} ${course.categoryName || ''} ${course.keywords || ''}`).includes(
-          normalizeSearch(query),
-        );
-
-      const price = Number(course.price || 0);
-      const level = String(course.level || '').toUpperCase();
-      let matchesFilter = true;
-      if (filter === 'free') matchesFilter = price === 0;
-      else if (filter === 'paid') matchesFilter = price > 0;
-      else if (filter === 'beginner') matchesFilter = level === 'BEGINNER';
-      else if (filter === 'intermediate') matchesFilter = level === 'INTERMEDIATE';
-      else if (filter === 'advanced') matchesFilter = level === 'ADVANCED';
-
-      return matchesCategory && matchesQuery && matchesFilter;
-    });
-
-    const sort = params.get('sort') || '';
-    if (sort === 'rating_desc') return [...next].sort((a, b) => Number(b.avgRating || 0) - Number(a.avgRating || 0));
-    if (sort === 'price_asc') return [...next].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-    if (sort === 'price_desc') return [...next].sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
-    return next;
-  }, [categories, category, courses, filter, query, params]);
+  const filteredCourses = courses;
 
   function updateFilters(next) {
     const paramsObj = new URLSearchParams(params);
+    if (!Object.hasOwn(next, 'page')) paramsObj.delete('page');
     Object.entries(next).forEach(([key, value]) => {
       if (!value) paramsObj.delete(key);
       else paramsObj.set(key, value);
@@ -225,7 +213,13 @@ function CourseListPage() {
         <select
           value={category}
           onChange={event => updateFilters({ category: event.target.value })}
-          style={{ minWidth: 200, padding: '12px 16px', borderRadius: 10, border: '1px solid #dfe3ea', background: '#fff' }}
+          style={{
+            minWidth: 200,
+            padding: '12px 16px',
+            borderRadius: 10,
+            border: '1px solid #dfe3ea',
+            background: '#fff',
+          }}
         >
           <option value="">Tất cả danh mục ({categories.length})</option>
           {categories.map(item => (
@@ -237,7 +231,13 @@ function CourseListPage() {
         <select
           value={params.get('sort') || ''}
           onChange={event => updateFilters({ sort: event.target.value })}
-          style={{ minWidth: 180, padding: '12px 16px', borderRadius: 10, border: '1px solid #dfe3ea', background: '#fff' }}
+          style={{
+            minWidth: 180,
+            padding: '12px 16px',
+            borderRadius: 10,
+            border: '1px solid #dfe3ea',
+            background: '#fff',
+          }}
         >
           <option value="">Sắp xếp: Mặc định</option>
           <option value="rating_desc">⭐ Đánh giá cao nhất</option>
@@ -246,16 +246,62 @@ function CourseListPage() {
         </select>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
+        <label>
+          Giá từ{' '}
+          <input
+            type="number"
+            min="0"
+            aria-label="Giá tối thiểu"
+            value={params.get('minPrice') || ''}
+            onChange={event => updateFilters({ minPrice: event.target.value })}
+          />
+        </label>
+        <label>
+          Giá đến{' '}
+          <input
+            type="number"
+            min="0"
+            aria-label="Giá tối đa"
+            value={params.get('maxPrice') || ''}
+            onChange={event => updateFilters({ maxPrice: event.target.value })}
+          />
+        </label>
+        <label>
+          Đánh giá{' '}
+          <select
+            aria-label="Đánh giá tối thiểu"
+            value={params.get('minRating') || ''}
+            onChange={event => updateFilters({ minRating: event.target.value })}
+          >
+            <option value="">Tất cả</option>
+            <option value="4">Từ 4 sao</option>
+            <option value="3">Từ 3 sao</option>
+            <option value="2">Từ 2 sao</option>
+          </select>
+        </label>
+      </div>
+      <div
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}
+      >
         <span style={{ fontSize: 13, color: '#64748b' }}>
-          Hiển thị <strong>{filteredCourses.length}</strong> khóa học phù hợp
+          Hiển thị <strong>{pagination.totalElements}</strong> khóa học phù hợp
         </span>
-        {(Boolean(category) || Boolean(query) || (Boolean(filter) && filter !== 'all') || Boolean(params.get('sort'))) && (
+        {(Boolean(category) ||
+          Boolean(query) ||
+          (Boolean(filter) && filter !== 'all') ||
+          Boolean(params.get('sort')) ||
+          params.has('minPrice') ||
+          params.has('maxPrice') ||
+          params.has('minRating')) && (
           <button
             type="button"
             className="button button-soft"
             style={{ fontSize: 12, padding: '4px 10px' }}
-            onClick={() => setParams(new URLSearchParams())}
+            onClick={() => {
+              setKeyword('');
+              setParams(new URLSearchParams());
+            }}
           >
             ✕ Xóa tất cả bộ lọc
           </button>
@@ -295,6 +341,30 @@ function CourseListPage() {
         </div>
       )}
 
+      {!error && pagination.totalPages > 1 && (
+        <nav
+          aria-label="Phân trang khóa học"
+          style={{ display: 'flex', justifyContent: 'center', gap: 16, margin: '24px 0' }}
+        >
+          <button
+            className="button button-soft"
+            disabled={loading || pagination.page <= 0}
+            onClick={() => updateFilters({ page: String(pagination.page - 1) })}
+          >
+            Trang trước
+          </button>
+          <span>
+            Trang {pagination.page + 1} / {pagination.totalPages}
+          </span>
+          <button
+            className="button button-soft"
+            disabled={loading || pagination.page + 1 >= pagination.totalPages}
+            onClick={() => updateFilters({ page: String(pagination.page + 1) })}
+          >
+            Trang sau
+          </button>
+        </nav>
+      )}
       <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} maxWidth="sm" fullWidth>
         <DialogTitle className="dialog-heading">
           Thông tin khóa học

@@ -115,6 +115,19 @@ class CourseContentAccessTests {
     }
 
     @Test
+    void archivedCourseKeepsPurchasedAccessAndRejectsOtherReaders() {
+        Course course = course();
+        course.setStatus(CourseStatus.ARCHIVED);
+        assertThatThrownBy(() -> access.requirePublished(course)).hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+        authenticate("USER");
+        when(learning.isEnrolled(42L, "Bearer validated-user-jwt")).thenReturn(false);
+        assertThatThrownBy(() -> access.requirePublished(course)).hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+        when(learning.isEnrolled(42L, "Bearer validated-user-jwt")).thenReturn(true);
+        access.requireLesson(lesson(course, false));
+        assertThat(access.canReadPrivate(course)).isTrue();
+    }
+
+    @Test
     void mediaTicketsAreBoundToObjectAndExpireWithoutAcceptingTampering() {
         String url = tickets.signLocalUrl("/api/v1/media/download/videos/test.mp4");
         var parts = url.split("[?&=]");

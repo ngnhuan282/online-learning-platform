@@ -1,0 +1,99 @@
+# Run with compose.yaml; TLS terminates at a trusted reverse proxy on this host.
+x-production-backend: &production-backend
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 512
+  mem_limit: 768m
+  environment: &production-environment
+    JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=65 -XX:+ExitOnOutOfMemoryError
+    SERVER_FORWARD_HEADERS_STRATEGY: framework
+    SPRINGDOC_API_DOCS_ENABLED: "false"
+    SPRINGDOC_SWAGGER_UI_ENABLED: "false"
+
+services:
+  mysql:
+    ports: !override []
+    mem_limit: 1536m
+    security_opt: [no-new-privileges:true]
+
+  auth-service:
+    <<: *production-backend
+    image: ${IMAGE_REGISTRY:-sgsphere}/auth-service:${RELEASE_TAG:?Set RELEASE_TAG to an immutable release identifier}
+    environment:
+      <<: *production-environment
+      REFRESH_COOKIE_SECURE: "true"
+      GOOGLE_REDIRECT_URI: ${PRODUCTION_ORIGIN:?Set the public HTTPS origin}/api/v1/auth/google/callback/google
+      GOOGLE_FRONTEND_ORIGIN: ${PRODUCTION_ORIGIN}
+      FRONTEND_RESET_URL: ${PRODUCTION_ORIGIN}/reset-password
+
+  course-service:
+    <<: *production-backend
+    image: ${IMAGE_REGISTRY:-sgsphere}/course-service:${RELEASE_TAG}
+    environment:
+      <<: *production-environment
+      STORAGE_TYPE: ${STORAGE_TYPE:?Configure durable media storage}
+
+  learning-service:
+    <<: *production-backend
+    image: ${IMAGE_REGISTRY:-sgsphere}/learning-service:${RELEASE_TAG}
+
+  payment-service:
+    <<: *production-backend
+    image: ${IMAGE_REGISTRY:-sgsphere}/payment-service:${RELEASE_TAG}
+    environment:
+      <<: *production-environment
+      PAYMENT_MOCK_ENABLED: "false"
+      VNPAY_RETURN_URL: ${PRODUCTION_ORIGIN}/api/v1/payments/vnpay/return
+      VNPAY_IPN_URL: ${PRODUCTION_ORIGIN}/api/v1/payments/vnpay/ipn
+      VNPAY_RESULT_URL: ${PRODUCTION_ORIGIN}/payment/result
+
+  ai-service:
+    <<: *production-backend
+    image: ${IMAGE_REGISTRY:-sgsphere}/ai-service:${RELEASE_TAG}
+
+  api-gateway:
+    <<: *production-backend
+    image: ${IMAGE_REGISTRY:-sgsphere}/api-gateway:${RELEASE_TAG}
+    ports: !override []
+    environment:
+      <<: *production-environment
+      CORS_ALLOWED_ORIGINS: ${PRODUCTION_ORIGIN}
+
+  web:
+    profiles: [backend]
+    image: ${IMAGE_REGISTRY:-sgsphere}/web:${RELEASE_TAG}
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=64m
+      - /var/run:size=4m
+      - /etc/nginx/conf.d:size=1m
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null http://127.0.0.1/healthz && wget -q -O /dev/null http://127.0.0.1/actuator/health/readiness"]
+      interval: 10s
+      timeout: 6s
+      start_period: 15s
+      retries: 12
+    environment:
+      TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR:?Set the actual trusted reverse proxy address or CIDR}
+      NGINX_ENVSUBST_FILTER: ^TRUSTED_PROXY_CIDR$
+    volumes:
+      - ./infra/docker/nginx.production.conf.template:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "127.0.0.1:${PRODUCTION_WEB_PORT:-8088}:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      api-gateway:
+        condition: service_healthy

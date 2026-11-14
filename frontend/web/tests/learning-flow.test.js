@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { after, afterEach, test } from 'node:test';
+import { after, afterEach, beforeEach, test } from 'node:test';
 import { JSDOM } from 'jsdom';
 import { act, createElement as h } from 'react';
 import { CacheProvider } from '@emotion/react';
@@ -28,10 +28,11 @@ const { default: PaymentResultPage } = await load('features/payment/pages/Paymen
 const { learningApi } = await load('features/learning/api/learningApi.js');
 const { paymentApi } = await load('features/payment/api/paymentApi.js');
 const { lessonApi } = await load('features/courses/api/lessonApi.js');
+const { mediaApi } = await load('features/courses/api/mediaApi.js');
 const { ToastContext } = await load('shared/context/ToastContext.jsx');
 const { NotificationsContext } = await load('features/learning/context/NotificationsContext.jsx');
 const { clearTokens } = await load('shared/utils/tokenUtils.js');
-const originals = [learningApi, paymentApi, lessonApi].map(api => [api, { ...api }]);
+const originals = [learningApi, paymentApi, lessonApi, mediaApi].map(api => [api, { ...api }]);
 const cache = createCache({ key: 'learning-flow-test' });
 let root;
 let navigate;
@@ -113,6 +114,10 @@ function button(text) {
   assert.ok(result, 'Missing button: ' + text);
   return result;
 }
+
+beforeEach(() => {
+  mediaApi.listResources = async () => ({ data: [] });
+});
 
 afterEach(async () => {
   await act(async () => root?.unmount());
@@ -415,6 +420,49 @@ test('document lessons expose their authorized download URL through the Gateway'
   assert.ok(link);
   assert.equal(link.href, 'http://gateway.test/api/v1/media/download/documents/lesson.pdf?ticket=test');
   assert.equal(link.target, '_blank');
+});
+
+test('quiz lessons link to their quiz without requesting a media playback URL', async () => {
+  const snapshot = course();
+  snapshot.sections[0].lessons[0] = {
+    ...snapshot.sections[0].lessons[0],
+    lessonType: 'QUIZ',
+    content: '77',
+  };
+  let playbackRequests = 0;
+  lessonApi.getPlayUrl = async () => {
+    playbackRequests++;
+    throw new Error('Quiz lessons have no media');
+  };
+  learningApi.getLearningCourse = async () => ({ data: snapshot });
+  learningApi.getCourseQuizzes = async () => ({ data: [] });
+  await render('/learning/42');
+  assert.equal(playbackRequests, 0);
+  assert.match(
+    document.querySelector('.lesson-stage a[href="/quizzes/77"]').textContent,
+    /Bắt đầu làm bài Quiz/,
+  );
+});
+
+test('lesson resources discard a late response after selecting another lesson', async () => {
+  let finishPrevious;
+  learningApi.getLearningCourse = async () => ({ data: course() });
+  learningApi.getCourseQuizzes = async () => ({ data: [] });
+  learningApi.accessLesson = async () => ({ data: { lessonId: 42102, status: 'IN_PROGRESS' } });
+  mediaApi.listResources = lessonId =>
+    lessonId === 42101
+      ? new Promise(resolve => {
+          finishPrevious = resolve;
+        })
+      : Promise.resolve({
+          data: [{ id: 2, title: 'Current attachment', downloadUrl: '/api/v1/media/download/current.pdf' }],
+        });
+  await render('/learning/42');
+  await act(async () => button('Bài thực tế thứ hai').click());
+  assert.match(document.body.textContent, /Current attachment/);
+  await act(async () => finishPrevious({ data: [{ id: 1, title: 'Previous attachment' }] }));
+  assert.match(document.body.textContent, /Current attachment/);
+  assert.doesNotMatch(document.body.textContent, /Previous attachment/);
 });
 
 test('YouTube playback parses watch parameters, short links and shorts without matching unrelated hosts', async () => {

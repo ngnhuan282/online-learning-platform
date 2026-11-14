@@ -79,6 +79,9 @@ class AiChatIntegrationTests {
     @Autowired
     AiConversationStore store;
 
+    @Autowired
+    com.elearning.ai.service.AiUsageLimiter usageLimiter;
+
     private final HttpClient client = HttpClient.newHttpClient();
 
     @DynamicPropertySource
@@ -164,6 +167,8 @@ class AiChatIntegrationTests {
         jdbc.update("DELETE FROM ai_messages");
         jdbc.update("DELETE FROM ai_usage_logs");
         jdbc.update("DELETE FROM ai_conversations");
+        jdbc.update("DELETE FROM ai_daily_usage");
+        properties.setDailyRequestLimit(100);
         providerStatus.set(200);
         contextStatus.set(200);
         calls.set(0);
@@ -249,6 +254,32 @@ class AiChatIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT outcome FROM ai_usage_logs", String.class)).isEqualTo(
             "TRUNCATED"
         );
+    }
+
+    @Test
+    void dailyBudgetIsSharedAcrossConversationsAndReplayDoesNotConsumeAgain() throws Exception {
+        properties.setDailyRequestLimit(1);
+        long first = create("{}");
+        long second = create("{}");
+        assertThat(send(first, "budget-request-1").statusCode()).isEqualTo(200);
+        assertThat(send(first, "budget-request-1").statusCode()).isEqualTo(200);
+        assertThat(send(second, "budget-request-2").statusCode()).isEqualTo(429);
+        assertThat(calls.get()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 1", Integer.class)).isEqualTo(1);
+        properties.setDailyRequestLimit(2);
+        assertThat(send(second, "budget-request-2").statusCode()).isEqualTo(200);
+        assertThat(calls.get()).isEqualTo(2);
+    }
+
+    @Test
+    void concurrentRequestsCannotExceedTheDailyBudget() {
+        properties.setDailyRequestLimit(3);
+        var requests = java.util.stream.IntStream.range(0, 16).mapToObj(index -> CompletableFuture.supplyAsync(() -> {
+            try { usageLimiter.consume(999L); return 1; }
+            catch (AppException limited) { return 0; }
+        }, executor)).toList();
+        assertThat(requests.stream().mapToInt(CompletableFuture::join).sum()).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 999", Integer.class)).isEqualTo(3);
     }
 
     @Test

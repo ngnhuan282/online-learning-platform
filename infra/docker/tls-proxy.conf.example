@@ -1,0 +1,29 @@
+# Install on the host TLS reverse proxy after replacing the hostname/certificate paths.
+# Do not expose port 8088 or trust arbitrary forwarded headers from public clients.
+server {
+    listen 80;
+    server_name learn.example.com;
+    return 301 https://learn.example.com$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name learn.example.com;
+    ssl_certificate /etc/letsencrypt/live/learn.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/learn.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 210m;
+    location / {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_http_version 1.1;
+        proxy_set_header Host learn.example.com;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header X-Forwarded-Host learn.example.com;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+}

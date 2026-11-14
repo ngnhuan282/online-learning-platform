@@ -47,6 +47,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Validate production configuration contracts
+        run: node --test infra/scripts/production-env.test.mjs
       - run: node infra/scripts/create-integration-env.mjs
       - name: Validate local and staging Compose
         run: |
@@ -65,9 +67,26 @@ jobs:
         run: docker compose --env-file .tmp/integration.env -p auth-integration -f compose.yaml -f compose.staging.yaml --profile backend up --build -d --wait --wait-timeout 300
       - name: Verify staging SPA and API proxy
         run: node infra/scripts/staging-smoke.mjs --demo
+      - name: Stop first disposable stack before production-overlay checks
+        run: docker compose --env-file .tmp/integration.env -p auth-integration -f compose.yaml -f compose.staging.yaml --profile backend down -v
+      - run: node infra/scripts/create-production-test-env.mjs
+      - name: Start production overlay with isolated fixtures
+        run: docker compose --parallel 1 --env-file .tmp/production-integration.env -p production-integration -f compose.yaml -f compose.production.yaml --profile backend up --build -d --wait --wait-timeout 300
+        env:
+          COMPOSE_BAKE: "false"
+      - name: Verify production behavior without external integrations
+        run: node infra/scripts/production-smoke.mjs --test-stack
+      - name: Verify backup integrity and complete restore
+        run: node infra/scripts/production-backup-smoke.mjs --test-stack
       - name: Show health on failure
         if: failure()
         run: docker compose --env-file .tmp/integration.env -p auth-integration --profile backend ps -a
       - name: Stop disposable stack
         if: always()
         run: docker compose --env-file .tmp/integration.env -p auth-integration -f compose.yaml -f compose.staging.yaml --profile backend down -v
+      - name: Stop disposable production stack
+        if: always()
+        run: |
+          if [ -f .tmp/production-integration.env ]; then
+            docker compose --env-file .tmp/production-integration.env -p production-integration -f compose.yaml -f compose.production.yaml --profile backend down -v
+          fi

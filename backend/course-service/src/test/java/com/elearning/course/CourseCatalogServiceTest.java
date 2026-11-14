@@ -3,6 +3,7 @@ package com.elearning.course;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 import com.elearning.course.dto.CourseResponse;
@@ -60,10 +61,11 @@ class CourseCatalogServiceTest {
         beginnerCourse.setStatus(CourseStatus.PUBLISHED);
         beginnerCourse.setCreatedAt(Instant.parse("2026-09-12T10:00:00Z"));
 
-        when(courseRepository.findByStatusAndCategoryIdAndLevel(
-            eq(CourseStatus.PUBLISHED),
+        when(courseRepository.search(
+            eq("writing"),
             eq(7L),
             eq(CourseLevel.BEGINNER),
+            isNull(), isNull(), isNull(), isNull(),
             any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(beginnerCourse), Pageable.unpaged(), 1));
 

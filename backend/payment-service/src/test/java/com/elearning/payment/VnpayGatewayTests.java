@@ -67,6 +67,18 @@ class VnpayGatewayTests {
     }
 
     @Test
+    void productionMerchantRequiresHttpsReturnAndResultUrls() {
+        var properties = configured();
+        properties.setPaymentUrl(URI.create("https://pay.vnpay.vn/vpcpay.html"));
+        assertThat(properties.isAvailable()).isFalse();
+        properties.setReturnUrl(URI.create("https://learn.test/api/v1/payments/vnpay/return"));
+        properties.setResultUrl(URI.create("https://learn.test/payment/result"));
+        assertThat(properties.isAvailable()).isTrue();
+        properties.setPaymentUrl(URI.create("https://pay.vnpay.vn.untrusted.test/vpcpay.html"));
+        assertThat(properties.isAvailable()).isFalse();
+    }
+
+    @Test
     void rejectsUnsignedCallbacksWithoutInterpretingStatus() {
         var values = new LinkedMultiValueMap<String, String>();
         Map.of(

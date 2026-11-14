@@ -5,13 +5,17 @@ Hướng dẫn tích hợp Auth/Course/Learning/Payment, Docker staging, logging
 
 Kết quả A8/A9 ngày 13/10/2026, API/auth contracts, lệnh PowerShell và bàn giao owner:
 [A8_A9_REPORT.md](docs/deployment/A8_A9_REPORT.md).
-Minh chứng nghiệm thu: [A8_A9_ACCEPTANCE.md](docs/testing/A8_A9_ACCEPTANCE.md).
+Kiểm tra runtime sau merge: [POST_MERGE_RUNTIME_REPORT.md](docs/testing/POST_MERGE_RUNTIME_REPORT.md).
 
 SGSphere là nền tảng học trực tuyến được xây dựng theo kiến trúc **Microservices**. Frontend sử dụng **React + Vite**, Backend sử dụng **Spring Boot**, dữ liệu được lưu trên **MySQL**, và mọi request từ trình duyệt đi qua **API Gateway**.
 
 > Mục tiêu của project: xây dựng một nền tảng học trực tuyến có thể mở rộng theo từng module như Course, Learning, Payment/VNPay, AI Assistant và triển khai cloud sau này.
 
 ---
+
+Chuẩn bị production và vận hành: [PRODUCTION.md](docs/deployment/PRODUCTION.md).
+Cấu hình dùng `.env.production.example` + `compose.production.yaml`; không seed demo lên production.
+Kết quả kiểm chứng: [PRODUCTION_READINESS_REPORT.md](docs/testing/PRODUCTION_READINESS_REPORT.md).
 
 ## 1. Tính năng hiện có
 
@@ -29,8 +33,8 @@ SGSphere là nền tảng học trực tuyến được xây dựng theo kiến 
 
 Course Published/preview, enrollment miễn phí, Learning/progress và Payment MOCK đã có luồng tích hợp.
 MOCK cần `PAYMENT_MOCK_ENABLED=true` trên môi trường demo/test; mặc định tắt.
-VNPay signed checkout/callback và AI provider vẫn chờ milestone của owner.
-Profile `backend` chạy core; thêm `--profile ai` nếu cần AI skeleton.
+VNPay signed checkout/callback, AI Gemini và lịch sử hội thoại đã có; cần credential phù hợp để bật.
+Profile `backend` chạy cả sáu service. AI không có key/model vẫn cho đọc lịch sử.
 
 ---
 
@@ -866,11 +870,11 @@ USER / ADMIN authorization     ✅
 
 Course Public Catalog          ✅ Published / preview
 Course Detail                  ✅ Enrollment authorization
-Admin Course Management        ⬜
+Admin Course Management        ✅
 Enrollment / Learning          ✅ Free / MOCK paid / progress
-Quiz                           ⬜
-VNPay                          ⬜ Signed checkout/callback chờ D9
-AI Assistant                   ⬜
+Quiz                           ✅
+VNPay                          ✅ Signed checkout/callback; cấu hình Sandbox / merchant production
+AI Assistant                   ✅ Gemini / lịch sử / hạn mức theo ngày
 AWS Deployment                 ⬜
 ```
 

@@ -3,6 +3,7 @@ package com.elearning.auth.entity;
 import com.elearning.auth.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -29,6 +30,18 @@ public class User {
 
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
+
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
+    @Column(length = 25)
+    private String phone;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(length = 1000)
+    private String biography;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -71,6 +84,13 @@ public class User {
 
     public void updateProfile(String fullName) {
         this.fullName = fullName;
+    }
+
+    public void updateProfileDetails(String avatarUrl, String phone, LocalDate dateOfBirth, String biography) {
+        this.avatarUrl = avatarUrl;
+        this.phone = phone;
+        this.dateOfBirth = dateOfBirth;
+        this.biography = biography;
     }
 
     public void updatePassword(String passwordHash) {

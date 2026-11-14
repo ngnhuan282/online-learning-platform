@@ -417,3 +417,6 @@
 .sign-in-success {
   color: #065f46;
 }
+.auth-social-buttons > button:only-child {
+  grid-column: 1 / -1;
+}

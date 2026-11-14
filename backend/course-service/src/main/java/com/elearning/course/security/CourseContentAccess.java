@@ -29,14 +29,19 @@ public class CourseContentAccess {
     }
 
     public void requirePublished(Course course) {
-        if (!isEditor() && course.getStatus() != CourseStatus.PUBLISHED) {
-            throw new AppException(ErrorCode.NOT_FOUND);
-        }
+        if (isEditor() || course.getStatus() == CourseStatus.PUBLISHED) return;
+        // Archiving stops discovery/new purchases, without revoking purchased access.
+        if (course.getStatus() == CourseStatus.ARCHIVED && hasEnrollment(course)) return;
+        throw new AppException(ErrorCode.NOT_FOUND);
     }
 
     public boolean canReadPrivate(Course course) {
         if (isEditor()) return true;
         requirePublished(course);
+        return hasEnrollment(course);
+    }
+
+    private boolean hasEnrollment(Course course) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) return false;
         if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) return false;

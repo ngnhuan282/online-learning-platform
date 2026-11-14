@@ -24,6 +24,9 @@ public class RefreshToken {
     @Column(name = "session_id", nullable = false, length = 64)
     private String sessionId;
 
+    @Column(nullable = false)
+    private boolean persistent;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
@@ -40,11 +43,16 @@ public class RefreshToken {
     }
 
     public RefreshToken(User user, String tokenHash, Instant expiresAt, String sessionId) {
+        this(user, tokenHash, expiresAt, sessionId, false);
+    }
+
+    public RefreshToken(User user, String tokenHash, Instant expiresAt, String sessionId, boolean persistent) {
         this.user = user;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
         this.createdAt = Instant.now();
         this.sessionId = sessionId;
+        this.persistent = persistent;
     }
 
     public void revoke() {

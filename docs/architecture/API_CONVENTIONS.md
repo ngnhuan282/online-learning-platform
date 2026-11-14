@@ -130,7 +130,7 @@ Protected requests returning 401 share one cookie refresh operation, save the ne
 
 Logout calls the backend to revoke the refresh token and expire its cookie, then clears local access/user state. It waits for any in-flight login/rotation before sending revocation. Network failure still clears the local session and displays that server logout could not be confirmed. Already-issued access JWTs remain valid until expiry.
 
-Login/register call Auth through Gateway. `CustomUserDetailsService` reads auth-local users and roles. Registration always creates an ACTIVE USER and ignores caller role/status fields; no account/password is seeded. Refresh tokens are persisted as hashes only; OAuth2 is not implemented.
+Login/register call Auth through Gateway. `CustomUserDetailsService` reads auth-local users and roles. Registration always creates an ACTIVE USER and ignores caller role/status fields; no account/password is seeded by registration. Refresh tokens are persisted as hashes only. Google OIDC is available through the existing Auth session flow; explicit administrator bootstrap is documented in `docs/deployment/PRODUCTION.md`.
 
 ## Auth endpoints
 
@@ -160,11 +160,11 @@ The login form also checks the 72-byte limit. Login continues to verify existing
 
 Refresh tokens contain 32 SecureRandom bytes encoded as unpadded Base64url. Only the SHA-256 hex hash is stored in `auth_db.refresh_tokens`. Every refresh transaction locks the user then the old token row, verifies expiration/revocation and account status, revokes the old token and inserts a new hash. Multiple sessions are independent. Concurrent use of the same token has one winner; the old token cannot refresh again.
 
-Login and refresh set `refresh_token` with HttpOnly, SameSite=Lax, Path=/api/v1/auth and configurable Secure. It is a session cookie (no persistent Max-Age/Expires); server expiration defaults to seven days via REFRESH_TOKEN_EXPIRATION_SECONDS. Production HTTPS should set REFRESH_COOKIE_SECURE=true. No refresh value appears in JSON or JavaScript storage. Logout expires the matching cookie with Max-Age=0 and is idempotent.
+Login and refresh set `refresh_token` with HttpOnly, SameSite=Lax, Path=/api/v1/auth and configurable Secure. Default login sets a session cookie. Login with `rememberMe=true` sets Max-Age to the refresh TTL and stores only this persistence preference alongside the token hash; rotation preserves it. Server expiration defaults to seven days via REFRESH_TOKEN_EXPIRATION_SECONDS. Production HTTPS sets Secure=true. No refresh value appears in JSON or JavaScript storage. Logout expires the matching cookie with Max-Age=0 and is idempotent.
 
 The four POST Auth endpoints are public and ignore stale Bearer tokens. Other routes retain existing JWT rules. Gateway CORS allows only configured origins, enables credentials, rejects wildcard origins, and forwards cookies normally. Axios uses withCredentials=true. SameSite=Lax requires frontend/Gateway deployment on the same site; local localhost ports satisfy this.
 
-Refresh authentication failures use 401: REFRESH_TOKEN_MISSING, REFRESH_TOKEN_INVALID, REFRESH_TOKEN_EXPIRED, REFRESH_TOKEN_REVOKED. Disabled/locked accounts retain ACCOUNT_DISABLED/ACCOUNT_LOCKED (403). Failed refresh clears the local token; a temporary `/me` failure without refresh retains it. Explicit retry can retry startup restoration. Refresh never loops automatically; verification and Remember Me are not implemented. Google OIDC login and linking use this same session machinery as documented above.
+Refresh authentication failures use 401: REFRESH_TOKEN_MISSING, REFRESH_TOKEN_INVALID, REFRESH_TOKEN_EXPIRED, REFRESH_TOKEN_REVOKED. Disabled/locked accounts retain ACCOUNT_DISABLED/ACCOUNT_LOCKED (403). Failed refresh clears the local token; a temporary `/me` failure without refresh retains it. Explicit retry can retry startup restoration. Refresh never loops automatically. Google OIDC login and linking use the same session machinery as documented above.
 
 `POST /api/v1/auth/forgot-password` and `POST /api/v1/auth/reset-password` are public only for those exact
 POST paths at Gateway/Auth. Forgot accepts `{email}` and returns the same 200 notice for unknown,

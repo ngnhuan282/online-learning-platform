@@ -34,11 +34,16 @@ public class VnpayProperties {
             hashSecret != null &&
             !hashSecret.isBlank() &&
             paymentUrl != null &&
-            paymentUrl.toString().equals("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html") &&
-            validUrl(returnUrl, "/api/v1/payments/vnpay/return", false) &&
+            (paymentUrl.toString().equals("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html") ||
+                paymentUrl.toString().equals("https://pay.vnpay.vn/vpcpay.html")) &&
+            validUrl(returnUrl, "/api/v1/payments/vnpay/return", isProduction()) &&
             validUrl(ipnUrl, "/api/v1/payments/vnpay/ipn", true) &&
-            validUrl(resultUrl, "/payment/result", false)
+            validUrl(resultUrl, "/payment/result", isProduction())
         );
+    }
+
+    private boolean isProduction() {
+        return paymentUrl != null && "pay.vnpay.vn".equals(paymentUrl.getHost());
     }
 
     private boolean validUrl(URI url, String path, boolean httpsOnly) {

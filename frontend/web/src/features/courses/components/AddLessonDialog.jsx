@@ -34,7 +34,11 @@ export default function AddLessonDialog({
         const adminRes = await learningApi.getAdminQuizzes();
         const list = adminRes?.data?.data ?? adminRes?.data ?? [];
         if (active) {
-          setAvailableQuizzes(Array.isArray(list) ? list : []);
+          setAvailableQuizzes(
+            Array.isArray(list)
+              ? list.filter(quiz => courseId == null || String(quiz.courseId) === String(courseId))
+              : [],
+          );
         }
       } catch (err) {
         console.warn('Could not load quizzes for lesson picker:', err);
@@ -46,7 +50,7 @@ export default function AddLessonDialog({
     return () => {
       active = false;
     };
-  }, []);
+  }, [courseId]);
 
   if (previousLesson !== initialLesson) {
     setPreviousLesson(initialLesson);

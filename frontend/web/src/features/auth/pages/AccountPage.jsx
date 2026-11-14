@@ -12,6 +12,12 @@ export default function AccountPage() {
 
   // Profile Form State
   const [fullName, setFullName] = useState(user?.fullName || '');
+  const [profile, setProfile] = useState({
+    avatarUrl: user?.avatarUrl || '',
+    phone: user?.phone || '',
+    dateOfBirth: user?.dateOfBirth || '',
+    biography: user?.biography || '',
+  });
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -39,7 +45,11 @@ export default function AccountPage() {
     }
     setProfileLoading(true);
     try {
-      const result = await userApi.updateProfile({ fullName: fullName.trim() });
+      const result = await userApi.updateProfile({
+        fullName: fullName.trim(),
+        ...profile,
+        dateOfBirth: profile.dateOfBirth || null,
+      });
       updateCurrentUser(result.data);
       setProfileSuccess('Cập nhật thông tin tài khoản thành công!');
     } catch (err) {
@@ -193,7 +203,18 @@ export default function AccountPage() {
               flexShrink: 0,
             }}
           >
-            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt="Ảnh đại diện"
+                referrerPolicy="no-referrer"
+                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+              />
+            ) : user?.fullName ? (
+              user.fullName.charAt(0).toUpperCase()
+            ) : (
+              'U'
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <h2 style={{ fontSize: 20, margin: 0, fontWeight: 700 }}>{user?.fullName || 'Người dùng'}</h2>
@@ -244,7 +265,7 @@ export default function AccountPage() {
             <div>
               <h3 style={{ fontSize: 18, fontWeight: 700 }}>Cập nhật hồ sơ</h3>
               <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-                Thay đổi tên hiển thị của bạn trên hệ thống.
+                Cập nhật thông tin cá nhân và liên hệ của bạn.
               </p>
             </div>
 
@@ -320,6 +341,47 @@ export default function AccountPage() {
                 />
               </div>
 
+              {[
+                ['avatarUrl', 'URL ảnh đại diện', 'url', 500],
+                ['phone', 'Số điện thoại', 'tel', 25],
+                ['dateOfBirth', 'Ngày sinh', 'date'],
+              ].map(([field, label, type, maxLength]) => (
+                <label key={field} style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
+                  {label}
+                  <input
+                    name={field}
+                    type={type}
+                    value={profile[field]}
+                    maxLength={maxLength}
+                    max={type === 'date' ? new Date().toLocaleDateString('en-CA') : undefined}
+                    onChange={event => setProfile(previous => ({ ...previous, [field]: event.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      fontSize: 14,
+                    }}
+                  />
+                </label>
+              ))}
+              <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
+                Giới thiệu bản thân
+                <textarea
+                  name="biography"
+                  rows={4}
+                  maxLength={1000}
+                  value={profile.biography}
+                  onChange={event => setProfile(previous => ({ ...previous, biography: event.target.value }))}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    fontSize: 14,
+                    resize: 'vertical',
+                  }}
+                />
+              </label>
               <button
                 type="submit"
                 className="button button-primary"

@@ -82,6 +82,7 @@ test('Axios attaches tokens, unwraps envelopes, normalizes 401 and rejects bypas
   await authApi.login({ email: 'test@example.com', password: 'test', remember: true }, { adapter });
   assert.equal(seen.headers.has('Authorization'), false);
   assert.equal(JSON.parse(seen.data).remember, undefined);
+  assert.equal(JSON.parse(seen.data).rememberMe, true);
   await assert.rejects(client.get('https://other.example/api/v1/users/me', { adapter }), {
     code: 'INVALID_API_URL',
   });

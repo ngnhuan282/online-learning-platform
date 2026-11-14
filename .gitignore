@@ -4,11 +4,13 @@
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.production.example
 **/node_modules/
 **/dist/
 **/target/
 **/*.local/
 .tmp/
+backups/
 .idea/
 .vscode/
 *.log
