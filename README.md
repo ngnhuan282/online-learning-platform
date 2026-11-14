@@ -471,6 +471,29 @@ exit;
 
 # 13. Test đăng ký và đăng nhập
 
+## Tài khoản mẫu theo loại người dùng
+
+Các tài khoản dưới đây dành cho **local/demo**, được tạo sau khi chạy
+[seed dữ liệu mẫu](infra/mysql/README.md#chạy-seed-bằng-powershell).
+Chỉ khởi động Docker sẽ không tự tạo các tài khoản này.
+
+| Loại người dùng | Email | Mật khẩu | Trạng thái |
+| --- | --- | --- | --- |
+| Quản trị viên (`ADMIN` + `USER`) | `admin@gmail.com` | `Admin123` | `ACTIVE` |
+| Học viên (`USER`) | `user@gmail.com` | `User123` | `ACTIVE` |
+| Học viên (`USER`) | `tran.thi.b@elearning.com` | `User123!` | `ACTIVE` |
+| Học viên (`USER`) | `le.van.c@elearning.com` | `User123!` | `ACTIVE` |
+| Học viên bị khóa (`USER`) | `pham.thi.d@elearning.com` | `User123!` | `LOCKED` |
+| Học viên (`USER`) | `hoang.van.e@elearning.com` | `User123!` | `ACTIVE` |
+
+- **Khách (`Guest`)**: không cần tài khoản, sử dụng website khi chưa đăng nhập.
+- **Admin** đăng nhập tại `/login` và được chuyển đến `/admin`; **học viên** đến `/account`.
+- Tài khoản `LOCKED` dùng để kiểm tra thông báo từ chối đăng nhập do bị khóa.
+- Vai trò tùy chỉnh do admin tạo và gán; seed chưa có tài khoản riêng cho các vai trò này.
+
+Không dùng tài khoản mẫu trên production. Tạo admin riêng theo
+[hướng dẫn production](docs/deployment/PRODUCTION.md#2-kiểm-tra-cấu-hình-tạo-admin-và-khởi-động).
+
 ## Đăng ký
 
 Mở:
