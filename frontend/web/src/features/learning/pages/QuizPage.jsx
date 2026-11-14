@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Button, Checkbox, FormControlLabel, Radio } from '@mui/material';
 import ErrorState from '../../../shared/components/ErrorState';
+import LearningHeader from '../components/LearningHeader';
 import { learningApi } from '../api/learningApi';
 import useAuth from '../../auth/hooks/useAuth';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
+import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
 import { clearQuizDraft, quizDraftKey, readQuizDraft, writeQuizDraft } from '../utils/quizDraft';
 import '../styles/quiz.css';
+
+const subscribeToSession = callback => {
+  window.addEventListener(AUTH_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(AUTH_CHANGED_EVENT, callback);
+};
 
 function remainingSeconds(attempt, quiz) {
   if (!quiz.timeLimitMinutes) return null;
@@ -152,17 +159,16 @@ function QuizWorkspace({ quizId, userId }) {
   return (
     <section className="learning-page">
       <div className="learning-shell quiz-workspace">
-        <div className="learning-page-header">
-          <div>
-            <p>Quiz</p>
-            <h1>{quiz?.title ?? `Quiz #${quizId}`}</h1>
-          </div>
+        <LearningHeader
+          title={quiz?.title ?? `Quiz #${quizId}`}
+          description="Kiểm tra kiến thức và theo dõi kết quả sau khi nộp bài."
+        >
           {quiz && (
             <Link className="button button-outline" to={`/learning/${quiz.courseId}`}>
               Quay lại khóa học
             </Link>
           )}
-        </div>
+        </LearningHeader>
         {error && (
           <ErrorState
             error={error}
@@ -196,7 +202,7 @@ function QuizWorkspace({ quizId, userId }) {
                     {quiz.questions.length}
                   </span>
                   {remaining != null && (
-                    <strong aria-live="polite">
+                    <strong role="timer" aria-label="Thời gian còn lại">
                       Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
                     </strong>
                   )}
@@ -225,6 +231,7 @@ function QuizWorkspace({ quizId, userId }) {
                             />
                           ) : (
                             <Radio
+                              name={`question-${question.id}`}
                               checked={(answers[question.id] ?? []).includes(option.id)}
                               onChange={() => choose(question, option.id, true)}
                             />
@@ -249,5 +256,6 @@ function QuizWorkspace({ quizId, userId }) {
 export default function QuizPage() {
   const { quizId } = useParams();
   const { user } = useAuth();
-  return <QuizWorkspace key={`${user?.id}:${quizId}`} quizId={quizId} userId={user?.id} />;
+  const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
+  return <QuizWorkspace key={`${user?.id}:${quizId}:${session}`} quizId={quizId} userId={user?.id} />;
 }
