@@ -38,7 +38,7 @@ integrations:
   ai:
     api-key: ${AI_API_KEY:}
     model: ${AI_MODEL:}
-    request-timeout-ms: ${AI_REQUEST_TIMEOUT_MS:15000}
+    request-timeout-ms: ${AI_REQUEST_TIMEOUT_MS:60000}
 
 course:
   service-url: ${COURSE_SERVICE_URL:http://localhost:8082}

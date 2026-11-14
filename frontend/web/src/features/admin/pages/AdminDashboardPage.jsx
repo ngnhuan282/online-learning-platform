@@ -14,6 +14,8 @@ import { adminApi } from '../api/adminApi';
 import { can, number, money, date } from '../utils/adminUtils';
 import { PageHeading, StatCard, LoadState } from '../components/AdminUi';
 import { getPaymentDisplayStatus } from '../../payment/utils/paymentFlow';
+import PaymentRevenueChart from '../../payment/components/PaymentRevenueChart';
+import '../../payment/styles/payment-admin.css';
 
 const sources = [
   ['overview', 'DASHBOARD_VIEW', 'Tài khoản'],
@@ -22,6 +24,20 @@ const sources = [
   ['payments', 'PAYMENT_REPORT_VIEW', 'Thanh toán'],
 ];
 const colors = ['#2563eb', '#38bdf8', '#1646b5', '#a8b8d5', '#86a9f9'];
+const paymentLabels = {
+  PENDING: 'Đang chờ',
+  SUCCESS: 'Thành công',
+  FAILED: 'Thất bại',
+  CANCELLED: 'Đã hủy',
+  EXPIRED: 'Hết hạn thanh toán',
+  REFUNDED: 'Hoàn tiền',
+};
+
+function paymentTone(status) {
+  if (status === 'SUCCESS') return 'green';
+  if (status === 'FAILED' || status === 'CANCELLED') return 'red';
+  return status === 'REFUNDED' ? 'purple' : 'amber';
+}
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
@@ -49,7 +65,9 @@ export default function AdminDashboardPage() {
   const revenueSeries = payments?.revenueSeries ?? [];
   const recentTransactions = payments?.recentTransactions ?? [];
   const maxUsers = Math.max(1, ...months.map(m => m.count ?? 0));
-  const maxRevenue = Math.max(1, ...revenueSeries.map(point => Number(point.amount ?? 0)));
+  const periodRevenue = payments
+    ? revenueSeries.reduce((sum, point) => sum + Number(point.amount ?? 0), 0)
+    : undefined;
   const categories = courses?.categories ?? [];
   const total = categories.reduce((sum, c) => sum + c.count, 0);
   let cursor = 0;
@@ -61,7 +79,8 @@ export default function AdminDashboardPage() {
     })
     .join(',');
   return (
-    <>
+    <div className="workspace-scope admin-dashboard-workspace">
+      <span className="workspace-kicker">Không gian quản trị</span>
       <section className="admin-welcome">
         <PageHeading
           title={`Chào mừng trở lại, ${user?.fullName || 'Quản trị viên'}!`}
@@ -128,68 +147,54 @@ export default function AdminDashboardPage() {
         )}
       </div>
       <div className="admin-dashboard-charts">
-        <section className="admin-card">
-          <div className="admin-card-heading">
-            <div>
-              <h2>Doanh thu & tăng trưởng tài khoản</h2>
-              <p>Doanh thu 6 ngày gần nhất · tài khoản mới 6 tháng gần nhất</p>
+        {can(user, 'PAYMENT_REPORT_VIEW') && (
+          <section className="admin-card payment-dashboard-revenue">
+            <div className="admin-card-heading">
+              <div>
+                <h2>Doanh thu thanh toán</h2>
+                <p>6 ngày gần nhất · Theo ngày thanh toán (UTC)</p>
+              </div>
+              <span className="admin-pill green">Giao dịch thành công</span>
             </div>
-          </div>
-          <h3>Doanh thu theo ngày (triệu ₫)</h3>
-          {revenueSeries.length ? (
-            <div
-              className="admin-bar-chart"
-              role="img"
-              aria-label="Doanh thu theo ngày trong 6 ngày gần nhất"
-            >
-              {revenueSeries.map((point, i) => {
-                const amount = Number(point.amount ?? 0);
-                return (
-                  <div className="admin-bar-column" key={point.label}>
+            <strong className="payment-period-revenue">
+              {state.loading ? 'Đang tải…' : money(periodRevenue)}
+            </strong>
+            <PaymentRevenueChart data={revenueSeries} loading={state.loading} unavailable={!payments} />
+          </section>
+        )}
+        {can(user, 'DASHBOARD_VIEW') && (
+          <section className="admin-card">
+            <div className="admin-card-heading">
+              <div>
+                <h2>Tăng trưởng tài khoản</h2>
+                <p>Tài khoản mới trong 6 tháng gần nhất</p>
+              </div>
+            </div>
+            {months.length ? (
+              <div className="admin-bar-chart" role="img" aria-label="Số tài khoản mới theo tháng">
+                {months.map((m, i) => (
+                  <div className="admin-bar-column" key={m.month}>
                     <div className="admin-bars">
                       <div
-                        className="admin-bar"
-                        style={{ height: `${(amount / maxRevenue) * 85}%` }}
-                        title={money(amount)}
+                        className="admin-bar cyan"
+                        style={{ height: `${((m.count ?? 0) / maxUsers) * 85}%` }}
+                        title={`${number(m.count)} tài khoản`}
                       >
-                        <span>{number(Math.round(amount / 100000) / 10)}</span>
+                        <span>{number(m.count)}</span>
                       </div>
                     </div>
-                    <small className={i === revenueSeries.length - 1 ? 'current' : ''}>{point.label}</small>
+                    <small className={i === months.length - 1 ? 'current' : ''}>
+                      {m.month.slice(5)}/{m.month.slice(0, 4)}
+                    </small>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="admin-empty">Chưa có dữ liệu doanh thu.</div>
-          )}
-          <h3>Tài khoản mới theo tháng</h3>
-          {months.length ? (
-            <div className="admin-bar-chart" role="img" aria-label="Số tài khoản mới theo tháng">
-              {months.map((m, i) => (
-                <div className="admin-bar-column" key={m.month}>
-                  <div className="admin-bars">
-                    <div
-                      className="admin-bar cyan"
-                      style={{ height: `${((m.count ?? 0) / maxUsers) * 85}%` }}
-                      title={`${number(m.count)} tài khoản`}
-                    >
-                      <span>{number(m.count)}</span>
-                    </div>
-                  </div>
-                  <small className={i === months.length - 1 ? 'current' : ''}>
-                    {m.month.slice(5)}/{m.month.slice(0, 4)}
-                  </small>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="admin-empty">Chưa có dữ liệu tài khoản.</div>
-          )}
-          <p className="admin-card-note">
-            Doanh thu từ thanh toán thành công theo ngày. Tài khoản được nhóm theo tháng đăng ký (UTC).
-          </p>
-        </section>
+                ))}
+              </div>
+            ) : (
+              <div className="admin-empty">Chưa có dữ liệu tài khoản.</div>
+            )}
+            <p className="admin-card-note">Tài khoản được nhóm theo tháng đăng ký (UTC).</p>
+          </section>
+        )}
         {can(user, 'COURSE_VIEW') && (
           <section className="admin-card">
             <h2>Phân bố khóa học</h2>
@@ -257,8 +262,8 @@ export default function AdminDashboardPage() {
                         : `${number(order.amount)} ${order.currency}`}
                     </td>
                     <td>
-                      <span className={`admin-pill ${order.status === 'SUCCESS' ? 'green' : 'amber'}`}>
-                        {getPaymentDisplayStatus(order) === 'EXPIRED' ? 'Hết hạn thanh toán' : order.status}
+                      <span className={`admin-pill ${paymentTone(getPaymentDisplayStatus(order))}`}>
+                        {paymentLabels[getPaymentDisplayStatus(order)] || order.status}
                       </span>
                     </td>
                     <td>{date(order.createdAt)}</td>
@@ -312,7 +317,7 @@ export default function AdminDashboardPage() {
           </div>
         </section>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -52,6 +52,9 @@ export function needsPaymentRefresh(order) {
 }
 
 export function getCheckoutErrorMessage(error) {
+  if (error?.code === 'COURSE_ALREADY_PURCHASED') {
+    return 'Bạn đã thanh toán khóa học này. Vui lòng xem lịch sử thanh toán để vào học hoặc kích hoạt lại quyền học; không cần thanh toán thêm.';
+  }
   if (error?.code === 'CHECKOUT_EXPIRED') {
     return 'Đơn này đã hết hạn thanh toán. Vui lòng kiểm tra lịch sử trước khi tạo giao dịch mới.';
   }

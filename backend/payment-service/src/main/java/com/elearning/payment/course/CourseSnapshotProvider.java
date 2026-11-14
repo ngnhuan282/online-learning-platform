@@ -78,10 +78,22 @@ public class CourseSnapshotProvider {
             throw new AppException(ErrorCode.CONFLICT);
         }
 
-        return new CourseSnapshot(course.id(), course.title().strip(), course.price(), PAYMENT_CURRENCY);
+        return new CourseSnapshot(
+            course.id(),
+            course.title().strip(),
+            course.price(),
+            PAYMENT_CURRENCY,
+            course.originalPrice()
+        );
     }
 
     private record CourseEnvelope(boolean success, CourseData data) {}
 
-    private record CourseData(Long id, String title, BigDecimal price, String status) {}
+    private record CourseData(
+        Long id,
+        String title,
+        BigDecimal price,
+        String status,
+        BigDecimal originalPrice
+    ) {}
 }

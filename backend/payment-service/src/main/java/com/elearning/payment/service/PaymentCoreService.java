@@ -29,6 +29,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -78,6 +79,10 @@ public class PaymentCoreService {
             return existingCheckout(existingOrder, request.courseId(), provider);
         }
 
+        if (payments.existsSuccessfulPurchase(userId, request.courseId())) {
+            throw new AppException(ErrorCode.COURSE_ALREADY_PURCHASED);
+        }
+
         CourseSnapshot course = courses.requirePurchasableCourse(request.courseId());
         CourseOrder order = new CourseOrder(
             generateOrderCode(),
@@ -88,7 +93,13 @@ public class PaymentCoreService {
             Instant.now().plusSeconds((provider == PaymentProvider.VNPAY ? vnpay.expireMinutes() : 15) * 60L)
         );
         order.addItem(
-            new OrderItem(course.id(), course.title(), course.price(), BigDecimal.ZERO, course.price())
+            new OrderItem(
+                course.id(),
+                course.title(),
+                course.originalPrice(),
+                course.discountAmount(),
+                course.price()
+            )
         );
         orders.saveAndFlush(order);
 
@@ -116,6 +127,14 @@ public class PaymentCoreService {
             toPaymentSummary(payment),
             payment.getCheckoutUrl()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CheckoutResponse> findExistingCheckout(CheckoutRequest request, Long userId) {
+        PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        return orders
+            .findByUserIdAndIdempotencyKey(userId, request.idempotencyKey().strip())
+            .map(order -> existingCheckout(order, request.courseId(), provider));
     }
 
     private CheckoutResponse existingCheckout(

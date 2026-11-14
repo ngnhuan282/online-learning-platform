@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import IconButton from '@mui/material/IconButton';
+import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
 import Tooltip from '@mui/material/Tooltip';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
@@ -120,6 +121,12 @@ export default function AiMessage({ message }) {
               {message.content}
             </Markdown>
           </div>
+        )}
+        {!isUser && message.truncated && (
+          <Alert severity="warning" className="ai-assistant-truncated">
+            Câu trả lời đã chạm giới hạn độ dài và chưa đầy đủ. Bạn có thể nhắn “Tiếp tục phần còn lại” hoặc
+            chia câu hỏi thành từng ý nhỏ.
+          </Alert>
         )}
         {!isUser && (
           <div className="ai-assistant-message-actions">

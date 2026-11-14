@@ -24,7 +24,7 @@ class AiProviderPropertiesTests {
             AiProviderProperties properties = context.getBean(AiProviderProperties.class);
             assertThat(properties.getApiKey()).isEmpty();
             assertThat(properties.getModel()).isEmpty();
-            assertThat(properties.getRequestTimeoutMs()).isEqualTo(15000);
+            assertThat(properties.getRequestTimeoutMs()).isEqualTo(60000);
         });
     }
 

@@ -9,7 +9,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import HistoryOutlined from '@mui/icons-material/HistoryOutlined';
 import Refresh from '@mui/icons-material/Refresh';
 import SchoolOutlined from '@mui/icons-material/SchoolOutlined';
-import AppLoading from '../../../shared/components/AppLoading';
+import Skeleton from '@mui/material/Skeleton';
 import { getAiErrorMessage, groupConversations } from '../utils/aiState';
 
 export default function ConversationSidebar({
@@ -34,6 +34,12 @@ export default function ConversationSidebar({
           <div>
             <HistoryOutlined fontSize="small" aria-hidden="true" />
             <h2>Hội thoại</h2>
+            <span
+              className="ai-assistant-history-count"
+              aria-label={`${conversations.length} hội thoại đã tải`}
+            >
+              {conversations.length}
+            </span>
           </div>
           {onClose && (
             <Tooltip title="Đóng danh sách hội thoại">
@@ -69,11 +75,18 @@ export default function ConversationSidebar({
             {getAiErrorMessage(historyError)}
           </Alert>
         )}
-        {historyPage < 0 && !historyError && <AppLoading label="Đang tải hội thoại..." />}
+        {historyPage < 0 && !historyError && (
+          <div className="workspace-skeleton" role="status" aria-label="Đang tải hội thoại">
+            <Skeleton height={64} />
+            <Skeleton height={64} />
+            <Skeleton height={64} />
+          </div>
+        )}
         {historyPage >= 0 && !conversations.length && (
           <div className="ai-assistant-history-empty">
             <ChatBubbleOutlined aria-hidden="true" />
             <p>Chưa có hội thoại</p>
+            <small>Các cuộc trò chuyện của bạn sẽ được lưu tại đây.</small>
           </div>
         )}
         <nav className="ai-assistant-conversation-list" aria-label="Các hội thoại">
@@ -126,6 +139,12 @@ export default function ConversationSidebar({
             Xem thêm
           </Button>
         )}
+      </div>
+      <div className="ai-assistant-history-footer">
+        <span className="ai-assistant-footer-dot" aria-hidden="true" />
+        <p>
+          Không gian học tập riêng<small>Chỉ bạn xem được lịch sử của mình.</small>
+        </p>
       </div>
     </aside>
   );

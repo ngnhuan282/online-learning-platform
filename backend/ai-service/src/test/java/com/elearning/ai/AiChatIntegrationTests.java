@@ -220,6 +220,38 @@ class AiChatIntegrationTests {
     }
 
     @Test
+    void truncatedAnswerIsMarkedInHistoryAndReplayWithoutGeneratingAgain() throws Exception {
+        long id = create("{}");
+        providerBody.set(
+            """
+            {"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"A partial explanation"}]}}],
+             "usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":4096}}
+            """
+        );
+        var response = send(id, "truncated-0001");
+        assertThat(response.statusCode()).isEqualTo(200);
+        JsonNode reply = mapper.readTree(response.body()).path("data");
+        assertThat(reply.get(0).path("truncated").asBoolean()).isFalse();
+        assertThat(reply.get(1).path("truncated").asBoolean()).isTrue();
+        assertThat(reply.get(1).path("content").asString()).isEqualTo("A partial explanation");
+
+        var history = request(BASE + "/" + id + "/messages", token(1, "USER"), null);
+        assertThat(
+            mapper.readTree(history.body()).path("data").path("content").get(0).path("truncated").asBoolean()
+        ).isTrue();
+        JsonNode replay = mapper.readTree(send(id, "truncated-0001").body()).path("data");
+        assertThat(replay.size()).isEqualTo(2);
+        assertThat(replay.get(1).path("id")).isEqualTo(reply.get(1).path("id"));
+        assertThat(replay.get(1).path("content")).isEqualTo(reply.get(1).path("content"));
+        assertThat(replay.get(1).path("truncated").asBoolean()).isTrue();
+        assertThat(calls.get()).isEqualTo(1);
+        assertThat(count("ai_messages")).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT outcome FROM ai_usage_logs", String.class)).isEqualTo(
+            "TRUNCATED"
+        );
+    }
+
+    @Test
     void realHttpProviderPersistsBothMessagesAndReplaysWithoutAnotherCall() throws Exception {
         long id = create("{\"userId\":999,\"apiKey\":\"untrusted\"}");
         var response = send(id, "request-0001");

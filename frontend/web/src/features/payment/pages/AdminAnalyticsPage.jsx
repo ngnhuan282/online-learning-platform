@@ -8,7 +8,9 @@ import Icon from '../../../shared/components/Icon';
 import { paymentApi } from '../api/paymentApi';
 import { formatDemoPrice } from '../data/paymentDemo';
 import { getPaymentDisplayStatus } from '../utils/paymentFlow';
+import PaymentRevenueChart from '../components/PaymentRevenueChart';
 import '../styles/payment.css';
+import '../styles/payment-admin.css';
 
 const EMPTY_LIST = [];
 
@@ -48,14 +50,6 @@ function formatDate(value) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value));
-}
-
-function barHeight(item, maxRevenue, maxOrders) {
-  const amount = toNumber(item.amount);
-  if (maxRevenue > 0) return Math.max(12, Math.round((amount / maxRevenue) * 100));
-  const orders = toNumber(item.orders);
-  if (maxOrders > 0) return Math.max(12, Math.round((orders / maxOrders) * 82));
-  return 12;
 }
 
 function buildCards(analytics) {
@@ -128,11 +122,9 @@ export default function AdminAnalyticsPage() {
   const cards = useMemo(() => buildCards(analytics), [analytics]);
   const revenueSeries = analytics?.revenueSeries || EMPTY_LIST;
   const recentTransactions = analytics?.recentTransactions || EMPTY_LIST;
-  const maxRevenue = Math.max(0, ...revenueSeries.map(item => toNumber(item.amount)));
-  const maxOrders = Math.max(0, ...revenueSeries.map(item => toNumber(item.orders)));
 
   return (
-    <section className="payment-page admin-analytics-page">
+    <section className="workspace-scope payment-page admin-analytics-page">
       <div className="container">
         <div className="payment-page-heading admin-heading">
           <div className="admin-heading-main">
@@ -186,21 +178,11 @@ export default function AdminAnalyticsPage() {
                     <Icon name="chart" size={20} />
                   </span>
                   <div>
-                    <h2>Hoạt động thanh toán 6 ngày gần nhất</h2>
-                    <p>
-                      Cột thể hiện doanh thu đã thanh toán thành công. Khi chưa có doanh thu thành công, biểu
-                      đồ tạm dùng số giao dịch được tạo để bạn vẫn thấy mức độ hoạt động mỗi ngày.
-                    </p>
+                    <h2>Doanh thu 6 ngày gần nhất</h2>
+                    <p>Chỉ tính thanh toán thành công theo ngày thanh toán, múi giờ UTC.</p>
                   </div>
                 </div>
-                <div className="revenue-bars" aria-label="Biểu đồ hoạt động thanh toán 6 ngày gần nhất">
-                  {revenueSeries.map(item => (
-                    <div className="revenue-bar" key={item.label} title={formatAmount(item.amount)}>
-                      <span style={{ height: `${barHeight(item, maxRevenue, maxOrders)}%` }} />
-                      <small>{item.label}</small>
-                    </div>
-                  ))}
-                </div>
+                <PaymentRevenueChart data={revenueSeries} />
                 <p className="analytics-generated-at">Cập nhật: {formatDate(analytics?.generatedAt)}</p>
               </article>
 
