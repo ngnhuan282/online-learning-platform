@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
+import LearningHeader from '../components/LearningHeader';
 import { learningApi } from '../api/learningApi';
 import useNotifications from '../hooks/useNotifications';
 import NotificationItem from '../components/NotificationItem';
@@ -80,11 +81,14 @@ function NotificationsContent({ notifications }) {
   return (
     <section className="learning-page">
       <div className="learning-shell">
-        <div className="learning-page-header">
-          <div>
-            <p>Notifications</p>
-            <h1>Thông báo của bạn</h1>
-          </div>
+        <LearningHeader
+          title="Thông báo của bạn"
+          description={
+            summary.unreadCount == null
+              ? 'Cập nhật về khóa học, thanh toán và kết quả học tập.'
+              : `${summary.unreadCount} thông báo chưa đọc. Theo dõi các cập nhật mới tại đây.`
+          }
+        >
           <button
             className="button button-outline"
             type="button"
@@ -93,7 +97,7 @@ function NotificationsContent({ notifications }) {
           >
             {updating ? 'Đang cập nhật...' : 'Đánh dấu tất cả đã đọc'}
           </button>
-        </div>
+        </LearningHeader>
         <div className="notification-filters">
           <label>
             Loại thông báo

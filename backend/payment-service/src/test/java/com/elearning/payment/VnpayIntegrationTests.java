@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -69,6 +70,8 @@ import tools.jackson.databind.json.JsonMapper;
 )
 @ActiveProfiles("test")
 class VnpayIntegrationTests {
+
+    private static final AtomicLong OWNER_IDS = new AtomicLong(100000);
 
     private static final String JWT_SECRET = "test-jwt-vnpay-integration-secret-at-least-32-bytes";
     private static final String SIGNING_SECRET = "test-sandbox-signing-secret";
@@ -113,8 +116,11 @@ class VnpayIntegrationTests {
 
     final HttpClient client = HttpClient.newHttpClient();
 
+    private long ownerId;
+
     @BeforeEach
     void contracts() {
+        ownerId = OWNER_IDS.incrementAndGet();
         given(courses.requirePurchasableCourse(101L)).willReturn(
             new CourseSnapshot(101L, "IELTS course", PRICE, "VND")
         );
@@ -165,7 +171,7 @@ class VnpayIntegrationTests {
     }
 
     JsonNode checkout() throws Exception {
-        return checkout(71L, "VNPAY", UUID.randomUUID().toString());
+        return checkout(ownerId, "VNPAY", UUID.randomUUID().toString());
     }
 
     Map<String, String> callback(String orderCode, String response, String status) {
@@ -221,7 +227,7 @@ class VnpayIntegrationTests {
 
     JsonNode order(String code) throws Exception {
         return mapper
-            .readTree(request(BASE + "/orders/" + code, token(71L, "USER"), "GET", null).body())
+            .readTree(request(BASE + "/orders/" + code, token(ownerId, "USER"), "GET", null).body())
             .get("data");
     }
 
@@ -247,7 +253,7 @@ class VnpayIntegrationTests {
     }
 
     JsonNode analytics() throws Exception {
-        var response = request(BASE + "/admin/analytics", token(71L, "ADMIN"), "GET", null);
+        var response = request(BASE + "/admin/analytics", token(ownerId, "ADMIN"), "GET", null);
         assertThat(response.statusCode()).isEqualTo(200);
         return mapper.readTree(response.body()).get("data");
     }
@@ -256,7 +262,7 @@ class VnpayIntegrationTests {
     void expiryWorkerClosesOnlyOverdueVnpayCheckoutsWithoutChangingProviderState() throws Exception {
         String expiredCode = checkout().get("orderCode").asString();
         String activeCode = checkout().get("orderCode").asString();
-        String mockCode = checkout(71L, "MOCK", UUID.randomUUID().toString()).get("orderCode").asString();
+        String mockCode = checkout(ownerId, "MOCK", UUID.randomUUID().toString()).get("orderCode").asString();
         pastCheckoutWindow(expiredCode);
         pastCheckoutWindow(mockCode);
         long events = transactions.count();
@@ -297,7 +303,7 @@ class VnpayIntegrationTests {
             String role = route.startsWith("/admin") ? "ADMIN" : "USER";
             var response = request(
                 BASE + route + "?expired=true&keyword=" + code,
-                token(71L, role),
+                token(ownerId, role),
                 "GET",
                 null
             );
@@ -311,7 +317,7 @@ class VnpayIntegrationTests {
             assertThat(row.get("expiresAt").isNull()).isFalse();
             var pending = request(
                 BASE + route + "?status=PENDING&keyword=" + code,
-                token(71L, role),
+                token(ownerId, role),
                 "GET",
                 null
             );
@@ -346,7 +352,7 @@ class VnpayIntegrationTests {
         assertThat(confirmed.get("payment").get("enrollmentReady").asBoolean()).isTrue();
         assertThat(core.expireVnpayOrder(code)).isFalse();
         assertThat(transactions.count()).isEqualTo(events + 1);
-        then(learning).should(times(1)).enroll(code, 71L, 101L);
+        then(learning).should(times(1)).enroll(code, ownerId, 101L);
     }
 
     @Test
@@ -360,7 +366,7 @@ class VnpayIntegrationTests {
         expire.join();
         assertThat(order(code).get("status").asString()).isEqualTo("PAID");
         assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isTrue();
-        then(learning).should(times(1)).enroll(code, 71L, 101L);
+        then(learning).should(times(1)).enroll(code, ownerId, 101L);
     }
 
     @Test
@@ -382,12 +388,12 @@ class VnpayIntegrationTests {
     @Test
     void expiredIdempotentCheckoutDoesNotCreateAnotherOrderOrReturnDeadPaymentLink() throws Exception {
         String key = UUID.randomUUID().toString();
-        String code = checkout(71L, "VNPAY", key).get("orderCode").asString();
+        String code = checkout(ownerId, "VNPAY", key).get("orderCode").asString();
         pastCheckoutWindow(code);
         long count = orders.count();
         var response = request(
             BASE + "/checkout",
-            token(71L, "USER"),
+            token(ownerId, "USER"),
             "POST",
             "{\"courseId\":101,\"provider\":\"VNPAY\",\"idempotencyKey\":\"" + key + "\"}"
         );
@@ -395,7 +401,7 @@ class VnpayIntegrationTests {
         assertThat(mapper.readTree(response.body()).get("code").asString()).isEqualTo("CHECKOUT_EXPIRED");
         assertThat(orders.count()).isEqualTo(count);
         JsonNode methods = mapper
-            .readTree(request(BASE + "/methods", token(71L, "USER"), "GET", null).body())
+            .readTree(request(BASE + "/methods", token(ownerId, "USER"), "GET", null).body())
             .get("data");
         assertThat(methods.get(1).get("label").asString()).isEqualTo("VNPay");
         assertThat(methods.get(1).get("description").asString()).isEqualTo("Thanh toán qua VNPay");
@@ -404,8 +410,8 @@ class VnpayIntegrationTests {
     @Test
     void signsServerPriceAndCallbacksAndReusesIdempotencyKey() throws Exception {
         String key = UUID.randomUUID().toString();
-        JsonNode first = checkout(71L, "VNPAY", key);
-        JsonNode duplicate = checkout(71L, "VNPAY", key);
+        JsonNode first = checkout(ownerId, "VNPAY", key);
+        JsonNode duplicate = checkout(ownerId, "VNPAY", key);
         assertThat(first.get("orderCode").asString()).isEqualTo(duplicate.get("orderCode").asString());
         assertThat(first.get("payment").get("status").asString()).isEqualTo("PENDING");
         assertThat(new BigDecimal(first.get("payment").get("amount").toString())).isEqualByComparingTo(PRICE);
@@ -449,7 +455,7 @@ class VnpayIntegrationTests {
         );
         assertThat(ipn(query)).isEqualTo("00");
         assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isTrue();
-        then(learning).should().enroll(code, 71L, 101L);
+        then(learning).should().enroll(code, ownerId, 101L);
     }
 
     @Test
@@ -498,7 +504,7 @@ class VnpayIntegrationTests {
         assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
         assertThat(order(code).get("payment").get("status").asString()).isEqualTo("SUCCESS");
         assertThat(transactions.count()).isEqualTo(count + 1);
-        then(learning).should(times(1)).enroll(code, 71L, 101L);
+        then(learning).should(times(1)).enroll(code, ownerId, 101L);
     }
 
     @Test
@@ -569,7 +575,7 @@ class VnpayIntegrationTests {
         assertThat(confirmed).isEqualTo(1);
         assertThat(ipn(query)).isEqualTo("02");
         assertThat(transactions.count()).isEqualTo(count + 1);
-        then(learning).should(times(1)).enroll(code, 71L, 101L);
+        then(learning).should(times(1)).enroll(code, ownerId, 101L);
     }
 
     @Test
@@ -585,13 +591,15 @@ class VnpayIntegrationTests {
         assertThat(confirmed.get("payment").get("status").asString()).isEqualTo("SUCCESS");
         assertThat(confirmed.get("payment").get("enrollmentReady").asBoolean()).isTrue();
         assertThat(transactions.count()).isEqualTo(count + 1);
-        then(learning).should(times(1)).enroll(code, 71L, 101L);
+        then(learning).should(times(1)).enroll(code, ownerId, 101L);
     }
 
     @Test
     void paidStateSurvivesLearningFailureAndOwnedRetryRecoversWithoutDuplicateEvent() throws Exception {
         String code = checkout().get("orderCode").asString();
-        willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE)).given(learning).enroll(code, 71L, 101L);
+        willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE))
+            .given(learning)
+            .enroll(code, ownerId, 101L);
         long count = transactions.count();
         String query = signed(callback(code, "00", "00"));
         assertThat(ipn(query)).isEqualTo("00");
@@ -599,27 +607,57 @@ class VnpayIntegrationTests {
         assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isFalse();
         String path = BASE + "/orders/" + code + "/activation";
         assertThat(request(path, token(72L, "USER"), "POST", null).statusCode()).isEqualTo(403);
-        assertThat(request(path, token(71L, "USER"), "POST", null).statusCode()).isEqualTo(503);
+        assertThat(request(path, token(ownerId, "USER"), "POST", null).statusCode()).isEqualTo(503);
         assertThat(order(code).get("payment").get("status").asString()).isEqualTo("SUCCESS");
-        willDoNothing().given(learning).enroll(code, 71L, 101L);
-        assertThat(request(path, token(71L, "USER"), "POST", null).statusCode()).isEqualTo(200);
+        willDoNothing().given(learning).enroll(code, ownerId, 101L);
+        assertThat(request(path, token(ownerId, "USER"), "POST", null).statusCode()).isEqualTo(200);
         assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isTrue();
         assertThat(ipn(query)).isEqualTo("02");
         assertThat(transactions.count()).isEqualTo(count + 1);
-        then(learning).should(times(3)).enroll(code, 71L, 101L);
+        then(learning).should(times(3)).enroll(code, ownerId, 101L);
     }
 
     @Test
     void restartSafeRetryUsesDurablePaidActivationMarker() throws Exception {
         String code = checkout().get("orderCode").asString();
-        willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE)).given(learning).enroll(code, 71L, 101L);
+        willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE))
+            .given(learning)
+            .enroll(code, ownerId, 101L);
         assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
-        willDoNothing().given(learning).enroll(code, 71L, 101L);
+        willDoNothing().given(learning).enroll(code, ownerId, 101L);
         var retry = new PaidCourseActivationRetry(payments, activation);
         retry.retryPendingActivation();
         retry.retryPendingActivation();
         assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isTrue();
-        then(learning).should(times(2)).enroll(code, 71L, 101L);
+        then(learning).should(times(2)).enroll(code, ownerId, 101L);
+    }
+
+    @Test
+    void paidCourseCannotBeChargedAgainWhileEnrollmentIsStillPending() throws Exception {
+        String key = UUID.randomUUID().toString();
+        String code = checkout(ownerId, "VNPAY", key).get("orderCode").asString();
+        willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE))
+            .given(learning)
+            .enroll(code, ownerId, 101L);
+        assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
+        assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isFalse();
+        long count = orders.count();
+
+        var blocked = request(
+            BASE + "/checkout",
+            token(ownerId, "USER"),
+            "POST",
+            "{\"courseId\":101,\"provider\":\"VNPAY\",\"idempotencyKey\":\"" + UUID.randomUUID() + "\"}"
+        );
+        assertThat(blocked.statusCode()).isEqualTo(409);
+        assertThat(mapper.readTree(blocked.body()).get("code").asString()).isEqualTo(
+            "COURSE_ALREADY_PURCHASED"
+        );
+        assertThat(orders.count()).isEqualTo(count);
+        var replay = checkout(ownerId, "VNPAY", key);
+        assertThat(replay.get("orderCode").asString()).isEqualTo(code);
+        assertThat(replay.get("payment").get("status").asString()).isEqualTo("SUCCESS");
+        then(learning).should(times(1)).enroll(code, ownerId, 101L);
     }
 
     @Test
@@ -627,20 +665,20 @@ class VnpayIntegrationTests {
         String code = checkout().get("orderCode").asString();
         String mock = BASE + "/mock/orders/" + code + "/complete";
         assertThat(
-            request(mock, token(71L, "USER"), "POST", "{\"status\":\"SUCCESS\"}").statusCode()
+            request(mock, token(ownerId, "USER"), "POST", "{\"status\":\"SUCCESS\"}").statusCode()
         ).isEqualTo(409);
         String admin = BASE + "/admin/orders/" + code;
         for (String status : new String[] { "SUCCESS", "FAILED", "CANCELLED", "REFUNDED" }) {
             assertThat(
                 request(
                     admin + "/status",
-                    token(71L, "ADMIN"),
+                    token(ownerId, "ADMIN"),
                     "PATCH",
                     "{\"status\":\"" + status + "\"}"
                 ).statusCode()
             ).isEqualTo(409);
         }
-        var detail = mapper.readTree(request(admin, token(71L, "ADMIN"), "GET", null).body()).get("data");
+        var detail = mapper.readTree(request(admin, token(ownerId, "ADMIN"), "GET", null).body()).get("data");
         assertThat(detail.get("availableStatuses").size()).isZero();
         assertThat(request(BASE + "/orders/" + code, token(72L, "USER"), "GET", null).statusCode()).isEqualTo(
             403

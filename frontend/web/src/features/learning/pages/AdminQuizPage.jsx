@@ -8,6 +8,7 @@ import { learningApi } from '../api/learningApi';
 import { courseApi } from '../../courses/api/courseApi';
 import ErrorState from '../../../shared/components/ErrorState';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
+import LearningHeader from '../components/LearningHeader';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import '../styles/quiz.css';
 
@@ -287,16 +288,16 @@ export default function AdminQuizPage() {
   }
 
   return (
-    <section className="admin-quiz-page">
-      <div className="admin-page-heading">
-        <div>
-          <p>Học tập</p>
-          <h1>Quản lý quiz</h1>
-        </div>
+    <section className="admin-quiz-page learning-admin-workspace">
+      <LearningHeader
+        title="Quản lý quiz"
+        description="Soạn câu hỏi, lưu bản nháp và xuất bản bài kiểm tra."
+        navigation={false}
+      >
         <Button variant="outlined" startIcon={<Add />} onClick={startNew} disabled={busy}>
           Quiz mới
         </Button>
-      </div>
+      </LearningHeader>
       {error && <ErrorState error={error} title="Không thể xử lý quiz" />}
       {listError && (
         <ErrorState

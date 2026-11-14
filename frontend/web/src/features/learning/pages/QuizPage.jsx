@@ -6,6 +6,7 @@ import ProgressBar from '../components/ProgressBar';
 import { learningApi } from '../api/learningApi';
 import useAuth from '../../auth/hooks/useAuth';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
+import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
 import { clearQuizDraft, quizDraftKey, readQuizDraft, writeQuizDraft } from '../utils/quizDraft';
 import '../styles/quiz.css';
 
@@ -343,5 +344,6 @@ function QuizWorkspace({ quizId, userId }) {
 export default function QuizPage() {
   const { quizId } = useParams();
   const { user } = useAuth();
-  return <QuizWorkspace key={`${user?.id}:${quizId}`} quizId={quizId} userId={user?.id} />;
+  const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
+  return <QuizWorkspace key={`${user?.id}:${quizId}:${session}`} quizId={quizId} userId={user?.id} />;
 }

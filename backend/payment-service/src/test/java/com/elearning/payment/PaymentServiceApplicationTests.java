@@ -10,6 +10,7 @@ import com.elearning.payment.common.response.ApiResponse;
 import com.elearning.payment.common.response.PageResponse;
 import com.elearning.payment.course.CourseSnapshot;
 import com.elearning.payment.course.CourseSnapshotProvider;
+import com.elearning.payment.entity.enums.PaymentStatus;
 import com.elearning.payment.learning.LearningEnrollmentClient;
 import com.elearning.payment.repository.CourseOrderRepository;
 import com.elearning.payment.repository.PaymentRepository;
@@ -31,6 +32,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -96,24 +99,14 @@ class PaymentServiceApplicationTests {
         given(courses.requirePurchasableCourse(anyLong())).willAnswer(invocation -> {
             Long courseId = invocation.getArgument(0);
             return switch (courseId.intValue()) {
-                case 101 -> new CourseSnapshot(
-                    101L,
-                    "IELTS Intensive",
-                    BigDecimal.valueOf(1_690_000),
-                    "VND"
-                );
+                case 101 -> new CourseSnapshot(101L, "IELTS Intensive", BigDecimal.valueOf(1_690_000), "VND");
                 case 102 -> new CourseSnapshot(
                     102L,
                     "English for Tech",
                     BigDecimal.valueOf(1_290_000),
                     "VND"
                 );
-                case 103 -> new CourseSnapshot(
-                    103L,
-                    "TOEIC 850+",
-                    BigDecimal.valueOf(1_090_000),
-                    "VND"
-                );
+                case 103 -> new CourseSnapshot(103L, "TOEIC 850+", BigDecimal.valueOf(1_090_000), "VND");
                 default -> throw new AppException(ErrorCode.NOT_FOUND);
             };
         });
@@ -169,6 +162,213 @@ class PaymentServiceApplicationTests {
         assertThat(json.has("timestamp")).isTrue();
         assertThat(json.has("trace")).isFalse();
         assertThat(response.body()).doesNotContain("sensitive-test-detail");
+    }
+
+    @Test
+    void rejectsAnotherCheckoutForPaidCourseButKeepsOriginalReplayAndOtherUsersAvailable() throws Exception {
+        String owner = token(88001L, "USER", 120);
+        String body =
+            "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"paid-course-original-key\"}";
+        var first = request("/api/v1/payments/checkout", owner, body);
+        assertThat(first.statusCode()).isEqualTo(200);
+        String code = mapper.readTree(first.body()).path("data").path("orderCode").asString();
+        var paid = request(
+            "/api/v1/payments/mock/orders/" + code + "/complete",
+            owner,
+            "{\"status\":\"SUCCESS\"}"
+        );
+        assertThat(paid.statusCode()).isEqualTo(200);
+        long count = orders.count();
+
+        error(
+            request(
+                "/api/v1/payments/checkout",
+                owner,
+                "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"paid-course-another-key\"}"
+            ),
+            409,
+            "COURSE_ALREADY_PURCHASED",
+            "/api/v1/payments/checkout"
+        );
+        assertThat(orders.count()).isEqualTo(count);
+        var replay = request("/api/v1/payments/checkout", owner, body);
+        assertThat(replay.statusCode()).isEqualTo(200);
+        assertThat(mapper.readTree(replay.body()).path("data").path("orderCode").asString()).isEqualTo(code);
+        assertThat(
+            request("/api/v1/payments/checkout", token(88002L, "USER", 120), body).statusCode()
+        ).isEqualTo(200);
+    }
+
+    @Test
+    void snapshotsServerOriginalPriceAndDiscountAndKeepsThemStableOnReplay() throws Exception {
+        given(courses.requirePurchasableCourse(101L)).willReturn(
+            new CourseSnapshot(
+                101L,
+                "Discounted English",
+                new BigDecimal("490000"),
+                "VND",
+                new BigDecimal("690000")
+            )
+        );
+        String body =
+            "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"discount-price-snapshot-key\",\"amount\":1,\"originalPrice\":1,\"discountAmount\":0}";
+        String access = token(88003L, "USER", 120);
+        var first = request("/api/v1/payments/checkout", access, body);
+        assertThat(first.statusCode()).isEqualTo(200);
+        JsonNode original = mapper.readTree(first.body()).path("data");
+        JsonNode item = original.path("order").path("items").get(0);
+        assertThat(item.path("unitPrice").decimalValue()).isEqualByComparingTo("690000");
+        assertThat(item.path("discountAmount").decimalValue()).isEqualByComparingTo("200000");
+        assertThat(item.path("finalPrice").decimalValue()).isEqualByComparingTo("490000");
+        assertThat(original.path("payment").path("amount").decimalValue()).isEqualByComparingTo("490000");
+
+        given(courses.requirePurchasableCourse(101L)).willReturn(
+            new CourseSnapshot(
+                101L,
+                "Updated English",
+                new BigDecimal("790000"),
+                "VND",
+                new BigDecimal("890000")
+            )
+        );
+        var replay = request("/api/v1/payments/checkout", access, body);
+        assertThat(replay.statusCode()).isEqualTo(200);
+        JsonNode replayItem = mapper.readTree(replay.body()).path("data").path("order").path("items").get(0);
+        for (String field : List.of("unitPrice", "discountAmount", "finalPrice")) {
+            assertThat(replayItem.path(field).decimalValue()).isEqualByComparingTo(
+                item.path(field).decimalValue()
+            );
+        }
+        var detail = request(
+            "/api/v1/payments/admin/orders/" + original.path("orderCode").asString(),
+            token("ADMIN", 120),
+            null
+        );
+        assertThat(detail.statusCode()).isEqualTo(200);
+        JsonNode savedItem = mapper.readTree(detail.body()).path("data").path("order").path("items").get(0);
+        for (String field : List.of("unitPrice", "discountAmount", "finalPrice")) {
+            assertThat(savedItem.path(field).decimalValue()).isEqualByComparingTo(
+                item.path(field).decimalValue()
+            );
+        }
+        then(courses).should(times(1)).requirePurchasableCourse(101L);
+    }
+
+    @Test
+    void concurrentSameKeyCheckoutsReturnOneCommittedOrderWithoutServerError() throws Exception {
+        var barrier = new CyclicBarrier(2);
+        given(courses.requirePurchasableCourse(101L)).willAnswer(invocation -> {
+            barrier.await(15, TimeUnit.SECONDS);
+            return new CourseSnapshot(101L, "Concurrent English", new BigDecimal("490000"), "VND");
+        });
+        long count = orders.count();
+        long paymentCount = payments.count();
+        var post = checkoutPost(88004L, 101L, "concurrent-identical-checkout-key");
+        var first = client.sendAsync(post, HttpResponse.BodyHandlers.ofString());
+        var second = client.sendAsync(post, HttpResponse.BodyHandlers.ofString());
+        var left = first.get(30, TimeUnit.SECONDS);
+        var right = second.get(30, TimeUnit.SECONDS);
+        assertThat(left.statusCode()).withFailMessage(left.body()).isEqualTo(200);
+        assertThat(right.statusCode()).withFailMessage(right.body()).isEqualTo(200);
+        JsonNode winner = mapper.readTree(left.body()).path("data");
+        JsonNode replay = mapper.readTree(right.body()).path("data");
+        assertThat(replay.path("orderCode")).isEqualTo(winner.path("orderCode"));
+        assertThat(replay.path("checkoutUrl")).isEqualTo(winner.path("checkoutUrl"));
+        assertThat(orders.count()).isEqualTo(count + 1);
+        assertThat(payments.count()).isEqualTo(paymentCount + 1);
+        var detail = request(
+            "/api/v1/payments/admin/orders/" + winner.path("orderCode").asString(),
+            token("ADMIN", 120),
+            null
+        );
+        assertThat(mapper.readTree(detail.body()).path("data").path("transactions").size()).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentSameKeyForDifferentCoursesCannotReplayAnotherCourse() throws Exception {
+        var barrier = new CyclicBarrier(2);
+        willAnswer(invocation -> {
+            barrier.await(15, TimeUnit.SECONDS);
+            return new CourseSnapshot(
+                invocation.getArgument(0),
+                "Concurrent course",
+                new BigDecimal("490000"),
+                "VND"
+            );
+        })
+            .given(courses)
+            .requirePurchasableCourse(anyLong());
+        long count = orders.count();
+        var first = client.sendAsync(
+            checkoutPost(88005L, 101L, "concurrent-different-course-key"),
+            HttpResponse.BodyHandlers.ofString()
+        );
+        var second = client.sendAsync(
+            checkoutPost(88005L, 102L, "concurrent-different-course-key"),
+            HttpResponse.BodyHandlers.ofString()
+        );
+        var left = first.get(30, TimeUnit.SECONDS);
+        var right = second.get(30, TimeUnit.SECONDS);
+        assertThat(List.of(left.statusCode(), right.statusCode())).containsExactlyInAnyOrder(200, 409);
+        var rejected = left.statusCode() == 409 ? left : right;
+        assertThat(mapper.readTree(rejected.body()).path("code").asString()).isEqualTo("CONFLICT");
+        assertThat(orders.count()).isEqualTo(count + 1);
+    }
+
+    private HttpRequest checkoutPost(long userId, long courseId, String key) {
+        return HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/payments/checkout"))
+            .header("Authorization", "Bearer " + token(userId, "USER", 120))
+            .header("Content-Type", "application/json")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "{\"courseId\":" + courseId + ",\"provider\":\"MOCK\",\"idempotencyKey\":\"" + key + "\"}"
+                )
+            )
+            .build();
+    }
+
+    @Test
+    void unsuccessfulAndRefundedPaymentsDoNotBlockANewPurchase() throws Exception {
+        for (PaymentStatus outcome : List.of(
+            PaymentStatus.FAILED,
+            PaymentStatus.CANCELLED,
+            PaymentStatus.REFUNDED
+        )) {
+            String access = token(88100L + outcome.ordinal(), "USER", 120);
+            String firstBody =
+                "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"retry-before-" +
+                outcome +
+                "\"}";
+            var first = request("/api/v1/payments/checkout", access, firstBody);
+            assertThat(first.statusCode()).isEqualTo(200);
+            String code = mapper.readTree(first.body()).path("data").path("orderCode").asString();
+            String initial = outcome == PaymentStatus.REFUNDED ? "SUCCESS" : outcome.name();
+            assertThat(
+                request(
+                    "/api/v1/payments/mock/orders/" + code + "/complete",
+                    access,
+                    "{\"status\":\"" + initial + "\"}"
+                ).statusCode()
+            ).isEqualTo(200);
+            if (outcome == PaymentStatus.REFUNDED) {
+                assertThat(
+                    patch(
+                        "/api/v1/payments/admin/orders/" + code + "/status",
+                        token("ADMIN", 120),
+                        "{\"status\":\"REFUNDED\"}"
+                    ).statusCode()
+                ).isEqualTo(200);
+            }
+            var retry = request(
+                "/api/v1/payments/checkout",
+                access,
+                "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"retry-after-" + outcome + "\"}"
+            );
+            assertThat(retry.statusCode()).withFailMessage(retry.body()).isEqualTo(200);
+            assertThat(mapper.readTree(retry.body()).path("data").path("orderCode").asString()).isNotEqualTo(
+                code
+            );
+        }
     }
 
     @Test
@@ -281,6 +481,7 @@ class PaymentServiceApplicationTests {
 
     @Test
     void createsInternalCheckoutAndExposesUserHistory() throws Exception {
+        long successfulBefore = payments.countByStatus(PaymentStatus.SUCCESS);
         error(
             request("/api/v1/payments/history", null, null),
             401,
@@ -307,7 +508,7 @@ class PaymentServiceApplicationTests {
             "/api/v1/payments/checkout",
             token("USER", 60),
             "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"checkout-course-101-main\"," +
-            "\"amount\":1,\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+                "\"amount\":1,\"returnUrl\":\"http://localhost:5173/payment/result\"}"
         );
         assertThat(checkout.statusCode()).isEqualTo(200);
         JsonNode checkoutJson = mapper.readTree(checkout.body());
@@ -330,8 +531,9 @@ class PaymentServiceApplicationTests {
             "{\"courseId\":101,\"provider\":\"MOCK\",\"idempotencyKey\":\"checkout-course-101-main\"}"
         );
         assertThat(repeatedCheckout.statusCode()).isEqualTo(200);
-        assertThat(mapper.readTree(repeatedCheckout.body()).get("data").get("orderCode").asString())
-            .isEqualTo(orderCode);
+        assertThat(
+            mapper.readTree(repeatedCheckout.body()).get("data").get("orderCode").asString()
+        ).isEqualTo(orderCode);
 
         error(
             request(
@@ -388,7 +590,7 @@ class PaymentServiceApplicationTests {
         JsonNode analyticsData = mapper.readTree(analytics.body()).get("data");
         assertThat(analyticsData.get("totalOrders").asLong()).isGreaterThanOrEqualTo(1);
         assertThat(analyticsData.get("pendingPayments").asLong()).isGreaterThanOrEqualTo(1);
-        assertThat(analyticsData.get("successfulPayments").asLong()).isEqualTo(0);
+        assertThat(analyticsData.get("successfulPayments").asLong()).isEqualTo(successfulBefore);
         assertThat(analyticsData.get("pendingAmount").asDouble()).isGreaterThan(0);
         assertThat(analyticsData.get("crossService").get("activeLearners").asLong()).isGreaterThanOrEqualTo(
             1
@@ -464,9 +666,7 @@ class PaymentServiceApplicationTests {
         assertThat(refunded.statusCode()).isEqualTo(200);
         JsonNode refundedData = mapper.readTree(refunded.body()).get("data");
         assertThat(refundedData.get("order").get("status").asString()).isEqualTo("CANCELLED");
-        assertThat(refundedData.get("order").get("payment").get("status").asString()).isEqualTo(
-            "REFUNDED"
-        );
+        assertThat(refundedData.get("order").get("payment").get("status").asString()).isEqualTo("REFUNDED");
         assertThat(refundedData.get("availableStatuses").size()).isZero();
     }
 
@@ -476,7 +676,7 @@ class PaymentServiceApplicationTests {
             "/api/v1/payments/checkout",
             token("USER", 60),
             "{\"courseId\":102,\"provider\":\"MOCK\",\"idempotencyKey\":\"mock-success-course-102\"," +
-            "\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+                "\"returnUrl\":\"http://localhost:5173/payment/result\"}"
         );
         assertThat(checkout.statusCode()).isEqualTo(200);
         String orderCode = mapper.readTree(checkout.body()).get("data").get("orderCode").asString();
@@ -499,10 +699,14 @@ class PaymentServiceApplicationTests {
             "/api/v1/payments/checkout",
             token("USER", 60),
             "{\"courseId\":103,\"provider\":\"MOCK\",\"idempotencyKey\":\"mock-failed-course-103\"," +
-            "\"returnUrl\":\"http://localhost:5173/payment/result\"}"
+                "\"returnUrl\":\"http://localhost:5173/payment/result\"}"
         );
         assertThat(secondCheckout.statusCode()).isEqualTo(200);
-        String failedOrderCode = mapper.readTree(secondCheckout.body()).get("data").get("orderCode").asString();
+        String failedOrderCode = mapper
+            .readTree(secondCheckout.body())
+            .get("data")
+            .get("orderCode")
+            .asString();
         String failedPath = "/api/v1/payments/mock/orders/" + failedOrderCode + "/complete";
 
         var failed = request(
@@ -516,7 +720,12 @@ class PaymentServiceApplicationTests {
         assertThat(failedData.get("payment").get("status").asString()).isEqualTo("FAILED");
         assertThat(failedData.get("payment").get("paidAt").isNull()).isTrue();
 
-        error(request(failedPath, token("USER", 60), "{\"status\":\"REFUNDED\"}"), 400, "BAD_REQUEST", failedPath);
+        error(
+            request(failedPath, token("USER", 60), "{\"status\":\"REFUNDED\"}"),
+            400,
+            "BAD_REQUEST",
+            failedPath
+        );
     }
 
     @Test
@@ -530,8 +739,10 @@ class PaymentServiceApplicationTests {
             "/api/v1/payments/checkout",
             ownerAccess,
             "{\"courseId\":101,\"provider\":\"MOCK\"," +
-            "\"idempotencyKey\":\"hardening-owner-checkout-101\"," +
-            "\"amount\":1,\"status\":\"SUCCESS\",\"userId\":" + otherUserId + "}"
+                "\"idempotencyKey\":\"hardening-owner-checkout-101\"," +
+                "\"amount\":1,\"status\":\"SUCCESS\",\"userId\":" +
+                otherUserId +
+                "}"
         );
         assertThat(checkout.statusCode()).withFailMessage(checkout.body()).isEqualTo(200);
         JsonNode checkoutData = mapper.readTree(checkout.body()).get("data");
@@ -549,21 +760,11 @@ class PaymentServiceApplicationTests {
         error(request(orderPath, otherAccess, null), 403, "FORBIDDEN", orderPath);
 
         String mockPath = "/api/v1/payments/mock/orders/" + orderCode + "/complete";
-        error(
-            request(mockPath, otherAccess, "{\"status\":\"SUCCESS\"}"),
-            403,
-            "FORBIDDEN",
-            mockPath
-        );
+        error(request(mockPath, otherAccess, "{\"status\":\"SUCCESS\"}"), 403, "FORBIDDEN", mockPath);
 
-        var otherHistory = request(
-            "/api/v1/payments/history?keyword=" + orderCode,
-            otherAccess,
-            null
-        );
+        var otherHistory = request("/api/v1/payments/history?keyword=" + orderCode, otherAccess, null);
         assertThat(otherHistory.statusCode()).isEqualTo(200);
-        assertThat(mapper.readTree(otherHistory.body()).get("data").get("totalElements").asLong())
-            .isZero();
+        assertThat(mapper.readTree(otherHistory.body()).get("data").get("totalElements").asLong()).isZero();
 
         String adminStatusPath = "/api/v1/payments/admin/orders/" + orderCode + "/status";
         error(
@@ -583,7 +784,7 @@ class PaymentServiceApplicationTests {
             "/api/v1/payments/checkout",
             access,
             "{\"courseId\":102,\"provider\":\"MOCK\"," +
-            "\"idempotencyKey\":\"hardening-learning-retry-102\"}"
+                "\"idempotencyKey\":\"hardening-learning-retry-102\"}"
         );
         assertThat(checkout.statusCode()).withFailMessage(checkout.body()).isEqualTo(200);
         String orderCode = mapper.readTree(checkout.body()).get("data").get("orderCode").asString();
@@ -593,12 +794,7 @@ class PaymentServiceApplicationTests {
             .enroll(orderCode, userId, 102L);
 
         String mockPath = "/api/v1/payments/mock/orders/" + orderCode + "/complete";
-        error(
-            request(mockPath, access, "{\"status\":\"SUCCESS\"}"),
-            503,
-            "SERVICE_UNAVAILABLE",
-            mockPath
-        );
+        error(request(mockPath, access, "{\"status\":\"SUCCESS\"}"), 503, "SERVICE_UNAVAILABLE", mockPath);
 
         JsonNode pending = mapper
             .readTree(request("/api/v1/payments/orders/" + orderCode, access, null).body())
@@ -608,18 +804,15 @@ class PaymentServiceApplicationTests {
 
         var retry = request(mockPath, access, "{\"status\":\"SUCCESS\"}");
         assertThat(retry.statusCode()).withFailMessage(retry.body()).isEqualTo(200);
-        assertThat(mapper.readTree(retry.body()).get("data").get("payment").get("status").asString())
-            .isEqualTo("SUCCESS");
+        assertThat(
+            mapper.readTree(retry.body()).get("data").get("payment").get("status").asString()
+        ).isEqualTo("SUCCESS");
 
         var repeated = request(mockPath, access, "{\"status\":\"SUCCESS\"}");
         assertThat(repeated.statusCode()).isEqualTo(200);
         then(learning).should(times(3)).enroll(orderCode, userId, 102L);
 
-        var detail = request(
-            "/api/v1/payments/admin/orders/" + orderCode,
-            token("ADMIN", 60),
-            null
-        );
+        var detail = request("/api/v1/payments/admin/orders/" + orderCode, token("ADMIN", 60), null);
         assertThat(detail.statusCode()).isEqualTo(200);
         assertThat(mapper.readTree(detail.body()).get("data").get("transactions").size()).isEqualTo(2);
 
@@ -635,12 +828,7 @@ class PaymentServiceApplicationTests {
     @Test
     void separatesPaymentReportingFromStatusManagementPermission() throws Exception {
         long reporterId = 7_301L;
-        String reporter = token(
-            reporterId,
-            "USER",
-            List.of("PAYMENT_REPORT_VIEW"),
-            60
-        );
+        String reporter = token(reporterId, "USER", List.of("PAYMENT_REPORT_VIEW"), 60);
 
         assertThat(request("/api/v1/payments/admin/orders", reporter, null).statusCode()).isEqualTo(200);
         assertThat(request("/api/v1/payments/admin/analytics", reporter, null).statusCode()).isEqualTo(200);

@@ -34,6 +34,7 @@ const { courseApi } = await load('features/courses/api/courseApi.js');
 const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
 const { NotificationsContext } = await load('features/learning/context/NotificationsContext.jsx');
 const { invalidateSessionRequests } = await load('shared/utils/tokenUtils.js');
+const { AUTH_CHANGED_EVENT } = await load('shared/constants/appConstants.js');
 const originalApis = [learningApi, courseApi].map(api => [api, { ...api }]);
 const cache = createCache({ key: 'quiz-dashboard-test' });
 let root;
@@ -282,6 +283,30 @@ test('changing accounts resets an attempt and ignores a response from the ended 
   assert.equal(document.querySelector('.quiz-taking-form'), null);
   assert.equal(window.sessionStorage.getItem('quiz-draft:2:21'), null);
   assert.ok(button('Bắt đầu làm bài'));
+});
+
+test('a new session for the same user resets quiz state and rejects the previous pending start', async () => {
+  let finish;
+  learningApi.startQuiz = () =>
+    new Promise(resolve => {
+      finish = resolve;
+    });
+  await render('/quizzes/21');
+  await click('Bắt đầu làm bài');
+  await act(async () => {
+    invalidateSessionRequests();
+    window.dispatchEvent(new dom.window.Event(AUTH_CHANGED_EVENT));
+  });
+  await act(async () => finish({ data: attempt() }));
+  assert.equal(document.querySelector('.quiz-taking-form'), null);
+  assert.ok(
+    [...document.querySelectorAll('button')].some(
+      item => item.textContent.includes('Bắt đầu làm bài') && !item.disabled,
+    ),
+  );
+  learningApi.startQuiz = async () => ({ data: attempt(21, 92) });
+  await click('Bắt đầu làm bài');
+  assert.ok(document.querySelector('.quiz-taking-form'));
 });
 
 test('result navigation ignores a previous review and ownership denial remains retryable', async () => {

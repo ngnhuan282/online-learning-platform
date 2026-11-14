@@ -23,6 +23,16 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     @Query(
         """
+        select count(p) > 0 from Payment p
+        join p.order o join o.items item
+        where o.userId = :userId and item.courseId = :courseId
+          and p.status = com.elearning.payment.entity.enums.PaymentStatus.SUCCESS
+        """
+    )
+    boolean existsSuccessfulPurchase(@Param("userId") Long userId, @Param("courseId") Long courseId);
+
+    @Query(
+        """
         select count(p) from Payment p
         where p.status = com.elearning.payment.entity.enums.PaymentStatus.PENDING
           and (p.provider <> com.elearning.payment.entity.enums.PaymentProvider.VNPAY
@@ -46,7 +56,13 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("select sum(payment.amount) from Payment payment where payment.status = :status")
     BigDecimal sumAmountByStatus(@Param("status") PaymentStatus status);
 
-    List<Payment> findByCreatedAtBetween(Instant start, Instant end);
+    @Query(
+        "select sum(p.amount) from Payment p where p.status = com.elearning.payment.entity.enums.PaymentStatus.SUCCESS " +
+            "and p.paidAt >= :start and p.paidAt < :end"
+    )
+    BigDecimal sumSuccessfulAmountPaidBetween(@Param("start") Instant start, @Param("end") Instant end);
+
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant start, Instant end);
 
     List<Payment> findTop10ByOrderByCreatedAtDesc();
 

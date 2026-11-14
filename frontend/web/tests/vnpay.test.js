@@ -22,6 +22,7 @@ globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const server = await createServer({
+  cacheDir: 'node_modules/.vite-tests/vnpay',
   server: { middlewareMode: true, hmr: false, ws: false },
   appType: 'custom',
   optimizeDeps: { noDiscovery: true, include: [] },
@@ -230,7 +231,31 @@ test('checkout uses the VNPay name and caption without a test badge', async () =
   assert.ok(document.querySelector('input[value="MOCK"]').checked);
 });
 
+test('checkout selects available VNPay and omits a disabled internal Mock method', async () => {
+  await mount(
+    null,
+    '?course=101',
+    async config => {
+      const data = config.url.endsWith('/methods')
+        ? [
+            { provider: 'MOCK', label: 'Thanh toán mô phỏng', available: false },
+            { provider: 'VNPAY', label: 'VNPay', description: 'Thanh toán qua VNPay', available: true },
+          ]
+        : { id: 101, title: 'IELTS nền tảng', status: 'PUBLISHED', price: 1490000 };
+      return { config, status: 200, headers: {}, data: { success: true, data } };
+    },
+    PaymentCheckoutPage,
+  );
+  assert.equal(document.querySelector('input[value="MOCK"]'), null);
+  assert.ok(document.querySelector('input[value="VNPAY"]').checked);
+  assert.equal(document.querySelector('.checkout-submit').disabled, false);
+});
+
 test('only unresolved provider payments need refresh and checkout errors are readable', () => {
+  assert.match(
+    getCheckoutErrorMessage({ status: 409, code: 'COURSE_ALREADY_PURCHASED' }),
+    /đã thanh toán khóa học này/,
+  );
   assert.equal(needsPaymentRefresh(order()), true);
   assert.equal(needsPaymentRefresh(order('SUCCESS', { enrollmentReady: false })), true);
   for (const status of ['SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED']) {

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
+import Skeleton from '@mui/material/Skeleton';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
@@ -20,7 +20,6 @@ import SchoolOutlined from '@mui/icons-material/SchoolOutlined';
 import SendOutlined from '@mui/icons-material/SendOutlined';
 import SpellcheckOutlined from '@mui/icons-material/SpellcheckOutlined';
 import TranslateOutlined from '@mui/icons-material/TranslateOutlined';
-import AppLoading from '../../../shared/components/AppLoading';
 import ErrorState from '../../../shared/components/ErrorState';
 import { ROUTES } from '../../../shared/constants/routes';
 import useAuth from '../../auth/hooks/useAuth';
@@ -29,6 +28,7 @@ import AiMessage from '../components/AiMessage';
 import ConversationSidebar from '../components/ConversationSidebar';
 import { getAiErrorMessage, mergeMessages, readCapabilities, readContext } from '../utils/aiState';
 import '../styles/ai-assistant.css';
+import '../../../shared/styles/feature-workspace.css';
 
 function ChatWorkspace() {
   const [params, setParams] = useSearchParams();
@@ -126,7 +126,13 @@ function ChatWorkspace() {
   }, [selectedId, retry]);
 
   useEffect(() => {
-    if (messagePage === 0) log.current?.scrollTo?.({ top: log.current.scrollHeight, behavior: 'smooth' });
+    if (messagePage === 0 && (messages.length || sending)) {
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      log.current?.scrollTo?.({
+        top: log.current.scrollHeight,
+        behavior: reduceMotion ? 'instant' : 'smooth',
+      });
+    }
   }, [messages, sending, messagePage]);
 
   async function moreConversations() {
@@ -266,14 +272,18 @@ function ChatWorkspace() {
   }
 
   return (
-    <section className="ai-assistant-page">
+    <section className="workspace-scope ai-assistant-page">
       <div className="container">
         <div className="ai-assistant-heading">
           <div>
             <span className="ai-assistant-heading-icon" aria-hidden="true">
               <AutoAwesomeOutlined />
             </span>
-            <h1>Trợ lý học tập AI</h1>
+            <div>
+              <span className="workspace-kicker">Góc học tập của bạn</span>
+              <h1>Trợ lý học tập AI</h1>
+              <p>Hỏi, luyện tập và hiểu tiếng Anh theo cách của bạn.</p>
+            </div>
           </div>
           <Button component={Link} to={ROUTES.COURSES} variant="outlined" startIcon={<ArrowBack />}>
             Khóa học
@@ -284,7 +294,7 @@ function ChatWorkspace() {
             <Drawer
               open={historyOpen}
               onClose={() => setHistoryOpen(false)}
-              slotProps={{ paper: { className: 'ai-assistant-history-drawer' } }}
+              slotProps={{ paper: { className: 'workspace-scope ai-assistant-history-drawer' } }}
             >
               {sidebar}
             </Drawer>
@@ -358,7 +368,14 @@ function ChatWorkspace() {
                   Tin nhắn trước
                 </Button>
               )}
-              {messageBusy && <AppLoading label="Đang tải tin nhắn..." />}
+              {messageBusy && (
+                <div className="workspace-skeleton" role="status" aria-label="Đang tải tin nhắn">
+                  <Skeleton width="32%" height={24} />
+                  <Skeleton width="92%" height={32} />
+                  <Skeleton width="80%" height={32} />
+                  <Skeleton width="65%" height={32} />
+                </div>
+              )}
               {messageError && (
                 <ErrorState
                   error={new Error(getAiErrorMessage(messageError))}
@@ -372,6 +389,11 @@ function ChatWorkspace() {
                     <AutoAwesomeOutlined />
                   </span>
                   <h2>Bạn muốn học gì hôm nay?</h2>
+                  <p>
+                    Một câu hỏi nhỏ, thêm một điều hiểu rõ.
+                    <br />
+                    Chọn gợi ý bên dưới hoặc bắt đầu bằng câu hỏi của bạn.
+                  </p>
                   <div className="ai-assistant-prompts">
                     {hasLessonContext && (
                       <>
@@ -405,27 +427,39 @@ function ChatWorkspace() {
                       variant="outlined"
                       startIcon={<MenuBookOutlined />}
                       disabled={blocked}
+                      aria-label="Ôn ngữ pháp"
                       onClick={() =>
                         choosePrompt('Giải thích thì hiện tại hoàn thành bằng tiếng Việt, kèm 3 ví dụ.')
                       }
                     >
-                      Ôn ngữ pháp
+                      <span>
+                        <strong>Ôn ngữ pháp</strong>
+                        <small>Hiểu cách dùng qua ví dụ</small>
+                      </span>
                     </Button>
                     <Button
                       variant="outlined"
                       startIcon={<TranslateOutlined />}
                       disabled={blocked}
+                      aria-label="Luyện từ vựng"
                       onClick={() => choosePrompt('Cho mình 5 từ vựng tiếng Anh về công việc, kèm ví dụ.')}
                     >
-                      Luyện từ vựng
+                      <span>
+                        <strong>Luyện từ vựng</strong>
+                        <small>Ghi nhớ từ trong ngữ cảnh</small>
+                      </span>
                     </Button>
                     <Button
                       variant="outlined"
                       startIcon={<SpellcheckOutlined />}
                       disabled={blocked}
+                      aria-label="Sửa câu tiếng Anh"
                       onClick={() => choosePrompt('Giúp mình sửa ngữ pháp và giải thích câu sau: ')}
                     >
-                      Sửa câu tiếng Anh
+                      <span>
+                        <strong>Sửa câu tiếng Anh</strong>
+                        <small>Viết tự nhiên và chính xác hơn</small>
+                      </span>
                     </Button>
                   </div>
                 </div>
@@ -435,8 +469,12 @@ function ChatWorkspace() {
               ))}
               {sending && (
                 <div className="ai-assistant-pending" role="status">
-                  <CircularProgress size={16} />
-                  Đang trả lời...
+                  <span className="ai-thinking-dots" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  Đang trả lời…
                 </div>
               )}
             </div>
@@ -486,7 +524,12 @@ function ChatWorkspace() {
               />
               <div className="ai-assistant-composer-actions">
                 <span className="ai-assistant-muted">
-                  {draft.length}/{maxLength}
+                  <span className="ai-assistant-keyboard-hint">
+                    Enter để gửi · Shift + Enter để xuống dòng
+                  </span>
+                  <span>
+                    {draft.length}/{maxLength}
+                  </span>
                 </span>
                 <div className="ai-assistant-tools">
                   <Tooltip title="Xóa bản nháp">
