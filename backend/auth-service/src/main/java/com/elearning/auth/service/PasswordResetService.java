@@ -159,16 +159,16 @@ public class PasswordResetService {
             var helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
             helper.setFrom(properties.mailFrom());
             helper.setTo(delivery.email());
-            helper.setSubject("SGEdu — Đặt lại mật khẩu");
+            helper.setSubject("ChitChatGo — Đặt lại mật khẩu");
             // Fragment never reaches the web server/access log. The page removes it from history.
             String link = properties.frontendResetUrl() + "#token=" + delivery.rawToken();
             helper.setText(
-                "Xin chào,\n\nBạn đã yêu cầu đặt lại mật khẩu tài khoản SGEdu.\n" +
+                "Xin chào,\n\nBạn đã yêu cầu đặt lại mật khẩu tài khoản ChitChatGo.\n" +
                     "Mở liên kết sau để chọn mật khẩu mới (có hiệu lực " +
                     properties.tokenTtlMinutes() +
                     " phút, chỉ dùng một lần):\n" +
                     link +
-                    "\n\nNếu bạn không yêu cầu, hãy bỏ qua email này. Mật khẩu của bạn chưa bị thay đổi.\n\nSGEdu",
+                    "\n\nNếu bạn không yêu cầu, hãy bỏ qua email này. Mật khẩu của bạn chưa bị thay đổi.\n\nChitChatGo",
                 false
             );
             // No database transaction spans this network call.

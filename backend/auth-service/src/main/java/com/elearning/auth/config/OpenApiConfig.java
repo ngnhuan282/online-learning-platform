@@ -22,7 +22,7 @@ public class OpenApiConfig {
     OpenAPI authOpenApi() {
         return new OpenAPI()
             .info(new Info()
-                .title("SGEdu Auth, User and RBAC API")
+                .title("ChitChatGo Auth, User and RBAC API")
                 .version("v1")
                 .description("All responses use the ApiResponse or ApiError envelope. " +
                     "Access tokens are sent as Bearer credentials; refresh tokens use an HttpOnly cookie."))

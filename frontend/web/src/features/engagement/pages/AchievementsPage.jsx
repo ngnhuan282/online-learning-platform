@@ -45,7 +45,7 @@ export default function AchievementsPage() {
     <section className="community-workspace container">
       <header className="workspace-heading">
         <div>
-          <span className="eyebrow">SGEdu · GROW</span>
+          <span className="eyebrow">ChitChatGo · GROW</span>
           <h1>{t('Thành tích học tập')}</h1>
           <p>{t('Học đều mỗi ngày, tiến bộ từng bước.')}</p>
         </div>

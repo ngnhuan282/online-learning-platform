@@ -277,7 +277,7 @@ export default function AuthForm({ mode }) {
                   >
                     {t('Chính sách bảo mật')}
                   </button>
-                  {t(' của SGEdu.')}
+                  {t(' của ChitChatGo.')}
                 </span>
               </label>
               {errors.terms && (

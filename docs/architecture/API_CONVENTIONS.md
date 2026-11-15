@@ -1,4 +1,4 @@
-# SGEdu API conventions
+# ChitChatGo API conventions
 
 All browser API requests go to `VITE_API_URL`, the API Gateway origin. Paths start with `/api/v1`; do not put `/api/v1` in `VITE_API_URL`. Feature APIs reuse `frontend/web/src/shared/apis/axiosClient.js`. Direct microservice URLs and secrets are forbidden in frontend source or environment variables.
 

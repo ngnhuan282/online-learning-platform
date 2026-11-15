@@ -11,11 +11,11 @@
   gap: 5px;
   padding: 9px 11px;
   border-radius: 15px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 850;
   white-space: nowrap;
   text-decoration: none;
-  min-height: 42px;
+  min-height: 44px;
 }
 .header-gems {
   color: #258cc4;
@@ -52,7 +52,7 @@
   border-radius: 15px;
   padding: 0 11px;
   box-shadow: 0 3px 0 #e8eaf2;
-  height: 42px;
+  height: 44px;
 }
 .language-flag {
   width: 22px;
@@ -69,9 +69,9 @@
   border: 0;
   padding: 0;
   color: #343957;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 750;
-  width: 64px;
+  width: 76px;
   min-width: 0;
   box-shadow: none;
 }
@@ -82,9 +82,10 @@
   color: #7b8098;
 }
 .site-header .header-inner {
-  max-width: 1640px;
-  gap: 23px;
+  max-width: 1800px;
+  gap: 24px;
   min-height: 88px;
+  height: 88px;
 }
 .site-header .header-actions {
   gap: 11px;
@@ -95,8 +96,8 @@
   display: none;
 }
 .site-header .notification-button {
-  width: 43px;
-  height: 43px;
+  width: 44px;
+  height: 44px;
   border: 1px solid #e1e5ee;
   border-radius: 15px;
   background: #fff;
@@ -112,21 +113,36 @@
   min-width: 0;
 }
 .site-header .main-nav {
-  gap: 18px;
+  gap: 21px;
 }
 .site-header .main-nav > a {
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 600;
 }
 .site-header .main-nav.is-open > .header-secondary-link {
   display: block;
 }
-@media (max-width: 1599px) {
+.site-header.is-authenticated .header-search {
+  display: none;
+}
+.site-header .brand {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+@media (max-width: 1023px) {
+  .site-header .main-nav {
+    top: 100%;
+    gap: 0;
+  }
+}
+@media (max-width: 1900px) {
   .site-header .main-nav > .header-secondary-link {
     display: none;
   }
 }
-@media (min-width: 1024px) and (max-width: 1450px) {
+@media (min-width: 1024px) and (max-width: 1700px) {
   .site-header .mobile-menu {
     display: inline-flex;
   }
@@ -136,6 +152,7 @@
     top: 100%;
     left: 0;
     right: 0;
+    height: auto;
     background: #fff;
     padding: 20px 32px;
     border-bottom: 1px solid #e7eaf1;
@@ -148,10 +165,22 @@
   .site-header .main-nav.is-open > .header-secondary-link {
     display: block;
   }
+  .site-header .main-nav > a {
+    height: auto;
+    padding: 12px;
+  }
+  .site-header .main-nav > a.active::after {
+    display: none;
+  }
 }
 @media (max-width: 767px) {
+  .site-header {
+    min-height: 78px;
+    height: auto;
+  }
   .site-header .header-inner {
     min-height: 78px;
+    height: 78px;
     gap: 10px;
   }
   .site-header .header-actions {

@@ -1,6 +1,6 @@
 # Tổng hợp chức năng còn thiếu so với Parroto
 
-- **Project:** SGSphere / SGEdu English — `online-learning-platform`.
+- **Project:** ChitChatGo — `online-learning-platform`.
 - **Website đối chiếu:** [Parroto](https://parroto.app/), ưu tiên nội dung tiếng Việt.
 - **Ngày rà soát:** 15/11/2026, múi giờ Việt Nam.
 - **Mốc mã nguồn:** commit `1af677f`, cùng các file trong workspace tại thời điểm rà soát.

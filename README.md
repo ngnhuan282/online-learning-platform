@@ -1,4 +1,6 @@
-# SGSphere – Online Learning Platform
+# ChitChatGo – Online Learning Platform
+
+Ứng dụng đã đổi tên thành **ChitChatGo**. Phạm vi đổi thương hiệu và các định danh kỹ thuật giữ tương thích được ghi tại [BRANDING.md](docs/architecture/BRANDING.md).
 
 Hướng dẫn tích hợp Auth/Course/Learning/Payment, Docker staging, logging, health check và kiểm tra trước merge:
 [SYSTEM_INTEGRATION.md](docs/testing/SYSTEM_INTEGRATION.md).
@@ -7,7 +9,7 @@ Kết quả A8/A9 ngày 13/10/2026, API/auth contracts, lệnh PowerShell và b�
 [A8_A9_REPORT.md](docs/deployment/A8_A9_REPORT.md).
 Kiểm tra runtime sau merge: [POST_MERGE_RUNTIME_REPORT.md](docs/testing/POST_MERGE_RUNTIME_REPORT.md).
 
-SGSphere là nền tảng học trực tuyến được xây dựng theo kiến trúc **Microservices**. Frontend sử dụng **React + Vite**, Backend sử dụng **Spring Boot**, dữ liệu được lưu trên **MySQL**, và mọi request từ trình duyệt đi qua **API Gateway**.
+ChitChatGo là nền tảng học trực tuyến được xây dựng theo kiến trúc **Microservices**. Frontend sử dụng **React + Vite**, Backend sử dụng **Spring Boot**, dữ liệu được lưu trên **MySQL**, và mọi request từ trình duyệt đi qua **API Gateway**.
 
 > Mục tiêu của project: xây dựng một nền tảng học trực tuyến có thể mở rộng theo từng module như Course, Learning, Payment/VNPay, AI Assistant và triển khai cloud sau này.
 
@@ -981,13 +983,13 @@ docker compose --profile backend down
 Sau khi backend đã tạo schema bằng Flyway, chạy tại root:
 
 ```powershell
-docker compose cp infra/mysql/seed-data.sql mysql:/tmp/sgsphere-seed.sql
+docker compose cp infra/mysql/seed-data.sql mysql:/tmp/chitchatgo-seed.sql
 
-docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot < /tmp/sgsphere-seed.sql'
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot < /tmp/chitchatgo-seed.sql'
 ```
 
 File `infra/mysql/seed-data.sql` tạo tài khoản `admin@gmail.com` / `Admin123`, `user@gmail.com` / `User123`, khóa học, giáo trình và dữ liệu Learning/Payment mẫu. Seed giữ nguyên ID tài khoản đã có và có thể chạy lại. Hướng dẫn chi tiết: [infra/mysql/README.md](infra/mysql/README.md).
 
-## SGSphere
+## ChitChatGo
 
 **Learn without limits. Build skills for your future.**

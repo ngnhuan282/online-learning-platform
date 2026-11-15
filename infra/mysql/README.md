@@ -1,4 +1,4 @@
-# Dữ liệu mẫu SGSphere
+# Dữ liệu mẫu ChitChatGo
 
 File seed chính là [`seed-data.sql`](seed-data.sql), thay cho file ở thư mục gốc,
 `05-seed-data.sql` và script `seed.ps1` trước đây. Chạy sau khi Auth, Course, Learning,
@@ -31,9 +31,9 @@ docker compose --profile backend up --build -d --wait
 Copy bản SQL mới nhất vào container rồi import bằng MySQL ở chế độ batch:
 
 ```powershell
-docker compose cp infra/mysql/seed-data.sql mysql:/tmp/sgsphere-seed.sql
+docker compose cp infra/mysql/seed-data.sql mysql:/tmp/chitchatgo-seed.sql
 
-docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot < /tmp/sgsphere-seed.sql'
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot < /tmp/chitchatgo-seed.sql'
 ```
 
 Lệnh sử dụng mật khẩu root đã cấu hình trong container. Cách copy này cũng áp dụng

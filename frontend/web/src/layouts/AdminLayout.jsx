@@ -84,7 +84,7 @@ export default function AdminLayout() {
               <SchoolOutlined />
             </span>
             <span>
-              SGEdu<small>ENGLISH PLATFORM</small>
+              ChitChatGo<small>ENGLISH PLATFORM</small>
             </span>
             <b>Admin</b>
           </Link>
@@ -144,7 +144,7 @@ export default function AdminLayout() {
                 />
               </form>
             ) : (
-              <span>SGEdu Admin</span>
+              <span>ChitChatGo Admin</span>
             )}
             <div className="admin-profile">
               <LanguageSwitcher />
@@ -156,7 +156,7 @@ export default function AdminLayout() {
           </main>
           <footer className="admin-footer">
             <span>
-              <SchoolOutlined fontSize="small" /> SGEdu
+              <SchoolOutlined fontSize="small" /> ChitChatGo
             </span>
             <span>{t('Không gian quản trị hệ thống học tập')}</span>
             <Link to="/">{t('Về trang học tập ↗')}</Link>

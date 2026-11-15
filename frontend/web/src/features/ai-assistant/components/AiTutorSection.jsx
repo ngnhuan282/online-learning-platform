@@ -95,7 +95,7 @@ export default function AiTutorSection() {
                 <Icon name="wave" size={22} />
               </span>
               <div>
-                <strong>SGEdu AI Speaking Coach</strong>
+                <strong>ChitChatGo AI Speaking Coach</strong>
                 <span>
                   <i /> {t('Đang học: Business Email & Meetings')}
                 </span>

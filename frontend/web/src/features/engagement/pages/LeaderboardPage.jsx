@@ -26,7 +26,7 @@ export default function LeaderboardPage() {
     <section className="community-workspace container">
       <header className="workspace-heading">
         <div>
-          <span className="eyebrow">SGEdu · TOGETHER</span>
+          <span className="eyebrow">ChitChatGo · TOGETHER</span>
           <h1>{t('Bảng xếp hạng')}</h1>
           <p>{t('Cùng nhau duy trì động lực học tiếng Anh.')}</p>
         </div>

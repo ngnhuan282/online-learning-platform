@@ -407,7 +407,7 @@ p {
 
 /* Shared public navigation */
 .site-header {
-  height: 72px;
+  min-height: 88px;
   background: rgb(255 255 255 / 97%);
   border-bottom: 1px solid var(--border);
   position: relative;
@@ -417,7 +417,7 @@ p {
   display: flex;
   align-items: center;
   gap: 24px;
-  height: 100%;
+  min-height: 88px;
 }
 .brand {
   display: inline-flex;
@@ -1878,7 +1878,7 @@ p {
     width: calc(100% - 32px);
   }
   .site-header {
-    height: 68px;
+    min-height: 78px;
   }
   .header-inner {
     gap: 12px;

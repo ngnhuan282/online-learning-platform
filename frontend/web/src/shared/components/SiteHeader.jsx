@@ -24,7 +24,7 @@ export default function SiteHeader() {
     document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' });
   }
   return (
-    <header className="site-header">
+    <header className={`site-header ${user ? 'is-authenticated' : ''}`}>
       <div className="container header-inner">
         <Brand />
         <nav

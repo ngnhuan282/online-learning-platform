@@ -42,7 +42,7 @@ export default function SiteFooter() {
               )}
             </p>
             <div className="social-links">
-              <Link aria-label={t('Cộng đồng SGEdu English')} to={ROUTES.COMMUNITY}>
+              <Link aria-label={t('Cộng đồng ChitChatGo')} to={ROUTES.COMMUNITY}>
                 <Icon name="globe" size={18} />
               </Link>
               <a href="/#courses" aria-label={t('Khóa học tiếng Anh')}>
@@ -86,7 +86,7 @@ export default function SiteFooter() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© 2025 SGEdu English. All rights reserved.</span>
+          <span>© 2025 ChitChatGo. All rights reserved.</span>
           <div>
             {bottomPolicies.map(item => (
               <button key={item.topic} onClick={() => setInfo(item.topic)}>

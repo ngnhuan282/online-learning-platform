@@ -239,7 +239,7 @@ class PasswordResetTests {
         );
         var message = messages.poll(5, TimeUnit.SECONDS);
         assertThat(message != null).isTrue();
-        assertThat(message.getSubject()).isEqualTo("SGEdu — Đặt lại mật khẩu");
+        assertThat(message.getSubject()).isEqualTo("ChitChatGo — Đặt lại mật khẩu");
         String content = message.getContent().toString();
         assertThat(content).contains(
             "15 phút",

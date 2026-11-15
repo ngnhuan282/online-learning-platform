@@ -60,7 +60,7 @@ export default function HeroSection() {
                 <i />
                 <i />
               </div>
-              <span>sgedu.vn/english/pronunciation-studio</span>
+              <span>ChitChatGo · Pronunciation Studio</span>
               <span className="live-badge">
                 <i /> AI Pronunciation Lab
               </span>

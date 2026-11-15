@@ -5,7 +5,7 @@ import Icon from './Icon';
 
 const content = {
   'Privacy Policy':
-    'SGEdu tôn trọng quyền riêng tư của bạn. Chính sách chi tiết về việc thu thập, sử dụng và bảo vệ dữ liệu sẽ được công bố khi nền tảng chính thức hoạt động.',
+    'ChitChatGo tôn trọng quyền riêng tư của bạn. Chính sách chi tiết về việc thu thập, sử dụng và bảo vệ dữ liệu sẽ được công bố khi nền tảng chính thức hoạt động.',
   'Terms of Service':
     'Nội dung học tập dành cho mục đích học tập cá nhân. Vui lòng tôn trọng bản quyền nội dung và các thành viên trong cộng đồng. Điều khoản dịch vụ đầy đủ sẽ được công bố trước khi nền tảng chính thức hoạt động.',
   Security:

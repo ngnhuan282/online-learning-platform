@@ -1,4 +1,4 @@
-export const APP_NAME = 'SGEdu';
+export const APP_NAME = 'ChitChatGo';
 export const API_PREFIX = '/api/v1';
 export const API_TIMEOUT_MS = 10000;
 export const DEFAULT_LOCALE = 'vi-VN';

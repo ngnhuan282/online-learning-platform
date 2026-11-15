@@ -3,7 +3,16 @@ import useLocale from '../i18n/useLocale';
 import { useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ButtonBase, Divider, ListItemIcon, ListItemText, Menu, MenuItem } from '@mui/material';
-import { KeyboardArrowDown, Logout, PersonOutlineOutlined } from '@mui/icons-material';
+import {
+  KeyboardArrowDown,
+  Logout,
+  PersonOutlineOutlined,
+  AdminPanelSettingsOutlined,
+  EmojiEventsOutlined,
+  ShoppingBagOutlined,
+  LeaderboardOutlined,
+  ForumOutlined,
+} from '@mui/icons-material';
 import useAuth from '../../features/auth/hooks/useAuth';
 import { ROUTES } from '../constants/routes';
 import { can } from '../../features/admin/utils/adminUtils';
@@ -75,19 +84,34 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
         </MenuItem>
         {can(user, 'ADMIN_ACCESS') && (
           <MenuItem component={Link} to="/admin" onClick={() => setAnchor(null)}>
+            <ListItemIcon>
+              <AdminPanelSettingsOutlined fontSize="small" />
+            </ListItemIcon>
             <ListItemText>{t('Không gian quản trị')}</ListItemText>
           </MenuItem>
         )}
         <MenuItem component={Link} to={ROUTES.ACHIEVEMENTS} onClick={() => setAnchor(null)}>
+          <ListItemIcon>
+            <EmojiEventsOutlined fontSize="small" />
+          </ListItemIcon>
           <ListItemText>{t('Thành tích học tập')}</ListItemText>
         </MenuItem>
         <MenuItem component={Link} to={ROUTES.SHOP} onClick={() => setAnchor(null)}>
+          <ListItemIcon>
+            <ShoppingBagOutlined fontSize="small" />
+          </ListItemIcon>
           <ListItemText>{t('Cửa hàng & kho đồ')}</ListItemText>
         </MenuItem>
         <MenuItem component={Link} to={ROUTES.LEADERBOARD} onClick={() => setAnchor(null)}>
+          <ListItemIcon>
+            <LeaderboardOutlined fontSize="small" />
+          </ListItemIcon>
           <ListItemText>{t('Bảng xếp hạng')}</ListItemText>
         </MenuItem>
         <MenuItem component={Link} to={ROUTES.COMMUNITY} onClick={() => setAnchor(null)}>
+          <ListItemIcon>
+            <ForumOutlined fontSize="small" />
+          </ListItemIcon>
           <ListItemText>{t('Diễn đàn')}</ListItemText>
         </MenuItem>
         <Divider />

@@ -24,8 +24,8 @@ function updateDocument() {
   document.documentElement.lang = locale;
   document.title =
     locale === 'en'
-      ? 'SGEdu English — Learn and grow together'
-      : 'SGEdu English — Chinh phục tiếng Anh, mở lối tương lai';
+      ? 'ChitChatGo — Learn and grow together'
+      : 'ChitChatGo — Chinh phục tiếng Anh, mở lối tương lai';
 }
 export function setLocale(value) {
   if (!['vi', 'en'].includes(value) || value === locale) return;

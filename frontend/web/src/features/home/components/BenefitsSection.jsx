@@ -36,7 +36,7 @@ export default function BenefitsSection() {
       <div className="container">
         <div className="section-heading centered">
           <span className="eyebrow">{t('LỢI ÍCH VƯỢT TRỘI')}</span>
-          <h2>{t('Tại sao chọn SGEdu English?')}</h2>
+          <h2>{t('Tại sao chọn ChitChatGo?')}</h2>
           <p>
             {t(
               'Môi trường luyện ngôn ngữ hiện đại, kết hợp phương pháp phản xạ khoa học và trợ lý AI thông minh 24/7.',

@@ -87,7 +87,7 @@ chưa có trong `.env` lúc triển khai; không chờ credentials để hoàn t
 1. Đăng nhập Gmail dùng làm sender → Google Account → **Security & sign-in** → **2-Step Verification**,
    bật và hoàn tất hướng dẫn. Xem [hướng dẫn Google](https://support.google.com/accounts/answer/185839?hl=en).
 2. Mở [App Passwords](https://myaccount.google.com/apppasswords), xác minh lại nếu được hỏi,
-   tạo app tên `SGEdu Auth`. Lưu mật khẩu ứng dụng 16 ký tự mà Google hiển thị.
+   tạo app tên `ChitChatGo Auth`. Lưu mật khẩu ứng dụng 16 ký tự mà Google hiển thị.
    App Password yêu cầu 2-Step Verification; một số tài khoản tổ chức, security-key-only hoặc Advanced
    Protection có thể không có lựa chọn này. Xem [Google App Passwords](https://support.google.com/accounts/answer/185833?hl=en).
 3. Thêm các biến còn thiếu vào `.env` root, giữ giá trị khác nguyên vẹn:

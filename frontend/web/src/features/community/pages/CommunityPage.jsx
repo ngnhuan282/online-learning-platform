@@ -48,7 +48,7 @@ export default function CommunityPage() {
     <section className="community-workspace container">
       <header className="workspace-heading">
         <div>
-          <span className="eyebrow">SGEdu · COMMUNITY</span>
+          <span className="eyebrow">ChitChatGo · COMMUNITY</span>
           <h1>{t('Diễn đàn')}</h1>
           <p>{t('Hỏi đáp, chia sẻ kinh nghiệm và học cùng cộng đồng.')}</p>
         </div>

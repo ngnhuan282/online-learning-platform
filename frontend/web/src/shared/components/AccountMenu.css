@@ -45,15 +45,29 @@
   color: #7b8ba5;
 }
 .account-menu-paper.MuiPaper-root {
-  min-width: 215px;
+  min-width: 264px;
+  max-width: calc(100vw - 32px);
   margin-top: 8px;
   border: 1px solid #e2eaf4;
   border-radius: 12px;
   box-shadow: 0 10px 35px #1722381c;
 }
 .account-menu-paper .MuiMenuItem-root {
-  min-height: 44px;
-  font-size: 14px;
+  min-height: 49px;
+  padding: 11px 18px;
+  gap: 12px;
+  font-size: 15px;
+}
+.account-menu-paper .MuiListItemIcon-root {
+  min-width: 24px;
+  color: #65718b;
+}
+.account-menu-paper .MuiListItemText-primary {
+  font-size: inherit;
+  font-weight: 500;
+}
+.account-menu-paper .MuiMenuItem-root:not(.account-menu-logout):hover .MuiListItemIcon-root {
+  color: #2563eb;
 }
 .account-menu-paper .account-menu-logout,
 .account-menu-paper .account-menu-logout .MuiListItemIcon-root {

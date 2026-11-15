@@ -1,4 +1,4 @@
--- SGSphere development seed for MySQL 8.4. Run after all service Flyway migrations.
+-- ChitChatGo development seed for MySQL 8.4. Run after all service Flyway migrations.
 -- Admin: admin@gmail.com / Admin123; learner: user@gmail.com / User123.
 -- Other sample learners use User123!; pham.thi.d@elearning.com is intentionally LOCKED.
 -- Users are resolved by email, roles by name. Existing user IDs and profile names are preserved.
@@ -11,9 +11,9 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 1;
 USE auth_db;
 
-DROP PROCEDURE IF EXISTS seed_sgsphere_data;
+DROP PROCEDURE IF EXISTS seed_chitchatgo_data;
 DELIMITER $$
-CREATE PROCEDURE seed_sgsphere_data()
+CREATE PROCEDURE seed_chitchatgo_data()
 BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -373,7 +373,7 @@ BEGIN
     END IF;
 
     INSERT INTO learning_db.notifications (id, user_id, type, title, body, action_url, read_at, created_at) VALUES
-    (1, @seed_admin_id, 'SYSTEM', 'Hệ thống SGSphere hoạt động ổn định', 'Tất cả 6 microservices và cổng API Gateway đã sẵn sàng phục vụ.', '/admin', '2026-10-01 08:00:00', '2026-10-01 08:00:00'),
+    (1, @seed_admin_id, 'SYSTEM', 'Hệ thống ChitChatGo hoạt động ổn định', 'Tất cả 6 microservices và cổng API Gateway đã sẵn sàng phục vụ.', '/admin', '2026-10-01 08:00:00', '2026-10-01 08:00:00'),
     (2, @seed_user_id, 'ENROLLMENT', 'Chào mừng bạn đến với IELTS Masterclass', 'Bạn đã đăng ký thành công khóa học. Hãy bắt đầu bài học đầu tiên!', '/learning/1', '2026-10-01 08:00:00', DATE_SUB('2026-10-01 08:00:00', INTERVAL 10 DAY)),
     (3, @seed_b_id, 'PROGRESS', 'Bạn đã hoàn thành 50% khóa TOEIC 850+', 'Tuyệt vời! Tiếp tục duy trì phong độ học tập hàng ngày nhé.', '/learning/2', NULL, DATE_SUB('2026-10-01 08:00:00', INTERVAL 2 DAY)),
     (4, @seed_c_id, 'QUIZ', 'Kết quả bài kiểm tra Business Communication', 'Bạn đã hoàn thành bài kiểm tra với điểm số 60/100.', '/quizzes/3/result', NULL, DATE_SUB('2026-10-01 08:00:00', INTERVAL 3 DAY)),
@@ -471,8 +471,8 @@ BEGIN
     COMMIT;
 END$$
 DELIMITER ;
-CALL seed_sgsphere_data();
-DROP PROCEDURE seed_sgsphere_data;
+CALL seed_chitchatgo_data();
+DROP PROCEDURE seed_chitchatgo_data;
 
 SELECT id, email, status FROM auth_db.users
 WHERE email IN ('admin@gmail.com', 'user@gmail.com') ORDER BY email;

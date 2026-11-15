@@ -71,7 +71,7 @@ export default function ShopPage() {
     <section className="shop-workspace container">
       <header className="shop-heading">
         <div>
-          <span className="eyebrow">SGEdu · COLLECT</span>
+          <span className="eyebrow">ChitChatGo · COLLECT</span>
           <h1>{t('Cửa hàng')}</h1>
           <p>{t('Học đều mỗi ngày để thu thập kim cương và mở khóa những vật phẩm yêu thích.')}</p>
         </div>
