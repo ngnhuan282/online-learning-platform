@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,6 +27,7 @@ const emptyForm = {
 };
 
 export default function AdminCoursePage() {
+  useLocale();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
@@ -268,7 +271,9 @@ export default function AdminCoursePage() {
     setMutationError(null);
     try {
       await courseApi.delete(id);
-      setCourses(prev => prev.map(item => String(item.id) === String(id) ? { ...item, status: 'ARCHIVED' } : item));
+      setCourses(prev =>
+        prev.map(item => (String(item.id) === String(id) ? { ...item, status: 'ARCHIVED' } : item)),
+      );
     } catch (error) {
       setMutationError(error);
     } finally {
@@ -280,10 +285,18 @@ export default function AdminCoursePage() {
   return (
     <section className="container" style={{ padding: '32px 0 80px' }}>
       <div style={{ display: 'grid', gap: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
           <div>
             <span className="eyebrow">ADMIN</span>
-            <h1 style={{ marginTop: 8 }}>Quản lý khóa học</h1>
+            <h1 style={{ marginTop: 8 }}>{t('Quản lý khóa học')}</h1>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button
@@ -292,27 +305,27 @@ export default function AdminCoursePage() {
               onClick={() => navigate('/admin/categories')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}
             >
-              Danh sách danh mục
+              {t('Danh sách danh mục')}
             </button>
           </div>
         </div>
 
         {loadError && <ErrorState error={loadError} onRetry={retryLoad} />}
-        {mutationError && <ErrorState title="Không thể lưu thay đổi" error={mutationError} />}
+        {mutationError && <ErrorState title={t('Không thể lưu thay đổi')} error={mutationError} />}
 
         <div className="course-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
           <div className="course-card" style={{ padding: 20 }}>
-            <small>Tổng khóa học</small>
+            <small>{t('Tổng khóa học')}</small>
             <h3 style={{ fontSize: 28, margin: '8px 0' }}>{courses.length}</h3>
           </div>
           <div className="course-card" style={{ padding: 20 }}>
-            <small>Tổng giá niêm yết đang hiển thị</small>
+            <small>{t('Tổng giá niêm yết đang hiển thị')}</small>
             <h3 style={{ fontSize: 28, margin: '8px 0' }}>{formatPrice(totalRevenue)}</h3>
           </div>
           <div className="course-card" style={{ padding: 20 }}>
-            <small>Trạng thái</small>
+            <small>{t('Trạng thái')}</small>
             <h3 style={{ fontSize: 28, margin: '8px 0' }}>
-              {loading ? 'Đang tải' : loadError ? 'Lỗi kết nối' : 'Đã tải'}
+              {loading ? t('Đang tải') : loadError ? t('Lỗi kết nối') : t('Đã tải')}
             </h3>
           </div>
         </div>
@@ -324,29 +337,31 @@ export default function AdminCoursePage() {
               onSubmit={handleSubmit}
               style={{ padding: 20, display: 'grid', gap: 14 }}
             >
-              <h3>{editingId ? 'Chỉnh sửa khóa học' : 'Thêm khóa học mới'}</h3>
+              <h3>{editingId ? t('Chỉnh sửa khóa học') : t('Thêm khóa học mới')}</h3>
               <input
-                aria-label="Tên khóa học"
+                aria-label={t('Tên khóa học')}
                 required
                 maxLength={200}
                 value={form.title}
                 onChange={event => setForm({ ...form, title: event.target.value })}
-                placeholder="Tên khóa học"
+                placeholder={t('Tên khóa học')}
                 style={{
                   padding: '10px 12px',
                   borderRadius: 8,
                   border: formErrors.title ? '1px solid #ef4444' : '1px solid #dfe3ea',
                 }}
               />
-              {formErrors.title && <span style={{ color: '#ef4444', fontSize: 12 }}>{formErrors.title}</span>}
+              {formErrors.title && (
+                <span style={{ color: '#ef4444', fontSize: 12 }}>{t(formErrors.title)}</span>
+              )}
 
               <textarea
-                aria-label="Mô tả khóa học"
+                aria-label={t('Mô tả khóa học')}
                 required
                 maxLength={2000}
                 value={form.description}
                 onChange={event => setForm({ ...form, description: event.target.value })}
-                placeholder="Mô tả khóa học"
+                placeholder={t('Mô tả khóa học')}
                 rows={4}
                 style={{
                   padding: '10px 12px',
@@ -356,64 +371,74 @@ export default function AdminCoursePage() {
                 }}
               />
               {formErrors.description && (
-                <span style={{ color: '#ef4444', fontSize: 12 }}>{formErrors.description}</span>
+                <span style={{ color: '#ef4444', fontSize: 12 }}>{t(formErrors.description)}</span>
               )}
 
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 6, display: 'block' }}>
-                  Danh mục khóa học
+                <label
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#475569',
+                    marginBottom: 6,
+                    display: 'block',
+                  }}
+                >
+                  {t('Danh mục khóa học')}
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <select
-                    aria-label="Danh mục"
+                    aria-label={t('Danh mục')}
                     required
                     value={form.categoryId}
                     onChange={event => setForm({ ...form, categoryId: event.target.value })}
                     style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
                   >
-                    <option value="">-- Chọn danh mục --</option>
+                    <option value="">{t('-- Chọn danh mục --')}</option>
                     {categories.map(category => (
                       <option key={category.id} value={category.id}>
-                        {category.name}
+                        {t(category.name)}
                       </option>
                     ))}
                   </select>
                   <button
                     type="button"
                     className="button button-soft"
-                    title="Thêm danh mục mới nhanh"
+                    title={t('Thêm danh mục mới nhanh')}
                     onClick={() => setShowAddCategoryModal(true)}
                     style={{ padding: '0 14px', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600 }}
                   >
-                    ➕ Thêm mới
+                    {t('➕ Thêm mới')}
                   </button>
                 </div>
               </div>
-              {!loading && !loadError && categories.length === 0 && <p>Chưa có danh mục để tạo khóa học.</p>}
+              {!loading && !loadError && categories.length === 0 && (
+                <p>{t('Chưa có danh mục để tạo khóa học.')}</p>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <input
                   type="number"
-                  aria-label="Giá"
+                  aria-label={t('Giá')}
                   min={0}
                   value={form.price}
                   onChange={event => setForm({ ...form, price: Number(event.target.value) })}
-                  placeholder="Giá"
+                  placeholder={t('Giá')}
                   style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
                 />
                 <input
                   type="number"
-                  aria-label="Giá gốc"
+                  aria-label={t('Giá gốc')}
                   min={0}
                   value={form.originalPrice}
                   onChange={event => setForm({ ...form, originalPrice: Number(event.target.value) })}
-                  placeholder="Giá gốc"
+                  placeholder={t('Giá gốc')}
                   style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
                 />
               </div>
 
               <select
-                aria-label="Trình độ"
+                aria-label={t('Trình độ')}
                 value={form.level}
                 onChange={event => setForm({ ...form, level: event.target.value })}
                 style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
@@ -426,7 +451,7 @@ export default function AdminCoursePage() {
               <MediaUploader
                 folder="thumbnails"
                 accept="image/*"
-                label="Ảnh đại diện khóa học (Thumbnail)"
+                label={t('Ảnh đại diện khóa học (Thumbnail)')}
                 maxSizeMB={10}
                 currentUrl={form.thumbnailUrl}
                 onUploadSuccess={info =>
@@ -450,15 +475,15 @@ export default function AdminCoursePage() {
                 >
                   {submitting
                     ? editingId
-                      ? 'Đang cập nhật...'
-                      : 'Đang lưu...'
+                      ? t('Đang cập nhật...')
+                      : t('Đang lưu...')
                     : editingId
-                      ? 'Cập nhật khóa học'
-                      : 'Lưu khóa học'}
+                      ? t('Cập nhật khóa học')
+                      : t('Lưu khóa học')}
                 </button>
                 {editingId && (
                   <button className="button button-soft" type="button" onClick={resetForm}>
-                    Hủy chỉnh sửa
+                    {t('Hủy chỉnh sửa')}
                   </button>
                 )}
               </div>
@@ -475,85 +500,155 @@ export default function AdminCoursePage() {
                 marginBottom: 14,
               }}
             >
-              <h3 style={{ margin: 0 }}>Danh sách khóa học</h3>
+              <h3 style={{ margin: 0 }}>{t('Danh sách khóa học')}</h3>
               <input
                 value={keyword}
                 onChange={e => setKeyword(e.target.value)}
-                placeholder="Tìm khóa học..."
+                placeholder={t('Tìm khóa học...')}
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #dfe3ea', minWidth: 180 }}
               />
             </div>
             {loading ? (
-              <p>Đang tải khóa học...</p>
+              <p>{t('Đang tải khóa học...')}</p>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e7ebf0' }}>
-                    <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Khóa học</th>
-                    <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Giá</th>
-                    <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Thao tác</th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        padding: '8px 10px',
+                        fontSize: 12,
+                        color: '#94a3b8',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      {t('Khóa học')}
+                    </th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        padding: '8px 10px',
+                        fontSize: 12,
+                        color: '#94a3b8',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t('Giá')}
+                    </th>
+                    <th
+                      style={{
+                        textAlign: 'right',
+                        padding: '8px 10px',
+                        fontSize: 12,
+                        color: '#94a3b8',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t('Thao tác')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {!loadError && filteredCourses.length === 0 && (
-                    <tr><td colSpan={3} style={{ padding: '16px 10px', color: '#94a3b8', fontSize: 14 }}>
-                      {debouncedKeyword ? 'Không tìm thấy khóa học phù hợp.' : 'Chưa có khóa học được xuất bản.'}
-                    </td></tr>
+                    <tr>
+                      <td colSpan={3} style={{ padding: '16px 10px', color: '#94a3b8', fontSize: 14 }}>
+                        {debouncedKeyword
+                          ? t('Không tìm thấy khóa học phù hợp.')
+                          : t('Chưa có khóa học được xuất bản.')}
+                      </td>
+                    </tr>
                   )}
                   {filteredCourses.map(course => (
                     <tr key={course.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '10px 10px' }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{course.title}</div>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 14,
+                            maxWidth: 260,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {course.title}
+                        </div>
                         <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
                           {course.categoryName}
                           <span style={{ margin: '0 5px', color: '#cbd5e1' }}>•</span>
-                          <span style={{ color: '#f59e0b', fontWeight: 600 }}>&#9733; {Number(course.avgRating || 0).toFixed(1)}</span>
-                          <span style={{ color: '#94a3b8', marginLeft: 4 }}>({course.reviewCount || 0} đánh giá)</span>
+                          <span style={{ color: '#f59e0b', fontWeight: 600 }}>
+                            &#9733; {Number(course.avgRating || 0).toFixed(1)}
+                          </span>
+                          <span style={{ color: '#94a3b8', marginLeft: 4 }}>
+                            ({course.reviewCount || 0} {t('đánh giá)')}
+                          </span>
                         </div>
                       </td>
-                      <td style={{ padding: '10px 10px', fontSize: 13, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                      <td
+                        style={{
+                          padding: '10px 10px',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {formatPrice(Number(course.price || 0))}
                       </td>
                       <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
                         <button
                           className="button button-soft"
                           type="button"
-                          title="Quản lý bài học"
+                          title={t('Quản lý bài học')}
                           onClick={() => navigate(`/admin/courses/${course.id}/curriculum`)}
                           style={{ padding: '5px 11px', fontSize: 12, marginRight: 4 }}
                         >
-                          Bài học
+                          {t('Bài học')}
                         </button>
                         <button
                           className="button button-soft"
                           type="button"
-                          title="Xem đánh giá"
+                          title={t('Xem đánh giá')}
                           onClick={() => navigate(`/admin/courses/${course.id}/reviews`)}
                           style={{ padding: '5px 11px', fontSize: 12, marginRight: 4 }}
                         >
-                          Đánh giá
+                          {t('Đánh giá')}
                         </button>
                         {can(user, 'COURSE_UPDATE') && (
                           <button
                             className="button button-soft"
                             type="button"
-                            title="Sửa khóa học"
+                            title={t('Sửa khóa học')}
                             onClick={() => handleEdit(course)}
                             style={{ padding: '5px 11px', fontSize: 12, marginRight: 4 }}
                           >
-                            Sửa
+                            {t('Sửa')}
                           </button>
                         )}
                         {can(user, 'COURSE_DELETE') && (
                           <button
                             className="button button-soft"
                             type="button"
-                            title="Lưu trữ khóa học (giữ dữ liệu)"
+                            title={t('Lưu trữ khóa học (giữ dữ liệu)')}
                             disabled={submitting || deletingId !== null || Boolean(loadError)}
                             onClick={() => handleDelete(course.id)}
-                            style={{ padding: '5px 11px', fontSize: 12, color: '#e53e3e', borderColor: '#fed7d7' }}
+                            style={{
+                              padding: '5px 11px',
+                              fontSize: 12,
+                              color: '#e53e3e',
+                              borderColor: '#fed7d7',
+                            }}
                           >
-                            {deletingId === course.id ? 'Đang xóa...' : 'Xóa'}
+                            {deletingId === course.id ? t('Đang xóa...') : t('Xóa')}
                           </button>
                         )}
                       </td>
@@ -571,11 +666,15 @@ export default function AdminCoursePage() {
                   onClick={() => changePage(Math.max(0, currentPage - 1))}
                   style={{ padding: '6px 14px' }}
                 >
-                  ← Trước
+                  {t('← Trước')}
                 </button>
                 <span style={{ fontSize: 13, color: '#64748b' }}>
                   Trang {currentPage + 1} / {totalPages}
-                  {totalElements > 0 && <span style={{ marginLeft: 6 }}>({totalElements} khóa học)</span>}
+                  {totalElements > 0 && (
+                    <span style={{ marginLeft: 6 }}>
+                      ({totalElements} {t('khóa học)')}
+                    </span>
+                  )}
                 </span>
                 <button
                   className="button button-soft"
@@ -624,53 +723,104 @@ export default function AdminCoursePage() {
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>➕ Thêm danh mục mới</h3>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{t('➕ Thêm danh mục mới')}</h3>
               <button
                 type="button"
                 onClick={() => {
                   setShowAddCategoryModal(false);
                   setCategoryModalError('');
                 }}
-                style={{ background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer', color: '#64748b' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 20,
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
               >
                 ✕
               </button>
             </div>
 
             {categoryModalError && (
-              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+              <div
+                style={{
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  marginBottom: 14,
+                }}
+              >
                 {categoryModalError}
               </div>
             )}
 
             <form onSubmit={handleCreateCategory} style={{ display: 'grid', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>
-                  Tên danh mục <span style={{ color: '#ef4444' }}>*</span>
+                <label
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: 6,
+                    display: 'block',
+                  }}
+                >
+                  {t('Tên danh mục')} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="text"
                   required
                   maxLength={100}
-                  placeholder="Ví dụ: Luyện thi VSTEP, Tiếng Anh Du học..."
+                  placeholder={t('Ví dụ: Luyện thi VSTEP, Tiếng Anh Du học...')}
                   value={newCategoryName}
                   onChange={e => setNewCategoryName(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #dfe3ea',
+                    boxSizing: 'border-box',
+                  }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6, display: 'block' }}>
-                  Mô tả danh mục
+                <label
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: 6,
+                    display: 'block',
+                  }}
+                >
+                  {t('Mô tả danh mục')}
                 </label>
                 <textarea
                   rows={3}
                   maxLength={500}
-                  placeholder="Mô tả ngắn gọn về đối tượng và mục tiêu của danh mục này..."
+                  placeholder={t('Mô tả ngắn gọn về đối tượng và mục tiêu của danh mục này...')}
                   value={newCategoryDesc}
                   onChange={e => setNewCategoryDesc(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea', resize: 'vertical', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid #dfe3ea',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                  }}
                 />
               </div>
 
@@ -683,14 +833,10 @@ export default function AdminCoursePage() {
                     setCategoryModalError('');
                   }}
                 >
-                  Hủy
+                  {t('Hủy')}
                 </button>
-                <button
-                  type="submit"
-                  className="button button-primary"
-                  disabled={creatingCategory}
-                >
-                  {creatingCategory ? 'Đang lưu...' : 'Lưu danh mục'}
+                <button type="submit" className="button button-primary" disabled={creatingCategory}>
+                  {creatingCategory ? t('Đang lưu...') : t('Lưu danh mục')}
                 </button>
               </div>
             </form>

@@ -94,22 +94,26 @@ const router = createBrowserRouter([
       {
         path: 'notifications',
         element: <RoleRoute roles={['ADMIN']} />,
-        children: [{
-          index: true,
-          lazy: async () => ({
-            Component: (await import('../features/learning/pages/AdminNotificationsPage')).default,
-          }),
-        }],
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/AdminNotificationsPage')).default,
+            }),
+          },
+        ],
       },
       {
         path: 'quizzes',
         element: <RoleRoute roles={['ADMIN']} />,
-        children: [{
-          index: true,
-          lazy: async () => ({
-            Component: (await import('../features/learning/pages/AdminQuizPage')).default,
-          }),
-        }],
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/AdminQuizPage')).default,
+            }),
+          },
+        ],
       },
       {
         path: 'courses',
@@ -188,7 +192,9 @@ const router = createBrowserRouter([
       },
       {
         path: 'forgot-password',
-        lazy: async () => ({ Component: (await import('../features/auth/pages/ForgotPasswordPage')).default }),
+        lazy: async () => ({
+          Component: (await import('../features/auth/pages/ForgotPasswordPage')).default,
+        }),
       },
       {
         path: 'reset-password',
@@ -213,6 +219,34 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
+          {
+            path: 'achievements',
+            lazy: async () => ({
+              Component: (await import('../features/engagement/pages/AchievementsPage')).default,
+            }),
+          },
+          {
+            path: 'shop',
+            lazy: async () => ({ Component: (await import('../features/shop/pages/ShopPage')).default }),
+          },
+          {
+            path: 'leaderboard',
+            lazy: async () => ({
+              Component: (await import('../features/engagement/pages/LeaderboardPage')).default,
+            }),
+          },
+          {
+            path: 'community',
+            lazy: async () => ({
+              Component: (await import('../features/community/pages/CommunityPage')).default,
+            }),
+          },
+          {
+            path: 'community/:id',
+            lazy: async () => ({
+              Component: (await import('../features/community/pages/CommunityPostPage')).default,
+            }),
+          },
           {
             path: 'dashboard',
             lazy: async () => ({

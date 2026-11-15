@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { NavLink } from 'react-router-dom';
 import DashboardOutlined from '@mui/icons-material/DashboardOutlined';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
@@ -11,22 +13,23 @@ const destinations = [
 ];
 
 export default function LearningHeader({ title, description, children, navigation = true }) {
+  useLocale();
   return (
     <>
       {navigation && (
-        <nav className="learning-navigation" aria-label="Điều hướng học tập">
+        <nav className="learning-navigation" aria-label={t('Điều hướng học tập')}>
           {destinations.map(({ to, label, Icon }) => (
             <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'is-active' : '')}>
               <Icon fontSize="small" aria-hidden="true" />
-              {label}
+              {t(label)}
             </NavLink>
           ))}
         </nav>
       )}
       <header className="learning-page-header">
         <div>
-          <h1>{title}</h1>
-          {description && <p className="learning-page-description">{description}</p>}
+          <h1>{t(title)}</h1>
+          {description && <p className="learning-page-description">{t(description)}</p>}
         </div>
         {children && <div className="learning-header-actions">{children}</div>}
       </header>

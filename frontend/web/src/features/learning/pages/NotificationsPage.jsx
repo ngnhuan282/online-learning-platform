@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
@@ -9,11 +11,13 @@ import { NOTIFICATION_CATEGORIES } from '../utils/notificationStream';
 import '../styles/notifications.css';
 
 export default function NotificationsPage() {
+  useLocale();
   const notifications = useNotifications();
   return <NotificationsContent key={notifications.userId ?? 'anonymous'} notifications={notifications} />;
 }
 
 function NotificationsContent({ notifications }) {
+  useLocale();
   const { userId, revision, summary, markAllRead, refresh } = notifications;
   const [category, setCategory] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -82,10 +86,10 @@ function NotificationsContent({ notifications }) {
     <section className="learning-page">
       <div className="learning-shell">
         <LearningHeader
-          title="Thông báo của bạn"
+          title={t('Thông báo của bạn')}
           description={
             summary.unreadCount == null
-              ? 'Cập nhật về khóa học, thanh toán và kết quả học tập.'
+              ? t('Cập nhật về khóa học, thanh toán và kết quả học tập.')
               : `${summary.unreadCount} thông báo chưa đọc. Theo dõi các cập nhật mới tại đây.`
           }
         >
@@ -95,12 +99,12 @@ function NotificationsContent({ notifications }) {
             disabled={updating || !summary.unreadCount}
             onClick={readAll}
           >
-            {updating ? 'Đang cập nhật...' : 'Đánh dấu tất cả đã đọc'}
+            {updating ? t('Đang cập nhật...') : t('Đánh dấu tất cả đã đọc')}
           </button>
         </LearningHeader>
         <div className="notification-filters">
           <label>
-            Loại thông báo
+            {t('Loại thông báo')}
             <select
               value={category}
               onChange={event => {
@@ -108,10 +112,10 @@ function NotificationsContent({ notifications }) {
                 setPage(0);
               }}
             >
-              <option value="">Tất cả</option>
+              <option value="">{t('Tất cả')}</option>
               {Object.entries(NOTIFICATION_CATEGORIES).map(([key, label]) => (
                 <option key={key} value={key}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </select>
@@ -125,19 +129,22 @@ function NotificationsContent({ notifications }) {
                 setPage(0);
               }}
             />
-            Chỉ chưa đọc
+            {t('Chỉ chưa đọc')}
           </label>
           <button className="button button-outline" type="button" onClick={reload}>
-            Tải lại
+            {t('Tải lại')}
           </button>
         </div>
         {state.query === query && state.error && <ErrorState error={state.error} onRetry={reload} />}
         {actionError && (
-          <ErrorState error={actionError} title="Không thể đánh dấu đã đọc" onRetry={readAll} />
+          <ErrorState error={actionError} title={t('Không thể đánh dấu đã đọc')} onRetry={readAll} />
         )}
-        {state.loading && <p role="status">Đang tải thông báo...</p>}
+        {state.loading && <p role="status">{t('Đang tải thông báo...')}</p>}
         {!state.loading && !state.error && data?.content.length === 0 && (
-          <EmptyState title="Chưa có thông báo" description="Thông báo phù hợp sẽ xuất hiện tại đây." />
+          <EmptyState
+            title={t('Chưa có thông báo')}
+            description={t('Thông báo phù hợp sẽ xuất hiện tại đây.')}
+          />
         )}
         <div className="notification-list" aria-busy={state.loading}>
           {data?.content.map(notification => (
@@ -145,17 +152,17 @@ function NotificationsContent({ notifications }) {
           ))}
         </div>
         {data && data.totalPages > 0 && (
-          <nav className="notification-pagination" aria-label="Phân trang thông báo">
+          <nav className="notification-pagination" aria-label={t('Phân trang thông báo')}>
             <button
               className="button button-outline"
               type="button"
               disabled={page === 0 || state.loading}
               onClick={() => setPage(value => value - 1)}
             >
-              Trang trước
+              {t('Trang trước')}
             </button>
             <span>
-              Trang {page + 1} / {data.totalPages} · {data.totalElements} thông báo
+              Trang {page + 1} / {data.totalPages} · {data.totalElements} {t('thông báo')}
             </span>
             <button
               className="button button-outline"

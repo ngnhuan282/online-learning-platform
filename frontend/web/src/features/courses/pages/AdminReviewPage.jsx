@@ -1,3 +1,5 @@
+import { t, getIntlLocale } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { courseApi } from '../api/courseApi';
@@ -5,11 +7,13 @@ import { reviewApi } from '../api/reviewApi';
 import StarRating from '../components/StarRating';
 
 export default function AdminReviewPage() {
+  useLocale();
   const { courseId } = useParams();
   return <ReviewsManager key={courseId || 'all'} initialCourseId={courseId} />;
 }
 
 function ReviewsManager({ initialCourseId }) {
+  useLocale();
   const [selectedCourseId, setSelectedCourseId] = useState(initialCourseId || '');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'VISIBLE' | 'HIDDEN'
   const [courses, setCourses] = useState([]);
@@ -37,7 +41,9 @@ function ReviewsManager({ initialCourseId }) {
       setLoading(true);
       setError(null);
 
-      const fetchCourse = courseIdToFetch ? courseApi.adminGetById(courseIdToFetch).catch(() => null) : Promise.resolve(null);
+      const fetchCourse = courseIdToFetch
+        ? courseApi.adminGetById(courseIdToFetch).catch(() => null)
+        : Promise.resolve(null);
       const fetchReviews = reviewApi.adminList(courseIdToFetch || undefined, { page, size: 10 });
 
       return Promise.all([fetchCourse, fetchReviews])
@@ -107,7 +113,11 @@ function ReviewsManager({ initialCourseId }) {
       }
       await loadData(pagination.page, selectedCourseId);
     } catch (err) {
-      if (typeof window !== 'undefined' && typeof window.alert === 'function') { window.alert(err?.response?.data?.message || 'Thao tác thất bại'); } else { console.error(err?.response?.data?.message || 'Thao tác thất bại'); }
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(err?.response?.data?.message || 'Thao tác thất bại');
+      } else {
+        console.error(err?.response?.data?.message || 'Thao tác thất bại');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -125,34 +135,51 @@ function ReviewsManager({ initialCourseId }) {
     <section className="section" style={{ minHeight: '80vh', padding: '24px 0 60px' }}>
       <div className="container">
         {/* Header navigation */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: 16,
+            marginBottom: 20,
+          }}
+        >
           <div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 6 }}>
               <Link to="/admin/courses" style={{ color: '#3b82f6', textDecoration: 'none', fontSize: 14 }}>
-                ← Danh sách khóa học
+                {t('← Danh sách khóa học')}
               </Link>
               {initialCourseId && (
                 <>
                   <span style={{ color: '#cbd5e1' }}>|</span>
-                  <Link to="/admin/reviews" style={{ color: '#64748b', textDecoration: 'none', fontSize: 14 }}>
-                    Xem tất cả đánh giá
+                  <Link
+                    to="/admin/reviews"
+                    style={{ color: '#64748b', textDecoration: 'none', fontSize: 14 }}
+                  >
+                    {t('Xem tất cả đánh giá')}
                   </Link>
                 </>
               )}
             </div>
             <h2 style={{ margin: '4px 0', fontSize: 24, fontWeight: 700 }}>
-              {courseDetail ? `Đánh giá: ${courseDetail.title}` : 'Quản lý Đánh giá Toàn hệ thống'}
+              {courseDetail ? `Đánh giá: ${courseDetail.title}` : t('Quản lý Đánh giá Toàn hệ thống')}
             </h2>
             <p style={{ color: '#64748b', margin: 0, fontSize: 14 }}>
-              Xem và kiểm duyệt đánh giá của học viên. Các review vi phạm chính sách có thể bị ẩn khỏi trang khóa học công khai.
+              {t(
+                'Xem và kiểm duyệt đánh giá của học viên. Các review vi phạm chính sách có thể bị ẩn khỏi trang khóa học công khai.',
+              )}
             </p>
           </div>
 
           {/* Filter Toolbar */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
-              <label htmlFor="course-select-filter" style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
-                Lọc theo khóa học:
+              <label
+                htmlFor="course-select-filter"
+                style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}
+              >
+                {t('Lọc theo khóa học:')}
               </label>
               <select
                 id="course-select-filter"
@@ -168,18 +195,21 @@ function ReviewsManager({ initialCourseId }) {
                   maxWidth: 320,
                 }}
               >
-                <option value="">-- Tất cả khóa học --</option>
+                <option value="">{t('-- Tất cả khóa học --')}</option>
                 {courses.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.title}
+                    {t(c.title)}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label htmlFor="status-select-filter" style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
-                Trạng thái:
+              <label
+                htmlFor="status-select-filter"
+                style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}
+              >
+                {t('Trạng thái:')}
               </label>
               <select
                 id="status-select-filter"
@@ -193,9 +223,18 @@ function ReviewsManager({ initialCourseId }) {
                   background: '#fff',
                 }}
               >
-                <option value="ALL">Tất cả ({reviews.length})</option>
-                <option value="VISIBLE">Hiển thị ({reviews.length - hiddenCount})</option>
-                <option value="HIDDEN">Đã ẩn ({hiddenCount})</option>
+                <option value="ALL">
+                  {t('Tất cả (')}
+                  {reviews.length})
+                </option>
+                <option value="VISIBLE">
+                  {t('Hiển thị (')}
+                  {reviews.length - hiddenCount})
+                </option>
+                <option value="HIDDEN">
+                  {t('Đã ẩn (')}
+                  {hiddenCount})
+                </option>
               </select>
             </div>
           </div>
@@ -212,29 +251,27 @@ function ReviewsManager({ initialCourseId }) {
         >
           {courseDetail && (
             <div className="course-card" style={{ padding: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: '#64748b' }}>Đánh giá trung bình</div>
+              <div style={{ fontSize: 13, color: '#64748b' }}>{t('Đánh giá trung bình')}</div>
               <div style={{ fontSize: 26, fontWeight: 700, color: '#f59e0b', marginTop: 4 }}>
                 ★ {courseDetail.avgRating ? Number(courseDetail.avgRating).toFixed(1) : '0.0'}
               </div>
             </div>
           )}
           <div className="course-card" style={{ padding: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#64748b' }}>Tổng số đánh giá</div>
+            <div style={{ fontSize: 13, color: '#64748b' }}>{t('Tổng số đánh giá')}</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: '#3b82f6', marginTop: 4 }}>
               {pagination.totalElements}
             </div>
           </div>
           <div className="course-card" style={{ padding: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#64748b' }}>Đang hiển thị trên trang này</div>
+            <div style={{ fontSize: 13, color: '#64748b' }}>{t('Đang hiển thị trên trang này')}</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: '#22c55e', marginTop: 4 }}>
               {reviews.length - hiddenCount}
             </div>
           </div>
           <div className="course-card" style={{ padding: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#64748b' }}>Đã ẩn vi phạm</div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: '#ef4444', marginTop: 4 }}>
-              {hiddenCount}
-            </div>
+            <div style={{ fontSize: 13, color: '#64748b' }}>{t('Đã ẩn vi phạm')}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#ef4444', marginTop: 4 }}>{hiddenCount}</div>
           </div>
         </div>
 
@@ -250,19 +287,21 @@ function ReviewsManager({ initialCourseId }) {
               marginBottom: 20,
             }}
           >
-            {error}
+            {t(error)}
           </div>
         )}
 
         {/* Reviews list */}
         <div className="course-card" style={{ padding: 24 }}>
           {loading ? (
-            <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>Đang tải đánh giá...</p>
+            <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>
+              {t('Đang tải đánh giá...')}
+            </p>
           ) : displayedReviews.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>
               {reviews.length === 0
-                ? 'Chưa có đánh giá nào được tìm thấy.'
-                : 'Không có đánh giá phù hợp với bộ lọc đã chọn.'}
+                ? t('Chưa có đánh giá nào được tìm thấy.')
+                : t('Không có đánh giá phù hợp với bộ lọc đã chọn.')}
             </p>
           ) : (
             <div style={{ display: 'grid', gap: 16 }}>
@@ -281,7 +320,15 @@ function ReviewsManager({ initialCourseId }) {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                        marginBottom: 6,
+                      }}
+                    >
                       <span style={{ fontWeight: 600, fontSize: 14 }}>
                         {review.userFullName || `Học viên #${review.userId}`}
                       </span>
@@ -305,7 +352,9 @@ function ReviewsManager({ initialCourseId }) {
                       <StarRating value={review.rating} readonly size={16} />
 
                       <span style={{ fontSize: 12, color: '#64748b' }}>
-                        {review.createdAt ? new Date(review.createdAt).toLocaleDateString('vi-VN') : ''}
+                        {review.createdAt
+                          ? new Date(review.createdAt).toLocaleDateString(getIntlLocale())
+                          : ''}
                       </span>
 
                       {review.hidden ? (
@@ -319,7 +368,7 @@ function ReviewsManager({ initialCourseId }) {
                             borderRadius: 4,
                           }}
                         >
-                          Đã ẩn
+                          {t('Đã ẩn')}
                         </span>
                       ) : (
                         <span
@@ -332,13 +381,13 @@ function ReviewsManager({ initialCourseId }) {
                             borderRadius: 4,
                           }}
                         >
-                          Hiển thị
+                          {t('Hiển thị')}
                         </span>
                       )}
                     </div>
 
                     <p style={{ margin: '6px 0 0', fontSize: 14, color: '#334155', lineHeight: 1.5 }}>
-                      {review.comment || <em style={{ color: '#94a3b8' }}>(Không có nhận xét)</em>}
+                      {review.comment || <em style={{ color: '#94a3b8' }}>{t('(Không có nhận xét)')}</em>}
                     </p>
                   </div>
 
@@ -355,7 +404,11 @@ function ReviewsManager({ initialCourseId }) {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {actionLoading === review.id ? 'Đang xử lý...' : review.hidden ? 'Bỏ ẩn' : 'Ẩn review'}
+                      {actionLoading === review.id
+                        ? t('Đang xử lý...')
+                        : review.hidden
+                          ? t('Bỏ ẩn')
+                          : t('Ẩn review')}
                     </button>
                   </div>
                 </div>
@@ -371,7 +424,7 @@ function ReviewsManager({ initialCourseId }) {
                 disabled={pagination.page <= 0 || loading}
                 onClick={() => loadData(pagination.page - 1, selectedCourseId)}
               >
-                Trang trước
+                {t('Trang trước')}
               </button>
               <span
                 style={{
@@ -398,4 +451,3 @@ function ReviewsManager({ initialCourseId }) {
     </section>
   );
 }
-

@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import Icon from '../../../shared/components/Icon';
 
 const benefits = [
@@ -28,15 +30,17 @@ const benefits = [
 ];
 
 export default function BenefitsSection() {
+  useLocale();
   return (
     <section className="benefits-section section-tinted" id="benefits">
       <div className="container">
         <div className="section-heading centered">
-          <span className="eyebrow">LỢI ÍCH VƯỢT TRỘI</span>
-          <h2>Tại sao chọn SGEdu English?</h2>
+          <span className="eyebrow">{t('LỢI ÍCH VƯỢT TRỘI')}</span>
+          <h2>{t('Tại sao chọn SGEdu English?')}</h2>
           <p>
-            Môi trường luyện ngôn ngữ hiện đại, kết hợp phương pháp phản xạ khoa học và trợ lý AI thông minh
-            24/7.
+            {t(
+              'Môi trường luyện ngôn ngữ hiện đại, kết hợp phương pháp phản xạ khoa học và trợ lý AI thông minh 24/7.',
+            )}
           </p>
         </div>
         <div className="benefit-grid">
@@ -45,8 +49,8 @@ export default function BenefitsSection() {
               <span className={`feature-icon ${benefit.color}`}>
                 <Icon name={benefit.icon} size={25} />
               </span>
-              <h3>{benefit.title}</h3>
-              <p>{benefit.text}</p>
+              <h3>{t(benefit.title)}</h3>
+              <p>{t(benefit.text)}</p>
             </article>
           ))}
         </div>

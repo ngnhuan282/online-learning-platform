@@ -1,3 +1,5 @@
+import { t, getIntlLocale } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Alert from '@mui/material/Alert';
@@ -34,6 +36,7 @@ function preserveDollarAmounts() {
 }
 
 function MarkdownLink({ href, children }) {
+  useLocale();
   if (href?.startsWith('#')) return <a href={href}>{children}</a>;
   let safeHref;
   try {
@@ -55,11 +58,11 @@ function MarkdownLink({ href, children }) {
 
 const markdownComponents = {
   a: MarkdownLink,
-  img: ({ alt }) => <span>{alt || '[Hình ảnh]'}</span>,
+  img: ({ alt }) => <span>{alt || t('[Hình ảnh]')}</span>,
   h1: ({ children }) => <h3>{children}</h3>,
   h2: ({ children }) => <h3>{children}</h3>,
   table: ({ children }) => (
-    <div className="ai-assistant-table" role="region" aria-label="Bảng trong câu trả lời" tabIndex={0}>
+    <div className="ai-assistant-table" role="region" aria-label={t('Bảng trong câu trả lời')} tabIndex={0}>
       <table>{children}</table>
     </div>
   ),
@@ -68,6 +71,7 @@ const markdownPlugins = [remarkGfm, remarkMath, preserveDollarAmounts];
 const rehypePlugins = [[rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 1000, maxSize: 20 }]];
 
 export default function AiMessage({ message }) {
+  useLocale();
   const isUser = message.sender === 'USER';
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -101,9 +105,9 @@ export default function AiMessage({ message }) {
       </div>
       <div className="ai-assistant-message-main">
         <div className="ai-assistant-message-label">
-          <span>{isUser ? 'Bạn' : 'Trợ lý AI'}</span>
+          <span>{isUser ? t('Bạn') : t('Trợ lý AI')}</span>
           <time dateTime={message.createdAt}>
-            {new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+            {new Date(message.createdAt).toLocaleTimeString(getIntlLocale(), {
               hour: '2-digit',
               minute: '2-digit',
             })}
@@ -124,18 +128,19 @@ export default function AiMessage({ message }) {
         )}
         {!isUser && message.truncated && (
           <Alert severity="warning" className="ai-assistant-truncated">
-            Câu trả lời đã chạm giới hạn độ dài và chưa đầy đủ. Bạn có thể nhắn “Tiếp tục phần còn lại” hoặc
-            chia câu hỏi thành từng ý nhỏ.
+            {t(
+              'Câu trả lời đã chạm giới hạn độ dài và chưa đầy đủ. Bạn có thể nhắn “Tiếp tục phần còn lại” hoặc chia câu hỏi thành từng ý nhỏ.',
+            )}
           </Alert>
         )}
         {!isUser && (
           <div className="ai-assistant-message-actions">
-            <Tooltip title={copied ? 'Đã sao chép' : 'Sao chép câu trả lời'}>
-              <IconButton aria-label="Sao chép câu trả lời" size="small" onClick={copy}>
+            <Tooltip title={copied ? t('Đã sao chép') : t('Sao chép câu trả lời')}>
+              <IconButton aria-label={t('Sao chép câu trả lời')} size="small" onClick={copy}>
                 {copied ? <CheckOutlined fontSize="small" /> : <ContentCopyOutlined fontSize="small" />}
               </IconButton>
             </Tooltip>
-            {copied && <span role="status">Đã sao chép</span>}
+            {copied && <span role="status">{t('Đã sao chép')}</span>}
           </div>
         )}
       </div>

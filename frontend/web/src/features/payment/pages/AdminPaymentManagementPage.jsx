@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Alert, Button, IconButton, MenuItem, Pagination, TextField, Tooltip, Skeleton } from '@mui/material';
@@ -38,6 +40,7 @@ function currency(amount, code) {
 }
 
 export default function AdminPaymentManagementPage() {
+  useLocale();
   const [params, setParams] = useSearchParams();
   const keyword = params.get('q') || '';
   const status = params.get('status') || '';
@@ -90,10 +93,10 @@ export default function AdminPaymentManagementPage() {
 
   return (
     <div className="workspace-scope admin-payment-workspace">
-      <span className="workspace-kicker">Quản trị thanh toán</span>
+      <span className="workspace-kicker">{t('Quản trị thanh toán')}</span>
       <PageHeading
-        title="Quản lý giao dịch thanh toán"
-        description="Theo dõi, tra cứu và xử lý trạng thái các giao dịch thanh toán của học viên."
+        title={t('Quản lý giao dịch thanh toán')}
+        description={t('Theo dõi, tra cứu và xử lý trạng thái các giao dịch thanh toán của học viên.')}
       >
         <Button
           variant="outlined"
@@ -104,38 +107,40 @@ export default function AdminPaymentManagementPage() {
             setRetry(value => value + 1);
           }}
         >
-          Làm mới
+          {t('Làm mới')}
         </Button>
       </PageHeading>
 
       {state.statsError && !state.loading && (
         <Alert severity="warning">
-          Chưa tải được số liệu tổng quan. Danh sách giao dịch vẫn có thể tra cứu. Chọn Làm mới để thử lại.
+          {t(
+            'Chưa tải được số liệu tổng quan. Danh sách giao dịch vẫn có thể tra cứu. Chọn Làm mới để thử lại.',
+          )}
         </Alert>
       )}
       <div className="admin-stats" aria-busy={state.loading}>
         <StatCard
-          title="TỔNG GIAO DỊCH"
+          title={t('TỔNG GIAO DỊCH')}
           value={state.loading ? <Skeleton width="65%" /> : number(stats?.totalOrders)}
           detail="Tất cả giao dịch đã được tạo"
           icon={<AccountBalanceWalletOutlined />}
         />
         <StatCard
-          title="ĐANG CHỜ"
+          title={t('ĐANG CHỜ')}
           value={state.loading ? <Skeleton width="50%" /> : number(stats?.pendingPayments)}
           detail={`${money(stats?.pendingAmount)} chưa hoàn tất`}
           icon={<HourglassTopOutlined />}
           tone="amber"
         />
         <StatCard
-          title="THÀNH CÔNG"
+          title={t('THÀNH CÔNG')}
           value={state.loading ? <Skeleton width="85%" /> : money(stats?.grossRevenue)}
           detail={`${number(stats?.successfulPayments)} giao dịch đã thanh toán`}
           icon={<TaskAlt />}
           tone="green"
         />
         <StatCard
-          title="CẦN THEO DÕI"
+          title={t('CẦN THEO DÕI')}
           value={state.loading ? <Skeleton width="50%" /> : number(failedCount)}
           detail="Giao dịch thất bại hoặc đã hủy"
           icon={<CancelOutlined />}
@@ -153,25 +158,25 @@ export default function AdminPaymentManagementPage() {
         >
           <TextField
             size="small"
-            placeholder="Tìm theo mã giao dịch hoặc khóa học..."
-            aria-label="Tìm giao dịch thanh toán"
+            placeholder={t('Tìm theo mã giao dịch hoặc khóa học...')}
+            aria-label={t('Tìm giao dịch thanh toán')}
             value={query}
             onChange={event => setSearchDraft({ source: keyword, value: event.target.value })}
           />
           <Button type="submit" variant="outlined" startIcon={<Search />}>
-            Tìm
+            {t('Tìm')}
           </Button>
           <TextField
             select
             size="small"
-            label="Trạng thái"
+            label={t('Trạng thái')}
             value={status}
             onChange={event => filter({ status: event.target.value })}
           >
-            <MenuItem value="">Tất cả trạng thái</MenuItem>
+            <MenuItem value="">{t('Tất cả trạng thái')}</MenuItem>
             {Object.entries(statuses).map(([code, label]) => (
               <MenuItem key={code} value={code}>
-                {label}
+                {t(label)}
               </MenuItem>
             ))}
           </TextField>
@@ -182,16 +187,16 @@ export default function AdminPaymentManagementPage() {
               filter({ q: '', status: '' });
             }}
           >
-            Đặt lại bộ lọc
+            {t('Đặt lại bộ lọc')}
           </Button>
         </form>
         <div className="admin-filter-summary">
           <span>
-            Đang lọc: <b>{keyword || 'Tất cả giao dịch'}</b>
+            {t('Đang lọc:')} <b>{keyword || t('Tất cả giao dịch')}</b>
             {status && <span className={`admin-pill ${statusTone(status)}`}>{statuses[status]}</span>}
           </span>
           <span>
-            Tìm thấy <b>{number(state.data?.totalElements)}</b> giao dịch phù hợp
+            {t('Tìm thấy')} <b>{number(state.data?.totalElements)}</b> {t('giao dịch phù hợp')}
           </span>
         </div>
       </section>
@@ -203,13 +208,13 @@ export default function AdminPaymentManagementPage() {
             <table className="admin-table admin-payments-table">
               <thead>
                 <tr>
-                  <th>MÃ GIAO DỊCH</th>
-                  <th>HỌC VIÊN</th>
-                  <th>KHÓA HỌC</th>
-                  <th>SỐ TIỀN</th>
-                  <th>TRẠNG THÁI</th>
-                  <th>THỜI GIAN</th>
-                  <th>THAO TÁC</th>
+                  <th>{t('MÃ GIAO DỊCH')}</th>
+                  <th>{t('HỌC VIÊN')}</th>
+                  <th>{t('KHÓA HỌC')}</th>
+                  <th>{t('SỐ TIỀN')}</th>
+                  <th>{t('TRẠNG THÁI')}</th>
+                  <th>{t('THỜI GIAN')}</th>
+                  <th>{t('THAO TÁC')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,10 +236,12 @@ export default function AdminPaymentManagementPage() {
                     </td>
                     <td>
                       <span>{date(row.createdAt)}</span>
-                      <small>Cập nhật: {date(row.updatedAt)}</small>
+                      <small>
+                        {t('Cập nhật:')} {date(row.updatedAt)}
+                      </small>
                     </td>
                     <td>
-                      <Tooltip title="Xem chi tiết giao dịch">
+                      <Tooltip title={t('Xem chi tiết giao dịch')}>
                         <IconButton
                           component={Link}
                           to={`/admin/payments/${row.orderCode}`}
@@ -250,25 +257,25 @@ export default function AdminPaymentManagementPage() {
             </table>
             {!rows.length && (
               <div className="admin-empty">
-                Không có giao dịch phù hợp. Hãy thử thay đổi từ khóa hoặc bộ lọc trạng thái.
+                {t('Không có giao dịch phù hợp. Hãy thử thay đổi từ khóa hoặc bộ lọc trạng thái.')}
               </div>
             )}
           </div>
           <div className="admin-pagination">
             <span>
-              Hiển thị {rows.length ? page * size + 1 : 0}–{page * size + rows.length} /{' '}
-              {number(state.data?.totalElements)} giao dịch
+              {t('Hiển thị')} {rows.length ? page * size + 1 : 0}–{page * size + rows.length} /{' '}
+              {number(state.data?.totalElements)} {t('giao dịch')}
             </span>
             <TextField
               select
               size="small"
-              label="Số dòng"
+              label={t('Số dòng')}
               value={size}
               onChange={event => filter({ size: event.target.value })}
             >
               {[10, 20, 50].map(value => (
                 <MenuItem key={value} value={value}>
-                  {value} dòng / trang
+                  {value} {t('dòng / trang')}
                 </MenuItem>
               ))}
             </TextField>

@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useNotifications from '../hooks/useNotifications';
@@ -9,6 +11,7 @@ import {
 import { formatDate } from '../../../shared/utils/formatDate';
 
 export default function NotificationItem({ notification, compact = false, onNavigate }) {
+  useLocale();
   const { markRead } = useNotifications();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -31,9 +34,9 @@ export default function NotificationItem({ notification, compact = false, onNavi
     >
       <div className="notification-meta">
         <span className="learning-chip">{NOTIFICATION_CATEGORIES[notificationCategory(notification)]}</span>
-        <span>{notification.read ? 'Đã đọc' : 'Chưa đọc'}</span>
+        <span>{notification.read ? t('Đã đọc') : t('Chưa đọc')}</span>
       </div>
-      <h2>{notification.title}</h2>
+      <h2>{t(notification.title)}</h2>
       <p>{notification.body}</p>
       <time dateTime={notification.createdAt}>
         {formatDate(notification.createdAt, { dateStyle: 'short', timeStyle: 'short' })}
@@ -47,16 +50,16 @@ export default function NotificationItem({ notification, compact = false, onNavi
               onNavigate?.();
             }}
           >
-            Xem chi tiết
+            {t('Xem chi tiết')}
           </Link>
         )}
         {!notification.read && (
           <button className="button button-outline" type="button" disabled={busy} onClick={read}>
-            {busy ? 'Đang cập nhật...' : 'Đánh dấu đã đọc'}
+            {busy ? t('Đang cập nhật...') : t('Đánh dấu đã đọc')}
           </button>
         )}
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{t(error)}</p>}
     </article>
   );
 }

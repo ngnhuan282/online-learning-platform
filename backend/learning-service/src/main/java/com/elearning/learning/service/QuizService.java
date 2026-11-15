@@ -29,29 +29,36 @@ public class QuizService {
     private final EnrollmentRepository enrollments;
     private final CourseCatalogClient courseCatalog;
     private final NotificationService notifications;
+    private final EngagementService engagement;
 
     public QuizService(
         QuizRepository quizzes,
         QuizAttemptRepository attempts,
         EnrollmentRepository enrollments,
         CourseCatalogClient courseCatalog,
-        NotificationService notifications
+        NotificationService notifications,
+        EngagementService engagement
     ) {
         this.quizzes = quizzes;
         this.attempts = attempts;
         this.enrollments = enrollments;
         this.courseCatalog = courseCatalog;
         this.notifications = notifications;
+        this.engagement = engagement;
     }
 
     public List<QuizListItemResponse> listPublished(Long userId, Long courseId) {
         ensureEnrolled(userId, courseId);
-        return quizzes.findByCourseIdAndPublishedTrueOrderByIdAsc(courseId)
-            .stream().map(QuizListItemResponse::from).toList();
+        return quizzes
+            .findByCourseIdAndPublishedTrueOrderByIdAsc(courseId)
+            .stream()
+            .map(QuizListItemResponse::from)
+            .toList();
     }
 
     public QuizResponse getPublished(Long userId, Long quizId) {
-        Quiz quiz = quizzes.findWithQuestionsByIdAndPublishedTrue(quizId)
+        Quiz quiz = quizzes
+            .findWithQuestionsByIdAndPublishedTrue(quizId)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         ensureEnrolled(userId, quiz.getCourseId());
         return QuizResponse.from(quiz);
@@ -108,15 +115,19 @@ public class QuizService {
 
     @Transactional
     public QuizResultResponse start(Long userId, Long quizId) {
-        Quiz quiz = quizzes.findById(quizId)
+        Quiz quiz = quizzes
+            .findById(quizId)
             .filter(item -> item.getPublished())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         ensureEnrolledForUpdate(userId, quiz.getCourseId());
         validateScorableQuiz(quiz);
 
         var current = attempts.findTopByUserIdAndQuizIdOrderByIdDesc(userId, quizId);
-        if (current.isPresent() && current.get().getStatus() == AttemptStatus.IN_PROGRESS
-            && !expired(current.get(), quiz, Instant.now())) {
+        if (
+            current.isPresent() &&
+            current.get().getStatus() == AttemptStatus.IN_PROGRESS &&
+            !expired(current.get(), quiz, Instant.now())
+        ) {
             return QuizResultResponse.from(current.get());
         }
 
@@ -130,10 +141,12 @@ public class QuizService {
 
     @Transactional
     public QuizResultResponse submit(Long userId, Long attemptId, QuizSubmissionRequest request) {
-        QuizAttempt attempt = attempts.findByIdAndUserId(attemptId, userId)
+        QuizAttempt attempt = attempts
+            .findByIdAndUserId(attemptId, userId)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS) throw new AppException(ErrorCode.CONFLICT);
-        Quiz quiz = quizzes.findWithQuestionsById(attempt.getQuiz().getId())
+        Quiz quiz = quizzes
+            .findWithQuestionsById(attempt.getQuiz().getId())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         ensureEnrolled(userId, quiz.getCourseId());
         validateScorableQuiz(quiz);
@@ -143,8 +156,10 @@ public class QuizService {
         Map<Long, Set<Long>> selections = new HashMap<>();
         for (QuizSubmissionRequest.Answer answer : request.answers()) {
             Set<Long> ids = new HashSet<>(answer.optionIds());
-            if (selections.putIfAbsent(answer.questionId(), ids) != null
-                || ids.size() != answer.optionIds().size()) {
+            if (
+                selections.putIfAbsent(answer.questionId(), ids) != null ||
+                ids.size() != answer.optionIds().size()
+            ) {
                 throw new AppException(ErrorCode.BAD_REQUEST);
             }
         }
@@ -181,42 +196,51 @@ public class QuizService {
             }
         }
         if (!selections.isEmpty()) throw new AppException(ErrorCode.BAD_REQUEST);
-        int score = (int) Math.round(earned * 100.0 / total);
+        int score = (int) Math.round((earned * 100.0) / total);
         attempt.setScore(score);
         attempt.setPassed(score >= quiz.getPassingScore());
         attempt.setStatus(AttemptStatus.GRADED);
         attempt.setSubmittedAt(now);
         var saved = attempts.save(attempt);
+        if (
+            request
+                .answers()
+                .stream()
+                .anyMatch(answer -> !answer.optionIds().isEmpty())
+        ) {
+            engagement.quizSubmitted(userId, quiz.getId());
+        }
         notifications.quizResult(userId, saved.getId(), quiz.getTitle(), score, saved.getPassed());
         return QuizResultResponse.from(saved);
     }
 
     public QuizResultResponse latestResult(Long userId, Long quizId) {
-        return attempts.findTopByUserIdAndQuizIdAndStatusOrderByIdDesc(
-            userId, quizId, AttemptStatus.GRADED
-        ).map(QuizResultResponse::from).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        return attempts
+            .findTopByUserIdAndQuizIdAndStatusOrderByIdDesc(userId, quizId, AttemptStatus.GRADED)
+            .map(QuizResultResponse::from)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
     public QuizReviewResponse review(Long userId, Long attemptId) {
-        QuizAttempt attempt = attempts.findOwned(attemptId, userId)
+        QuizAttempt attempt = attempts
+            .findOwned(attemptId, userId)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         if (attempt.getStatus() != AttemptStatus.GRADED) {
             throw new AppException(ErrorCode.CONFLICT);
         }
-        Quiz quiz = quizzes.findWithQuestionsById(attempt.getQuiz().getId())
+        Quiz quiz = quizzes
+            .findWithQuestionsById(attempt.getQuiz().getId())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         return QuizReviewResponse.from(attempt, quiz);
     }
 
     private Quiz findAdminQuiz(Long id) {
-        return quizzes.findWithQuestionsById(id)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        return quizzes.findWithQuestionsById(id).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
     private Quiz findAdminQuizForUpdate(Long id) {
         // Lock the root before loading children so publish/update/delete see one definition.
-        return quizzes.findForUpdateById(id)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        return quizzes.findForUpdateById(id).orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
     }
 
     private void validateCourseReference(Long courseId, Long lessonId) {
@@ -228,38 +252,59 @@ public class QuizService {
     }
 
     private void ensureEnrolled(Long userId, Long courseId) {
-        if (enrollments.findByUserIdAndCourseId(userId, courseId)
-            .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED).isEmpty()) {
+        if (
+            enrollments
+                .findByUserIdAndCourseId(userId, courseId)
+                .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED)
+                .isEmpty()
+        ) {
             throw new AppException(ErrorCode.FORBIDDEN);
         }
     }
 
     private void ensureEnrolledForUpdate(Long userId, Long courseId) {
-        if (enrollments.findForUpdateByUserIdAndCourseId(userId, courseId)
-            .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED).isEmpty()) {
+        if (
+            enrollments
+                .findForUpdateByUserIdAndCourseId(userId, courseId)
+                .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED)
+                .isEmpty()
+        ) {
             throw new AppException(ErrorCode.FORBIDDEN);
         }
     }
 
     private boolean expired(QuizAttempt attempt, Quiz quiz, Instant now) {
-        return quiz.getTimeLimitMinutes() != null
-            && !now.isBefore(attempt.getStartedAt().plusSeconds(quiz.getTimeLimitMinutes() * 60L));
+        return (
+            quiz.getTimeLimitMinutes() != null &&
+            !now.isBefore(attempt.getStartedAt().plusSeconds(quiz.getTimeLimitMinutes() * 60L))
+        );
     }
 
     private void validateScorableQuiz(Quiz quiz) {
-        if (quiz.getQuestions().isEmpty() || quiz.getPassingScore() == null
-            || quiz.getPassingScore() < 0 || quiz.getPassingScore() > 100
-            || (quiz.getTimeLimitMinutes() != null && quiz.getTimeLimitMinutes() <= 0)) {
+        if (
+            quiz.getQuestions().isEmpty() ||
+            quiz.getPassingScore() == null ||
+            quiz.getPassingScore() < 0 ||
+            quiz.getPassingScore() > 100 ||
+            (quiz.getTimeLimitMinutes() != null && quiz.getTimeLimitMinutes() <= 0)
+        ) {
             throw new AppException(ErrorCode.CONFLICT);
         }
         for (QuizQuestion question : quiz.getQuestions()) {
-            if (question.getQuestionType() == null || question.getQuestionType() == QuestionType.TEXT
-                || question.getPoints() == null || question.getPoints() <= 0
-                || question.getOptions().size() < 2) {
+            if (
+                question.getQuestionType() == null ||
+                question.getQuestionType() == QuestionType.TEXT ||
+                question.getPoints() == null ||
+                question.getPoints() <= 0 ||
+                question.getOptions().size() < 2
+            ) {
                 throw new AppException(ErrorCode.CONFLICT);
             }
-            long correct = question.getOptions().stream()
-                .filter(option -> Boolean.TRUE.equals(option.getCorrect())).count();
+            long correct = question
+                .getOptions()
+                .stream()
+                .filter(option -> Boolean.TRUE.equals(option.getCorrect()))
+                .count();
             if (correct == 0 || (question.getQuestionType() == QuestionType.SINGLE_CHOICE && correct != 1)) {
                 throw new AppException(ErrorCode.CONFLICT);
             }
@@ -271,7 +316,11 @@ public class QuizService {
             if (question.questionType() == QuestionType.TEXT || question.options().size() < 2) {
                 throw new AppException(ErrorCode.BAD_REQUEST);
             }
-            long correct = question.options().stream().filter(option -> option.correct()).count();
+            long correct = question
+                .options()
+                .stream()
+                .filter(option -> option.correct())
+                .count();
             if (correct == 0 || (question.questionType() == QuestionType.SINGLE_CHOICE && correct != 1)) {
                 throw new AppException(ErrorCode.BAD_REQUEST);
             }

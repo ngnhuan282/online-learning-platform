@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState, useMemo, useSyncExternalStore } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Button, Checkbox, FormControlLabel, Radio } from '@mui/material';
@@ -24,6 +26,7 @@ function remainingSeconds(attempt, quiz) {
 }
 
 function QuizWorkspace({ quizId, userId }) {
+  useLocale();
   const navigate = useNavigate();
   const draftKey = quizDraftKey(userId, quizId);
   const mounted = useRef(false);
@@ -171,32 +174,35 @@ function QuizWorkspace({ quizId, userId }) {
         {/* Header Card */}
         <div className="quiz-header-card">
           <div className="quiz-header-nav">
-            <span className="quiz-tag-badge">📝 Bài kiểm tra đánh giá năng lực</span>
+            <span className="quiz-tag-badge">{t('📝 Bài kiểm tra đánh giá năng lực')}</span>
             {quiz && (
               <Link
                 className="button button-soft"
                 to={`/learning/${quiz.courseId}`}
                 style={{ fontSize: 13, textDecoration: 'none', padding: '6px 14px' }}
               >
-                ← Quay lại khóa học
+                {t('← Quay lại khóa học')}
               </Link>
             )}
           </div>
 
           <h1 className="quiz-header-title">{quiz?.title ?? `Quiz #${quizId}`}</h1>
-          {quiz?.description && <p className="quiz-header-desc">{quiz.description}</p>}
+          {quiz?.description && <p className="quiz-header-desc">{t(quiz.description)}</p>}
 
           {quiz && (
             <div className="quiz-overview-badges quiz-overview">
               <span className="quiz-stat-pill">
-                📋 <strong>{totalQuestions}</strong> câu hỏi
+                📋 <strong>{totalQuestions}</strong> {t('câu hỏi')}
               </span>
               <span className="quiz-stat-pill is-pass">
-                🎯 Điểm đạt: <strong>{quiz.passingScore}%</strong>
+                {t('🎯 Điểm đạt:')} <strong>{quiz.passingScore}%</strong>
               </span>
               {quiz.timeLimitMinutes && (
                 <span className="quiz-stat-pill is-timer">
-                  ⏱️ Thời gian: <strong>{quiz.timeLimitMinutes} phút</strong>
+                  {t('⏱️ Thời gian:')}{' '}
+                  <strong>
+                    {quiz.timeLimitMinutes} {t('phút')}
+                  </strong>
                 </span>
               )}
             </div>
@@ -207,35 +213,38 @@ function QuizWorkspace({ quizId, userId }) {
           <ErrorState
             error={error}
             title={
-              error.status === 403 ? 'Bạn chưa có quyền làm bài kiểm tra này' : 'Không thể xử lý bài kiểm tra'
+              error.status === 403
+                ? t('Bạn chưa có quyền làm bài kiểm tra này')
+                : t('Không thể xử lý bài kiểm tra')
             }
             onRetry={!quiz ? () => setRetry(value => value + 1) : undefined}
           />
         )}
 
-        {loading && <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>Đang tải bài kiểm tra...</p>}
+        {loading && (
+          <p style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>
+            {t('Đang tải bài kiểm tra...')}
+          </p>
+        )}
 
         {quiz && (
           <>
             {!attempt || remaining === 0 ? (
               <div className="quiz-start-hero quiz-start">
                 <span className="quiz-start-icon">🎯</span>
-                <h3>Sẵn sàng làm bài kiểm tra?</h3>
+                <h3>{t('Sẵn sàng làm bài kiểm tra?')}</h3>
                 <p>
-                  Hãy đọc kỹ từng câu hỏi và chọn câu trả lời đúng nhất. Hệ thống sẽ lưu nháp câu trả lời của bạn trong suốt quá trình làm bài.
+                  {t(
+                    'Hãy đọc kỹ từng câu hỏi và chọn câu trả lời đúng nhất. Hệ thống sẽ lưu nháp câu trả lời của bạn trong suốt quá trình làm bài.',
+                  )}
                 </p>
                 {remaining === 0 && (
                   <Alert severity="warning" style={{ marginBottom: 20, textAlign: 'left' }}>
-                    Đã hết thời gian làm bài ở lượt trước. Hãy bắt đầu một lượt làm bài mới.
+                    {t('Đã hết thời gian làm bài ở lượt trước. Hãy bắt đầu một lượt làm bài mới.')}
                   </Alert>
                 )}
-                <Button
-                  variant="contained"
-                  onClick={start}
-                  disabled={busy}
-                  className="quiz-start-btn"
-                >
-                  {remaining === 0 ? 'Làm lượt mới' : 'Bắt đầu làm bài'}
+                <Button variant="contained" onClick={start} disabled={busy} className="quiz-start-btn">
+                  {remaining === 0 ? t('Làm lượt mới') : t('Bắt đầu làm bài')}
                 </Button>
               </div>
             ) : (
@@ -244,11 +253,16 @@ function QuizWorkspace({ quizId, userId }) {
                 <div className="quiz-taking-sticky-bar">
                   <div className="quiz-taking-toolbar">
                     <span className="quiz-progress-text">
-                      📊 Đã trả lời: <strong>{answeredCount}/{totalQuestions}</strong> câu ({progressPercent}%)
+                      {t('📊 Đã trả lời:')}{' '}
+                      <strong>
+                        {answeredCount}/{totalQuestions}
+                      </strong>{' '}
+                      {t('câu (')}
+                      {progressPercent}%)
                     </span>
                     {remaining != null && (
                       <span className="quiz-timer-clock" aria-live="polite">
-                        ⏱️ Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+                        {t('⏱️ Còn')} {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
                       </span>
                     )}
                   </div>
@@ -269,15 +283,19 @@ function QuizWorkspace({ quizId, userId }) {
                       }}
                     >
                       <div className="quiz-question-header">
-                        <span className="quiz-question-number">Câu {index + 1}</span>
-                        <span className="quiz-question-points">{question.points} điểm</span>
+                        <span className="quiz-question-number">
+                          {t('Câu')} {index + 1}
+                        </span>
+                        <span className="quiz-question-points">
+                          {question.points} {t('điểm')}
+                        </span>
                       </div>
 
                       <h2 className="quiz-question-title">{question.questionText}</h2>
                       <div className="quiz-question-hint">
                         {question.questionType === 'MULTIPLE_CHOICE'
-                          ? '☑️ Chọn các đáp án đúng (có thể chọn nhiều)'
-                          : '🔘 Chọn một đáp án đúng nhất'}
+                          ? t('☑️ Chọn các đáp án đúng (có thể chọn nhiều)')
+                          : t('🔘 Chọn một đáp án đúng nhất')}
                       </div>
 
                       <div className="quiz-options-group">
@@ -326,7 +344,7 @@ function QuizWorkspace({ quizId, userId }) {
                   <p className="quiz-submit-hint">
                     {answeredCount < totalQuestions
                       ? `⚠️ Bạn mới hoàn thành ${answeredCount}/${totalQuestions} câu hỏi. Hãy kiểm tra lại trước khi nộp.`
-                      : '🎉 Bạn đã trả lời tất cả các câu hỏi! Sẵn sàng nộp bài.'}
+                      : t('🎉 Bạn đã trả lời tất cả các câu hỏi! Sẵn sàng nộp bài.')}
                   </p>
                   <Button
                     type="submit"
@@ -334,7 +352,7 @@ function QuizWorkspace({ quizId, userId }) {
                     disabled={busy || remaining === 0}
                     className="quiz-submit-btn"
                   >
-                    {busy ? 'Đang nộp bài...' : '🚀 Nộp bài'}
+                    {busy ? t('Đang nộp bài...') : t('🚀 Nộp bài')}
                   </Button>
                 </div>
               </form>
@@ -347,6 +365,7 @@ function QuizWorkspace({ quizId, userId }) {
 }
 
 export default function QuizPage() {
+  useLocale();
   const { quizId } = useParams();
   const { user } = useAuth();
   const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);

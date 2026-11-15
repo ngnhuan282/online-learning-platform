@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
@@ -8,6 +10,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import '../styles/auth.css';
 
 export default function ForgotPasswordPage() {
+  useLocale();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -49,13 +52,13 @@ export default function ForgotPasswordPage() {
     <section className="auth-section" aria-labelledby="forgot-password-title">
       <div className="auth-card">
         <div className="auth-heading">
-          <h1 id="forgot-password-title">Quên mật khẩu?</h1>
-          <p>Nhập email của tài khoản để yêu cầu đặt lại mật khẩu.</p>
+          <h1 id="forgot-password-title">{t('Quên mật khẩu?')}</h1>
+          <p>{t('Nhập email của tài khoản để yêu cầu đặt lại mật khẩu.')}</p>
         </div>
         <form className="auth-reset-form" onSubmit={submit} noValidate aria-busy={submitting}>
           <AuthField
             name="resetEmail"
-            label="Địa chỉ Email"
+            label={t('Địa chỉ Email')}
             type="email"
             autoComplete="email"
             icon={<EmailOutlined />}
@@ -71,20 +74,20 @@ export default function ForgotPasswordPage() {
           />
           {error && (
             <p className="auth-notice" role="alert">
-              {error}
+              {t(error)}
             </p>
           )}
           {notice && (
             <p className="auth-notice" role="status">
-              {notice}
+              {t(notice)}
             </p>
           )}
           <button className="button button-primary auth-submit" type="submit" disabled={submitting}>
-            {submitting ? 'Đang tiếp nhận yêu cầu...' : 'Gửi hướng dẫn đặt lại mật khẩu'}
+            {submitting ? t('Đang tiếp nhận yêu cầu...') : t('Gửi hướng dẫn đặt lại mật khẩu')}
           </button>
         </form>
         <p className="auth-switch">
-          <Link to={ROUTES.LOGIN}>Quay về đăng nhập</Link>
+          <Link to={ROUTES.LOGIN}>{t('Quay về đăng nhập')}</Link>
         </p>
       </div>
     </section>

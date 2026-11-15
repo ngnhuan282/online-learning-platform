@@ -145,6 +145,7 @@ services:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN to at least 32 random UTF-8 bytes}
       COURSE_SERVICE_URL: http://course-service:8082
       LEARNING_DB_URL: jdbc:mysql://mysql:3306/learning_db
+      AUTH_SERVICE_URL: http://auth-service:8081
       LEARNING_DB_USERNAME: learning_app
       LEARNING_DB_PASSWORD: ${LEARNING_DB_PASSWORD}
       NOTIFICATION_EVENT_API_KEY: ${NOTIFICATION_EVENT_API_KEY:-}

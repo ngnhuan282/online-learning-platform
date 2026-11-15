@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, Button } from '@mui/material';
@@ -40,6 +42,7 @@ function paymentTone(status) {
 }
 
 export default function AdminDashboardPage() {
+  useLocale();
   const { user } = useAuth();
   const [state, setState] = useState({ loading: true, data: {}, errors: [] });
   const [retry, setRetry] = useState(0);
@@ -80,11 +83,11 @@ export default function AdminDashboardPage() {
     .join(',');
   return (
     <div className="workspace-scope admin-dashboard-workspace">
-      <span className="workspace-kicker">Không gian quản trị</span>
+      <span className="workspace-kicker">{t('Không gian quản trị')}</span>
       <section className="admin-welcome">
         <PageHeading
-          title={`Chào mừng trở lại, ${user?.fullName || 'Quản trị viên'}!`}
-          description="Theo dõi tài khoản, khóa học và hoạt động học tập của hệ thống."
+          title={`Chào mừng trở lại, ${user?.fullName || t('Quản trị viên')}!`}
+          description={t('Theo dõi tài khoản, khóa học và hoạt động học tập của hệ thống.')}
         >
           <Button
             variant="outlined"
@@ -95,11 +98,11 @@ export default function AdminDashboardPage() {
               setRetry(r => r + 1);
             }}
           >
-            Làm mới dữ liệu
+            {t('Làm mới dữ liệu')}
           </Button>
           {can(user, 'USER_CREATE') && (
             <Button component={Link} to="/admin/users?create=1" variant="contained">
-              + Thêm tài khoản
+              {t('+ Thêm tài khoản')}
             </Button>
           )}
         </PageHeading>
@@ -107,13 +110,14 @@ export default function AdminDashboardPage() {
       <LoadState loading={state.loading} />
       {state.errors.length > 0 && (
         <Alert severity="warning">
-          Chưa tải được: {state.errors.join(', ')}. Kiểm tra service và chọn Làm mới dữ liệu.
+          {t('Chưa tải được:')} {state.errors.join(', ')}
+          {t('. Kiểm tra service và chọn Làm mới dữ liệu.')}
         </Alert>
       )}
       <div className="admin-stats">
         {can(user, 'PAYMENT_REPORT_VIEW') && (
           <StatCard
-            title="TỔNG DOANH THU"
+            title={t('TỔNG DOANH THU')}
             value={money(payments?.grossRevenue)}
             detail="Tổng giá trị đơn đã thanh toán (VND)"
             icon={<AccountBalanceWalletOutlined />}
@@ -121,7 +125,7 @@ export default function AdminDashboardPage() {
         )}
         {can(user, 'DASHBOARD_VIEW') && (
           <StatCard
-            title="TÀI KHOẢN HỆ THỐNG"
+            title={t('TÀI KHOẢN HỆ THỐNG')}
             value={number(overview?.total)}
             detail={`${number(overview?.newThisWeek)} tài khoản mới trong 7 ngày`}
             icon={<PeopleOutlined />}
@@ -130,7 +134,7 @@ export default function AdminDashboardPage() {
         )}
         {can(user, 'COURSE_VIEW') && (
           <StatCard
-            title="KHÓA HỌC ĐANG MỞ"
+            title={t('KHÓA HỌC ĐANG MỞ')}
             value={number(courses?.published)}
             detail={`Trong tổng số ${number(courses?.total)} khóa học`}
             icon={<MenuBookOutlined />}
@@ -138,7 +142,7 @@ export default function AdminDashboardPage() {
         )}
         {can(user, 'LEARNING_REPORT_VIEW') && (
           <StatCard
-            title="TỶ LỆ HOÀN THÀNH"
+            title={t('TỶ LỆ HOÀN THÀNH')}
             value={learning ? `${learning.completionRate.toFixed(1)}%` : '—'}
             detail={`${number(learning?.completed)} / ${number(learning?.enrollments)} lượt ghi danh hợp lệ`}
             icon={<TaskAlt />}
@@ -151,13 +155,13 @@ export default function AdminDashboardPage() {
           <section className="admin-card payment-dashboard-revenue">
             <div className="admin-card-heading">
               <div>
-                <h2>Doanh thu thanh toán</h2>
-                <p>6 ngày gần nhất · Theo ngày thanh toán (UTC)</p>
+                <h2>{t('Doanh thu thanh toán')}</h2>
+                <p>{t('6 ngày gần nhất · Theo ngày thanh toán (UTC)')}</p>
               </div>
-              <span className="admin-pill green">Giao dịch thành công</span>
+              <span className="admin-pill green">{t('Giao dịch thành công')}</span>
             </div>
             <strong className="payment-period-revenue">
-              {state.loading ? 'Đang tải…' : money(periodRevenue)}
+              {state.loading ? t('Đang tải…') : money(periodRevenue)}
             </strong>
             <PaymentRevenueChart data={revenueSeries} loading={state.loading} unavailable={!payments} />
           </section>
@@ -166,12 +170,12 @@ export default function AdminDashboardPage() {
           <section className="admin-card">
             <div className="admin-card-heading">
               <div>
-                <h2>Tăng trưởng tài khoản</h2>
-                <p>Tài khoản mới trong 6 tháng gần nhất</p>
+                <h2>{t('Tăng trưởng tài khoản')}</h2>
+                <p>{t('Tài khoản mới trong 6 tháng gần nhất')}</p>
               </div>
             </div>
             {months.length ? (
-              <div className="admin-bar-chart" role="img" aria-label="Số tài khoản mới theo tháng">
+              <div className="admin-bar-chart" role="img" aria-label={t('Số tài khoản mới theo tháng')}>
                 {months.map((m, i) => (
                   <div className="admin-bar-column" key={m.month}>
                     <div className="admin-bars">
@@ -190,34 +194,34 @@ export default function AdminDashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="admin-empty">Chưa có dữ liệu tài khoản.</div>
+              <div className="admin-empty">{t('Chưa có dữ liệu tài khoản.')}</div>
             )}
-            <p className="admin-card-note">Tài khoản được nhóm theo tháng đăng ký (UTC).</p>
+            <p className="admin-card-note">{t('Tài khoản được nhóm theo tháng đăng ký (UTC).')}</p>
           </section>
         )}
         {can(user, 'COURSE_VIEW') && (
           <section className="admin-card">
-            <h2>Phân bố khóa học</h2>
-            <p>Số khóa học theo danh mục</p>
+            <h2>{t('Phân bố khóa học')}</h2>
+            <p>{t('Số khóa học theo danh mục')}</p>
             <div
               className="admin-donut"
               style={{ background: total ? `conic-gradient(${gradient})` : '#e6ecf5' }}
             >
               <div>
                 <strong>{number(courses?.total)}</strong>
-                <small>KHÓA HỌC</small>
+                <small>{t('KHÓA HỌC')}</small>
               </div>
             </div>
             <div className="admin-category-legend">
               {categories.map((c, i) => (
                 <div key={c.name}>
                   <i style={{ background: colors[i % colors.length] }} />
-                  <span>{c.name}</span>
+                  <span>{t(c.name)}</span>
                   <b>{number(c.count)}</b>
                 </div>
               ))}
             </div>
-            {!categories.length && <p>Chưa có danh mục.</p>}
+            {!categories.length && <p>{t('Chưa có danh mục.')}</p>}
           </section>
         )}
       </div>
@@ -226,24 +230,24 @@ export default function AdminDashboardPage() {
           <div className="admin-card-heading">
             <div>
               <h2>
-                Đơn hàng gần nhất <span className="admin-pill green">Dữ liệu hệ thống</span>
+                {t('Đơn hàng gần nhất')} <span className="admin-pill green">{t('Dữ liệu hệ thống')}</span>
               </h2>
-              <p>5 đơn mới nhất, gồm cả đơn chưa thanh toán</p>
+              <p>{t('5 đơn mới nhất, gồm cả đơn chưa thanh toán')}</p>
             </div>
             <Button component={Link} to="/admin/payments" endIcon={<ArrowForward />}>
-              Quản lý thanh toán
+              {t('Quản lý thanh toán')}
             </Button>
           </div>
           <div className="admin-table-scroll">
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>MÃ ĐƠN</th>
-                  <th>HỌC VIÊN</th>
-                  <th>KHÓA HỌC</th>
-                  <th>SỐ TIỀN</th>
-                  <th>TRẠNG THÁI</th>
-                  <th>THỜI GIAN</th>
+                  <th>{t('MÃ ĐƠN')}</th>
+                  <th>{t('HỌC VIÊN')}</th>
+                  <th>{t('KHÓA HỌC')}</th>
+                  <th>{t('SỐ TIỀN')}</th>
+                  <th>{t('TRẠNG THÁI')}</th>
+                  <th>{t('THỜI GIAN')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,7 +277,7 @@ export default function AdminDashboardPage() {
             </table>
             {!recentTransactions.length && (
               <div className="admin-empty">
-                {payments ? 'Chưa có đơn hàng.' : 'Chưa tải được dữ liệu thanh toán.'}
+                {payments ? t('Chưa có đơn hàng.') : t('Chưa tải được dữ liệu thanh toán.')}
               </div>
             )}
           </div>
@@ -282,8 +286,8 @@ export default function AdminDashboardPage() {
       <div className="admin-bottom-grid">
         {courses && (
           <section className="admin-card">
-            <h2>Khóa học mới nhất</h2>
-            <p>Được sắp xếp theo ngày tạo</p>
+            <h2>{t('Khóa học mới nhất')}</h2>
+            <p>{t('Được sắp xếp theo ngày tạo')}</p>
             {courses.recent.map((course, i) => (
               <div className="admin-course-row" key={course.id}>
                 <span className="admin-rank">0{i + 1}</span>
@@ -295,23 +299,23 @@ export default function AdminDashboardPage() {
               </div>
             ))}
             <Button component={Link} to="/admin/courses" endIcon={<ArrowForward />}>
-              Quản lý khóa học
+              {t('Quản lý khóa học')}
             </Button>
           </section>
         )}
         <section className="admin-card admin-security-card">
           <AdminPanel />
-          <h2>Quản trị & bảo mật</h2>
-          <p>Phân quyền theo chức năng và theo dõi thay đổi tài khoản trong nhật ký quản trị.</p>
+          <h2>{t('Quản trị & bảo mật')}</h2>
+          <p>{t('Phân quyền theo chức năng và theo dõi thay đổi tài khoản trong nhật ký quản trị.')}</p>
           <div className="admin-actions">
             {can(user, 'ROLE_VIEW') && (
               <Button component={Link} to="/admin/roles" variant="outlined">
-                Quản lý phân quyền
+                {t('Quản lý phân quyền')}
               </Button>
             )}
             {can(user, 'AUDIT_VIEW') && (
               <Button component={Link} to="/admin/audit">
-                Xem nhật ký →
+                {t('Xem nhật ký →')}
               </Button>
             )}
           </div>
@@ -322,5 +326,6 @@ export default function AdminDashboardPage() {
 }
 
 function AdminPanel() {
+  useLocale();
   return <TaskAlt className="admin-security-large" />;
 }

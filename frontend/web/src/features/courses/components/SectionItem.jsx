@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState } from 'react';
 import LessonItem from './LessonItem';
 
@@ -23,6 +25,7 @@ export default function SectionItem({
   onMoveLessonDown,
   onManageResources,
 }) {
+  useLocale();
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [titleInput, setTitleInput] = useState(section.title);
@@ -73,9 +76,16 @@ export default function SectionItem({
         {/* Expand toggle */}
         <button
           type="button"
-          aria-label={expanded ? 'Thu gọn' : 'Mở rộng'}
+          aria-label={expanded ? t('Thu gọn') : t('Mở rộng')}
           onClick={() => setExpanded(v => !v)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0, color: '#475569' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 18,
+            padding: 0,
+            color: '#475569',
+          }}
         >
           {expanded ? '▼' : '▶'}
         </button>
@@ -90,7 +100,7 @@ export default function SectionItem({
               onBlur={handleSaveTitle}
               onKeyDown={handleKeyDown}
               disabled={saving}
-              aria-label="Tên chương"
+              aria-label={t('Tên chương')}
               style={{
                 width: '100%',
                 padding: '6px 10px',
@@ -102,9 +112,9 @@ export default function SectionItem({
             />
           ) : (
             <span style={{ fontWeight: 600, fontSize: 15 }}>
-              {section.title}
+              {t(section.title)}
               <span style={{ marginLeft: 8, color: '#94a3b8', fontWeight: 400, fontSize: 13 }}>
-                ({lessons.length} bài)
+                ({lessons.length} {t('bài)')}
               </span>
             </span>
           )}
@@ -114,39 +124,54 @@ export default function SectionItem({
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             type="button"
-            title="Di chuyển lên"
+            title={t('Di chuyển lên')}
             disabled={isFirst}
             onClick={onMoveUp}
-            style={{ background: 'none', border: 'none', cursor: isFirst ? 'not-allowed' : 'pointer', color: isFirst ? '#cbd5e1' : '#475569', fontSize: 16 }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isFirst ? 'not-allowed' : 'pointer',
+              color: isFirst ? '#cbd5e1' : '#475569',
+              fontSize: 16,
+            }}
           >
             ▲
           </button>
           <button
             type="button"
-            title="Di chuyển xuống"
+            title={t('Di chuyển xuống')}
             disabled={isLast}
             onClick={onMoveDown}
-            style={{ background: 'none', border: 'none', cursor: isLast ? 'not-allowed' : 'pointer', color: isLast ? '#cbd5e1' : '#475569', fontSize: 16 }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isLast ? 'not-allowed' : 'pointer',
+              color: isLast ? '#cbd5e1' : '#475569',
+              fontSize: 16,
+            }}
           >
             ▼
           </button>
           <button
             type="button"
-            title="Sửa tên chương"
-            onClick={() => { setEditing(true); setTitleInput(section.title); }}
+            title={t('Sửa tên chương')}
+            onClick={() => {
+              setEditing(true);
+              setTitleInput(section.title);
+            }}
             className="button button-soft"
             style={{ padding: '4px 12px', fontSize: 13 }}
           >
-            ✏️ Sửa
+            {t('✏️ Sửa')}
           </button>
           <button
             type="button"
-            title="Xóa chương"
+            title={t('Xóa chương')}
             onClick={onDelete}
             className="button button-soft"
             style={{ padding: '4px 12px', fontSize: 13, color: '#dc2626' }}
           >
-            🗑️ Xóa
+            {t('🗑️ Xóa')}
           </button>
         </div>
       </div>
@@ -155,7 +180,7 @@ export default function SectionItem({
       {expanded && (
         <div style={{ padding: '10px 18px 14px' }}>
           {lessons.length === 0 && (
-            <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>Chưa có bài học.</p>
+            <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>{t('Chưa có bài học.')}</p>
           )}
           {lessons.map((lesson, idx) => (
             <LessonItem
@@ -178,7 +203,7 @@ export default function SectionItem({
             onClick={onAddLesson}
             style={{ marginTop: 8, fontSize: 13, width: '100%' }}
           >
-            + Thêm bài học
+            {t('+ Thêm bài học')}
           </button>
         </div>
       )}

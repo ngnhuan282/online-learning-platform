@@ -1,4 +1,6 @@
-﻿import { useRef, useState } from 'react';
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
+import { useRef, useState } from 'react';
 import Icon from '../../../shared/components/Icon';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -38,6 +40,7 @@ const replies = [
 ];
 
 export default function AiTutorSection() {
+  useLocale();
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
   const chatRef = useRef(null);
@@ -58,13 +61,14 @@ export default function AiTutorSection() {
       <div className="container">
         <div className="ai-panel">
           <div className="ai-copy">
-            <span className="eyebrow-pill">Gia sư AI độc quyền</span>
+            <span className="eyebrow-pill">{t('Gia sư AI độc quyền')}</span>
             <h2>
-              Luyện phát âm & Giao tiếp phản xạ cùng <span>Trợ lý AI</span>
+              {t('Luyện phát âm & Giao tiếp phản xạ cùng')} <span>{t('Trợ lý AI')}</span>
             </h2>
             <p>
-              Trợ lý AI chuyên ngữ đồng hành 24/7 giúp bạn tự tin nói tiếng Anh tự nhiên như người bản xứ mà
-              không e ngại hay áp lực.
+              {t(
+                'Trợ lý AI chuyên ngữ đồng hành 24/7 giúp bạn tự tin nói tiếng Anh tự nhiên như người bản xứ mà không e ngại hay áp lực.',
+              )}
             </p>
             <ul>
               {features.map(feature => (
@@ -72,16 +76,16 @@ export default function AiTutorSection() {
                   <span>
                     <Icon name="check" size={16} />
                   </span>
-                  {feature}
+                  {t(feature)}
                 </li>
               ))}
             </ul>
             <Link className="button button-primary" to={ROUTES.AI_ASSISTANT}>
               <Icon name="mic" size={18} />
-              Học với trợ lý AI
+              {t('Học với trợ lý AI')}
             </Link>
             <Link className="button button-outline" to={ROUTES.AI_ASSISTANT}>
-              Mở trợ lý AI
+              {t('Mở trợ lý AI')}
               <Icon name="arrow" size={18} />
             </Link>
           </div>
@@ -93,7 +97,7 @@ export default function AiTutorSection() {
               <div>
                 <strong>SGEdu AI Speaking Coach</strong>
                 <span>
-                  <i /> Đang học: Business Email & Meetings
+                  <i /> {t('Đang học: Business Email & Meetings')}
                 </span>
               </div>
               <span className="model-badge">
@@ -106,11 +110,11 @@ export default function AiTutorSection() {
               className="chat-messages"
               ref={chatRef}
               role="log"
-              aria-label="Hội thoại luyện tiếng Anh với trợ lý AI"
+              aria-label={t('Hội thoại luyện tiếng Anh với trợ lý AI')}
             >
               <div className="user-message">
                 <div>
-                  <small>Bạn (Học viên)</small>
+                  <small>{t('Bạn (Học viên)')}</small>
                   <p>How do I ask my project manager for feedback politely in an email?</p>
                 </div>
                 <span className="user-avatar">U</span>
@@ -133,7 +137,7 @@ export default function AiTutorSection() {
                   </div>
                   <div className="speaking-tip">
                     <Icon name="check" size={14} />
-                    Bạn chọn một cách diễn đạt và thử luyện nói nhé!
+                    {t('Bạn chọn một cách diễn đạt và thử luyện nói nhé!')}
                   </div>
                 </div>
               </div>
@@ -141,7 +145,7 @@ export default function AiTutorSection() {
                 <div key={index}>
                   <div className="user-message">
                     <div>
-                      <small>Bạn (Học viên)</small>
+                      <small>{t('Bạn (Học viên)')}</small>
                       <p>{message.question}</p>
                     </div>
                     <span className="user-avatar">U</span>
@@ -152,7 +156,9 @@ export default function AiTutorSection() {
                     </span>
                     <div>
                       <p>{message.answer}</p>
-                      <small className="demo-note">Phản hồi minh họa · Chưa kết nối AI chấm phát âm</small>
+                      <small className="demo-note">
+                        {t('Phản hồi minh họa · Chưa kết nối AI chấm phát âm')}
+                      </small>
                     </div>
                   </div>
                 </div>
@@ -160,13 +166,17 @@ export default function AiTutorSection() {
             </div>
             <form className="chat-form" onSubmit={sendMessage}>
               <input
-                aria-label="Câu hỏi luyện tiếng Anh cho trợ lý AI"
-                placeholder="Thử hỏi: ‘Can you give me an example for…’"
+                aria-label={t('Câu hỏi luyện tiếng Anh cho trợ lý AI')}
+                placeholder={t('Thử hỏi: ‘Can you give me an example for…’')}
                 value={question}
                 onChange={event => setQuestion(event.target.value)}
                 maxLength={1000}
               />
-              <button className="button button-primary" aria-label="Gửi câu hỏi" disabled={!question.trim()}>
+              <button
+                className="button button-primary"
+                aria-label={t('Gửi câu hỏi')}
+                disabled={!question.trim()}
+              >
                 <Icon name="arrow" size={18} />
               </button>
             </form>

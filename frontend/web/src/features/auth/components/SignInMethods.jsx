@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
@@ -9,6 +11,7 @@ import { googleErrorMessage, startGoogleLink } from '../utils/googleLogin';
 import '../styles/auth.css';
 
 export default function SignInMethods({ onStatus }) {
+  useLocale();
   const { user } = useAuth();
   const location = useLocation();
   const [state, setState] = useState({ loading: true });
@@ -77,42 +80,42 @@ export default function SignInMethods({ onStatus }) {
 
   return (
     <section id="sign-in-methods" className="sign-in-methods" aria-labelledby="sign-in-methods-title">
-      <h2 id="sign-in-methods-title">Phương thức đăng nhập</h2>
+      <h2 id="sign-in-methods-title">{t('Phương thức đăng nhập')}</h2>
       {location.state?.googleLinkUpdated && (
         <p role="status" className="sign-in-success">
           {location.state.alreadyLinked
-            ? 'Google này đã được liên kết với tài khoản của bạn.'
-            : 'Liên kết Google thành công. Bạn có thể dùng cả mật khẩu và Google để đăng nhập.'}
+            ? t('Google này đã được liên kết với tài khoản của bạn.')
+            : t('Liên kết Google thành công. Bạn có thể dùng cả mật khẩu và Google để đăng nhập.')}
         </p>
       )}
       {state.loading ? (
-        <p role="status">Đang tải phương thức đăng nhập...</p>
+        <p role="status">{t('Đang tải phương thức đăng nhập...')}</p>
       ) : state.error ? (
         <div role="status">
-          <p>{state.error}</p>
+          <p>{t(state.error)}</p>
           <button className="button button-outline" onClick={() => setRetry(value => value + 1)}>
-            Thử lại
+            {t('Thử lại')}
           </button>
         </div>
       ) : (
         <>
           <p>
-            Email và mật khẩu:{' '}
+            {t('Email và mật khẩu:')}{' '}
             <strong>
-              {state.data.passwordEnabled ? 'Đã thiết lập' : 'Chưa thiết lập; tài khoản sử dụng Google'}
+              {state.data.passwordEnabled ? t('Đã thiết lập') : t('Chưa thiết lập; tài khoản sử dụng Google')}
             </strong>
           </p>
           <p>
             Google:{' '}
             <strong>
-              {state.data.google ? `Đã liên kết — ${state.data.google.email}` : 'Chưa liên kết'}
+              {state.data.google ? `Đã liên kết — ${state.data.google.email}` : t('Chưa liên kết')}
             </strong>
           </p>
           {state.data.passwordEnabled && !state.data.google && (
             <>
               <p>
-                Liên kết Google có email đã xác minh trùng với {user.email}. Hồ sơ và dữ liệu học tập được giữ
-                nguyên.
+                {t('Liên kết Google có email đã xác minh trùng với')} {user.email}
+                {t('. Hồ sơ và dữ liệu học tập được giữ nguyên.')}
               </p>
               <button
                 type="button"
@@ -122,20 +125,20 @@ export default function SignInMethods({ onStatus }) {
                   setOpen(true);
                 }}
               >
-                Liên kết Google
+                {t('Liên kết Google')}
               </button>
             </>
           )}
         </>
       )}
       <Dialog open={open} onClose={close} fullWidth maxWidth="xs" aria-labelledby="google-link-title">
-        <DialogTitle id="google-link-title">Xác nhận liên kết Google</DialogTitle>
+        <DialogTitle id="google-link-title">{t('Xác nhận liên kết Google')}</DialogTitle>
         <DialogContent>
           <form className="auth-reset-form" onSubmit={submit} aria-busy={submitting}>
-            <p>Nhập mật khẩu hiện tại, sau đó chọn tài khoản Google có cùng email đã xác minh.</p>
+            <p>{t('Nhập mật khẩu hiện tại, sau đó chọn tài khoản Google có cùng email đã xác minh.')}</p>
             <AuthField
               name="googleLinkPassword"
-              label="Mật khẩu hiện tại"
+              label={t('Mật khẩu hiện tại')}
               type="password"
               autoComplete="current-password"
               icon={<LockOutlined />}
@@ -148,14 +151,14 @@ export default function SignInMethods({ onStatus }) {
             />
             {error && (
               <p className="auth-notice" role="status">
-                {error}
+                {t(error)}
               </p>
             )}
             <button type="submit" className="button button-primary" disabled={submitting || !password}>
-              {submitting ? 'Đang chuyển đến Google...' : 'Xác nhận và tiếp tục'}
+              {submitting ? t('Đang chuyển đến Google...') : t('Xác nhận và tiếp tục')}
             </button>
             <button type="button" className="button button-outline" disabled={submitting} onClick={close}>
-              Hủy
+              {t('Hủy')}
             </button>
           </form>
         </DialogContent>

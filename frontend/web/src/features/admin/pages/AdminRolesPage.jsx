@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -28,6 +30,7 @@ import { can, download, togglePermission } from '../utils/adminUtils';
 import { LoadState, PageHeading, StatCard } from '../components/AdminUi';
 
 export default function AdminRolesPage() {
+  useLocale();
   const { user } = useAuth();
   const toast = useToast();
   const [state, setState] = useState({ loading: true, roles: [], catalog: [], error: null });
@@ -154,8 +157,8 @@ export default function AdminRolesPage() {
   return (
     <>
       <PageHeading
-        title="Vai trò & Phân quyền"
-        description="Quản lý vai trò và quyền truy cập của người dùng trong hệ thống."
+        title={t('Vai trò & Phân quyền')}
+        description={t('Quản lý vai trò và quyền truy cập của người dùng trong hệ thống.')}
       >
         {can(user, 'ROLE_MANAGE') && (
           <Button
@@ -168,33 +171,33 @@ export default function AdminRolesPage() {
               setDialog('create');
             }}
           >
-            Tạo vai trò
+            {t('Tạo vai trò')}
           </Button>
         )}
       </PageHeading>
       <div className="admin-stats">
         <StatCard
-          title="TỔNG SỐ VAI TRÒ"
+          title={t('TỔNG SỐ VAI TRÒ')}
           value={state.roles.length}
           detail="Vai trò đang được cấu hình"
           icon={<BadgeOutlined />}
         />
         <StatCard
-          title="TỔNG SỐ QUYỀN"
+          title={t('TỔNG SỐ QUYỀN')}
           value={state.catalog.length}
           detail="Quyền gắn với API của hệ thống"
           icon={<ShieldOutlined />}
           tone="green"
         />
         <StatCard
-          title="VAI TRÒ HỆ THỐNG"
+          title={t('VAI TRÒ HỆ THỐNG')}
           value={state.roles.filter(r => r.systemRole).length}
           detail="Vai trò mặc định, không thể chỉnh sửa hoặc xóa"
           icon={<LockOutlined />}
           tone="amber"
         />
         <StatCard
-          title="VAI TRÒ TÙY CHỈNH"
+          title={t('VAI TRÒ TÙY CHỈNH')}
           value={state.roles.filter(r => !r.systemRole).length}
           detail="Có thể tùy chỉnh quyền chức năng"
           icon={<Tune />}
@@ -206,12 +209,12 @@ export default function AdminRolesPage() {
         <div className="admin-roles-layout">
           <aside className="admin-card admin-role-list">
             <h2>
-              Danh sách vai trò <span className="admin-pill">{state.roles.length}</span>
+              {t('Danh sách vai trò')} <span className="admin-pill">{state.roles.length}</span>
             </h2>
             <TextField
               size="small"
               fullWidth
-              label="Tìm vai trò"
+              label={t('Tìm vai trò')}
               value={query}
               onChange={e => setQuery(e.target.value)}
             />
@@ -222,7 +225,7 @@ export default function AdminRolesPage() {
                 ['custom', 'Tùy chỉnh'],
               ].map(([value, label]) => (
                 <button key={value} className={type === value ? 'active' : ''} onClick={() => setType(value)}>
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -239,17 +242,19 @@ export default function AdminRolesPage() {
                   onClick={() => select(role)}
                 >
                   <div>
-                    <strong>{role.name}</strong>
+                    <strong>{t(role.name)}</strong>
                     <span className={`admin-pill ${role.systemRole ? 'amber' : ''}`}>
-                      {role.systemRole ? 'Hệ thống' : 'Tùy chỉnh'}
+                      {role.systemRole ? t('Hệ thống') : t('Tùy chỉnh')}
                     </span>
                   </div>
-                  <b>{role.label}</b>
-                  <p>{role.description || 'Chưa có mô tả'}</p>
+                  <b>{t(role.label)}</b>
+                  <p>{role.description || t('Chưa có mô tả')}</p>
                   <div>
-                    <small>{role.userCount} người dùng</small>
                     <small>
-                      {role.permissions.length}/{state.catalog.length} quyền
+                      {role.userCount} {t('người dùng')}
+                    </small>
+                    <small>
+                      {role.permissions.length}/{state.catalog.length} {t('quyền')}
                     </small>
                   </div>
                 </button>
@@ -261,13 +266,15 @@ export default function AdminRolesPage() {
                 <div className="admin-card-heading">
                   <div>
                     <h2>
-                      {selected.label} <span className="admin-pill">{selected.name}</span>
+                      {t(selected.label)} <span className="admin-pill">{t(selected.name)}</span>
                     </h2>
-                    <p>{selected.description || 'Quản lý quyền truy cập theo chức năng.'}</p>
+                    <p>{selected.description || t('Quản lý quyền truy cập theo chức năng.')}</p>
                     <span className="admin-pill">
-                      {permissions.length}/{state.catalog.length} quyền được cấp
+                      {permissions.length}/{state.catalog.length} {t('quyền được cấp')}
                     </span>{' '}
-                    <span className="admin-pill">{selected.userCount} người dùng đang gán</span>
+                    <span className="admin-pill">
+                      {selected.userCount} {t('người dùng đang gán')}
+                    </span>
                   </div>
                   {editable && (
                     <div className="admin-actions">
@@ -279,7 +286,7 @@ export default function AdminRolesPage() {
                           setError(null);
                         }}
                       >
-                        Hoàn tác
+                        {t('Hoàn tác')}
                       </Button>
                       <Button
                         variant="contained"
@@ -287,27 +294,31 @@ export default function AdminRolesPage() {
                         startIcon={<SaveOutlined />}
                         onClick={mutate}
                       >
-                        Lưu thay đổi
+                        {t('Lưu thay đổi')}
                       </Button>
                     </div>
                   )}
                 </div>
                 {dirty && (
-                  <Alert severity="warning">Có thay đổi chưa được lưu. Chọn Lưu thay đổi để áp dụng.</Alert>
+                  <Alert severity="warning">
+                    {t('Có thay đổi chưa được lưu. Chọn Lưu thay đổi để áp dụng.')}
+                  </Alert>
                 )}
                 {selected.name === 'USER' ? (
                   <Alert severity="info">
-                    USER là vai trò học viên mặc định và không có quyền quản trị. Để cấp quyền quản trị cho
-                    một nhóm tài khoản, hãy tạo và gán thêm vai trò tùy chỉnh.
+                    {t(
+                      'USER là vai trò học viên mặc định và không có quyền quản trị. Để cấp quyền quản trị cho một nhóm tài khoản, hãy tạo và gán thêm vai trò tùy chỉnh.',
+                    )}
                   </Alert>
                 ) : selected.systemRole ? (
                   <Alert severity="info">
-                    ADMIN luôn có toàn quyền quản trị, không thể chỉnh sửa hoặc xóa vai trò này.
+                    {t('ADMIN luôn có toàn quyền quản trị, không thể chỉnh sửa hoặc xóa vai trò này.')}
                   </Alert>
                 ) : (
                   <Alert severity="info">
-                    Quyền thao tác tự chọn quyền xem tương ứng. Gán vai trò và quản lý vai trò chỉ dành cho
-                    ADMIN.
+                    {t(
+                      'Quyền thao tác tự chọn quyền xem tương ứng. Gán vai trò và quản lý vai trò chỉ dành cho ADMIN.',
+                    )}
                   </Alert>
                 )}
                 <LoadState error={error} />
@@ -315,27 +326,27 @@ export default function AdminRolesPage() {
               <section className="admin-card admin-permission-toolbar">
                 <TextField
                   size="small"
-                  label="Tìm quyền hoặc chức năng"
+                  label={t('Tìm quyền hoặc chức năng')}
                   value={permissionQuery}
                   onChange={e => setPermissionQuery(e.target.value)}
                 />
                 <TextField
                   select
                   size="small"
-                  label="Lọc quyền"
+                  label={t('Lọc quyền')}
                   value={filter}
                   onChange={e => setFilter(e.target.value)}
                 >
-                  <MenuItem value="all">Tất cả</MenuItem>
-                  <MenuItem value="granted">Đã cấp</MenuItem>
-                  <MenuItem value="ungranted">Chưa cấp</MenuItem>
+                  <MenuItem value="all">{t('Tất cả')}</MenuItem>
+                  <MenuItem value="granted">{t('Đã cấp')}</MenuItem>
+                  <MenuItem value="ungranted">{t('Chưa cấp')}</MenuItem>
                 </TextField>
                 {editable && (
                   <Button
                     disabled={busy}
                     onClick={() => setDraft(state.catalog.filter(p => !p.adminOnly).map(p => p.code))}
                   >
-                    Chọn tất cả
+                    {t('Chọn tất cả')}
                   </Button>
                 )}
               </section>
@@ -344,12 +355,12 @@ export default function AdminRolesPage() {
                   <table className="admin-table admin-permission-table">
                     <thead>
                       <tr>
-                        <th>CHỨC NĂNG / TÀI NGUYÊN</th>
+                        <th>{t('CHỨC NĂNG / TÀI NGUYÊN')}</th>
                         <th>XEM</th>
-                        <th>TẠO</th>
-                        <th>SỬA</th>
-                        <th>XÓA</th>
-                        <th>HÀNH ĐỘNG ĐẶC THÙ</th>
+                        <th>{t('TẠO')}</th>
+                        <th>{t('SỬA')}</th>
+                        <th>{t('XÓA')}</th>
+                        <th>{t('HÀNH ĐỘNG ĐẶC THÙ')}</th>
                       </tr>
                     </thead>
                     {Object.entries(groups).map(([group, resources]) => (
@@ -380,7 +391,7 @@ export default function AdminRolesPage() {
                                       onChange={e => check(permission, e.target.checked)}
                                       slotProps={{ input: { 'aria-label': permission.code } }}
                                     />
-                                    {permission.label}
+                                    {t(permission.label)}
                                     {permission.adminOnly && ' (ADMIN)'}
                                   </label>
                                 ))}
@@ -390,7 +401,9 @@ export default function AdminRolesPage() {
                       </tbody>
                     ))}
                   </table>
-                  {!Object.keys(groups).length && <div className="admin-empty">Không có quyền phù hợp.</div>}
+                  {!Object.keys(groups).length && (
+                    <div className="admin-empty">{t('Không có quyền phù hợp.')}</div>
+                  )}
                 </div>
                 <div className="admin-pagination">
                   <Button
@@ -403,7 +416,7 @@ export default function AdminRolesPage() {
                       )
                     }
                   >
-                    Tải ma trận quyền (JSON)
+                    {t('Tải ma trận quyền (JSON)')}
                   </Button>
                   {editable && (
                     <>
@@ -417,11 +430,11 @@ export default function AdminRolesPage() {
                             setDialog('delete');
                           }}
                         >
-                          Xóa vai trò
+                          {t('Xóa vai trò')}{' '}
                         </Button>
                       )}
                       <Button variant="contained" disabled={!dirty || busy} onClick={mutate}>
-                        Áp dụng thay đổi
+                        {t('Áp dụng thay đổi')}
                       </Button>
                     </>
                   )}
@@ -447,10 +460,10 @@ export default function AdminRolesPage() {
         >
           <DialogTitle>
             {dialog === 'create'
-              ? 'Tạo vai trò tùy chỉnh'
+              ? t('Tạo vai trò tùy chỉnh')
               : dialog === 'delete'
-                ? 'Xóa vai trò'
-                : 'Thay đổi chưa được lưu'}
+                ? t('Xóa vai trò')
+                : t('Thay đổi chưa được lưu')}
           </DialogTitle>
           <DialogContent className="admin-dialog-content">
             <LoadState error={error} />
@@ -459,21 +472,21 @@ export default function AdminRolesPage() {
                 <TextField
                   autoFocus
                   required
-                  label="Mã vai trò"
-                  helperText="Chữ in hoa, số và dấu gạch dưới. Ví dụ: CONTENT_MANAGER"
+                  label={t('Mã vai trò')}
+                  helperText={t('Chữ in hoa, số và dấu gạch dưới. Ví dụ: CONTENT_MANAGER')}
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value.toUpperCase() })}
                   slotProps={{ htmlInput: { pattern: '[A-Z][A-Z0-9_]{1,63}', maxLength: 64 } }}
                 />
                 <TextField
                   required
-                  label="Tên hiển thị"
+                  label={t('Tên hiển thị')}
                   value={form.label}
                   onChange={e => setForm({ ...form, label: e.target.value })}
                   slotProps={{ htmlInput: { maxLength: 100 } }}
                 />
                 <TextField
-                  label="Mô tả"
+                  label={t('Mô tả')}
                   multiline
                   rows={3}
                   value={form.description}
@@ -483,18 +496,19 @@ export default function AdminRolesPage() {
               </>
             ) : dialog === 'delete' ? (
               <p>
-                Xóa vai trò <strong>{selected?.name}</strong>? Chỉ có thể xóa vai trò chưa gán cho tài khoản.
+                {t('Xóa vai trò')} <strong>{selected?.name}</strong>
+                {t('? Chỉ có thể xóa vai trò chưa gán cho tài khoản.')}
               </p>
             ) : (
-              <p>Bỏ các thay đổi chưa lưu và chuyển sang vai trò khác?</p>
+              <p>{t('Bỏ các thay đổi chưa lưu và chuyển sang vai trò khác?')}</p>
             )}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDialog(null)} disabled={busy}>
-              Hủy
+              {t('Hủy')}
             </Button>
             <Button type="submit" variant="contained" disabled={busy}>
-              {busy ? 'Đang lưu...' : dialog === 'discard' ? 'Bỏ thay đổi' : 'Xác nhận'}
+              {busy ? t('Đang lưu...') : dialog === 'discard' ? t('Bỏ thay đổi') : t('Xác nhận')}
             </Button>
           </DialogActions>
         </form>

@@ -1,3 +1,5 @@
+import { t, getIntlLocale } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
 import RefreshRounded from '@mui/icons-material/RefreshRounded';
@@ -37,7 +39,7 @@ function toNumber(value) {
 
 function formatAmount(amount, currency = 'VND') {
   if (currency === 'VND') return formatDemoPrice(toNumber(amount));
-  return new Intl.NumberFormat('vi-VN', {
+  return new Intl.NumberFormat(getIntlLocale(), {
     style: 'currency',
     currency,
     maximumFractionDigits: 2,
@@ -46,7 +48,7 @@ function formatAmount(amount, currency = 'VND') {
 
 function formatDate(value) {
   if (!value) return 'Chưa có';
-  return new Intl.DateTimeFormat('vi-VN', {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value));
@@ -87,6 +89,7 @@ function buildCards(analytics) {
 }
 
 export default function AdminAnalyticsPage() {
+  useLocale();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -130,12 +133,12 @@ export default function AdminAnalyticsPage() {
           <div className="admin-heading-main">
             <Link className="button button-outline admin-back-button" to="/admin">
               <ArrowBackRounded className="icon" style={{ fontSize: 17 }} aria-hidden="true" />
-              Về trang admin
+              {t('Về trang admin')}
             </Link>
             <div>
-              <span className="eyebrow">THỐNG KÊ THANH TOÁN</span>
-              <h1>Tổng quan thanh toán</h1>
-              <p>Theo dõi doanh thu, giao dịch và trạng thái ghi danh của các khóa học.</p>
+              <span className="eyebrow">{t('THỐNG KÊ THANH TOÁN')}</span>
+              <h1>{t('Tổng quan thanh toán')}</h1>
+              <p>{t('Theo dõi doanh thu, giao dịch và trạng thái ghi danh của các khóa học.')}</p>
             </div>
           </div>
           <div className="admin-heading-actions">
@@ -145,17 +148,17 @@ export default function AdminAnalyticsPage() {
               onClick={loadAnalytics}
               disabled={loading}
             >
-              Làm mới <RefreshRounded className="icon" style={{ fontSize: 17 }} aria-hidden="true" />
+              {t('Làm mới')} <RefreshRounded className="icon" style={{ fontSize: 17 }} aria-hidden="true" />
             </button>
           </div>
         </div>
 
         {loading ? (
           <article className="payment-panel">
-            <AppLoading label="Đang tải thống kê thanh toán..." />
+            <AppLoading label={t('Đang tải thống kê thanh toán...')} />
           </article>
         ) : error ? (
-          <ErrorState error={error} title="Không thể tải thống kê thanh toán" onRetry={loadAnalytics} />
+          <ErrorState error={error} title={t('Không thể tải thống kê thanh toán')} onRetry={loadAnalytics} />
         ) : (
           <>
             <div className="analytics-card-grid">
@@ -164,7 +167,7 @@ export default function AdminAnalyticsPage() {
                   <span className={`feature-icon ${card.tone}`}>
                     <Icon name={card.icon} size={20} />
                   </span>
-                  <p>{card.label}</p>
+                  <p>{t(card.label)}</p>
                   <strong>{card.value}</strong>
                   <small>{card.helper}</small>
                 </article>
@@ -178,12 +181,14 @@ export default function AdminAnalyticsPage() {
                     <Icon name="chart" size={20} />
                   </span>
                   <div>
-                    <h2>Doanh thu 6 ngày gần nhất</h2>
-                    <p>Chỉ tính thanh toán thành công theo ngày thanh toán, múi giờ UTC.</p>
+                    <h2>{t('Doanh thu 6 ngày gần nhất')}</h2>
+                    <p>{t('Chỉ tính thanh toán thành công theo ngày thanh toán, múi giờ UTC.')}</p>
                   </div>
                 </div>
                 <PaymentRevenueChart data={revenueSeries} />
-                <p className="analytics-generated-at">Cập nhật: {formatDate(analytics?.generatedAt)}</p>
+                <p className="analytics-generated-at">
+                  {t('Cập nhật:')} {formatDate(analytics?.generatedAt)}
+                </p>
               </article>
 
               <article className="payment-panel admin-contract-panel">
@@ -192,23 +197,26 @@ export default function AdminAnalyticsPage() {
                     <Icon name="check" size={20} />
                   </span>
                   <div>
-                    <h2>Học viên & khóa học</h2>
-                    <p>Tóm tắt số học viên, khóa học và giao dịch có thể kích hoạt học sau thanh toán.</p>
+                    <h2>{t('Học viên & khóa học')}</h2>
+                    <p>
+                      {t('Tóm tắt số học viên, khóa học và giao dịch có thể kích hoạt học sau thanh toán.')}
+                    </p>
                   </div>
                 </div>
                 <ul className="payment-check-list">
                   <li>
                     <Icon name="check" size={18} />
-                    {analytics?.crossService?.activeLearners ?? 0} học viên đã tạo giao dịch thanh toán.
+                    {analytics?.crossService?.activeLearners ?? 0}{' '}
+                    {t('học viên đã tạo giao dịch thanh toán.')}
                   </li>
                   <li>
                     <Icon name="check" size={18} />
-                    {analytics?.crossService?.paidCourses ?? 0} khóa học đã có giao dịch phát sinh.
+                    {analytics?.crossService?.paidCourses ?? 0} {t('khóa học đã có giao dịch phát sinh.')}
                   </li>
                   <li>
                     <Icon name="check" size={18} />
-                    {analytics?.failedPayments ?? 0} giao dịch thất bại/đã hủy,{' '}
-                    {formatAmount(analytics?.refundedAmount)} hoàn tiền.
+                    {analytics?.failedPayments ?? 0} {t('giao dịch thất bại/đã hủy,')}{' '}
+                    {formatAmount(analytics?.refundedAmount)} {t('hoàn tiền.')}
                   </li>
                 </ul>
               </article>
@@ -220,27 +228,27 @@ export default function AdminAnalyticsPage() {
                   <Icon name="assignment" size={20} />
                 </span>
                 <div>
-                  <h2>Giao dịch gần đây</h2>
-                  <p>10 giao dịch thanh toán mới nhất.</p>
+                  <h2>{t('Giao dịch gần đây')}</h2>
+                  <p>{t('10 giao dịch thanh toán mới nhất.')}</p>
                 </div>
               </div>
               <div className="transaction-table-wrap">
                 <table className="transaction-table">
                   <thead>
                     <tr>
-                      <th>Mã đơn</th>
-                      <th>Học viên</th>
-                      <th>Khóa học</th>
-                      <th>Số tiền</th>
-                      <th>Trạng thái</th>
-                      <th>Ngày tạo</th>
+                      <th>{t('Mã đơn')}</th>
+                      <th>{t('Học viên')}</th>
+                      <th>{t('Khóa học')}</th>
+                      <th>{t('Số tiền')}</th>
+                      <th>{t('Trạng thái')}</th>
+                      <th>{t('Ngày tạo')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentTransactions.length === 0 ? (
                       <tr>
                         <td className="transaction-empty-cell" colSpan={6}>
-                          Chưa có giao dịch thanh toán nào.
+                          {t('Chưa có giao dịch thanh toán nào.')}
                         </td>
                       </tr>
                     ) : (

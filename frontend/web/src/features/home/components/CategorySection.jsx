@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
@@ -15,6 +17,7 @@ const keywords = [
 ];
 
 export default function CategorySection() {
+  useLocale();
   const [query, setQuery] = useState('');
   const [categories, setCategories] = useState([]);
   const [error, setError] = useState(null);
@@ -49,7 +52,7 @@ export default function CategorySection() {
   }
   return (
     <>
-      <section className="search-section" aria-label="Tìm khóa học phù hợp">
+      <section className="search-section" aria-label={t('Tìm khóa học phù hợp')}>
         <div className="discovery-search-wrap">
           <form
             className="discovery-search"
@@ -61,17 +64,17 @@ export default function CategorySection() {
           >
             <Icon name="search" size={25} />
             <input
-              aria-label="Bạn muốn cải thiện kỹ năng gì hôm nay?"
-              placeholder="Bạn muốn cải thiện kỹ năng gì hôm nay? (VD: IELTS Speaking, TOEIC 800+...)"
+              aria-label={t('Bạn muốn cải thiện kỹ năng gì hôm nay?')}
+              placeholder={t('Bạn muốn cải thiện kỹ năng gì hôm nay? (VD: IELTS Speaking, TOEIC 800+...)')}
               value={query}
               onChange={event => setQuery(event.target.value)}
             />
             <button className="button button-primary" type="submit">
-              Tìm kiếm <Icon name="arrow" size={18} />
+              {t('Tìm kiếm')} <Icon name="arrow" size={18} />
             </button>
           </form>
           <div className="popular-keywords">
-            <span>Từ khóa phổ biến:</span>
+            <span>{t('Từ khóa phổ biến:')}</span>
             {keywords.map(keyword => (
               <button
                 key={keyword}
@@ -90,18 +93,18 @@ export default function CategorySection() {
         <div className="container">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">CHUYÊN ĐỀ TRỌNG TÂM</span>
-              <h2>Danh mục khóa học Tiếng Anh phổ biến</h2>
-              <p>Lộ trình học bài bản từ mất gốc đến thành thạo, bám sát các tiêu chuẩn quốc tế.</p>
+              <span className="eyebrow">{t('CHUYÊN ĐỀ TRỌNG TÂM')}</span>
+              <h2>{t('Danh mục khóa học Tiếng Anh phổ biến')}</h2>
+              <p>{t('Lộ trình học bài bản từ mất gốc đến thành thạo, bám sát các tiêu chuẩn quốc tế.')}</p>
             </div>
             <button className="text-link" onClick={() => search('')}>
-              Xem tất cả danh mục <Icon name="arrow" size={17} />
+              {t('Xem tất cả danh mục')} <Icon name="arrow" size={17} />
             </button>
           </div>
           {error && (
             <ErrorState
               error={error}
-              title="Không thể tải danh mục"
+              title={t('Không thể tải danh mục')}
               onRetry={() => setAttempt(value => value + 1)}
             />
           )}
@@ -111,10 +114,12 @@ export default function CategorySection() {
                 <span className={`feature-icon ${category.color || 'blue'}`}>
                   <Icon name={category.icon || 'cap'} size={25} />
                 </span>
-                <h3>{category.name}</h3>
-                <p>{category.description}</p>
+                <h3>{t(category.name)}</h3>
+                <p>{t(category.description)}</p>
                 <span className="category-bottom">
-                  <span>{category.count != null ? `${category.count} khóa học` : 'Khám phá khóa học'}</span>
+                  <span>
+                    {category.count != null ? `${category.count} khóa học` : t('Khám phá khóa học')}
+                  </span>
                   <Icon name="arrow" size={23} />
                 </span>
               </button>

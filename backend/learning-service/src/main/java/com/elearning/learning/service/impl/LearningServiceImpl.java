@@ -10,6 +10,7 @@ import com.elearning.learning.entity.enums.EnrollmentStatus;
 import com.elearning.learning.entity.enums.ProgressStatus;
 import com.elearning.learning.repository.*;
 import com.elearning.learning.service.CourseCatalogClient;
+import com.elearning.learning.service.EngagementService;
 import com.elearning.learning.service.LearningService;
 import com.elearning.learning.service.NotificationService;
 import java.time.Instant;
@@ -29,6 +30,7 @@ public class LearningServiceImpl implements LearningService {
     private final NotificationService notifications;
     private final CourseCatalogClient courseCatalog;
     private final JdbcTemplate jdbc;
+    private final EngagementService engagement;
 
     public LearningServiceImpl(
         EnrollmentRepository enrollments,
@@ -36,7 +38,8 @@ public class LearningServiceImpl implements LearningService {
         QuizAttemptRepository attempts,
         NotificationService notifications,
         CourseCatalogClient courseCatalog,
-        JdbcTemplate jdbc
+        JdbcTemplate jdbc,
+        EngagementService engagement
     ) {
         this.enrollments = enrollments;
         this.progress = progress;
@@ -44,6 +47,7 @@ public class LearningServiceImpl implements LearningService {
         this.notifications = notifications;
         this.courseCatalog = courseCatalog;
         this.jdbc = jdbc;
+        this.engagement = engagement;
     }
 
     @Override
@@ -220,7 +224,10 @@ public class LearningServiceImpl implements LearningService {
             enrollment.setStatus(EnrollmentStatus.COMPLETED);
             enrollment.setCompletedAt(Instant.now());
         }
-        if (firstCompletion) notifications.lessonCompleted(userId, courseId, lessonId);
+        if (firstCompletion) {
+            engagement.lessonCompleted(userId, lessonId);
+            notifications.lessonCompleted(userId, courseId, lessonId);
+        }
         return LessonProgressResponse.from(saved);
     }
 
@@ -271,7 +278,9 @@ public class LearningServiceImpl implements LearningService {
         return enrollments
             .findByUserIdAndCourseId(userId, courseId)
             .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
-            .map(enrollment -> new EnrollmentCheckResponse(true, enrollment.getStatus().name(), userId, courseId))
+            .map(enrollment ->
+                new EnrollmentCheckResponse(true, enrollment.getStatus().name(), userId, courseId)
+            )
             .orElseGet(() -> new EnrollmentCheckResponse(false, null, userId, courseId));
     }
 }

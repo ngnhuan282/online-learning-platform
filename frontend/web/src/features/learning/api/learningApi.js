@@ -1,5 +1,12 @@
 import axiosClient from '../../../shared/apis/axiosClient';
 import { ENDPOINTS } from '../../../shared/apis/endpoints';
+import { notifyEngagementChanged } from '../../engagement/utils/engagementEvents';
+
+const updateEngagement = promise =>
+  promise.then(response => {
+    notifyEngagementChanged();
+    return response;
+  });
 
 export const learningApi = {
   getDashboard: options => axiosClient.get(ENDPOINTS.learning.dashboard, options),
@@ -9,11 +16,12 @@ export const learningApi = {
   getCourseProgress: courseId => axiosClient.get(ENDPOINTS.learning.progress(courseId)),
   accessLesson: (courseId, lessonId) => axiosClient.post(ENDPOINTS.learning.lessonAccess(courseId, lessonId)),
   markLessonComplete: (courseId, lessonId) =>
-    axiosClient.patch(ENDPOINTS.learning.lessonComplete(courseId, lessonId)),
+    updateEngagement(axiosClient.patch(ENDPOINTS.learning.lessonComplete(courseId, lessonId))),
   getQuiz: quizId => axiosClient.get(ENDPOINTS.learning.quiz(quizId)),
   getCourseQuizzes: courseId => axiosClient.get(ENDPOINTS.learning.courseQuizzes(courseId)),
   startQuiz: quizId => axiosClient.post(ENDPOINTS.learning.quizStart(quizId)),
-  submitQuiz: (attemptId, answers) => axiosClient.post(ENDPOINTS.learning.quizSubmit(attemptId), { answers }),
+  submitQuiz: (attemptId, answers) =>
+    updateEngagement(axiosClient.post(ENDPOINTS.learning.quizSubmit(attemptId), { answers })),
   getQuizResult: quizId => axiosClient.get(ENDPOINTS.learning.quizResult(quizId)),
   getQuizReview: attemptId => axiosClient.get(ENDPOINTS.learning.quizReview(attemptId)),
   getAdminQuizzes: () => axiosClient.get(ENDPOINTS.learning.adminQuizzes),

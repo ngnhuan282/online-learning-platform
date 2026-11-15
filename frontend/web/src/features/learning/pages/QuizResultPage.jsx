@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';
@@ -11,6 +13,7 @@ import useLearningResource from '../hooks/useLearningResource';
 import '../styles/quiz.css';
 
 function QuizResult({ attemptId, quizId }) {
+  useLocale();
   const loadReview = useCallback(
     async ({ signal }) => {
       const selectedAttemptId = attemptId ?? (await learningApi.getQuizResult(quizId)).data.attemptId;
@@ -27,21 +30,23 @@ function QuizResult({ attemptId, quizId }) {
     <section className="learning-page">
       <div className="learning-shell quiz-result-shell" aria-busy={loading}>
         <LearningHeader
-          title={result?.quizTitle ?? 'Kết quả quiz'}
-          description="Kết quả bài kiểm tra và đáp án của lượt làm này."
+          title={result?.quizTitle ?? t('Kết quả quiz')}
+          description={t('Kết quả bài kiểm tra và đáp án của lượt làm này.')}
         >
           {result?.courseId && (
             <Link className="button button-outline" to={`/learning/${result.courseId}`}>
-              Quay lại khóa học
+              {t('Quay lại khóa học')}
             </Link>
           )}
         </LearningHeader>
 
-        {loading && !result && <p>Đang tải kết quả...</p>}
+        {loading && !result && <p>{t('Đang tải kết quả...')}</p>}
         {error && (
           <ErrorState
             error={error}
-            title={error.status === 403 ? 'Bạn không có quyền xem kết quả này' : 'Không thể tải kết quả quiz'}
+            title={
+              error.status === 403 ? t('Bạn không có quyền xem kết quả này') : t('Không thể tải kết quả quiz')
+            }
             onRetry={reload}
           />
         )}
@@ -50,33 +55,45 @@ function QuizResult({ attemptId, quizId }) {
           <>
             <article className="quiz-result-card">
               <span className={`learning-chip ${result.passed ? 'is-success' : 'is-warning'}`}>
-                {result.passed ? 'Đạt' : 'Chưa đạt'}
+                {result.passed ? t('Đạt') : t('Chưa đạt')}
               </span>
               <strong>{result.score}%</strong>
               <ProgressBar value={result.score} />
               <p>
-                Điểm đạt {result.passingScore}% · Đúng {correctCount}/{result.questions.length} câu
+                {t('Điểm đạt')} {result.passingScore}
+                {t('% · Đúng')} {correctCount}/{result.questions.length} {t('câu')}
               </p>
-              <p>Lượt làm #{result.attemptId}</p>
+              <p>
+                {t('Lượt làm #')}
+                {result.attemptId}
+              </p>
               <Link className="button button-outline" to={`/quizzes/${result.quizId}`}>
-                Làm lại
+                {t('Làm lại')}
               </Link>
             </article>
 
-            <section className="quiz-review" aria-label="Xem lại đáp án">
+            <section className="quiz-review" aria-label={t('Xem lại đáp án')}>
               <div className="quiz-review-heading">
-                <h2>Xem lại đáp án</h2>
-                <span>{result.questions.length} câu hỏi</span>
+                <h2>{t('Xem lại đáp án')}</h2>
+                <span>
+                  {result.questions.length} {t('câu hỏi')}
+                </span>
               </div>
               <div className="quiz-review-list">
                 {result.questions.map((question, index) => (
                   <article className="quiz-review-question" key={question.id}>
                     <div className="quiz-review-question-heading">
-                      <span>Câu {index + 1}</span>
+                      <span>
+                        {t('Câu')} {index + 1}
+                      </span>
                       <span className={question.correct ? 'is-correct' : 'is-incorrect'}>
-                        {question.correct ? 'Đúng' : question.answered ? 'Chưa đúng' : 'Chưa trả lời'}
+                        {question.correct
+                          ? t('Đúng')
+                          : question.answered
+                            ? t('Chưa đúng')
+                            : t('Chưa trả lời')}
                         {' · '}
-                        {question.pointsAwarded}/{question.points} điểm
+                        {question.pointsAwarded}/{question.points} {t('điểm')}
                       </span>
                     </div>
                     <h3>{question.questionText}</h3>
@@ -95,9 +112,9 @@ function QuizResult({ attemptId, quizId }) {
                           )}
                           <span>{option.optionText}</span>
                           <small>
-                            {option.selected && 'Bạn chọn'}
+                            {option.selected && t('Bạn chọn')}
                             {option.selected && option.correct && ' · '}
-                            {option.correct && 'Đáp án đúng'}
+                            {option.correct && t('Đáp án đúng')}
                           </small>
                         </div>
                       ))}
@@ -114,6 +131,7 @@ function QuizResult({ attemptId, quizId }) {
 }
 
 export default function QuizResultPage() {
+  useLocale();
   const { attemptId, quizId } = useParams();
   return <QuizResult key={`${attemptId}:${quizId}`} attemptId={attemptId} quizId={quizId} />;
 }

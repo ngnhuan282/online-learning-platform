@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -41,6 +43,7 @@ const statuses = { ACTIVE: 'Hoạt động', LOCKED: 'Đã khóa', DISABLED: 'V�
 const emptyForm = { fullName: '', email: '', password: '', status: 'ACTIVE' };
 
 export default function AdminAccountsPage() {
+  useLocale();
   const { user } = useAuth();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
@@ -183,8 +186,8 @@ export default function AdminAccountsPage() {
   return (
     <>
       <PageHeading
-        title="Quản lý tài khoản & người dùng"
-        description="Quản lý danh sách học viên, thông tin tài khoản và quyền truy cập hệ thống."
+        title={t('Quản lý tài khoản & người dùng')}
+        description={t('Quản lý danh sách học viên, thông tin tài khoản và quyền truy cập hệ thống.')}
       >
         <Button
           variant="outlined"
@@ -192,7 +195,7 @@ export default function AdminAccountsPage() {
           disabled={!rows.length || state.loading}
           onClick={exportPage}
         >
-          Xuất CSV trang này
+          {t('Xuất CSV trang này')}
         </Button>
         {can(user, 'USER_CREATE') && (
           <Button
@@ -201,33 +204,33 @@ export default function AdminAccountsPage() {
             disabled={state.loading || Boolean(state.error)}
             onClick={() => open('create')}
           >
-            Thêm tài khoản
+            {t('Thêm tài khoản')}
           </Button>
         )}
       </PageHeading>
       <div className="admin-stats">
         <StatCard
-          title="TỔNG TÀI KHOẢN"
+          title={t('TỔNG TÀI KHOẢN')}
           value={number(state.stats?.total)}
           detail="Tất cả tài khoản trong hệ thống"
           icon={<PeopleOutlined />}
         />
         <StatCard
-          title="ĐANG HOẠT ĐỘNG"
+          title={t('ĐANG HOẠT ĐỘNG')}
           value={number(state.stats?.active)}
           detail="Tài khoản được phép đăng nhập"
           icon={<VerifiedUserOutlined />}
           tone="green"
         />
         <StatCard
-          title="TÀI KHOẢN MỚI"
+          title={t('TÀI KHOẢN MỚI')}
           value={number(state.stats?.newThisWeek)}
           detail="Được tạo trong 7 ngày gần nhất"
           icon={<PersonAddAlt />}
           tone="purple"
         />
         <StatCard
-          title="TÀI KHOẢN BỊ KHÓA"
+          title={t('TÀI KHOẢN BỊ KHÓA')}
           value={number(state.stats?.locked)}
           detail={`${number(state.stats?.disabled)} tài khoản bị vô hiệu hóa`}
           icon={<LockOutlined />}
@@ -244,39 +247,39 @@ export default function AdminAccountsPage() {
         >
           <TextField
             size="small"
-            placeholder="Tìm theo tên, email..."
-            aria-label="Tìm tài khoản"
+            placeholder={t('Tìm theo tên, email...')}
+            aria-label={t('Tìm tài khoản')}
             value={query}
             onChange={event => setQuery(event.target.value)}
           />
           <Button type="submit" variant="outlined" startIcon={<Search />}>
-            Tìm
+            {t('Tìm')}
           </Button>
           <TextField
             select
             size="small"
-            label="Vai trò"
+            label={t('Vai trò')}
             value={role}
             onChange={event => filter({ role: event.target.value })}
           >
-            <MenuItem value="">Tất cả vai trò</MenuItem>
+            <MenuItem value="">{t('Tất cả vai trò')}</MenuItem>
             {state.roles.map(r => (
               <MenuItem key={r.id} value={r.name}>
-                {r.label}
+                {t(r.label)}
               </MenuItem>
             ))}
           </TextField>
           <TextField
             select
             size="small"
-            label="Trạng thái"
+            label={t('Trạng thái')}
             value={status}
             onChange={event => filter({ status: event.target.value })}
           >
-            <MenuItem value="">Tất cả trạng thái</MenuItem>
+            <MenuItem value="">{t('Tất cả trạng thái')}</MenuItem>
             {Object.entries(statuses).map(([key, label]) => (
               <MenuItem key={key} value={key}>
-                {label}
+                {t(label)}
               </MenuItem>
             ))}
           </TextField>
@@ -287,17 +290,17 @@ export default function AdminAccountsPage() {
               filter({ q: '', role: '', status: '' });
             }}
           >
-            Đặt lại bộ lọc
+            {t('Đặt lại bộ lọc')}
           </Button>
         </form>
         <div className="admin-filter-summary">
           <span>
-            Đang lọc: <b>{keyword || 'Tất cả tài khoản'}</b>
+            {t('Đang lọc:')} <b>{keyword || t('Tất cả tài khoản')}</b>
             {role && <span className="admin-pill">{roleLabel(role)}</span>}
             {status && <span className="admin-pill">{statuses[status]}</span>}
           </span>
           <span>
-            Tìm thấy <b>{number(state.data?.totalElements)}</b> kết quả phù hợp
+            {t('Tìm thấy')} <b>{number(state.data?.totalElements)}</b> {t('kết quả phù hợp')}
           </span>
         </div>
       </section>
@@ -308,11 +311,11 @@ export default function AdminAccountsPage() {
             <table className="admin-table admin-users-table">
               <thead>
                 <tr>
-                  <th>NGƯỜI DÙNG</th>
-                  <th>VAI TRÒ</th>
-                  <th>TRẠNG THÁI</th>
-                  <th>NGÀY TẠO / ĐĂNG NHẬP GẦN NHẤT</th>
-                  <th>THAO TÁC</th>
+                  <th>{t('NGƯỜI DÙNG')}</th>
+                  <th>{t('VAI TRÒ')}</th>
+                  <th>{t('TRẠNG THÁI')}</th>
+                  <th>{t('NGÀY TẠO / ĐĂNG NHẬP GẦN NHẤT')}</th>
+                  <th>{t('THAO TÁC')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -343,17 +346,19 @@ export default function AdminAccountsPage() {
                     </td>
                     <td>
                       <span>{date(row.lastLoginAt)}</span>
-                      <small>Ngày tạo: {date(row.createdAt)}</small>
+                      <small>
+                        {t('Ngày tạo:')} {date(row.createdAt)}
+                      </small>
                     </td>
                     <td>
                       <div className="admin-row-actions">
-                        <Tooltip title="Xem / sửa thông tin">
+                        <Tooltip title={t('Xem / sửa thông tin')}>
                           <IconButton aria-label={`Xem ${row.fullName}`} onClick={() => open('detail', row)}>
                             <VisibilityOutlined fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         {can(user, 'USER_STATUS_UPDATE') && (
-                          <Tooltip title={row.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở tài khoản'}>
+                          <Tooltip title={row.status === 'ACTIVE' ? t('Khóa tài khoản') : t('Mở tài khoản')}>
                             <span>
                               <IconButton
                                 disabled={row.id === user.id}
@@ -370,14 +375,14 @@ export default function AdminAccountsPage() {
                           </Tooltip>
                         )}
                         {can(user, 'USER_UPDATE') && (
-                          <Tooltip title="Sửa tài khoản">
+                          <Tooltip title={t('Sửa tài khoản')}>
                             <IconButton aria-label={`Sửa ${row.fullName}`} onClick={() => open('edit', row)}>
                               <EditOutlined fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         )}
                         {can(user, 'USER_DELETE') && (
-                          <Tooltip title="Xóa tài khoản">
+                          <Tooltip title={t('Xóa tài khoản')}>
                             <span>
                               <IconButton
                                 color="error"
@@ -397,24 +402,24 @@ export default function AdminAccountsPage() {
               </tbody>
             </table>
             {!rows.length && (
-              <div className="admin-empty">Không có tài khoản phù hợp. Hãy thử thay đổi bộ lọc.</div>
+              <div className="admin-empty">{t('Không có tài khoản phù hợp. Hãy thử thay đổi bộ lọc.')}</div>
             )}
           </div>
           <div className="admin-pagination">
             <span>
-              Hiển thị {rows.length ? page * size + 1 : 0}–{page * size + rows.length} /{' '}
-              {number(state.data?.totalElements)} tài khoản
+              {t('Hiển thị')} {rows.length ? page * size + 1 : 0}–{page * size + rows.length} /{' '}
+              {number(state.data?.totalElements)} {t('tài khoản')}
             </span>
             <TextField
               select
               size="small"
-              label="Số dòng"
+              label={t('Số dòng')}
               value={size}
               onChange={event => filter({ size: event.target.value })}
             >
               {[10, 20, 50].map(value => (
                 <MenuItem key={value} value={value}>
-                  {value} dòng / trang
+                  {value} {t('dòng / trang')}
                 </MenuItem>
               ))}
             </TextField>
@@ -431,15 +436,16 @@ export default function AdminAccountsPage() {
       <section className="admin-policy">
         <VerifiedUserOutlined />
         <div>
-          <strong>Chính sách bảo mật & phân quyền tài khoản</strong>
+          <strong>{t('Chính sách bảo mật & phân quyền tài khoản')}</strong>
           <p>
-            Thay đổi trạng thái và vai trò được lưu trong nhật ký quản trị. Mỗi tài khoản được cấp quyền theo
-            vai trò đã gán.
+            {t(
+              'Thay đổi trạng thái và vai trò được lưu trong nhật ký quản trị. Mỗi tài khoản được cấp quyền theo vai trò đã gán.',
+            )}
           </p>
         </div>
         {can(user, 'AUDIT_VIEW') && (
           <Button component={Link} to="/admin/audit" variant="outlined">
-            Xem nhật ký
+            {t('Xem nhật ký')}
           </Button>
         )}
       </section>
@@ -447,14 +453,14 @@ export default function AdminAccountsPage() {
         <form onSubmit={save}>
           <DialogTitle>
             {showCreate
-              ? 'Thêm tài khoản'
+              ? t('Thêm tài khoản')
               : modal?.type === 'edit'
-                ? 'Sửa tài khoản và vai trò'
+                ? t('Sửa tài khoản và vai trò')
                 : modal?.type === 'delete'
-                  ? 'Xác nhận xóa tài khoản'
+                  ? t('Xác nhận xóa tài khoản')
                   : modal?.type === 'status'
-                    ? 'Xác nhận thay đổi trạng thái'
-                    : 'Thông tin tài khoản'}
+                    ? t('Xác nhận thay đổi trạng thái')
+                    : t('Thông tin tài khoản')}
           </DialogTitle>
           <DialogContent className="admin-dialog-content">
             <LoadState error={mutationError} />
@@ -463,7 +469,7 @@ export default function AdminAccountsPage() {
                 <TextField
                   autoFocus
                   required
-                  label="Họ và tên"
+                  label={t('Họ và tên')}
                   value={form.fullName}
                   onChange={e => setForm({ ...form, fullName: e.target.value })}
                   slotProps={{ htmlInput: { minLength: 2, maxLength: 100 } }}
@@ -476,17 +482,17 @@ export default function AdminAccountsPage() {
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   disabled={!showCreate}
                   helperText={
-                    !showCreate ? 'Email là định danh tài khoản và hiện không hỗ trợ thay đổi.' : undefined
+                    !showCreate ? t('Email là định danh tài khoản và hiện không hỗ trợ thay đổi.') : undefined
                   }
                   slotProps={{ htmlInput: { maxLength: 254 } }}
                 />
                 {showCreate && (
                   <TextField
                     required
-                    label="Mật khẩu khởi tạo"
+                    label={t('Mật khẩu khởi tạo')}
                     type="password"
                     autoComplete="new-password"
-                    helperText="8–72 ký tự, có chữ hoa, chữ thường và số."
+                    helperText={t('8–72 ký tự, có chữ hoa, chữ thường và số.')}
                     value={form.password}
                     onChange={e => setForm({ ...form, password: e.target.value })}
                     slotProps={{
@@ -501,18 +507,18 @@ export default function AdminAccountsPage() {
                 {showCreate && can(user, 'USER_STATUS_UPDATE') && (
                   <TextField
                     select
-                    label="Trạng thái"
+                    label={t('Trạng thái')}
                     value={form.status}
                     onChange={e => setForm({ ...form, status: e.target.value })}
                   >
                     {Object.entries(statuses).map(([code, label]) => (
                       <MenuItem key={code} value={code}>
-                        {label}
+                        {t(label)}
                       </MenuItem>
                     ))}
                   </TextField>
                 )}
-                <strong>Vai trò</strong>
+                <strong>{t('Vai trò')}</strong>
                 {state.roles
                   .filter(r => can(user, 'USER_ROLES_ASSIGN') || selectedRoles.includes(r.name))
                   .map(r => (
@@ -540,34 +546,34 @@ export default function AdminAccountsPage() {
                       label={`${r.label} (${r.name})`}
                     />
                   ))}
-                {!selectedRoles.length && <Alert severity="error">Chọn ít nhất một vai trò.</Alert>}
+                {!selectedRoles.length && <Alert severity="error">{t('Chọn ít nhất một vai trò.')}</Alert>}
               </>
             ) : modal?.type === 'delete' ? (
               <Alert severity="warning">
-                Xóa mềm tài khoản <strong>{modal.target.fullName}</strong> ({modal.target.email})? Tài khoản
-                sẽ không còn đăng nhập được. Dữ liệu học tập và thanh toán được giữ lại.
+                {t('Xóa mềm tài khoản')} <strong>{modal.target.fullName}</strong> ({modal.target.email}
+                {t(')? Tài khoản sẽ không còn đăng nhập được. Dữ liệu học tập và thanh toán được giữ lại.')}
               </Alert>
             ) : modal?.type === 'status' ? (
               <p>
-                Bạn muốn {modal.target.status === 'ACTIVE' ? 'khóa' : 'mở lại'} tài khoản{' '}
+                {t('Bạn muốn')} {modal.target.status === 'ACTIVE' ? t('khóa') : t('mở lại')} {t('tài khoản')}{' '}
                 <strong>{modal.target.email}</strong>?
               </p>
             ) : (
               modal && (
                 <>
-                  {detailLoading && <div role="status">Đang tải chi tiết tài khoản...</div>}
-                  <TextField label="Họ tên" value={modal.target.fullName} disabled />
+                  {detailLoading && <div role="status">{t('Đang tải chi tiết tài khoản...')}</div>}
+                  <TextField label={t('Họ tên')} value={modal.target.fullName} disabled />
                   <TextField label="Email" value={modal.target.email} disabled />
                   <p>
-                    Vai trò: {modal.target.roles.map(roleLabel).join(', ')} · Trạng thái:{' '}
+                    {t('Vai trò:')} {modal.target.roles.map(roleLabel).join(', ')} {t('· Trạng thái:')}{' '}
                     {statuses[modal.target.status]}
                   </p>
                   <p>
                     ID: {modal.target.id}
                     <br />
-                    Ngày tạo: {date(modal.target.createdAt)}
+                    {t('Ngày tạo:')} {date(modal.target.createdAt)}
                     <br />
-                    Đăng nhập gần nhất: {date(modal.target.lastLoginAt)}
+                    {t('Đăng nhập gần nhất:')} {date(modal.target.lastLoginAt)}
                   </p>
                 </>
               )
@@ -575,7 +581,7 @@ export default function AdminAccountsPage() {
           </DialogContent>
           <DialogActions>
             <Button onClick={close} disabled={busy}>
-              Đóng
+              {t('Đóng')}
             </Button>
             {(showCreate || ['edit', 'delete', 'status'].includes(modal?.type)) && (
               <Button
@@ -584,7 +590,11 @@ export default function AdminAccountsPage() {
                 type="submit"
                 disabled={busy || ((showCreate || modal?.type === 'edit') && !selectedRoles.length)}
               >
-                {busy ? 'Đang xử lý...' : modal?.type === 'delete' ? 'Xóa tài khoản' : 'Lưu thay đổi'}
+                {busy
+                  ? t('Đang xử lý...')
+                  : modal?.type === 'delete'
+                    ? t('Xóa tài khoản')
+                    : t('Lưu thay đổi')}
               </Button>
             )}
           </DialogActions>

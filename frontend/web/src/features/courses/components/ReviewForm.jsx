@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState } from 'react';
 import StarRating from './StarRating';
 import { reviewApi } from '../api/reviewApi';
@@ -111,6 +113,7 @@ const formStyles = {
  *   onCancel        — callback khi hủy sửa
  */
 export default function ReviewForm({ courseId, existingReview = null, onSubmitSuccess, onCancel }) {
+  useLocale();
   const { user } = useAuth();
   const [previousReview, setPreviousReview] = useState(existingReview);
   const [rating, setRating] = useState(existingReview?.rating || 5);
@@ -176,20 +179,20 @@ export default function ReviewForm({ courseId, existingReview = null, onSubmitSu
   return (
     <form style={formStyles.container} onSubmit={handleSubmit}>
       <h4 style={formStyles.title}>
-        {existingReview ? 'Chỉnh sửa đánh giá của bạn' : 'Viết đánh giá của bạn'}
+        {existingReview ? t('Chỉnh sửa đánh giá của bạn') : t('Viết đánh giá của bạn')}
       </h4>
 
       {user?.fullName && (
         <div style={formStyles.authorBanner}>
-          <span>Đang đánh giá với tư cách:</span>
+          <span>{t('Đang đánh giá với tư cách:')}</span>
           <strong>{user.fullName}</strong>
         </div>
       )}
 
-      {error && <div style={formStyles.error}>{error}</div>}
+      {error && <div style={formStyles.error}>{t(error)}</div>}
 
       <div style={formStyles.ratingRow}>
-        <span style={formStyles.ratingText}>Đánh giá:</span>
+        <span style={formStyles.ratingText}>{t('Đánh giá:')}</span>
         <StarRating value={rating} onChange={setRating} size={24} />
         <span style={{ ...formStyles.ratingText, fontWeight: 700, color: '#d97706' }}>{rating} / 5 sao</span>
       </div>
@@ -197,24 +200,24 @@ export default function ReviewForm({ courseId, existingReview = null, onSubmitSu
       <div>
         <textarea
           style={formStyles.textarea}
-          placeholder="Chia sẻ trải nghiệm và cảm nhận của bạn về khóa học này..."
+          placeholder={t('Chia sẻ trải nghiệm và cảm nhận của bạn về khóa học này...')}
           value={comment}
           onChange={e => setComment(e.target.value)}
           maxLength={2000}
         />
         <div style={formStyles.counterRow}>
-          <span>Tối đa 2000 ký tự</span>
+          <span>{t('Tối đa 2000 ký tự')}</span>
           <span>{comment.length} / 2000</span>
         </div>
       </div>
 
       <div style={formStyles.actions}>
         <button type="submit" style={formStyles.submitBtn} disabled={submitting}>
-          {submitting ? 'Đang gửi...' : existingReview ? 'Cập nhật' : 'Gửi đánh giá'}
+          {submitting ? t('Đang gửi...') : existingReview ? t('Cập nhật') : t('Gửi đánh giá')}
         </button>
         {existingReview && onCancel && (
           <button type="button" style={formStyles.cancelBtn} onClick={onCancel} disabled={submitting}>
-            Hủy
+            {t('Hủy')}
           </button>
         )}
       </div>

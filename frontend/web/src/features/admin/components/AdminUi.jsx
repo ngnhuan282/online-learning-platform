@@ -1,12 +1,15 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { Alert, Button, CircularProgress } from '@mui/material';
 import { Refresh } from '@mui/icons-material';
 
 export function PageHeading({ title, description, children }) {
+  useLocale();
   return (
     <div className="admin-page-heading">
       <div>
-        <h1>{title}</h1>
-        <p>{description}</p>
+        <h1>{t(title)}</h1>
+        <p>{t(description)}</p>
       </div>
       <div className="admin-actions">{children}</div>
     </div>
@@ -14,10 +17,11 @@ export function PageHeading({ title, description, children }) {
 }
 
 export function StatCard({ title, value, detail, icon, tone = 'blue' }) {
+  useLocale();
   return (
     <section className="admin-stat">
       <div className="admin-stat-label">
-        {title}
+        {t(title)}
         <span className={`admin-stat-icon ${tone}`}>{icon}</span>
       </div>
       <strong>{value}</strong>
@@ -27,10 +31,11 @@ export function StatCard({ title, value, detail, icon, tone = 'blue' }) {
 }
 
 export function LoadState({ loading, error, retry }) {
+  useLocale();
   if (loading)
     return (
       <div className="admin-loading" role="status">
-        <CircularProgress size={24} /> Đang tải dữ liệu...
+        <CircularProgress size={24} /> {t('Đang tải dữ liệu...')}
       </div>
     );
   if (error) {
@@ -48,12 +53,12 @@ export function LoadState({ loading, error, retry }) {
         action={
           retry && (
             <Button color="inherit" onClick={retry} startIcon={<Refresh />}>
-              Thử lại
+              {t('Thử lại')}
             </Button>
           )
         }
       >
-        {message}
+        {t(message)}
         {error.errors && (
           <ul>
             {Object.entries(error.errors).map(([field, messages]) => (

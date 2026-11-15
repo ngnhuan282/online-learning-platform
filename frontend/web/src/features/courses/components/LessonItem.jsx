@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 export default function LessonItem({
   lesson,
   lessonTypeLabel,
@@ -9,6 +11,7 @@ export default function LessonItem({
   onMoveDown,
   onManageResources,
 }) {
+  useLocale();
   return (
     <div
       style={{
@@ -28,7 +31,7 @@ export default function LessonItem({
 
       <div style={{ flex: 1 }}>
         <span style={{ fontSize: 14 }}>
-          {lesson.title}
+          {t(lesson.title)}
           {lesson.preview && (
             <span
               style={{
@@ -49,25 +52,37 @@ export default function LessonItem({
       <div style={{ display: 'flex', gap: 4 }}>
         <button
           type="button"
-          title="Lên trên"
+          title={t('Lên trên')}
           disabled={isFirst}
           onClick={onMoveUp}
-          style={{ background: 'none', border: 'none', cursor: isFirst ? 'not-allowed' : 'pointer', color: isFirst ? '#cbd5e1' : '#475569', fontSize: 14 }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: isFirst ? 'not-allowed' : 'pointer',
+            color: isFirst ? '#cbd5e1' : '#475569',
+            fontSize: 14,
+          }}
         >
           ▲
         </button>
         <button
           type="button"
-          title="Xuống dưới"
+          title={t('Xuống dưới')}
           disabled={isLast}
           onClick={onMoveDown}
-          style={{ background: 'none', border: 'none', cursor: isLast ? 'not-allowed' : 'pointer', color: isLast ? '#cbd5e1' : '#475569', fontSize: 14 }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: isLast ? 'not-allowed' : 'pointer',
+            color: isLast ? '#cbd5e1' : '#475569',
+            fontSize: 14,
+          }}
         >
           ▼
         </button>
         <button
           type="button"
-          title="Tài liệu đính kèm"
+          title={t('Tài liệu đính kèm')}
           onClick={() => onManageResources && onManageResources(lesson)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 4px' }}
         >
@@ -75,7 +90,7 @@ export default function LessonItem({
         </button>
         <button
           type="button"
-          title="Sửa bài học"
+          title={t('Sửa bài học')}
           onClick={onEdit}
           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 4px' }}
         >
@@ -83,9 +98,16 @@ export default function LessonItem({
         </button>
         <button
           type="button"
-          title="Xóa bài học"
+          title={t('Xóa bài học')}
           onClick={onDelete}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 4px', color: '#dc2626' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 15,
+            padding: '0 4px',
+            color: '#dc2626',
+          }}
         >
           🗑️
         </button>

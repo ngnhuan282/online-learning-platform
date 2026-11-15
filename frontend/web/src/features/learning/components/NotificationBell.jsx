@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
@@ -8,6 +10,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import '../styles/notifications.css';
 
 export default function NotificationBell() {
+  useLocale();
   const { userId, summary, loading, error, refresh } = useNotifications();
   const [open, setOpen] = useState(false);
   const wrapper = useRef(null);
@@ -32,7 +35,11 @@ export default function NotificationBell() {
       <button
         className="icon-button notification-button"
         type="button"
-        aria-label={`Thông báo${summary.unreadCount ? `, ${summary.unreadCount} chưa đọc` : ''}`}
+        aria-label={
+          summary.unreadCount
+            ? t('Thông báo, {count} chưa đọc', { count: summary.unreadCount })
+            : t('Thông báo')
+        }
         aria-expanded={open}
         onClick={() => {
           if (!open) refresh();
@@ -45,11 +52,11 @@ export default function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="notification-panel" aria-label="Thông báo gần đây" aria-busy={loading}>
-          <strong>Thông báo</strong>
+        <div className="notification-panel" aria-label={t('Thông báo gần đây')} aria-busy={loading}>
+          <strong>{t('Thông báo')}</strong>
           {error && <ErrorState error={error} onRetry={refresh} />}
-          {loading && !summary.notifications.length && <p role="status">Đang tải thông báo...</p>}
-          {!loading && !error && !summary.notifications.length && <p>Chưa có thông báo.</p>}
+          {loading && !summary.notifications.length && <p role="status">{t('Đang tải thông báo...')}</p>}
+          {!loading && !error && !summary.notifications.length && <p>{t('Chưa có thông báo.')}</p>}
           <div className="notification-preview">
             {summary.notifications.map(notification => (
               <NotificationItem
@@ -61,7 +68,7 @@ export default function NotificationBell() {
             ))}
           </div>
           <Link to={ROUTES.NOTIFICATIONS} onClick={() => setOpen(false)}>
-            Xem tất cả thông báo
+            {t('Xem tất cả thông báo')}
           </Link>
         </div>
       )}

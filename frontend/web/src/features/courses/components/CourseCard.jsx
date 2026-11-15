@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import Icon from '../../../shared/components/Icon';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
 import { formatPrice } from '../data/demoCourses';
@@ -10,6 +12,7 @@ export default function CourseCard({
   onEnroll,
   onSelect,
 }) {
+  useLocale();
   const isFree = course.price === 0;
   const actionLabel = enrolled ? 'Đã ghi danh' : isFree && canEnroll ? 'Học ngay' : 'Xem khóa học';
 
@@ -35,30 +38,32 @@ export default function CourseCard({
         />
         <span className="course-badges">
           <span>{course.tag}</span>
-          {course.price === 0 && <b>MIỄN PHÍ</b>}
+          {course.price === 0 && <b>{t('MIỄN PHÍ')}</b>}
         </span>
       </button>
       <div className="course-card-body">
         <div className="course-rating">
           <span>
-            <b className="star">★</b> <strong>{course.rating}</strong> ({course.reviews} đánh giá)
+            <b className="star">★</b> <strong>{course.rating}</strong> ({course.reviews} {t('đánh giá)')}
           </span>
           {course.students != null && (
             <>
               <span>•</span>
-              <span>{new Intl.NumberFormat('en-US').format(course.students)} học viên</span>
+              <span>
+                {new Intl.NumberFormat('en-US').format(course.students)} {t('học viên')}
+              </span>
             </>
           )}
         </div>
         <h3>
           <button onClick={() => onSelect(course)}>{course.title}</button>
         </h3>
-        <p>{course.description}</p>
+        <p>{t(course.description)}</p>
         <div className="course-meta">
           {course.hours != null && (
             <span>
               <Icon name="clock" size={14} />
-              {course.hours} giờ
+              {course.hours} {t('giờ')}
             </span>
           )}
           <span>
@@ -67,7 +72,7 @@ export default function CourseCard({
           </span>
         </div>
         <div className={`course-price ${course.price === 0 ? 'free-price' : ''}`}>
-          <strong>{course.price === 0 ? 'Miễn phí (0đ)' : formatPrice(course.price)}</strong>
+          <strong>{course.price === 0 ? t('Miễn phí (0đ)') : formatPrice(course.price)}</strong>
           <div>
             {course.originalPrice ? (
               <>
@@ -75,7 +80,7 @@ export default function CourseCard({
                 {course.discount && <span>−{course.discount}%</span>}
               </>
             ) : (
-              <span>Truy cập trọn đời</span>
+              <span>{t('Truy cập trọn đời')}</span>
             )}
           </div>
         </div>
@@ -84,7 +89,7 @@ export default function CourseCard({
           disabled={enrolling || enrolled}
           onClick={() => (isFree && canEnroll ? onEnroll(course) : onSelect(course))}
         >
-          {enrolling ? 'Đang ghi danh...' : actionLabel}
+          {enrolling ? t('Đang ghi danh...') : actionLabel}
           <Icon name={isFree && canEnroll ? 'cap' : 'arrow'} size={16} />
         </button>
       </div>

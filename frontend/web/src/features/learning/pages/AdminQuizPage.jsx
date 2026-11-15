@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, FormControlLabel, MenuItem, TextField } from '@mui/material';
 import Add from '@mui/icons-material/Add';
@@ -76,6 +78,7 @@ function definitionError(form) {
 }
 
 export default function AdminQuizPage() {
+  useLocale();
   const editorRef = useRef(null);
   const mounted = useRef(false);
   const pending = useRef(false);
@@ -290,35 +293,35 @@ export default function AdminQuizPage() {
   return (
     <section className="admin-quiz-page learning-admin-workspace">
       <LearningHeader
-        title="Quản lý quiz"
-        description="Soạn câu hỏi, lưu bản nháp và xuất bản bài kiểm tra."
+        title={t('Quản lý quiz')}
+        description={t('Soạn câu hỏi, lưu bản nháp và xuất bản bài kiểm tra.')}
         navigation={false}
       >
         <Button variant="outlined" startIcon={<Add />} onClick={startNew} disabled={busy}>
-          Quiz mới
+          {t('Quiz mới')}
         </Button>
       </LearningHeader>
-      {error && <ErrorState error={error} title="Không thể xử lý quiz" />}
+      {error && <ErrorState error={error} title={t('Không thể xử lý quiz')} />}
       {listError && (
         <ErrorState
           error={listError}
-          title="Không thể tải danh sách quiz"
+          title={t('Không thể tải danh sách quiz')}
           onRetry={busy ? undefined : () => setRetry(value => value + 1)}
         />
       )}
       {courseError && (
         <ErrorState
           error={courseError}
-          title="Không thể tải danh sách khóa học; bạn có thể nhập mã khóa học"
+          title={t('Không thể tải danh sách khóa học; bạn có thể nhập mã khóa học')}
           onRetry={busy ? undefined : () => setRetry(value => value + 1)}
         />
       )}
-      {message && <Alert severity="success">{message}</Alert>}
+      {message && <Alert severity="success">{t(message)}</Alert>}
       <div className="quiz-admin-layout">
         <aside className="quiz-admin-list" aria-busy={loading}>
-          <h2>Danh sách quiz</h2>
-          {loading && <p>Đang tải...</p>}
-          {!loading && !listError && quizzes.length === 0 && <p>Chưa có quiz.</p>}
+          <h2>{t('Danh sách quiz')}</h2>
+          {loading && <p>{t('Đang tải...')}</p>}
+          {!loading && !listError && quizzes.length === 0 && <p>{t('Chưa có quiz.')}</p>}
           {quizzes.map(quiz => (
             <button
               key={quiz.id}
@@ -327,21 +330,22 @@ export default function AdminQuizPage() {
               onClick={() => selectQuiz(quiz.id)}
               disabled={busy}
             >
-              <strong>{quiz.title}</strong>
+              <strong>{t(quiz.title)}</strong>
               <span>
-                Khóa #{quiz.courseId} · {quiz.published ? 'Đã xuất bản' : 'Bản nháp'}
+                {t('Khóa #')}
+                {quiz.courseId} · {quiz.published ? t('Đã xuất bản') : t('Bản nháp')}
               </span>
             </button>
           ))}
         </aside>
         <form ref={editorRef} className="quiz-editor" onSubmit={save}>
           <div className="quiz-editor-heading">
-            <h2>{editingId ? `Quiz #${editingId}` : 'Tạo quiz'}</h2>
-            {published && <span className="learning-chip is-success">Đã xuất bản</span>}
+            <h2>{editingId ? `Quiz #${editingId}` : t('Tạo quiz')}</h2>
+            {published && <span className="learning-chip is-success">{t('Đã xuất bản')}</span>}
           </div>
           <div className="quiz-form-grid">
             <TextField
-              label="Khóa học"
+              label={t('Khóa học')}
               select={courses.length > 0}
               type={courses.length ? undefined : 'number'}
               value={form.courseId}
@@ -357,7 +361,7 @@ export default function AdminQuizPage() {
               ))}
             </TextField>
             <TextField
-              label="Bài học (tùy chọn)"
+              label={t('Bài học (tùy chọn)')}
               type="number"
               slotProps={{ htmlInput: { min: 1 } }}
               value={form.lessonId}
@@ -365,7 +369,7 @@ export default function AdminQuizPage() {
               disabled={published || busy}
             />
             <TextField
-              label="Tên quiz"
+              label={t('Tên quiz')}
               value={form.title}
               required
               slotProps={{ htmlInput: { maxLength: 255 } }}
@@ -373,7 +377,7 @@ export default function AdminQuizPage() {
               disabled={published || busy}
             />
             <TextField
-              label="Điểm đạt (%)"
+              label={t('Điểm đạt (%)')}
               type="number"
               slotProps={{ htmlInput: { min: 0, max: 100 } }}
               value={form.passingScore}
@@ -382,7 +386,7 @@ export default function AdminQuizPage() {
               disabled={published || busy}
             />
             <TextField
-              label="Giới hạn thời gian (phút)"
+              label={t('Giới hạn thời gian (phút)')}
               type="number"
               slotProps={{ htmlInput: { min: 1 } }}
               value={form.timeLimitMinutes}
@@ -390,7 +394,7 @@ export default function AdminQuizPage() {
               disabled={published || busy}
             />
             <TextField
-              label="Mô tả"
+              label={t('Mô tả')}
               multiline
               rows={2}
               slotProps={{ htmlInput: { maxLength: 1000 } }}
@@ -400,14 +404,16 @@ export default function AdminQuizPage() {
             />
           </div>
           <div className="quiz-editor-heading">
-            <h3>Câu hỏi</h3>
+            <h3>{t('Câu hỏi')}</h3>
           </div>
           {form.questions.map((question, questionIndex) => (
             <fieldset className="quiz-question-editor" key={questionIndex} disabled={published || busy}>
-              <legend>Câu {questionIndex + 1}</legend>
+              <legend>
+                {t('Câu')} {questionIndex + 1}
+              </legend>
               <div className="quiz-form-grid">
                 <TextField
-                  label="Nội dung câu hỏi"
+                  label={t('Nội dung câu hỏi')}
                   value={question.questionText}
                   required
                   slotProps={{ htmlInput: { maxLength: 1000 } }}
@@ -417,7 +423,7 @@ export default function AdminQuizPage() {
                 />
                 <TextField
                   select
-                  label="Loại câu hỏi"
+                  label={t('Loại câu hỏi')}
                   value={question.questionType}
                   onChange={event =>
                     updateQuestion(questionIndex, {
@@ -433,11 +439,11 @@ export default function AdminQuizPage() {
                     })
                   }
                 >
-                  <MenuItem value="SINGLE_CHOICE">Một đáp án</MenuItem>
-                  <MenuItem value="MULTIPLE_CHOICE">Nhiều đáp án</MenuItem>
+                  <MenuItem value="SINGLE_CHOICE">{t('Một đáp án')}</MenuItem>
+                  <MenuItem value="MULTIPLE_CHOICE">{t('Nhiều đáp án')}</MenuItem>
                 </TextField>
                 <TextField
-                  label="Điểm"
+                  label={t('Điểm')}
                   type="number"
                   slotProps={{ htmlInput: { min: 1 } }}
                   value={question.points}
@@ -450,7 +456,7 @@ export default function AdminQuizPage() {
                 {question.options.map((option, optionIndex) => (
                   <div className="quiz-option-editor" key={optionIndex}>
                     <FormControlLabel
-                      label="Đúng"
+                      label={t('Đúng')}
                       control={
                         <Checkbox
                           checked={option.correct}
@@ -494,7 +500,7 @@ export default function AdminQuizPage() {
                     })
                   }
                 >
-                  Đáp án
+                  {t('Đáp án')}
                 </Button>
                 <Button
                   color="error"
@@ -507,7 +513,7 @@ export default function AdminQuizPage() {
                     })
                   }
                 >
-                  Xóa câu hỏi
+                  {t('Xóa câu hỏi')}
                 </Button>
               </div>
             </fieldset>
@@ -519,10 +525,10 @@ export default function AdminQuizPage() {
                 disabled={busy}
                 onClick={() => setForm({ ...form, questions: [...form.questions, blankQuestion()] })}
               >
-                Thêm câu hỏi
+                {t('Thêm câu hỏi')}
               </Button>
               <Button type="submit" variant="contained" startIcon={<SaveOutlined />} disabled={busy}>
-                {editingId ? 'Lưu thay đổi' : 'Tạo bản nháp'}
+                {editingId ? t('Lưu thay đổi') : t('Tạo bản nháp')}
               </Button>
               <Button
                 type="button"
@@ -531,7 +537,7 @@ export default function AdminQuizPage() {
                 onClick={publish}
                 disabled={!editingId || busy}
               >
-                Xuất bản
+                {t('Xuất bản')}
               </Button>
               {editingId && (
                 <Button
@@ -541,7 +547,7 @@ export default function AdminQuizPage() {
                   onClick={() => setConfirmDelete(true)}
                   disabled={busy}
                 >
-                  Xóa bản nháp
+                  {t('Xóa bản nháp')}
                 </Button>
               )}
             </div>
@@ -550,9 +556,9 @@ export default function AdminQuizPage() {
       </div>
       <ConfirmDialog
         open={confirmDelete}
-        title="Xóa bản nháp quiz?"
-        description="Câu hỏi và đáp án trong bản nháp sẽ bị xóa."
-        confirmLabel="Xóa"
+        title={t('Xóa bản nháp quiz?')}
+        description={t('Câu hỏi và đáp án trong bản nháp sẽ bị xóa.')}
+        confirmLabel={t('Xóa')}
         destructive
         pending={busy}
         onConfirm={deleteDraft}

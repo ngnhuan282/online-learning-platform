@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import useAuth from '../../auth/hooks/useAuth';
 import ErrorState from '../../../shared/components/ErrorState';
@@ -12,11 +14,13 @@ const validUserId = value => /^\d+$/.test(value) && Number.isSafeInteger(Number(
 const newMessage = () => ({ userId: '', title: '', body: '' });
 
 export default function AdminNotificationsPage() {
+  useLocale();
   const { user } = useAuth();
   return <AdminNotificationsContent key={user?.id ?? 'anonymous'} />;
 }
 
 function AdminNotificationsContent() {
+  useLocale();
   const [recipient, setRecipient] = useState('');
   const [category, setCategory] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -119,19 +123,20 @@ function AdminNotificationsContent() {
   return (
     <section className="admin-notifications learning-admin-workspace">
       <LearningHeader
-        title="Quản lý thông báo"
-        description="Gửi thông báo hệ thống và tra cứu lịch sử theo người nhận."
+        title={t('Quản lý thông báo')}
+        description={t('Gửi thông báo hệ thống và tra cứu lịch sử theo người nhận.')}
         navigation={false}
       />
       <form className="notification-compose" onSubmit={send}>
-        <h2>Gửi thông báo hệ thống</h2>
+        <h2>{t('Gửi thông báo hệ thống')}</h2>
         <p>
-          Gửi tới một ID người dùng cụ thể. Các thông báo Course, Payment và Learning được tạo theo sự kiện
-          nghiệp vụ.
+          {t(
+            'Gửi tới một ID người dùng cụ thể. Các thông báo Course, Payment và Learning được tạo theo sự kiện nghiệp vụ.',
+          )}
         </p>
         <fieldset disabled={sending}>
           <label>
-            ID người nhận
+            {t('ID người nhận')}
             <input
               required
               inputMode="numeric"
@@ -140,7 +145,7 @@ function AdminNotificationsContent() {
             />
           </label>
           <label>
-            Tiêu đề
+            {t('Tiêu đề')}
             <input
               required
               maxLength={255}
@@ -149,7 +154,7 @@ function AdminNotificationsContent() {
             />
           </label>
           <label>
-            Nội dung
+            {t('Nội dung')}
             <textarea
               required
               maxLength={1000}
@@ -159,22 +164,24 @@ function AdminNotificationsContent() {
             />
           </label>
           <button className="button button-primary" type="submit">
-            {sending ? 'Đang gửi...' : 'Gửi thông báo'}
+            {sending ? t('Đang gửi...') : t('Gửi thông báo')}
           </button>
         </fieldset>
         {sendError && (
-          <p role="alert">{sendError.message} Bạn có thể gửi lại; cùng yêu cầu sẽ không tạo bản trùng.</p>
+          <p role="alert">
+            {t(sendError.message)} {t('Bạn có thể gửi lại; cùng yêu cầu sẽ không tạo bản trùng.')}
+          </p>
         )}
-        {sent && <p role="status">Đã gửi thông báo hệ thống.</p>}
+        {sent && <p role="status">{t('Đã gửi thông báo hệ thống.')}</p>}
       </form>
-      <h2>Lịch sử thông báo</h2>
+      <h2>{t('Lịch sử thông báo')}</h2>
       <div className="notification-filters">
         <label>
-          ID người nhận
+          {t('ID người nhận')}
           <input
             inputMode="numeric"
             value={recipient}
-            placeholder="Tất cả người nhận"
+            placeholder={t('Tất cả người nhận')}
             onChange={event => {
               setRecipient(event.target.value);
               setPage(0);
@@ -182,7 +189,7 @@ function AdminNotificationsContent() {
           />
         </label>
         <label>
-          Loại thông báo
+          {t('Loại thông báo')}
           <select
             value={category}
             onChange={event => {
@@ -190,10 +197,10 @@ function AdminNotificationsContent() {
               setPage(0);
             }}
           >
-            <option value="">Tất cả</option>
+            <option value="">{t('Tất cả')}</option>
             {Object.entries(NOTIFICATION_CATEGORIES).map(([key, label]) => (
               <option key={key} value={key}>
-                {label}
+                {t(label)}
               </option>
             ))}
           </select>
@@ -207,23 +214,23 @@ function AdminNotificationsContent() {
               setPage(0);
             }}
           />
-          Chỉ chưa đọc
+          {t('Chỉ chưa đọc')}
         </label>
         <button
           className="button button-outline"
           type="button"
           onClick={() => setRevision(value => value + 1)}
         >
-          Tải lại
+          {t('Tải lại')}
         </button>
       </div>
-      {recipientInvalid && <p role="alert">ID người nhận phải là số nguyên dương hợp lệ.</p>}
+      {recipientInvalid && <p role="alert">{t('ID người nhận phải là số nguyên dương hợp lệ.')}</p>}
       {current && state.error && (
         <ErrorState error={state.error} onRetry={() => setRevision(value => value + 1)} />
       )}
-      {!recipientInvalid && (!current || state.loading) && <p role="status">Đang tải thông báo...</p>}
+      {!recipientInvalid && (!current || state.loading) && <p role="status">{t('Đang tải thông báo...')}</p>}
       {current && !state.loading && !state.error && data?.content.length === 0 && (
-        <EmptyState title="Chưa có thông báo phù hợp" />
+        <EmptyState title={t('Chưa có thông báo phù hợp')} />
       )}
       <div className="notification-list">
         {data?.content.map(notification => (
@@ -233,12 +240,12 @@ function AdminNotificationsContent() {
           >
             <div className="notification-meta">
               <span>
-                {NOTIFICATION_CATEGORIES[notificationCategory(notification)]} · Người nhận #
+                {NOTIFICATION_CATEGORIES[notificationCategory(notification)]} {t('· Người nhận #')}
                 {notification.userId}
               </span>
-              <span>{notification.read ? 'Đã đọc' : 'Chưa đọc'}</span>
+              <span>{notification.read ? t('Đã đọc') : t('Chưa đọc')}</span>
             </div>
-            <h3>{notification.title}</h3>
+            <h3>{t(notification.title)}</h3>
             <p>{notification.body}</p>
             <time dateTime={notification.createdAt}>
               {formatDate(notification.createdAt, { dateStyle: 'short', timeStyle: 'short' })}
@@ -247,17 +254,17 @@ function AdminNotificationsContent() {
         ))}
       </div>
       {data && data.totalPages > 0 && (
-        <nav className="notification-pagination" aria-label="Phân trang thông báo quản trị">
+        <nav className="notification-pagination" aria-label={t('Phân trang thông báo quản trị')}>
           <button
             className="button button-outline"
             type="button"
             disabled={page === 0 || state.loading}
             onClick={() => setPage(value => value - 1)}
           >
-            Trang trước
+            {t('Trang trước')}
           </button>
           <span>
-            Trang {page + 1} / {data.totalPages} · {data.totalElements} thông báo
+            Trang {page + 1} / {data.totalPages} · {data.totalElements} {t('thông báo')}
           </span>
           <button
             className="button button-outline"

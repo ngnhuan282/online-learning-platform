@@ -1,3 +1,5 @@
+import { t } from '../i18n/locale';
+import useLocale from '../i18n/useLocale';
 import { useId } from 'react';
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 export default function ConfirmDialog({
@@ -9,7 +11,9 @@ export default function ConfirmDialog({
   pending = false,
   confirmLabel = 'Xác nhận',
   destructive = false,
+  children,
 }) {
+  useLocale();
   const id = useId();
   return (
     <Dialog
@@ -18,15 +22,16 @@ export default function ConfirmDialog({
       aria-labelledby={`${id}-title`}
       aria-describedby={description ? `${id}-description` : undefined}
     >
-      <DialogTitle id={`${id}-title`}>{title}</DialogTitle>
+      <DialogTitle id={`${id}-title`}>{t(title)}</DialogTitle>
       {description && (
         <DialogContent>
-          <DialogContentText id={`${id}-description`}>{description}</DialogContentText>
+          <DialogContentText id={`${id}-description`}>{t(description)}</DialogContentText>
         </DialogContent>
       )}
+      {children && <DialogContent>{children}</DialogContent>}
       <DialogActions>
         <Button onClick={onClose} disabled={pending} autoFocus>
-          Hủy
+          {t('Hủy')}
         </Button>
         <Button
           onClick={onConfirm}
@@ -34,7 +39,7 @@ export default function ConfirmDialog({
           color={destructive ? 'error' : 'primary'}
           variant="contained"
         >
-          {pending ? 'Đang xử lý…' : confirmLabel}
+          {pending ? t('Đang xử lý…') : confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

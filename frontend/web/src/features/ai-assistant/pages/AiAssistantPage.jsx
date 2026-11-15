@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
@@ -31,6 +33,7 @@ import '../styles/ai-assistant.css';
 import '../../../shared/styles/feature-workspace.css';
 
 function ChatWorkspace() {
+  useLocale();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('conversationId');
   const [capabilities, setCapabilities] = useState(null);
@@ -280,13 +283,13 @@ function ChatWorkspace() {
               <AutoAwesomeOutlined />
             </span>
             <div>
-              <span className="workspace-kicker">Góc học tập của bạn</span>
-              <h1>Trợ lý học tập AI</h1>
-              <p>Hỏi, luyện tập và hiểu tiếng Anh theo cách của bạn.</p>
+              <span className="workspace-kicker">{t('Góc học tập của bạn')}</span>
+              <h1>{t('Trợ lý học tập AI')}</h1>
+              <p>{t('Hỏi, luyện tập và hiểu tiếng Anh theo cách của bạn.')}</p>
             </div>
           </div>
           <Button component={Link} to={ROUTES.COURSES} variant="outlined" startIcon={<ArrowBack />}>
-            Khóa học
+            {t('Khóa học')}
           </Button>
         </div>
         <div className="ai-assistant-workspace">
@@ -305,9 +308,9 @@ function ChatWorkspace() {
             <div className="ai-assistant-toolbar">
               <div className="ai-assistant-conversation-heading">
                 {mobile && (
-                  <Tooltip title="Danh sách hội thoại">
+                  <Tooltip title={t('Danh sách hội thoại')}>
                     <IconButton
-                      aria-label="Mở danh sách hội thoại"
+                      aria-label={t('Mở danh sách hội thoại')}
                       aria-expanded={historyOpen}
                       onClick={() => setHistoryOpen(true)}
                     >
@@ -316,10 +319,10 @@ function ChatWorkspace() {
                   </Tooltip>
                 )}
                 <div>
-                  <h2 title={conversation?.title}>{conversation?.title || 'Cuộc trò chuyện mới'}</h2>
+                  <h2 title={conversation?.title}>{conversation?.title || t('Cuộc trò chuyện mới')}</h2>
                   <p className="ai-assistant-context">
                     {contextTitle ? <SchoolOutlined /> : <AutoAwesomeOutlined />}
-                    <span>{contextTitle || 'Trợ lý học tiếng Anh'}</span>
+                    <span>{contextTitle || t('Trợ lý học tiếng Anh')}</span>
                   </p>
                 </div>
               </div>
@@ -330,10 +333,10 @@ function ChatWorkspace() {
                   color={capabilities?.available && !connectionError ? 'success' : 'default'}
                   variant="outlined"
                 />
-                <Tooltip title="Làm mới">
+                <Tooltip title={t('Làm mới')}>
                   <span>
                     <IconButton
-                      aria-label="Làm mới"
+                      aria-label={t('Làm mới')}
                       disabled={sending || messageBusy}
                       onClick={() => setRetry(value => value + 1)}
                     >
@@ -345,7 +348,8 @@ function ChatWorkspace() {
             </div>
             {params.get('courseId') && !selectedId && (
               <Alert severity="info">
-                Ngữ cảnh: khóa học #{params.get('courseId')}
+                {t('Ngữ cảnh: khóa học #')}
+                {params.get('courseId')}
                 {params.get('lessonId') ? ` / bài học #${params.get('lessonId')}` : ''}
               </Alert>
             )}
@@ -353,23 +357,23 @@ function ChatWorkspace() {
               <Alert severity="warning">
                 {connectionError
                   ? getAiErrorMessage(connectionError)
-                  : 'Trợ lý AI chưa được cấu hình. Lịch sử hội thoại vẫn có thể xem lại.'}
+                  : t('Trợ lý AI chưa được cấu hình. Lịch sử hội thoại vẫn có thể xem lại.')}
               </Alert>
             )}
             <div
               className="ai-assistant-messages"
               role="log"
-              aria-label="Nội dung hội thoại"
+              aria-label={t('Nội dung hội thoại')}
               aria-live="polite"
               ref={log}
             >
               {!messageLast && (
                 <Button disabled={messageBusy || sending} onClick={olderMessages}>
-                  Tin nhắn trước
+                  {t('Tin nhắn trước')}
                 </Button>
               )}
               {messageBusy && (
-                <div className="workspace-skeleton" role="status" aria-label="Đang tải tin nhắn">
+                <div className="workspace-skeleton" role="status" aria-label={t('Đang tải tin nhắn')}>
                   <Skeleton width="32%" height={24} />
                   <Skeleton width="92%" height={32} />
                   <Skeleton width="80%" height={32} />
@@ -379,7 +383,7 @@ function ChatWorkspace() {
               {messageError && (
                 <ErrorState
                   error={new Error(getAiErrorMessage(messageError))}
-                  title="Không thể tải hội thoại"
+                  title={t('Không thể tải hội thoại')}
                   onRetry={() => setRetry(value => value + 1)}
                 />
               )}
@@ -388,11 +392,11 @@ function ChatWorkspace() {
                   <span className="ai-assistant-empty-icon" aria-hidden="true">
                     <AutoAwesomeOutlined />
                   </span>
-                  <h2>Bạn muốn học gì hôm nay?</h2>
+                  <h2>{t('Bạn muốn học gì hôm nay?')}</h2>
                   <p>
-                    Một câu hỏi nhỏ, thêm một điều hiểu rõ.
+                    {t('Một câu hỏi nhỏ, thêm một điều hiểu rõ.')}
                     <br />
-                    Chọn gợi ý bên dưới hoặc bắt đầu bằng câu hỏi của bạn.
+                    {t('Chọn gợi ý bên dưới hoặc bắt đầu bằng câu hỏi của bạn.')}
                   </p>
                   <div className="ai-assistant-prompts">
                     {hasLessonContext && (
@@ -407,7 +411,7 @@ function ChatWorkspace() {
                             )
                           }
                         >
-                          Tóm tắt bài học
+                          {t('Tóm tắt bài học')}
                         </Button>
                         <Button
                           variant="outlined"
@@ -419,7 +423,7 @@ function ChatWorkspace() {
                             )
                           }
                         >
-                          Câu hỏi luyện tập
+                          {t('Câu hỏi luyện tập')}
                         </Button>
                       </>
                     )}
@@ -427,38 +431,38 @@ function ChatWorkspace() {
                       variant="outlined"
                       startIcon={<MenuBookOutlined />}
                       disabled={blocked}
-                      aria-label="Ôn ngữ pháp"
+                      aria-label={t('Ôn ngữ pháp')}
                       onClick={() =>
                         choosePrompt('Giải thích thì hiện tại hoàn thành bằng tiếng Việt, kèm 3 ví dụ.')
                       }
                     >
                       <span>
-                        <strong>Ôn ngữ pháp</strong>
-                        <small>Hiểu cách dùng qua ví dụ</small>
+                        <strong>{t('Ôn ngữ pháp')}</strong>
+                        <small>{t('Hiểu cách dùng qua ví dụ')}</small>
                       </span>
                     </Button>
                     <Button
                       variant="outlined"
                       startIcon={<TranslateOutlined />}
                       disabled={blocked}
-                      aria-label="Luyện từ vựng"
+                      aria-label={t('Luyện từ vựng')}
                       onClick={() => choosePrompt('Cho mình 5 từ vựng tiếng Anh về công việc, kèm ví dụ.')}
                     >
                       <span>
-                        <strong>Luyện từ vựng</strong>
-                        <small>Ghi nhớ từ trong ngữ cảnh</small>
+                        <strong>{t('Luyện từ vựng')}</strong>
+                        <small>{t('Ghi nhớ từ trong ngữ cảnh')}</small>
                       </span>
                     </Button>
                     <Button
                       variant="outlined"
                       startIcon={<SpellcheckOutlined />}
                       disabled={blocked}
-                      aria-label="Sửa câu tiếng Anh"
+                      aria-label={t('Sửa câu tiếng Anh')}
                       onClick={() => choosePrompt('Giúp mình sửa ngữ pháp và giải thích câu sau: ')}
                     >
                       <span>
-                        <strong>Sửa câu tiếng Anh</strong>
-                        <small>Viết tự nhiên và chính xác hơn</small>
+                        <strong>{t('Sửa câu tiếng Anh')}</strong>
+                        <small>{t('Viết tự nhiên và chính xác hơn')}</small>
                       </span>
                     </Button>
                   </div>
@@ -474,7 +478,7 @@ function ChatWorkspace() {
                     <i />
                     <i />
                   </span>
-                  Đang trả lời…
+                  {t('Đang trả lời…')}
                 </div>
               )}
             </div>
@@ -490,7 +494,7 @@ function ChatWorkspace() {
                   severity="error"
                   action={
                     <Button disabled={sending || !capabilities?.available} onClick={() => send(failed)}>
-                      Thử lại
+                      {t('Thử lại')}
                     </Button>
                   }
                 >
@@ -503,8 +507,8 @@ function ChatWorkspace() {
                 multiline
                 minRows={2}
                 maxRows={4}
-                label="Câu hỏi của bạn"
-                placeholder="Nhập câu hỏi về bài học..."
+                label={t('Câu hỏi của bạn')}
+                placeholder={t('Nhập câu hỏi về bài học...')}
                 value={draft}
                 inputRef={input}
                 disabled={sending}
@@ -525,17 +529,17 @@ function ChatWorkspace() {
               <div className="ai-assistant-composer-actions">
                 <span className="ai-assistant-muted">
                   <span className="ai-assistant-keyboard-hint">
-                    Enter để gửi · Shift + Enter để xuống dòng
+                    {t('Enter để gửi · Shift + Enter để xuống dòng')}
                   </span>
                   <span>
                     {draft.length}/{maxLength}
                   </span>
                 </span>
                 <div className="ai-assistant-tools">
-                  <Tooltip title="Xóa bản nháp">
+                  <Tooltip title={t('Xóa bản nháp')}>
                     <span>
                       <IconButton
-                        aria-label="Xóa bản nháp"
+                        aria-label={t('Xóa bản nháp')}
                         disabled={!draft || sending}
                         onClick={() => {
                           setDraft('');
@@ -546,12 +550,12 @@ function ChatWorkspace() {
                       </IconButton>
                     </span>
                   </Tooltip>
-                  <Tooltip title="Gửi câu hỏi">
+                  <Tooltip title={t('Gửi câu hỏi')}>
                     <span>
                       <IconButton
                         className="ai-assistant-send"
                         type="submit"
-                        aria-label="Gửi câu hỏi"
+                        aria-label={t('Gửi câu hỏi')}
                         color="primary"
                         disabled={blocked || !draft.trim()}
                       >
@@ -570,6 +574,7 @@ function ChatWorkspace() {
 }
 
 export default function AiAssistantPage() {
+  useLocale();
   const { user } = useAuth();
   const [params] = useSearchParams();
   return <ChatWorkspace key={`${user?.id ?? 'anonymous'}:${params.toString()}`} />;

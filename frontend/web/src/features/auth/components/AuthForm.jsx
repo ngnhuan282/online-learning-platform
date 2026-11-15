@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
@@ -24,6 +26,7 @@ import { getPasswordStrength, validateAuth } from '../schemas/authValidation';
 import '../styles/auth.css';
 
 export default function AuthForm({ mode }) {
+  useLocale();
   const registering = mode === 'register';
   const { login, register } = useAuth();
   const showToast = useToast();
@@ -163,11 +166,11 @@ export default function AuthForm({ mode }) {
     <section className={`auth-section auth-section-${mode}`} aria-labelledby="auth-title">
       <div className={`auth-card auth-card-${mode}`}>
         <div className="auth-heading">
-          <h1 id="auth-title">{registering ? 'Tạo tài khoản mới' : 'Đăng nhập tài khoản'}</h1>
+          <h1 id="auth-title">{registering ? t('Tạo tài khoản mới') : t('Đăng nhập tài khoản')}</h1>
           <p>
             {registering
-              ? 'Bắt đầu hành trình chinh phục tiếng Anh ngay hôm nay.'
-              : 'Chào mừng bạn quay trở lại! Vui lòng nhập thông tin để tiếp tục.'}
+              ? t('Bắt đầu hành trình chinh phục tiếng Anh ngay hôm nay.')
+              : t('Chào mừng bạn quay trở lại! Vui lòng nhập thông tin để tiếp tục.')}
           </p>
         </div>
         <SocialAuthButtons
@@ -177,22 +180,24 @@ export default function AuthForm({ mode }) {
           googleLoading={googleLoading}
         />
         <div className="auth-divider">
-          <span>Hoặc {registering ? 'đăng ký' : 'đăng nhập'} bằng Email</span>
+          <span>
+            {t('Hoặc')} {registering ? t('đăng ký') : t('đăng nhập')} {t('bằng Email')}
+          </span>
         </div>
         <form className="auth-form" onSubmit={submit} noValidate aria-busy={submitting}>
           {registering && (
             <AuthField
               {...fieldProps('fullName')}
-              label="Họ và tên"
+              label={t('Họ và tên')}
               icon={<PersonOutlined />}
               autoComplete="name"
-              placeholder="Ví dụ: Nguyễn Văn A"
+              placeholder={t('Ví dụ: Nguyễn Văn A')}
               maxLength={100}
             />
           )}
           <AuthField
             {...fieldProps('email')}
-            label="Địa chỉ Email"
+            label={t('Địa chỉ Email')}
             type="email"
             icon={<EmailOutlined />}
             autoComplete="email"
@@ -202,7 +207,7 @@ export default function AuthForm({ mode }) {
           <div className="auth-password-group">
             <AuthField
               {...fieldProps('password')}
-              label="Mật khẩu"
+              label={t('Mật khẩu')}
               type="password"
               icon={<LockOutlined />}
               autoComplete={registering ? 'new-password' : 'current-password'}
@@ -212,16 +217,16 @@ export default function AuthForm({ mode }) {
             {registering && (
               <div className={`password-strength ${strength.tone}`}>
                 <div className="password-strength-label">
-                  <span>Độ mạnh mật khẩu</span>
+                  <span>{t('Độ mạnh mật khẩu')}</span>
                   <strong aria-live="polite">
                     {strength.score === 3 && <CheckCircle style={{ fontSize: 15 }} />}
-                    {strength.label}
+                    {t(strength.label)}
                   </strong>
                 </div>
                 <div
                   className="password-strength-bars"
                   role="meter"
-                  aria-label="Độ mạnh mật khẩu"
+                  aria-label={t('Độ mạnh mật khẩu')}
                   aria-valuemin={0}
                   aria-valuemax={3}
                   aria-valuenow={strength.score}
@@ -237,7 +242,7 @@ export default function AuthForm({ mode }) {
           {registering && (
             <AuthField
               {...fieldProps('confirmPassword')}
-              label="Xác nhận mật khẩu"
+              label={t('Xác nhận mật khẩu')}
               type="password"
               icon={<VerifiedUserOutlined />}
               autoComplete="new-password"
@@ -256,23 +261,23 @@ export default function AuthForm({ mode }) {
                   aria-describedby={errors.terms ? 'terms-error' : undefined}
                 />
                 <span>
-                  {'Tôi đồng ý với '}
+                  {t('Tôi đồng ý với ')}
                   <button
                     type="button"
                     className="auth-inline-link"
                     onClick={() => setPolicy('Terms of Service')}
                   >
-                    Điều khoản dịch vụ
+                    {t('Điều khoản dịch vụ')}
                   </button>
-                  {' và '}
+                  {t(' và ')}
                   <button
                     type="button"
                     className="auth-inline-link"
                     onClick={() => setPolicy('Privacy Policy')}
                   >
-                    Chính sách bảo mật
+                    {t('Chính sách bảo mật')}
                   </button>
-                  {' của SGEdu.'}
+                  {t(' của SGEdu.')}
                 </span>
               </label>
               {errors.terms && (
@@ -285,33 +290,33 @@ export default function AuthForm({ mode }) {
             <div className="auth-options">
               <label className="auth-checkbox">
                 <input type="checkbox" name="remember" checked={values.remember} onChange={update} />
-                <span>Ghi nhớ đăng nhập</span>
+                <span>{t('Ghi nhớ đăng nhập')}</span>
               </label>
               <Link className="auth-inline-link" to={ROUTES.FORGOT_PASSWORD}>
-                Quên mật khẩu?
+                {t('Quên mật khẩu?')}
               </Link>
             </div>
           )}
           <button className="button button-primary auth-submit" type="submit" disabled={submitting}>
-            {submitting ? 'Đang xử lý...' : registering ? 'Tạo tài khoản' : 'Đăng nhập'}
+            {submitting ? t('Đang xử lý...') : registering ? t('Tạo tài khoản') : t('Đăng nhập')}
             <Icon name="arrow" size={20} />
           </button>
           {notice && (
             <p ref={noticeRef} tabIndex={-1} role="status" className="auth-notice">
-              {notice}
+              {t(notice)}
             </p>
           )}
         </form>
         <p className="auth-switch">
-          {registering ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}{' '}
+          {registering ? t('Đã có tài khoản?') : t('Chưa có tài khoản?')}{' '}
           <Link to={registering ? ROUTES.LOGIN : ROUTES.REGISTER} state={{ from: location.state?.from }}>
-            {registering ? 'Đăng nhập' : 'Đăng ký ngay'}
+            {registering ? t('Đăng nhập') : t('Đăng ký ngay')}
           </Link>
         </p>
         {!registering && (
           <div className="auth-security">
             <Lock style={{ fontSize: 17 }} />
-            <span>Mật khẩu của bạn không được lưu trong trình duyệt.</span>
+            <span>{t('Mật khẩu của bạn không được lưu trong trình duyệt.')}</span>
           </div>
         )}
       </div>

@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
@@ -14,6 +16,7 @@ import {
 import '../styles/auth.css';
 
 export default function GoogleCallbackPage() {
+  useLocale();
   const { completeGoogleLogin, user, isLoading, sessionError } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -80,13 +83,14 @@ export default function GoogleCallbackPage() {
   return (
     <section className="auth-section" aria-busy={!error}>
       <div className="auth-card">
-        <h1>{linking ? 'Liên kết Google' : 'Đăng nhập bằng Google'}</h1>
+        <h1>{linking ? t('Liên kết Google') : t('Đăng nhập bằng Google')}</h1>
         <p role="status">
-          {error || (linking ? 'Đang khôi phục phiên và hoàn tất liên kết...' : 'Đang hoàn tất đăng nhập...')}
+          {error ||
+            (linking ? t('Đang khôi phục phiên và hoàn tất liên kết...') : t('Đang hoàn tất đăng nhập...'))}
         </p>
         {error && (
           <Link to={linking ? `${profilePath}#sign-in-methods` : ROUTES.LOGIN} replace>
-            {linking ? 'Quay lại Hồ sơ' : 'Quay lại đăng nhập'}
+            {linking ? t('Quay lại Hồ sơ') : t('Quay lại đăng nhập')}
           </Link>
         )}
       </div>

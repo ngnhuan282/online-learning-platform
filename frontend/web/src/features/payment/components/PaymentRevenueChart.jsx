@@ -1,20 +1,23 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { money } from '../../admin/utils/adminUtils';
 
 export default function PaymentRevenueChart({ data, loading, unavailable }) {
+  useLocale();
   if (loading)
     return (
       <div className="payment-chart-state" role="status">
-        Đang tải doanh thu…
+        {t('Đang tải doanh thu…')}
       </div>
     );
   if (unavailable) {
     return (
       <div className="payment-chart-state" role="status">
-        Chưa tải được doanh thu. Hãy làm mới dữ liệu.
+        {t('Chưa tải được doanh thu. Hãy làm mới dữ liệu.')}
       </div>
     );
   }
-  if (!data?.length) return <div className="payment-chart-state">Chưa có dữ liệu doanh thu.</div>;
+  if (!data?.length) return <div className="payment-chart-state">{t('Chưa có dữ liệu doanh thu.')}</div>;
 
   const maximum = Math.max(1, ...data.map(point => Number(point.amount)));
   const hasRevenue = data.some(point => Number(point.amount) > 0);
@@ -23,7 +26,7 @@ export default function PaymentRevenueChart({ data, loading, unavailable }) {
       <div
         className="payment-revenue-chart"
         role="region"
-        aria-label="Doanh thu thanh toán theo ngày"
+        aria-label={t('Doanh thu thanh toán theo ngày')}
         tabIndex={0}
       >
         <div className="payment-revenue-axis" aria-hidden="true">
@@ -41,27 +44,29 @@ export default function PaymentRevenueChart({ data, loading, unavailable }) {
                   title={`${point.label}: ${money(point.amount)}`}
                 />
               </div>
-              <span>{point.label}</span>
+              <span>{t(point.label)}</span>
             </div>
           ))}
         </div>
       </div>
-      {!hasRevenue && <p className="payment-chart-empty">Chưa có thanh toán thành công trong khoảng này.</p>}
+      {!hasRevenue && (
+        <p className="payment-chart-empty">{t('Chưa có thanh toán thành công trong khoảng này.')}</p>
+      )}
       <details className="payment-chart-data">
-        <summary>Xem số liệu theo ngày</summary>
+        <summary>{t('Xem số liệu theo ngày')}</summary>
         <table>
-          <caption>Doanh thu theo ngày thanh toán, múi giờ UTC</caption>
+          <caption>{t('Doanh thu theo ngày thanh toán, múi giờ UTC')}</caption>
           <thead>
             <tr>
-              <th>Ngày</th>
+              <th>{t('Ngày')}</th>
               <th>Doanh thu</th>
-              <th>Giao dịch tạo mới</th>
+              <th>{t('Giao dịch tạo mới')}</th>
             </tr>
           </thead>
           <tbody>
             {data.map(point => (
               <tr key={point.label}>
-                <th>{point.label}</th>
+                <th>{t(point.label)}</th>
                 <td>{money(point.amount)}</td>
                 <td>{point.orders}</td>
               </tr>

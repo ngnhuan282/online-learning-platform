@@ -1,0 +1,110 @@
+.learner-avatar {
+  display: inline-block;
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.learner-avatar-portrait {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inset: 4px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e5ecff;
+  color: #334ba3;
+  font-size: 14px;
+  font-weight: 800;
+}
+.learner-avatar-portrait img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.learner-avatar-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.has-art-frame .learner-avatar-portrait {
+  inset: auto;
+  top: var(--portrait-y);
+  left: 50%;
+  width: var(--portrait-diameter);
+  height: var(--portrait-diameter);
+  transform: translate(-50%, -50%);
+}
+.learner-avatar.ring-frame {
+  border: 3px solid #d3ddf0;
+  border-radius: 50%;
+}
+.learner-avatar.ring-frame .learner-avatar-portrait {
+  inset: 1px;
+}
+.learner-avatar.frame-FIRST_LESSON {
+  border-color: #22a06b;
+}
+.learner-avatar.frame-STREAK_3 {
+  border-color: #eb6c2a;
+}
+.learner-avatar.frame-STREAK_7 {
+  border-color: #e6ae2b;
+}
+.learner-avatar.frame-STREAK_30 {
+  border-color: #b37c14;
+}
+.learner-avatar.frame-LEVEL_5 {
+  border-color: #9b51e0;
+}
+.learner-avatar.frame-FRAME_CLASSIC {
+  border-color: #8e72ec;
+  box-shadow:
+    0 0 0 3px #ede4ff,
+    0 0 16px #b7a0fa65;
+}
+.learner-avatar-level {
+  position: absolute;
+  right: -4px;
+  bottom: -5px;
+  z-index: 2;
+  border: 2px solid white;
+  border-radius: 10px;
+  padding: 1px 5px;
+  background: #272952;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 15px;
+  box-shadow: 0 2px 4px #1f245025;
+  white-space: nowrap;
+}
+.avatar-size-small {
+  width: 38px;
+  height: 38px;
+}
+.avatar-size-header {
+  width: 56px;
+  height: 56px;
+}
+.avatar-size-large {
+  width: 110px;
+  height: 110px;
+}
+.avatar-size-large .learner-avatar-portrait {
+  font-size: 28px;
+}
+.avatar-size-large .learner-avatar-level {
+  font-size: 12px;
+  padding: 2px 9px;
+}
+.has-art-frame.avatar-size-header .learner-avatar-portrait {
+  font-size: 9px;
+}

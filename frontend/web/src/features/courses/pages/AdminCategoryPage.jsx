@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,6 +12,7 @@ const emptyForm = {
 };
 
 export default function AdminCategoryPage() {
+  useLocale();
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -117,17 +120,17 @@ export default function AdminCategoryPage() {
               fontSize: 13,
             }}
           >
-            ← Quay lại quản lý khóa học
+            {t('← Quay lại quản lý khóa học')}
           </button>
           <span className="eyebrow">ADMIN</span>
-          <h1 style={{ marginTop: 8 }}>Quản lý danh mục</h1>
+          <h1 style={{ marginTop: 8 }}>{t('Quản lý danh mục')}</h1>
         </div>
 
         {error && (
           <p role="alert">
-            {error}{' '}
+            {t(error)}{' '}
             <button type="button" onClick={loadCategories}>
-              Thử lại
+              {t('Thử lại')}
             </button>
           </p>
         )}
@@ -137,27 +140,27 @@ export default function AdminCategoryPage() {
             onSubmit={handleSubmit}
             style={{ padding: 20, display: 'grid', gap: 14 }}
           >
-            <h3>{editingId ? 'Chỉnh sửa danh mục' : 'Thêm danh mục mới'}</h3>
+            <h3>{editingId ? t('Chỉnh sửa danh mục') : t('Thêm danh mục mới')}</h3>
             <label>
               <input
                 type="checkbox"
                 checked={form.active}
                 onChange={event => setForm({ ...form, active: event.target.checked })}
               />{' '}
-              Hiển thị danh mục
+              {t('Hiển thị danh mục')}
             </label>
 
             <input
               value={form.name}
               onChange={event => setForm({ ...form, name: event.target.value })}
-              placeholder="Tên danh mục"
+              placeholder={t('Tên danh mục')}
               style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #dfe3ea' }}
             />
 
             <textarea
               value={form.description}
               onChange={event => setForm({ ...form, description: event.target.value })}
-              placeholder="Mô tả danh mục"
+              placeholder={t('Mô tả danh mục')}
               rows={4}
               style={{
                 padding: '10px 12px',
@@ -176,11 +179,11 @@ export default function AdminCategoryPage() {
               >
                 {saving
                   ? editingId
-                    ? 'Đang cập nhật...'
-                    : 'Đang lưu...'
+                    ? t('Đang cập nhật...')
+                    : t('Đang lưu...')
                   : editingId
-                    ? 'Cập nhật danh mục'
-                    : 'Lưu danh mục'}
+                    ? t('Cập nhật danh mục')
+                    : t('Lưu danh mục')}
               </button>
               {editingId && (
                 <button
@@ -189,18 +192,18 @@ export default function AdminCategoryPage() {
                   onClick={resetForm}
                   style={{ paddingLeft: 16, paddingRight: 16, whiteSpace: 'nowrap' }}
                 >
-                  Hủy
+                  {t('Hủy')}
                 </button>
               )}
             </div>
           </form>
 
           <div className="course-card" style={{ padding: 20 }}>
-            <h3>Danh sách danh mục</h3>
+            <h3>{t('Danh sách danh mục')}</h3>
             {loading ? (
-              <p>Đang tải danh mục...</p>
+              <p>{t('Đang tải danh mục...')}</p>
             ) : categories.length === 0 ? (
-              <p style={{ color: '#94a3b8', fontSize: 14 }}>Chưa có danh mục nào.</p>
+              <p style={{ color: '#94a3b8', fontSize: 14 }}>{t('Chưa có danh mục nào.')}</p>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
                 <thead>
@@ -214,7 +217,7 @@ export default function AdminCategoryPage() {
                         fontWeight: 600,
                       }}
                     >
-                      Tên danh mục
+                      {t('Tên danh mục')}
                     </th>
                     <th
                       style={{
@@ -225,7 +228,7 @@ export default function AdminCategoryPage() {
                         fontWeight: 600,
                       }}
                     >
-                      Mô tả
+                      {t('Mô tả')}
                     </th>
                     <th
                       style={{
@@ -237,7 +240,7 @@ export default function AdminCategoryPage() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      Thao tác
+                      {t('Thao tác')}
                     </th>
                   </tr>
                 </thead>
@@ -255,7 +258,7 @@ export default function AdminCategoryPage() {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {category.name} {category.active === false && <small>(Đã ẩn)</small>}
+                        {t(category.name)} {category.active === false && <small>{t('(Đã ẩn)')}</small>}
                       </td>
                       <td
                         style={{
@@ -277,7 +280,7 @@ export default function AdminCategoryPage() {
                           onClick={() => handleEdit(category)}
                           style={{ padding: '5px 14px', fontSize: 13, marginRight: 6 }}
                         >
-                          Sửa
+                          {t('Sửa')}
                         </button>
                         <button
                           className="button button-soft"
@@ -291,7 +294,7 @@ export default function AdminCategoryPage() {
                             borderColor: '#fed7d7',
                           }}
                         >
-                          Ẩn
+                          {t('Ẩn')}
                         </button>
                       </td>
                     </tr>

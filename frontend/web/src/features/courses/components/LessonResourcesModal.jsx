@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useCallback, useState, useEffect } from 'react';
 import { mediaApi } from '../api/mediaApi';
 import MediaUploader from './MediaUploader';
@@ -12,10 +14,12 @@ function formatBytes(bytes) {
 }
 
 export default function LessonResourcesModal({ lesson, onClose }) {
+  useLocale();
   return <LessonResources key={lesson?.id} lesson={lesson} onClose={onClose} />;
 }
 
 function LessonResources({ lesson, onClose }) {
+  useLocale();
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -132,9 +136,9 @@ function LessonResources({ lesson, onClose }) {
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
         >
           <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Tài liệu đính kèm</h3>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{t('Tài liệu đính kèm')}</h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
-              Bài học: <strong>{lesson.title}</strong>
+              {t('Bài học:')} <strong>{t(lesson.title)}</strong>
             </p>
           </div>
           <button
@@ -158,7 +162,7 @@ function LessonResources({ lesson, onClose }) {
               marginBottom: 16,
             }}
           >
-            {error}
+            {t(error)}
           </div>
         )}
 
@@ -166,7 +170,7 @@ function LessonResources({ lesson, onClose }) {
         <div style={{ marginBottom: 20 }}>
           {loading ? (
             <p style={{ fontSize: 14, color: '#64748b', textAlign: 'center', padding: 20 }}>
-              Đang tải danh sách tài liệu...
+              {t('Đang tải danh sách tài liệu...')}
             </p>
           ) : resources.length === 0 ? (
             <p
@@ -179,7 +183,7 @@ function LessonResources({ lesson, onClose }) {
                 borderRadius: 8,
               }}
             >
-              Chưa có tài liệu đính kèm nào.
+              {t('Chưa có tài liệu đính kèm nào.')}
             </p>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
@@ -201,7 +205,7 @@ function LessonResources({ lesson, onClose }) {
                       {item.resourceType === 'PDF' ? '📕' : item.resourceType === 'VIDEO' ? '🎬' : '📄'}
                     </span>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{item.title}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{t(item.title)}</div>
                       <div style={{ fontSize: 12, color: '#64748b' }}>
                         {item.fileName} • {formatBytes(item.fileSize)}
                       </div>
@@ -217,7 +221,7 @@ function LessonResources({ lesson, onClose }) {
                         className="button button-soft"
                         style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}
                       >
-                        Tải về
+                        {t('Tải về')}
                       </a>
                     )}
                     <button
@@ -231,7 +235,7 @@ function LessonResources({ lesson, onClose }) {
                         fontSize: 14,
                         padding: '4px 6px',
                       }}
-                      title="Xóa tài liệu"
+                      title={t('Xóa tài liệu')}
                     >
                       🗑️
                     </button>
@@ -250,7 +254,7 @@ function LessonResources({ lesson, onClose }) {
             onClick={() => setAdding(true)}
             style={{ width: '100%', fontSize: 14 }}
           >
-            + Tải lên tài liệu mới
+            {t('+ Tải lên tài liệu mới')}
           </button>
         ) : (
           <form
@@ -265,7 +269,7 @@ function LessonResources({ lesson, onClose }) {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ margin: 0, fontSize: 15 }}>Đính kèm tài liệu mới</h4>
+              <h4 style={{ margin: 0, fontSize: 15 }}>{t('Đính kèm tài liệu mới')}</h4>
               <button
                 type="button"
                 onClick={() => setAdding(false)}
@@ -277,20 +281,20 @@ function LessonResources({ lesson, onClose }) {
                   fontSize: 12,
                 }}
               >
-                Hủy bỏ
+                {t('Hủy bỏ')}
               </button>
             </div>
 
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-                Tên hiển thị tài liệu <span style={{ color: '#ef4444' }}>*</span>
+                {t('Tên hiển thị tài liệu')} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="VD: Slide bài giảng (PDF), Mã nguồn mẫu"
+                placeholder={t('VD: Slide bài giảng (PDF), Mã nguồn mẫu')}
                 style={{
                   width: '100%',
                   padding: '8px 10px',
@@ -304,7 +308,7 @@ function LessonResources({ lesson, onClose }) {
 
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-                Loại tài nguyên
+                {t('Loại tài nguyên')}
               </label>
               <select
                 value={resourceType}
@@ -318,18 +322,18 @@ function LessonResources({ lesson, onClose }) {
                   boxSizing: 'border-box',
                 }}
               >
-                <option value="PDF">PDF Tài liệu</option>
-                <option value="DOCUMENT">Tài liệu văn bản (Word, Excel)</option>
-                <option value="SOURCE_CODE">Mã nguồn (ZIP, RAR)</option>
-                <option value="IMAGE">Hình ảnh minh họa</option>
-                <option value="OTHER">Khác</option>
+                <option value="PDF">{t('PDF Tài liệu')}</option>
+                <option value="DOCUMENT">{t('Tài liệu văn bản (Word, Excel)')}</option>
+                <option value="SOURCE_CODE">{t('Mã nguồn (ZIP, RAR)')}</option>
+                <option value="IMAGE">{t('Hình ảnh minh họa')}</option>
+                <option value="OTHER">{t('Khác')}</option>
               </select>
             </div>
 
             <MediaUploader
               folder="documents"
               accept=".pdf,.doc,.docx,.zip,.rar,.txt,.png,.jpg"
-              label="Chọn tệp đính kèm"
+              label={t('Chọn tệp đính kèm')}
               maxSizeMB={30}
               onUploadSuccess={fileInfo => setUploadedFile(fileInfo)}
             />
@@ -341,14 +345,14 @@ function LessonResources({ lesson, onClose }) {
                 onClick={() => setAdding(false)}
                 disabled={submitting}
               >
-                Hủy
+                {t('Hủy')}
               </button>
               <button
                 type="submit"
                 className="button button-primary"
                 disabled={!title.trim() || !uploadedFile || submitting}
               >
-                {submitting ? 'Đang lưu...' : 'Lưu tài liệu'}
+                {submitting ? t('Đang lưu...') : t('Lưu tài liệu')}
               </button>
             </div>
           </form>

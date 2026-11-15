@@ -1,4 +1,5 @@
-﻿// Local presentation data. Replace with Course Service responses when the API is ready.
+import { getIntlLocale } from '../../../shared/i18n/locale.js';
+// Local presentation data. Replace with Course Service responses when the API is ready.
 export const categories = [
   {
     id: 'ielts',
@@ -177,7 +178,7 @@ export const demoCourses = [
   },
 ];
 
-export const formatPrice = value => `${new Intl.NumberFormat('vi-VN').format(value)}đ`;
+export const formatPrice = value => `${new Intl.NumberFormat(getIntlLocale()).format(value)}đ`;
 export const normalizeSearch = value =>
   value
     .normalize('NFD')

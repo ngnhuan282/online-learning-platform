@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { Link } from 'react-router-dom';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
 import TaskAltOutlined from '@mui/icons-material/TaskAltOutlined';
@@ -24,6 +26,7 @@ const emptyDashboard = {
 const enrollmentLabels = { ACTIVE: 'Đang học', COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy' };
 
 export default function UserDashboardPage() {
+  useLocale();
   const notifications = useNotifications();
   const { data, error, loading, reload } = useLearningResource(
     learningApi.getDashboard,
@@ -47,21 +50,32 @@ export default function UserDashboardPage() {
     <section className="learning-page">
       <div className="learning-shell">
         <LearningHeader
-          title="Bảng điều khiển học tập"
-          description="Tiếp tục hành trình học và theo dõi kết quả của bạn."
+          title={t('Bảng điều khiển học tập')}
+          description={t('Tiếp tục hành trình học và theo dõi kết quả của bạn.')}
         >
           <Link className="button button-primary" to="/my-courses">
-            Vào khóa học của tôi
+            {t('Vào khóa học của tôi')}
             <ArrowForwardRounded fontSize="small" aria-hidden="true" />
           </Link>
         </LearningHeader>
+        <div className="achievement-shortcuts">
+          <Link className="button button-outline" to="/achievements">
+            {t('Thành tích học tập')}
+          </Link>
+          <Link className="button button-outline" to="/leaderboard">
+            {t('Bảng xếp hạng')}
+          </Link>
+          <Link className="button button-outline" to="/community">
+            {t('Diễn đàn')}
+          </Link>
+        </div>
 
-        {loading && <AppLoading label="Đang tải bảng điều khiển..." />}
+        {loading && <AppLoading label={t('Đang tải bảng điều khiển...')} />}
         {error && <ErrorState error={error} onRetry={reload} />}
         {notifications.error && (
           <ErrorState
             error={notifications.error}
-            title="Không thể tải thông báo"
+            title={t('Không thể tải thông báo')}
             onRetry={notifications.refresh}
           />
         )}
@@ -70,7 +84,7 @@ export default function UserDashboardPage() {
           {stats.map(({ Icon, ...item }) => (
             <article className="learning-stat-card" key={item.label}>
               <div className="learning-stat-heading">
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
                 <Icon fontSize="small" aria-hidden="true" />
               </div>
               <strong>{!item.notification && (loading || error) ? '—' : item.value}</strong>
@@ -81,26 +95,32 @@ export default function UserDashboardPage() {
         <div className="learning-grid">
           <article className="learning-panel">
             <div className="learning-panel-heading">
-              <h2>Khóa học gần đây</h2>
-              <Link to="/my-courses">Xem tất cả</Link>
+              <h2>{t('Khóa học gần đây')}</h2>
+              <Link to="/my-courses">{t('Xem tất cả')}</Link>
             </div>
             <div className="learning-list">
               {!loading && !error && data.recentEnrollments.length === 0 && (
                 <div className="learning-empty">
                   <AutoStoriesOutlined aria-hidden="true" />
-                  <p>Bạn chưa ghi danh khóa học nào.</p>
-                  <Link to="/courses">Khám phá khóa học</Link>
+                  <p>{t('Bạn chưa ghi danh khóa học nào.')}</p>
+                  <Link to="/courses">{t('Khám phá khóa học')}</Link>
                 </div>
               )}
               {data.recentEnrollments.map(enrollment =>
                 enrollment.status === 'CANCELLED' ? (
                   <div className="learning-row" key={enrollment.id}>
-                    <span>Khóa học #{enrollment.courseId}</span>
+                    <span>
+                      {t('Khóa học #')}
+                      {enrollment.courseId}
+                    </span>
                     <b className="learning-chip">{enrollmentLabels[enrollment.status]}</b>
                   </div>
                 ) : (
                   <Link className="learning-row" to={`/learning/${enrollment.courseId}`} key={enrollment.id}>
-                    <span>Khóa học #{enrollment.courseId}</span>
+                    <span>
+                      {t('Khóa học #')}
+                      {enrollment.courseId}
+                    </span>
                     <b className={`learning-chip ${enrollment.status === 'COMPLETED' ? 'is-success' : ''}`}>
                       {enrollmentLabels[enrollment.status] ?? enrollment.status}
                     </b>
@@ -112,14 +132,14 @@ export default function UserDashboardPage() {
 
           <article className="learning-panel">
             <div className="learning-panel-heading">
-              <h2>Quiz gần đây</h2>
+              <h2>{t('Quiz gần đây')}</h2>
             </div>
             <div className="learning-list">
               {!loading && !error && data.recentQuizResults.length === 0 && (
                 <div className="learning-empty">
                   <QuizOutlined aria-hidden="true" />
-                  <p>Bạn chưa có kết quả quiz.</p>
-                  <span>Kết quả sẽ xuất hiện sau khi bạn nộp bài.</span>
+                  <p>{t('Bạn chưa có kết quả quiz.')}</p>
+                  <span>{t('Kết quả sẽ xuất hiện sau khi bạn nộp bài.')}</span>
                 </div>
               )}
               {data.recentQuizResults.map(result => (

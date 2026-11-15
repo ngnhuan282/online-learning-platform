@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState, useRef } from 'react';
 import { mediaApi } from '../api/mediaApi';
 import { resolveMediaUrl } from '../../../shared/utils/mediaUrl';
@@ -20,6 +22,7 @@ export default function MediaUploader({
   onUploadSuccess,
   onUploadError,
 }) {
+  useLocale();
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -112,7 +115,7 @@ export default function MediaUploader({
     <div style={{ display: 'grid', gap: 10 }}>
       {label && (
         <span style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>
-          {label} (Tối đa {maxSizeMB} MB)
+          {t(label)} {t('(Tối đa')} {maxSizeMB} MB)
         </span>
       )}
 
@@ -154,7 +157,9 @@ export default function MediaUploader({
 
         {uploading ? (
           <div style={{ display: 'grid', gap: 8, padding: '10px 0' }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#1e293b' }}>Đang tải lên... {progress}%</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#1e293b' }}>
+              {t('Đang tải lên...')} {progress}%
+            </div>
             {/* Progress Bar */}
             <div
               style={{
@@ -185,9 +190,11 @@ export default function MediaUploader({
               {accept.includes('video') ? '🎬' : accept.includes('image') ? '🖼️' : '📁'}
             </span>
             <span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb' }}>
-              Nhấn để chọn tệp hoặc kéo thả vào đây
+              {t('Nhấn để chọn tệp hoặc kéo thả vào đây')}
             </span>
-            <span style={{ fontSize: 12, color: '#64748b' }}>Hỗ trợ: {accept.replace(/\*/g, 'tất cả')}</span>
+            <span style={{ fontSize: 12, color: '#64748b' }}>
+              {t('Hỗ trợ:')} {accept.replace(/\*/g, 'tất cả')}
+            </span>
           </div>
         )}
       </div>
@@ -251,9 +258,11 @@ export default function MediaUploader({
                   maxWidth: 260,
                 }}
               >
-                {uploadedFile?.fileName || 'Tệp đã tải lên'}
+                {uploadedFile?.fileName || t('Tệp đã tải lên')}
               </div>
-              <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ Đã tải lên máy chủ</div>
+              <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>
+                {t('✓ Đã tải lên máy chủ')}
+              </div>
             </div>
           </div>
 
@@ -269,7 +278,7 @@ export default function MediaUploader({
               padding: '4px 8px',
             }}
           >
-            Gỡ bỏ
+            {t('Gỡ bỏ')}
           </button>
         </div>
       )}

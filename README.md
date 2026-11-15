@@ -19,6 +19,14 @@ Kết quả kiểm chứng: [PRODUCTION_READINESS_REPORT.md](docs/testing/PRODUC
 
 ## 1. Tính năng hiện có
 
+Đợt bổ sung 15/11/2026: streak theo ngày Việt Nam, XP/cấp độ/huy hiệu/kim cương và khung avatar,
+bảng xếp hạng theo tháng/toàn thời gian, giao diện Việt–Anh, diễn đàn theo chủ đề với hỏi đáp và bình luận.
+Hướng dẫn sử dụng, quy tắc tính điểm và API: [ENGAGEMENT_COMMUNITY.md](docs/learning/ENGAGEMENT_COMMUNITY.md).
+
+Cửa hàng `/shop` và kho đồ: mua/trang bị khung avatar, ảnh nền, streak freeze bằng kim cương học tập;
+header hiển thị thông báo, streak, số dư, avatar và cấp độ, bộ chọn ngôn ngữ có cờ.
+Quy tắc mua và vận hành: [SHOP.md](docs/learning/SHOP.md).
+
 - Đăng ký tài khoản.
 - Đăng nhập bằng email và mật khẩu.
 - Phân quyền `USER` và `ADMIN`.

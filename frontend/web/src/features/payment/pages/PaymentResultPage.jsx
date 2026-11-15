@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import RefreshOutlined from '@mui/icons-material/RefreshOutlined';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -76,6 +78,7 @@ function paymentTone(status, provider) {
 }
 
 export default function PaymentResultPage() {
+  useLocale();
   const [params] = useSearchParams();
   const orderCode = params.get('orderCode');
   const invalidCallback = params.get('callbackError') === 'invalid';
@@ -157,14 +160,14 @@ export default function PaymentResultPage() {
                     : 'Không tìm thấy mã đơn hàng để kiểm tra kết quả.',
                 )
               }
-              title={invalidCallback ? 'Chưa xác minh được kết quả' : 'Chưa có thông tin thanh toán'}
+              title={invalidCallback ? t('Chưa xác minh được kết quả') : t('Chưa có thông tin thanh toán')}
             />
             <div className="result-actions result-error-actions">
               <Link className="button button-primary" to={ROUTES.PAYMENT_HISTORY}>
-                Xem lịch sử thanh toán
+                {t('Xem lịch sử thanh toán')}
               </Link>
               <Link className="button button-outline" to={ROUTES.COURSES}>
-                Chọn khóa học
+                {t('Chọn khóa học')}
               </Link>
             </div>
           </article>
@@ -178,7 +181,7 @@ export default function PaymentResultPage() {
       <section className="workspace-scope payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
-            <AppLoading label="Đang tải kết quả thanh toán..." />
+            <AppLoading label={t('Đang tải kết quả thanh toán...')} />
           </article>
         </div>
       </section>
@@ -193,13 +196,13 @@ export default function PaymentResultPage() {
           <article className="payment-panel result-card">
             <ErrorState
               error={forbidden ? new Error('Bạn không có quyền xem giao dịch này.') : error}
-              title={forbidden ? 'Không thể xem giao dịch' : 'Không thể tải kết quả thanh toán'}
+              title={forbidden ? t('Không thể xem giao dịch') : t('Không thể tải kết quả thanh toán')}
               onRetry={forbidden ? undefined : retryResultLoad}
             />
             {forbidden && (
               <div className="result-actions result-error-actions">
                 <Link className="button button-primary" to={ROUTES.PAYMENT_HISTORY}>
-                  Về lịch sử thanh toán
+                  {t('Về lịch sử thanh toán')}
                 </Link>
               </div>
             )}
@@ -248,34 +251,36 @@ export default function PaymentResultPage() {
             <Icon name={copy.icon} size={30} />
           </span>
           <span className="eyebrow">{copy.eyebrow}</span>
-          <h1>{copy.title}</h1>
+          <h1>{t(copy.title)}</h1>
           <p>
             {awaitingActivation
-              ? 'Thanh toán đã thành công. Đang chờ quyền học được đồng bộ, bạn không cần thanh toán lại.'
+              ? t('Thanh toán đã thành công. Đang chờ quyền học được đồng bộ, bạn không cần thanh toán lại.')
               : copy.description}
           </p>
-          {error && <ErrorState error={error} title="Chưa thể cập nhật kết quả" onRetry={retryResultLoad} />}
-          {activationError && <ErrorState error={activationError} title="Đang chờ kích hoạt khóa học" />}
+          {error && (
+            <ErrorState error={error} title={t('Chưa thể cập nhật kết quả')} onRetry={retryResultLoad} />
+          )}
+          {activationError && <ErrorState error={activationError} title={t('Đang chờ kích hoạt khóa học')} />}
           {awaitingActivation && enrollmentState.error && (
-            <p role="status">Chưa kiểm tra được quyền học. Vui lòng kiểm tra lại.</p>
+            <p role="status">{t('Chưa kiểm tra được quyền học. Vui lòng kiểm tra lại.')}</p>
           )}
 
           <dl className="result-details">
             <div>
-              <dt>Mã đơn hàng</dt>
+              <dt>{t('Mã đơn hàng')}</dt>
               <dd>{order.orderCode}</dd>
             </div>
             <div>
-              <dt>Khóa học</dt>
+              <dt>{t('Khóa học')}</dt>
               <dd>{courseTitle}</dd>
             </div>
             <div>
-              <dt>Số tiền</dt>
+              <dt>{t('Số tiền')}</dt>
               <dd>{formatCurrency(Number(amount), order.payment?.currency || order.currency)}</dd>
             </div>
             <div>
-              <dt>Phương thức</dt>
-              <dd>{provider === 'VNPAY' ? 'VNPay' : 'Thanh toán mô phỏng'}</dd>
+              <dt>{t('Phương thức')}</dt>
+              <dd>{provider === 'VNPAY' ? 'VNPay' : t('Thanh toán mô phỏng')}</dd>
             </div>
           </dl>
 
@@ -287,50 +292,50 @@ export default function PaymentResultPage() {
                 disabled={activating}
               >
                 {activating
-                  ? 'Đang kích hoạt...'
+                  ? t('Đang kích hoạt...')
                   : provider === 'VNPAY'
-                    ? 'Thử kích hoạt khóa học'
-                    : 'Kiểm tra lại quyền học'}{' '}
+                    ? t('Thử kích hoạt khóa học')
+                    : t('Kiểm tra lại quyền học')}{' '}
                 <RefreshOutlined sx={{ fontSize: 17 }} />
               </button>
             ) : paymentStatus === 'SUCCESS' ? (
               <Link className="button button-primary" to="/my-courses">
-                Vào khu học tập <Icon name="arrow" size={17} />
+                {t('Vào khu học tập')} <Icon name="arrow" size={17} />
               </Link>
             ) : paymentStatus === 'EXPIRED' ? (
               <>
                 <button className="button button-primary" onClick={retryResultLoad}>
-                  Kiểm tra kết quả <RefreshOutlined sx={{ fontSize: 17 }} />
+                  {t('Kiểm tra kết quả')} <RefreshOutlined sx={{ fontSize: 17 }} />
                 </button>
                 <Link className="button button-outline" to={retryCheckoutUrl}>
-                  Tạo giao dịch mới <Icon name="arrow" size={17} />
+                  {t('Tạo giao dịch mới')} <Icon name="arrow" size={17} />
                 </Link>
               </>
             ) : paymentStatus === 'PENDING' ? (
               <>
                 {provider === 'VNPAY' && (
                   <button className="button button-primary" onClick={retryResultLoad}>
-                    Kiểm tra kết quả <RefreshOutlined sx={{ fontSize: 17 }} />
+                    {t('Kiểm tra kết quả')} <RefreshOutlined sx={{ fontSize: 17 }} />
                   </button>
                 )}
                 {resumePaymentUrl &&
                   (provider === 'VNPAY' ? (
                     <a className="button button-outline" href={resumePaymentUrl} rel="noreferrer">
-                      Tiếp tục thanh toán <Icon name="arrow" size={17} />
+                      {t('Tiếp tục thanh toán')} <Icon name="arrow" size={17} />
                     </a>
                   ) : (
                     <Link className="button button-primary" to={resumePaymentUrl}>
-                      Tiếp tục thanh toán <Icon name="arrow" size={17} />
+                      {t('Tiếp tục thanh toán')} <Icon name="arrow" size={17} />
                     </Link>
                   ))}
               </>
             ) : (
               <Link className="button button-primary" to={retryCheckoutUrl}>
-                Thanh toán lại <Icon name="arrow" size={17} />
+                {t('Thanh toán lại')} <Icon name="arrow" size={17} />
               </Link>
             )}
             <Link className="button button-outline" to={ROUTES.PAYMENT_HISTORY}>
-              Lịch sử thanh toán
+              {t('Lịch sử thanh toán')}
             </Link>
           </div>
         </article>

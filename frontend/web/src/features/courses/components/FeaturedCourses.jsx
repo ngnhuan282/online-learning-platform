@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
 import ErrorState from '../../../shared/components/ErrorState';
@@ -15,6 +17,7 @@ const filters = [
 ];
 
 export default function FeaturedCourses() {
+  useLocale();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { courses, categories, loading, error, categoryError, retry } = useCourseCatalog();
@@ -65,11 +68,11 @@ export default function FeaturedCourses() {
       <div className="container">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">CHẤT LƯỢNG HÀNG ĐẦU</span>
-            <h2>Khóa học Tiếng Anh nổi bật</h2>
-            <p>Được hàng chục ngàn học viên lựa chọn để chinh phục mục tiêu sự nghiệp.</p>
+            <span className="eyebrow">{t('CHẤT LƯỢNG HÀNG ĐẦU')}</span>
+            <h2>{t('Khóa học Tiếng Anh nổi bật')}</h2>
+            <p>{t('Được hàng chục ngàn học viên lựa chọn để chinh phục mục tiêu sự nghiệp.')}</p>
           </div>
-          <div className="course-filters" role="group" aria-label="Lọc khóa học">
+          <div className="course-filters" role="group" aria-label={t('Lọc khóa học')}>
             {filters.map(item => (
               <button
                 key={item.id}
@@ -77,7 +80,7 @@ export default function FeaturedCourses() {
                 aria-pressed={filter === item.id}
                 onClick={() => setFilter(item.id)}
               >
-                {item.label}
+                {t(item.label)}
               </button>
             ))}
           </div>
@@ -85,22 +88,28 @@ export default function FeaturedCourses() {
         {(query || category) && (
           <div className="search-results-summary" role="status">
             <span>
-              {filteredCourses.length} khóa học {query && <>cho “{query}”</>}
+              {filteredCourses.length} {t('khóa học')} {query && <>cho “{query}”</>}
               {category && (
-                <> thuộc {categories.find(item => String(item.id) === String(category))?.name || category}</>
+                <>
+                  {' '}
+                  {t('thuộc')}{' '}
+                  {categories.find(item => String(item.id) === String(category))?.name || category}
+                </>
               )}
             </span>
             <button className="text-link" onClick={() => setParams({})}>
-              Xóa bộ lọc <Icon name="close" size={16} />
+              {t('Xóa bộ lọc')} <Icon name="close" size={16} />
             </button>
           </div>
         )}
-        {categoryError && <ErrorState error={categoryError} title="Không thể tải danh mục" onRetry={retry} />}
+        {categoryError && (
+          <ErrorState error={categoryError} title={t('Không thể tải danh mục')} onRetry={retry} />
+        )}
         {error ? (
-          <ErrorState error={error} title="Không thể tải khóa học" onRetry={retry} />
+          <ErrorState error={error} title={t('Không thể tải khóa học')} onRetry={retry} />
         ) : loading ? (
           <div className="empty-courses" role="status">
-            <h3>Đang tải khóa học...</h3>
+            <h3>{t('Đang tải khóa học...')}</h3>
           </div>
         ) : filteredCourses.length ? (
           <div className="course-grid">
@@ -115,10 +124,10 @@ export default function FeaturedCourses() {
         ) : (
           <div className="empty-courses" role="status">
             <Icon name="search" size={38} />
-            <h3>Chưa tìm thấy khóa học phù hợp</h3>
-            <p>Hãy thử từ khóa khác hoặc khám phá các khóa học hiện có.</p>
+            <h3>{t('Chưa tìm thấy khóa học phù hợp')}</h3>
+            <p>{t('Hãy thử từ khóa khác hoặc khám phá các khóa học hiện có.')}</p>
             <button className="button button-outline" onClick={() => setParams({})}>
-              Xem tất cả khóa học
+              {t('Xem tất cả khóa học')}
             </button>
           </div>
         )}

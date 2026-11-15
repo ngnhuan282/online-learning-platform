@@ -1,3 +1,5 @@
+import { t, getIntlLocale } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MenuItem, Pagination, TextField } from '@mui/material';
@@ -31,13 +33,14 @@ function statusTone(status) {
 
 function formatDate(value) {
   if (!value) return 'Chưa có';
-  return new Intl.DateTimeFormat('vi-VN', {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value));
 }
 
 export default function PaymentHistoryPage() {
+  useLocale();
   const [history, setHistory] = useState(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
@@ -113,12 +116,12 @@ export default function PaymentHistoryPage() {
       <div className="container">
         <div className="payment-page-heading admin-heading">
           <div>
-            <span className="workspace-kicker">Giao dịch của bạn</span>
-            <h1>Lịch sử thanh toán</h1>
-            <p>Theo dõi các giao dịch thanh toán khóa học của bạn.</p>
+            <span className="workspace-kicker">{t('Giao dịch của bạn')}</span>
+            <h1>{t('Lịch sử thanh toán')}</h1>
+            <p>{t('Theo dõi các giao dịch thanh toán khóa học của bạn.')}</p>
           </div>
           <Link className="button button-outline" to={ROUTES.COURSES}>
-            Chọn khóa học <Icon name="arrow" size={16} />
+            {t('Chọn khóa học')} <Icon name="arrow" size={16} />
           </Link>
         </div>
 
@@ -128,31 +131,35 @@ export default function PaymentHistoryPage() {
               type="text"
               value={keyword}
               onChange={event => setKeyword(event.target.value)}
-              placeholder="Tìm theo mã đơn hoặc khóa học..."
-              aria-label="Tìm theo mã đơn hoặc khóa học"
+              placeholder={t('Tìm theo mã đơn hoặc khóa học...')}
+              aria-label={t('Tìm theo mã đơn hoặc khóa học')}
             />
             <button className="button button-primary" type="submit">
-              <Icon name="search" size={15} /> Tìm kiếm
+              <Icon name="search" size={15} /> {t('Tìm kiếm')}
             </button>
           </form>
 
           <div className="payment-filter-actions">
-            <select aria-label="Lọc trạng thái thanh toán" value={statusFilter} onChange={handleStatusChange}>
-              <option value="">Tất cả trạng thái</option>
-              <option value="PENDING">Đang chờ</option>
-              <option value="EXPIRED">Hết hạn thanh toán</option>
-              <option value="SUCCESS">Thành công</option>
-              <option value="FAILED">Thất bại</option>
-              <option value="CANCELLED">Đã hủy</option>
-              <option value="REFUNDED">Hoàn tiền</option>
+            <select
+              aria-label={t('Lọc trạng thái thanh toán')}
+              value={statusFilter}
+              onChange={handleStatusChange}
+            >
+              <option value="">{t('Tất cả trạng thái')}</option>
+              <option value="PENDING">{t('Đang chờ')}</option>
+              <option value="EXPIRED">{t('Hết hạn thanh toán')}</option>
+              <option value="SUCCESS">{t('Thành công')}</option>
+              <option value="FAILED">{t('Thất bại')}</option>
+              <option value="CANCELLED">{t('Đã hủy')}</option>
+              <option value="REFUNDED">{t('Hoàn tiền')}</option>
             </select>
             {hasFilters && (
               <button className="button button-soft" type="button" onClick={handleResetFilters}>
-                Đặt lại
+                {t('Đặt lại')}
               </button>
             )}
             <button className="button button-outline" type="button" onClick={refreshHistory}>
-              Tải lại
+              {t('Tải lại')}
             </button>
           </div>
         </div>
@@ -160,31 +167,39 @@ export default function PaymentHistoryPage() {
         <article className="payment-panel transaction-panel">
           <div className="payment-table-heading">
             <div>
-              <h2>Tất cả giao dịch</h2>
-              <p>{hasFilters ? 'Kết quả theo bộ lọc hiện tại' : 'Lịch sử mua khóa học của bạn'}</p>
+              <h2>{t('Tất cả giao dịch')}</h2>
+              <p>{hasFilters ? t('Kết quả theo bộ lọc hiện tại') : t('Lịch sử mua khóa học của bạn')}</p>
             </div>
-            {!loading && !error && <span className="payment-count-badge">{totalElements} giao dịch</span>}
+            {!loading && !error && (
+              <span className="payment-count-badge">
+                {totalElements} {t('giao dịch')}
+              </span>
+            )}
           </div>
           {loading ? (
-            <AppLoading label="Đang tải lịch sử thanh toán..." />
+            <AppLoading label={t('Đang tải lịch sử thanh toán...')} />
           ) : error ? (
-            <ErrorState error={error} title="Không thể tải lịch sử thanh toán" onRetry={refreshHistory} />
+            <ErrorState
+              error={error}
+              title={t('Không thể tải lịch sử thanh toán')}
+              onRetry={refreshHistory}
+            />
           ) : items.length === 0 ? (
             <EmptyState
-              title={hasFilters ? 'Không tìm thấy giao dịch' : 'Chưa có giao dịch'}
+              title={hasFilters ? t('Không tìm thấy giao dịch') : t('Chưa có giao dịch')}
               description={
                 hasFilters
-                  ? 'Hãy thử đổi từ khóa tìm kiếm hoặc bỏ bộ lọc trạng thái.'
-                  : 'Khi bạn thanh toán khóa học, giao dịch sẽ xuất hiện ở đây.'
+                  ? t('Hãy thử đổi từ khóa tìm kiếm hoặc bỏ bộ lọc trạng thái.')
+                  : t('Khi bạn thanh toán khóa học, giao dịch sẽ xuất hiện ở đây.')
               }
               action={
                 hasFilters ? (
                   <button className="button button-primary" type="button" onClick={handleResetFilters}>
-                    Xóa bộ lọc
+                    {t('Xóa bộ lọc')}
                   </button>
                 ) : (
                   <Link className="button button-primary" to={ROUTES.COURSES}>
-                    Chọn khóa học <Icon name="arrow" size={17} />
+                    {t('Chọn khóa học')} <Icon name="arrow" size={17} />
                   </Link>
                 )
               }
@@ -195,12 +210,12 @@ export default function PaymentHistoryPage() {
                 <table className="transaction-table">
                   <thead>
                     <tr>
-                      <th>Mã đơn</th>
-                      <th>Khóa học</th>
-                      <th>Số tiền</th>
-                      <th>Trạng thái</th>
-                      <th>Ngày tạo</th>
-                      <th>Hoàn tất</th>
+                      <th>{t('Mã đơn')}</th>
+                      <th>{t('Khóa học')}</th>
+                      <th>{t('Số tiền')}</th>
+                      <th>{t('Trạng thái')}</th>
+                      <th>{t('Ngày tạo')}</th>
+                      <th>{t('Hoàn tất')}</th>
                       <th />
                     </tr>
                   </thead>
@@ -221,7 +236,7 @@ export default function PaymentHistoryPage() {
                           <Link
                             to={`${ROUTES.PAYMENT_RESULT}?orderCode=${encodeURIComponent(item.orderCode)}`}
                           >
-                            Chi tiết
+                            {t('Chi tiết')}
                           </Link>
                         </td>
                       </tr>
@@ -232,19 +247,19 @@ export default function PaymentHistoryPage() {
 
               <div className="payment-pagination">
                 <span>
-                  Hiển thị {items.length ? page * pageSize + 1 : 0}–{page * pageSize + items.length} /{' '}
-                  {totalElements} giao dịch
+                  {t('Hiển thị')} {items.length ? page * pageSize + 1 : 0}–{page * pageSize + items.length} /{' '}
+                  {totalElements} {t('giao dịch')}
                 </span>
                 <TextField
                   select
                   size="small"
-                  label="Số dòng"
+                  label={t('Số dòng')}
                   value={pageSize}
                   onChange={handlePageSizeChange}
                 >
                   {PAGE_SIZE_OPTIONS.map(value => (
                     <MenuItem key={value} value={value}>
-                      {value} dòng / trang
+                      {value} {t('dòng / trang')}
                     </MenuItem>
                   ))}
                 </TextField>

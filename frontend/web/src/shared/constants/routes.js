@@ -1,5 +1,9 @@
 export const ROUTES = Object.freeze({
   HOME: '/',
+  SHOP: '/shop',
+  ACHIEVEMENTS: '/achievements',
+  LEADERBOARD: '/leaderboard',
+  COMMUNITY: '/community',
   NOTIFICATIONS: '/notifications',
   LOGIN: '/login',
   FORGOT_PASSWORD: '/forgot-password',

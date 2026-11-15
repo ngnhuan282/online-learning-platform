@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
@@ -6,8 +8,10 @@ import Icon from '../../../shared/components/Icon';
 import StatusChip from '../../../shared/components/StatusChip';
 import SignInMethods from '../components/SignInMethods';
 import { can } from '../../admin/utils/adminUtils';
+import ProfileAppearance from '../../shop/components/ProfileAppearance';
 
 export default function AccountPage() {
+  useLocale();
   const { user, updateCurrentUser } = useAuth();
 
   // Profile Form State
@@ -107,6 +111,7 @@ export default function AccountPage() {
   return (
     <section className="container section" style={{ padding: '32px 0 80px' }}>
       <div style={{ maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <ProfileAppearance />
         {/* Header Section */}
         <div
           style={{
@@ -118,19 +123,21 @@ export default function AccountPage() {
           }}
         >
           <div>
-            <span className="eyebrow">{hasAdminAccess ? 'KHÔNG GIAN QUẢN TRỊ' : 'THÔNG TIN CÁ NHÂN'}</span>
-            <h1 style={{ marginTop: 8, fontSize: '1.875rem' }}>Hồ sơ cá nhân</h1>
+            <span className="eyebrow">
+              {hasAdminAccess ? t('KHÔNG GIAN QUẢN TRỊ') : t('THÔNG TIN CÁ NHÂN')}
+            </span>
+            <h1 style={{ marginTop: 8, fontSize: '1.875rem' }}>{t('Hồ sơ cá nhân')}</h1>
             <p style={{ color: 'var(--muted)', marginTop: 4 }}>
-              Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.
+              {t('Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.')}
             </p>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             <Link className="button button-soft" to="/payment/history">
-              <Icon name="assignment" size={15} /> Lịch sử thanh toán
+              <Icon name="assignment" size={15} /> {t('Lịch sử thanh toán')}
             </Link>
             <Link className="button button-outline" to="/">
-              <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)', marginRight: 6 }} /> Về trang
-              chủ
+              <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)', marginRight: 6 }} />{' '}
+              {t('Về trang chủ')}
             </Link>
           </div>
         </div>
@@ -151,15 +158,15 @@ export default function AccountPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 20 }}>🛡️</span>
-              <strong style={{ fontSize: 17, color: '#fff' }}>Bảng điều khiển Quản trị viên</strong>
+              <strong style={{ fontSize: 17, color: '#fff' }}>{t('Bảng điều khiển Quản trị viên')}</strong>
             </div>
             <p style={{ color: '#cbd5e1', fontSize: 14, margin: 0 }}>
-              Truy cập nhanh các tính năng quản trị bạn được cấp quyền:
+              {t('Truy cập nhanh các tính năng quản trị bạn được cấp quyền:')}
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
               {can(user, 'USER_VIEW') && (
                 <Link className="button button-primary" to="/admin/users" style={{ background: '#3b82f6' }}>
-                  👥 Quản lý người dùng
+                  {t('👥 Quản lý người dùng')}
                 </Link>
               )}
               {can(user, 'COURSE_VIEW') && (
@@ -168,7 +175,7 @@ export default function AccountPage() {
                   to="/admin/courses"
                   style={{ color: '#fff', borderColor: '#475569' }}
                 >
-                  📚 Quản lý khóa học
+                  {t('📚 Quản lý khóa học')}
                 </Link>
               )}
             </div>
@@ -206,7 +213,7 @@ export default function AccountPage() {
             {user?.avatarUrl ? (
               <img
                 src={user.avatarUrl}
-                alt="Ảnh đại diện"
+                alt={t('Ảnh đại diện')}
                 referrerPolicy="no-referrer"
                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
               />
@@ -217,12 +224,12 @@ export default function AccountPage() {
             )}
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <h2 style={{ fontSize: 20, margin: 0, fontWeight: 700 }}>{user?.fullName || 'Người dùng'}</h2>
+            <h2 style={{ fontSize: 20, margin: 0, fontWeight: 700 }}>{user?.fullName || t('Người dùng')}</h2>
             <p style={{ color: 'var(--muted)', margin: '4px 0 8px', fontSize: 14 }}>{user?.email}</p>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <StatusChip
                 status={user?.status || 'ACTIVE'}
-                label={user?.status === 'LOCKED' ? 'Bị khóa' : 'Đang hoạt động'}
+                label={user?.status === 'LOCKED' ? t('Bị khóa') : t('Đang hoạt động')}
               />
               {user?.roles?.map(role => (
                 <span
@@ -263,9 +270,9 @@ export default function AccountPage() {
             }}
           >
             <div>
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>Cập nhật hồ sơ</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 700 }}>{t('Cập nhật hồ sơ')}</h3>
               <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-                Cập nhật thông tin cá nhân và liên hệ của bạn.
+                {t('Cập nhật thông tin cá nhân và liên hệ của bạn.')}
               </p>
             </div>
 
@@ -302,7 +309,7 @@ export default function AccountPage() {
             >
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Email đăng ký (Read-only)
+                  {t('Email đăng ký (Read-only)')}
                 </label>
                 <input
                   type="email"
@@ -322,13 +329,13 @@ export default function AccountPage() {
 
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  Họ và tên
+                  {t('Họ và tên')}
                 </label>
                 <input
                   type="text"
                   required
                   maxLength={100}
-                  placeholder="Nhập họ và tên đầy đủ"
+                  placeholder={t('Nhập họ và tên đầy đủ')}
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   style={{
@@ -347,7 +354,7 @@ export default function AccountPage() {
                 ['dateOfBirth', 'Ngày sinh', 'date'],
               ].map(([field, label, type, maxLength]) => (
                 <label key={field} style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                  {label}
+                  {t(label)}
                   <input
                     name={field}
                     type={type}
@@ -366,7 +373,7 @@ export default function AccountPage() {
                 </label>
               ))}
               <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                Giới thiệu bản thân
+                {t('Giới thiệu bản thân')}
                 <textarea
                   name="biography"
                   rows={4}
@@ -388,7 +395,7 @@ export default function AccountPage() {
                 disabled={profileLoading || !fullName.trim()}
                 style={{ marginTop: 8 }}
               >
-                {profileLoading ? 'Đang lưu...' : 'Lưu thông tin'}
+                {profileLoading ? t('Đang lưu...') : t('Lưu thông tin')}
               </button>
             </form>
           </div>
@@ -408,9 +415,9 @@ export default function AccountPage() {
               }}
             >
               <div>
-                <h3 style={{ fontSize: 18, fontWeight: 700 }}>Đổi mật khẩu</h3>
+                <h3 style={{ fontSize: 18, fontWeight: 700 }}>{t('Đổi mật khẩu')}</h3>
                 <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-                  Bảo vệ tài khoản với mật khẩu tối thiểu 8 ký tự.
+                  {t('Bảo vệ tài khoản với mật khẩu tối thiểu 8 ký tự.')}
                 </p>
               </div>
 
@@ -447,13 +454,13 @@ export default function AccountPage() {
               >
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    Mật khẩu hiện tại
+                    {t('Mật khẩu hiện tại')}
                   </label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type={showCurrentPassword ? 'text' : 'password'}
                       required
-                      placeholder="Mật khẩu đang dùng"
+                      placeholder={t('Mật khẩu đang dùng')}
                       value={currentPassword}
                       onChange={e => setCurrentPassword(e.target.value)}
                       style={{
@@ -479,20 +486,20 @@ export default function AccountPage() {
                         fontSize: 12,
                       }}
                     >
-                      {showCurrentPassword ? 'Ẩn' : 'Hiện'}
+                      {showCurrentPassword ? t('Ẩn') : t('Hiện')}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    Mật khẩu mới
+                    {t('Mật khẩu mới')}
                   </label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       required
-                      placeholder="Tối thiểu 8 ký tự, gồm HOA, thường, số"
+                      placeholder={t('Tối thiểu 8 ký tự, gồm HOA, thường, số')}
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
                       style={{
@@ -518,19 +525,19 @@ export default function AccountPage() {
                         fontSize: 12,
                       }}
                     >
-                      {showNewPassword ? 'Ẩn' : 'Hiện'}
+                      {showNewPassword ? t('Ẩn') : t('Hiện')}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    Xác nhận mật khẩu mới
+                    {t('Xác nhận mật khẩu mới')}
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder="Nhập lại mật khẩu mới"
+                    placeholder={t('Nhập lại mật khẩu mới')}
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
                     style={{
@@ -549,7 +556,7 @@ export default function AccountPage() {
                   disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword}
                   style={{ marginTop: 8 }}
                 >
-                  {passwordLoading ? 'Đang đổi...' : 'Đổi mật khẩu'}
+                  {passwordLoading ? t('Đang đổi...') : t('Đổi mật khẩu')}
                 </button>
               </form>
             </div>

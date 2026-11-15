@@ -1,27 +1,25 @@
+import { t } from '../i18n/locale';
+import useLocale from '../i18n/useLocale';
 import { useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Avatar, ButtonBase, Divider, ListItemIcon, ListItemText, Menu, MenuItem } from '@mui/material';
+import { ButtonBase, Divider, ListItemIcon, ListItemText, Menu, MenuItem } from '@mui/material';
 import { KeyboardArrowDown, Logout, PersonOutlineOutlined } from '@mui/icons-material';
 import useAuth from '../../features/auth/hooks/useAuth';
 import { ROUTES } from '../constants/routes';
 import { can } from '../../features/admin/utils/adminUtils';
 import './AccountMenu.css';
+import useEngagement from '../../features/engagement/hooks/useEngagement';
+import LearnerAvatar from './LearnerAvatar';
 
 export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = false }) {
+  useLocale();
   const { user, logout, isLoggingOut } = useAuth();
+  const { summary } = useEngagement();
   const [anchor, setAnchor] = useState(null);
   const navigate = useNavigate();
   const id = useId();
   const open = Boolean(anchor);
   if (!user) return null;
-  const initials =
-    user.fullName
-      ?.trim()
-      .split(/\s+/)
-      .slice(-2)
-      .map(word => word[0])
-      .join('')
-      .toUpperCase() || 'U';
 
   async function signOut() {
     setAnchor(null);
@@ -34,14 +32,21 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
       <ButtonBase
         id={`${id}-trigger`}
         className="account-menu-trigger"
-        aria-label={`Menu tài khoản của ${user.fullName || user.email}`}
+        aria-label={t('Menu tài khoản của {name}', { name: user.fullName || user.email })}
         aria-haspopup="menu"
         aria-controls={open ? `${id}-menu` : undefined}
         aria-expanded={open}
         disabled={isLoggingOut}
         onClick={event => setAnchor(event.currentTarget)}
       >
-        <Avatar className="account-menu-avatar">{initials}</Avatar>
+        <LearnerAvatar
+          name={user.fullName}
+          avatarUrl={user.avatarUrl}
+          frame={summary?.activeFrame}
+          level={summary?.level}
+          size="header"
+          showLevel
+        />
         {showDetails && (
           <span className="account-menu-details">
             <strong>{user.fullName}</strong>
@@ -66,19 +71,31 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
           <ListItemIcon>
             <PersonOutlineOutlined fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Hồ sơ cá nhân</ListItemText>
+          <ListItemText>{t('Hồ sơ cá nhân')}</ListItemText>
         </MenuItem>
         {can(user, 'ADMIN_ACCESS') && (
           <MenuItem component={Link} to="/admin" onClick={() => setAnchor(null)}>
-            <ListItemText>Không gian quản trị</ListItemText>
+            <ListItemText>{t('Không gian quản trị')}</ListItemText>
           </MenuItem>
         )}
+        <MenuItem component={Link} to={ROUTES.ACHIEVEMENTS} onClick={() => setAnchor(null)}>
+          <ListItemText>{t('Thành tích học tập')}</ListItemText>
+        </MenuItem>
+        <MenuItem component={Link} to={ROUTES.SHOP} onClick={() => setAnchor(null)}>
+          <ListItemText>{t('Cửa hàng & kho đồ')}</ListItemText>
+        </MenuItem>
+        <MenuItem component={Link} to={ROUTES.LEADERBOARD} onClick={() => setAnchor(null)}>
+          <ListItemText>{t('Bảng xếp hạng')}</ListItemText>
+        </MenuItem>
+        <MenuItem component={Link} to={ROUTES.COMMUNITY} onClick={() => setAnchor(null)}>
+          <ListItemText>{t('Diễn đàn')}</ListItemText>
+        </MenuItem>
         <Divider />
         <MenuItem onClick={signOut} disabled={isLoggingOut} className="account-menu-logout">
           <ListItemIcon>
             <Logout fontSize="small" />
           </ListItemIcon>
-          <ListItemText>{isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}</ListItemText>
+          <ListItemText>{isLoggingOut ? t('Đang đăng xuất...') : t('Đăng xuất')}</ListItemText>
         </MenuItem>
       </Menu>
     </>

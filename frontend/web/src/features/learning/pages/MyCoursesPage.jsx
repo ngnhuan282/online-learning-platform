@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
@@ -13,6 +15,7 @@ import { formatDate } from '../../../shared/utils/formatDate';
 const EMPTY_ENROLLMENTS = [];
 
 export default function MyCoursesPage() {
+  useLocale();
   const notifications = useNotifications();
   const { data, error, loading, reload } = useLearningResource(
     learningApi.getMyEnrollments,
@@ -67,23 +70,23 @@ export default function MyCoursesPage() {
     <section className="learning-page">
       <div className="learning-shell">
         <LearningHeader
-          title="Khóa học của tôi"
-          description="Tất cả khóa học và tiến độ học của bạn ở một nơi."
+          title={t('Khóa học của tôi')}
+          description={t('Tất cả khóa học và tiến độ học của bạn ở một nơi.')}
         >
           <Link className="button button-outline" to="/dashboard">
-            Bảng điều khiển
+            {t('Bảng điều khiển')}
           </Link>
         </LearningHeader>
 
-        {loading && <AppLoading label="Đang tải khóa học đã ghi danh..." />}
+        {loading && <AppLoading label={t('Đang tải khóa học đã ghi danh...')} />}
 
-        {error && <ErrorState error={error} title="Không thể tải khóa học của tôi" onRetry={reload} />}
+        {error && <ErrorState error={error} title={t('Không thể tải khóa học của tôi')} onRetry={reload} />}
 
         {!loading && !error && data.length === 0 && (
           <div className="learning-empty">
             <AutoStoriesOutlined aria-hidden="true" />
             <p>
-              Bạn chưa ghi danh khóa học nào. <Link to="/courses">Khám phá khóa học</Link>
+              {t('Bạn chưa ghi danh khóa học nào.')} <Link to="/courses">{t('Khám phá khóa học')}</Link>
             </p>
           </div>
         )}
@@ -91,25 +94,25 @@ export default function MyCoursesPage() {
         {!loading && !error && data.length > 0 && (
           <div className="learning-collection-toolbar">
             <span>
-              {visibleEnrollments.length} / {data.length} khóa học
+              {visibleEnrollments.length} / {data.length} {t('khóa học')}
             </span>
             <div className="learning-collection-search">
               <input
                 type="search"
-                aria-label="Tìm khóa học đã ghi danh"
-                placeholder="Tìm khóa học..."
+                aria-label={t('Tìm khóa học đã ghi danh')}
+                placeholder={t('Tìm khóa học...')}
                 value={search}
                 onChange={event => setSearch(event.target.value)}
               />
               <select
-                aria-label="Trạng thái khóa học"
+                aria-label={t('Trạng thái khóa học')}
                 value={status}
                 onChange={event => setStatus(event.target.value)}
               >
-                <option value="">Tất cả trạng thái</option>
-                <option value="ACTIVE">Đang học</option>
-                <option value="COMPLETED">Hoàn thành</option>
-                <option value="CANCELLED">Đã hủy</option>
+                <option value="">{t('Tất cả trạng thái')}</option>
+                <option value="ACTIVE">{t('Đang học')}</option>
+                <option value="COMPLETED">{t('Hoàn thành')}</option>
+                <option value="CANCELLED">{t('Đã hủy')}</option>
               </select>
             </div>
           </div>
@@ -117,7 +120,7 @@ export default function MyCoursesPage() {
 
         {!loading && !error && data.length > 0 && visibleEnrollments.length === 0 && (
           <div className="learning-empty">
-            <p>Không có khóa học phù hợp.</p>
+            <p>{t('Không có khóa học phù hợp.')}</p>
             <button
               className="button button-outline"
               type="button"
@@ -126,7 +129,7 @@ export default function MyCoursesPage() {
                 setStatus('');
               }}
             >
-              Xóa bộ lọc
+              {t('Xóa bộ lọc')}
             </button>
           </div>
         )}
@@ -145,43 +148,48 @@ export default function MyCoursesPage() {
                       className={`learning-chip ${enrollment.status === 'COMPLETED' ? 'is-success' : enrollment.status === 'CANCELLED' ? 'is-cancelled' : ''}`}
                     >
                       {enrollment.status === 'COMPLETED'
-                        ? 'Hoàn thành'
+                        ? t('Hoàn thành')
                         : enrollment.status === 'CANCELLED'
-                          ? 'Đã hủy'
-                          : 'Đang học'}
+                          ? t('Đã hủy')
+                          : t('Đang học')}
                     </span>
                     <AutoStoriesOutlined aria-hidden="true" />
                   </div>
                   <h2>{title || 'Khóa học #' + enrollment.courseId}</h2>
-                  {description && <p>{description}</p>}
+                  {description && <p>{t(description)}</p>}
                 </div>
 
                 {detail?.course && (
                   <div className="my-course-progress">
                     <ProgressBar value={detail.course.progressPercent} />
                     <p>
-                      {detail.course.progressPercent}% hoàn thành — {detail.course.completedLessons}/
-                      {detail.course.totalLessons} bài
+                      {detail.course.progressPercent}
+                      {t('% hoàn thành —')} {detail.course.completedLessons}/{detail.course.totalLessons}{' '}
+                      {t('bài')}
                     </p>
                   </div>
                 )}
 
                 {detail?.error && (
-                  <ErrorState error={detail.error} title="Không thể tải tiến độ" onRetry={reload} />
+                  <ErrorState error={detail.error} title={t('Không thể tải tiến độ')} onRetry={reload} />
                 )}
 
-                {enrollment.status !== 'CANCELLED' && !detail && <p role="status">Đang tải tiến độ...</p>}
+                {enrollment.status !== 'CANCELLED' && !detail && (
+                  <p role="status">{t('Đang tải tiến độ...')}</p>
+                )}
 
                 <div className="my-course-meta">
                   <span>Ghi danh: {formatDate(enrollment.enrolledAt, { dateStyle: 'short' })}</span>
                   {enrollment.lastAccessedAt && (
-                    <span>Truy cập: {formatDate(enrollment.lastAccessedAt, { dateStyle: 'short' })}</span>
+                    <span>
+                      {t('Truy cập:')} {formatDate(enrollment.lastAccessedAt, { dateStyle: 'short' })}
+                    </span>
                   )}
                 </div>
 
                 {enrollment.status !== 'CANCELLED' && (
                   <Link className="button button-primary" to={'/learning/' + enrollment.courseId}>
-                    {enrollment.status === 'COMPLETED' ? 'Ôn tập khóa học' : 'Tiếp tục học'}
+                    {enrollment.status === 'COMPLETED' ? t('Ôn tập khóa học') : t('Tiếp tục học')}
                   </Link>
                 )}
               </article>

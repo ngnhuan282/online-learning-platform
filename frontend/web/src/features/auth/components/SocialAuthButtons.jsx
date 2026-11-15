@@ -1,4 +1,7 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 function GoogleIcon() {
+  useLocale();
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
       <path
@@ -19,16 +22,17 @@ function GoogleIcon() {
 }
 
 export default function SocialAuthButtons({ registering, onSelect, disabled, googleLoading }) {
+  useLocale();
   return (
     <div className="auth-social-buttons">
       <button type="button" disabled={disabled} onClick={() => onSelect('Google')} aria-busy={googleLoading}>
         <GoogleIcon />
         <span>
           {googleLoading
-            ? 'Đang chuyển đến Google...'
+            ? t('Đang chuyển đến Google...')
             : registering
-              ? 'Đăng ký với Google'
-              : 'Đăng nhập bằng Google'}
+              ? t('Đăng ký với Google')
+              : t('Đăng nhập bằng Google')}
         </span>
       </button>
     </div>

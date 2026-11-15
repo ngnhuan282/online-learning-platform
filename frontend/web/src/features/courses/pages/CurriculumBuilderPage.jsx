@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCurriculum } from '../hooks/useCurriculum';
@@ -8,6 +10,7 @@ import AddLessonDialog from '../components/AddLessonDialog';
 import LessonResourcesModal from '../components/LessonResourcesModal';
 
 export default function CurriculumBuilderPage() {
+  useLocale();
   const { courseId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
@@ -51,10 +54,7 @@ export default function CurriculumBuilderPage() {
   /* ── Helpers ── */
 
   const handleError = err => {
-    const msg =
-      err?.response?.data?.message ||
-      err?.message ||
-      'Đã xảy ra lỗi, vui lòng thử lại.';
+    const msg = err?.response?.data?.message || err?.message || 'Đã xảy ra lỗi, vui lòng thử lại.';
     setActionError(msg);
     setTimeout(() => setActionError(null), 4000);
   };
@@ -183,7 +183,15 @@ export default function CurriculumBuilderPage() {
     <section className="container" style={{ padding: '32px 0 80px' }}>
       <div style={{ display: 'grid', gap: 24 }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: 16,
+          }}
+        >
           <div>
             <button
               className="button button-soft"
@@ -191,21 +199,32 @@ export default function CurriculumBuilderPage() {
               onClick={() => navigate('/admin/courses')}
               style={{ marginBottom: 10, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
-              ← Quay lại danh sách khóa học
+              {t('← Quay lại danh sách khóa học')}
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-              <span className="eyebrow">QUẢN LÝ KHÓA HỌC</span>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}
+            >
+              <span className="eyebrow">{t('QUẢN LÝ KHÓA HỌC')}</span>
               {course?.categoryName && (
-                <span style={{ fontSize: 12, padding: '2px 8px', background: '#e0f2fe', color: '#0369a1', borderRadius: 4, fontWeight: 600 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    padding: '2px 8px',
+                    background: '#e0f2fe',
+                    color: '#0369a1',
+                    borderRadius: 4,
+                    fontWeight: 600,
+                  }}
+                >
                   {course.categoryName}
                 </span>
               )}
             </div>
             <h1 style={{ marginTop: 2, fontSize: 24, fontWeight: 700 }}>
-              {course?.title ? `Đề cương bài học: ${course.title}` : 'Quản lý Đề cương bài học'}
+              {course?.title ? `Đề cương bài học: ${course.title}` : t('Quản lý Đề cương bài học')}
             </h1>
             <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: 14 }}>
-              Cấu trúc chương học và các bài học (Video, Tài liệu PDF, Lý thuyết, Bài kiểm tra Quiz).
+              {t('Cấu trúc chương học và các bài học (Video, Tài liệu PDF, Lý thuyết, Bài kiểm tra Quiz).')}
             </p>
           </div>
           <button
@@ -213,9 +232,15 @@ export default function CurriculumBuilderPage() {
             className="button button-primary"
             type="button"
             onClick={() => setAddSectionOpen(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 14 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '10px 18px',
+              fontSize: 14,
+            }}
           >
-            ➕ Thêm chương học mới
+            {t('➕ Thêm chương học mới')}
           </button>
         </div>
 
@@ -230,14 +255,21 @@ export default function CurriculumBuilderPage() {
               border: '1px solid #fecaca',
             }}
           >
-            Lỗi tải đề cương bài học:{' '}
-            {error?.response?.data?.message || error?.message || 'Lỗi không xác định'}
+            {t('Lỗi tải đề cương bài học:')}{' '}
+            {error?.response?.data?.message || error?.message || t('Lỗi không xác định')}
             <button
               type="button"
               onClick={refresh}
-              style={{ marginLeft: 12, textDecoration: 'underline', background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}
+              style={{
+                marginLeft: 12,
+                textDecoration: 'underline',
+                background: 'none',
+                border: 'none',
+                color: '#dc2626',
+                cursor: 'pointer',
+              }}
             >
-              Thử lại
+              {t('Thử lại')}
             </button>
           </div>
         )}
@@ -259,54 +291,45 @@ export default function CurriculumBuilderPage() {
         {/* Loading */}
         {loading && (
           <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>
-            Đang tải đề cương bài học...
+            {t('Đang tải đề cương bài học...')}
           </div>
         )}
 
         {/* Empty state */}
         {!loading && !error && sections.length === 0 && (
-          <div
-            className="course-card"
-            style={{ padding: 40, textAlign: 'center', color: '#64748b' }}
-          >
-            <p style={{ fontSize: 16, marginBottom: 12 }}>Khóa học này chưa có chương học nào.</p>
-            <button
-              className="button button-primary"
-              type="button"
-              onClick={() => setAddSectionOpen(true)}
-            >
-              ➕ Thêm chương đầu tiên
+          <div className="course-card" style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+            <p style={{ fontSize: 16, marginBottom: 12 }}>{t('Khóa học này chưa có chương học nào.')}</p>
+            <button className="button button-primary" type="button" onClick={() => setAddSectionOpen(true)}>
+              {t('➕ Thêm chương đầu tiên')}
             </button>
           </div>
         )}
 
         {/* Sections list */}
-        {!loading && sections.map((section, idx) => (
-          <SectionItem
-            key={section.id}
-            section={section}
-            isFirst={idx === 0}
-            isLast={idx === sections.length - 1}
-            onUpdate={payload => handleUpdateSection(section.id, payload)}
-            onDelete={() => handleDeleteSection(section.id)}
-            onMoveUp={() => handleMoveSectionUp(section)}
-            onMoveDown={() => handleMoveSectionDown(section)}
-            onAddLesson={() => setLessonDialogState({ sectionId: section.id, lesson: null })}
-            onEditLesson={lesson => setLessonDialogState({ sectionId: section.id, lesson })}
-            onDeleteLesson={lessonId => handleDeleteLesson(section.id, lessonId)}
-            onMoveLessonUp={lesson => handleMoveLessonUp(section.id, lesson)}
-            onMoveLessonDown={lesson => handleMoveLessonDown(section.id, lesson)}
-            onManageResources={lesson => setResourceModalLesson(lesson)}
-          />
-        ))}
+        {!loading &&
+          sections.map((section, idx) => (
+            <SectionItem
+              key={section.id}
+              section={section}
+              isFirst={idx === 0}
+              isLast={idx === sections.length - 1}
+              onUpdate={payload => handleUpdateSection(section.id, payload)}
+              onDelete={() => handleDeleteSection(section.id)}
+              onMoveUp={() => handleMoveSectionUp(section)}
+              onMoveDown={() => handleMoveSectionDown(section)}
+              onAddLesson={() => setLessonDialogState({ sectionId: section.id, lesson: null })}
+              onEditLesson={lesson => setLessonDialogState({ sectionId: section.id, lesson })}
+              onDeleteLesson={lessonId => handleDeleteLesson(section.id, lessonId)}
+              onMoveLessonUp={lesson => handleMoveLessonUp(section.id, lesson)}
+              onMoveLessonDown={lesson => handleMoveLessonDown(section.id, lesson)}
+              onManageResources={lesson => setResourceModalLesson(lesson)}
+            />
+          ))}
       </div>
 
       {/* Dialogs */}
       {addSectionOpen && (
-        <AddSectionDialog
-          onConfirm={handleAddSection}
-          onCancel={() => setAddSectionOpen(false)}
-        />
+        <AddSectionDialog onConfirm={handleAddSection} onCancel={() => setAddSectionOpen(false)} />
       )}
       {lessonDialogState && (
         <AddLessonDialog
@@ -324,10 +347,7 @@ export default function CurriculumBuilderPage() {
         />
       )}
       {resourceModalLesson && (
-        <LessonResourcesModal
-          lesson={resourceModalLesson}
-          onClose={() => setResourceModalLesson(null)}
-        />
+        <LessonResourcesModal lesson={resourceModalLesson} onClose={() => setResourceModalLesson(null)} />
       )}
     </section>
   );

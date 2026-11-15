@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AppLoading from '../../../shared/components/AppLoading';
@@ -47,6 +49,7 @@ function buildReturnPath(returnUrl, orderCode, status) {
 }
 
 export default function MockPaymentPage() {
+  useLocale();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const orderCode = params.get('orderCode');
@@ -84,7 +87,8 @@ export default function MockPaymentPage() {
   const alreadyProcessed = payment && payment.status !== 'PENDING';
 
   const resultPath = useMemo(
-    () => (orderCode ? buildReturnPath(returnUrl, orderCode, payment?.status || 'PENDING') : ROUTES.PAYMENT_RESULT),
+    () =>
+      orderCode ? buildReturnPath(returnUrl, orderCode, payment?.status || 'PENDING') : ROUTES.PAYMENT_RESULT,
     [orderCode, payment?.status, returnUrl],
   );
 
@@ -129,14 +133,14 @@ export default function MockPaymentPage() {
               <Icon name="close" size={30} />
             </span>
             <span className="eyebrow">MOCK PAYMENT</span>
-            <h1>Thiếu mã giao dịch</h1>
-            <p>Không tìm thấy mã đơn hàng để mô phỏng thanh toán.</p>
+            <h1>{t('Thiếu mã giao dịch')}</h1>
+            <p>{t('Không tìm thấy mã đơn hàng để mô phỏng thanh toán.')}</p>
             <div className="result-actions">
               <Link className="button button-primary" to={ROUTES.PAYMENT_HISTORY}>
-                Xem lịch sử thanh toán
+                {t('Xem lịch sử thanh toán')}
               </Link>
               <Link className="button button-outline" to={ROUTES.COURSES}>
-                Chọn khóa học
+                {t('Chọn khóa học')}
               </Link>
             </div>
           </article>
@@ -150,7 +154,7 @@ export default function MockPaymentPage() {
       <section className="payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
-            <AppLoading label="Đang tải giao dịch thanh toán..." />
+            <AppLoading label={t('Đang tải giao dịch thanh toán...')} />
           </article>
         </div>
       </section>
@@ -162,11 +166,7 @@ export default function MockPaymentPage() {
       <section className="payment-page payment-result-page">
         <div className="container payment-result-container">
           <article className="payment-panel result-card">
-            <ErrorState
-              error={state.error}
-              title="Không thể tải giao dịch"
-              onRetry={retryOrderLoad}
-            />
+            <ErrorState error={state.error} title={t('Không thể tải giao dịch')} onRetry={retryOrderLoad} />
           </article>
         </div>
       </section>
@@ -178,8 +178,8 @@ export default function MockPaymentPage() {
       <div className="container">
         <div className="payment-page-heading">
           <span className="eyebrow">MOCK PAYMENT</span>
-          <h1>Cổng thanh toán mô phỏng</h1>
-          <p>Chọn kết quả giao dịch để kiểm thử luồng thanh toán khóa học.</p>
+          <h1>{t('Cổng thanh toán mô phỏng')}</h1>
+          <p>{t('Chọn kết quả giao dịch để kiểm thử luồng thanh toán khóa học.')}</p>
         </div>
 
         <div className="mock-payment-grid">
@@ -189,26 +189,26 @@ export default function MockPaymentPage() {
                 <Icon name="shield" size={20} />
               </span>
               <div>
-                <h2>Thông tin giao dịch</h2>
-                <p>Kiểm tra lại khóa học và số tiền trước khi chọn kết quả.</p>
+                <h2>{t('Thông tin giao dịch')}</h2>
+                <p>{t('Kiểm tra lại khóa học và số tiền trước khi chọn kết quả.')}</p>
               </div>
             </div>
 
             <dl className="result-details mock-payment-details">
               <div>
-                <dt>Mã đơn hàng</dt>
+                <dt>{t('Mã đơn hàng')}</dt>
                 <dd>{state.order.orderCode}</dd>
               </div>
               <div>
-                <dt>Trạng thái</dt>
+                <dt>{t('Trạng thái')}</dt>
                 <dd>{statusLabel[payment?.status] || payment?.status}</dd>
               </div>
               <div>
-                <dt>Khóa học</dt>
-                <dd>{item?.courseTitle || 'Khóa học'}</dd>
+                <dt>{t('Khóa học')}</dt>
+                <dd>{item?.courseTitle || t('Khóa học')}</dd>
               </div>
               <div>
-                <dt>Số tiền</dt>
+                <dt>{t('Số tiền')}</dt>
                 <dd>{formatDemoPrice(amount)}</dd>
               </div>
             </dl>
@@ -216,12 +216,12 @@ export default function MockPaymentPage() {
             {alreadyProcessed ? (
               <div className="mock-provider-note success">
                 <Icon name="check" size={18} />
-                Giao dịch này đã có kết quả. Bạn có thể xem trang kết quả hoặc lịch sử thanh toán.
+                {t('Giao dịch này đã có kết quả. Bạn có thể xem trang kết quả hoặc lịch sử thanh toán.')}
               </div>
             ) : (
               <div className="mock-provider-note">
                 <Icon name="clock" size={18} />
-                Đây là cổng thanh toán mô phỏng cho tuần 5, chưa gọi nhà cung cấp bên ngoài.
+                {t('Đây là cổng thanh toán mô phỏng cho tuần 5, chưa gọi nhà cung cấp bên ngoài.')}
               </div>
             )}
           </article>
@@ -232,8 +232,8 @@ export default function MockPaymentPage() {
                 <Icon name="check" size={20} />
               </span>
               <div>
-                <h2>Kết quả thanh toán</h2>
-                <p>Mô phỏng phản hồi từ cổng thanh toán.</p>
+                <h2>{t('Kết quả thanh toán')}</h2>
+                <p>{t('Mô phỏng phản hồi từ cổng thanh toán.')}</p>
               </div>
             </div>
 
@@ -246,7 +246,7 @@ export default function MockPaymentPage() {
                 disabled={alreadyProcessed || Boolean(processingStatus)}
                 onClick={() => completePayment('SUCCESS')}
               >
-                {processingStatus === 'SUCCESS' ? 'Đang xử lý...' : 'Thanh toán thành công'}
+                {processingStatus === 'SUCCESS' ? t('Đang xử lý...') : t('Thanh toán thành công')}
                 <Icon name="check" size={17} />
               </button>
               <button
@@ -255,7 +255,7 @@ export default function MockPaymentPage() {
                 disabled={alreadyProcessed || Boolean(processingStatus)}
                 onClick={() => completePayment('FAILED')}
               >
-                {processingStatus === 'FAILED' ? 'Đang xử lý...' : 'Thanh toán thất bại'}
+                {processingStatus === 'FAILED' ? t('Đang xử lý...') : t('Thanh toán thất bại')}
                 <Icon name="close" size={17} />
               </button>
               <button
@@ -264,16 +264,16 @@ export default function MockPaymentPage() {
                 disabled={alreadyProcessed || Boolean(processingStatus)}
                 onClick={() => completePayment('CANCELLED')}
               >
-                {processingStatus === 'CANCELLED' ? 'Đang xử lý...' : 'Hủy giao dịch'}
+                {processingStatus === 'CANCELLED' ? t('Đang xử lý...') : t('Hủy giao dịch')}
               </button>
             </div>
 
             <div className="result-actions mock-secondary-actions">
               <Link className="button button-outline" to={resultPath}>
-                Xem kết quả
+                {t('Xem kết quả')}
               </Link>
               <Link className="button button-outline" to={ROUTES.PAYMENT_HISTORY}>
-                Lịch sử thanh toán
+                {t('Lịch sử thanh toán')}
               </Link>
             </div>
           </aside>

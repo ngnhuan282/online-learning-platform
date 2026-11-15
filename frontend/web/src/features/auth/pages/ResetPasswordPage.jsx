@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import LockOutlined from '@mui/icons-material/LockOutlined';
@@ -11,6 +13,7 @@ import '../styles/auth.css';
 const INVALID_LINK = 'Liên kết không hợp lệ, đã hết hạn hoặc đã được sử dụng. Vui lòng yêu cầu liên kết mới.';
 
 export default function ResetPasswordPage() {
+  useLocale();
   const location = useLocation();
   const [token, setToken] = useState(() => {
     const params = new URLSearchParams(location.hash.slice(1));
@@ -73,12 +76,12 @@ export default function ResetPasswordPage() {
     <section className="auth-section" aria-labelledby="reset-password-title">
       <div className="auth-card">
         <div className="auth-heading">
-          <h1 id="reset-password-title">Đặt lại mật khẩu</h1>
-          <p>Chọn mật khẩu mới cho tài khoản của bạn.</p>
+          <h1 id="reset-password-title">{t('Đặt lại mật khẩu')}</h1>
+          <p>{t('Chọn mật khẩu mới cho tài khoản của bạn.')}</p>
         </div>
         {done ? (
           <p className="auth-notice" role="status">
-            Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.
+            {t('Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.')}
           </p>
         ) : !token ? (
           <p className="auth-notice" role="alert">
@@ -88,7 +91,7 @@ export default function ResetPasswordPage() {
           <form className="auth-reset-form" onSubmit={submit} noValidate aria-busy={submitting}>
             <AuthField
               name="newPassword"
-              label="Mật khẩu mới"
+              label={t('Mật khẩu mới')}
               type="password"
               autoComplete="new-password"
               icon={<LockOutlined />}
@@ -101,7 +104,7 @@ export default function ResetPasswordPage() {
             />
             <AuthField
               name="confirmPassword"
-              label="Xác nhận mật khẩu mới"
+              label={t('Xác nhận mật khẩu mới')}
               type="password"
               autoComplete="new-password"
               icon={<LockOutlined />}
@@ -113,21 +116,21 @@ export default function ResetPasswordPage() {
             />
             {error && (
               <p className="auth-notice" role="alert">
-                {error}
+                {t(error)}
               </p>
             )}
             <button type="submit" className="button button-primary auth-submit" disabled={submitting}>
-              {submitting ? 'Đang đặt lại mật khẩu...' : 'Đặt lại mật khẩu'}
+              {submitting ? t('Đang đặt lại mật khẩu...') : t('Đặt lại mật khẩu')}
             </button>
           </form>
         )}
         {!done && (
           <p className="auth-switch">
-            <Link to={ROUTES.FORGOT_PASSWORD}>Yêu cầu liên kết mới</Link>
+            <Link to={ROUTES.FORGOT_PASSWORD}>{t('Yêu cầu liên kết mới')}</Link>
           </p>
         )}
         <p className="auth-switch">
-          <Link to={ROUTES.LOGIN}>Quay về đăng nhập</Link>
+          <Link to={ROUTES.LOGIN}>{t('Quay về đăng nhập')}</Link>
         </p>
       </div>
     </section>

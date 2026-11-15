@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState, useEffect } from 'react';
 import { buildLessonPayload, normalizeLessonFormData } from '../utils/lessonForm';
 import MediaUploader from './MediaUploader';
@@ -17,6 +19,7 @@ export default function AddLessonDialog({
   onConfirm,
   onCancel,
 }) {
+  useLocale();
   const [previousLesson, setPreviousLesson] = useState(initialLesson);
   const [form, setForm] = useState(() => normalizeLessonFormData(initialLesson ?? {}));
   const [submitting, setSubmitting] = useState(false);
@@ -133,7 +136,7 @@ export default function AddLessonDialog({
         }}
       >
         <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>
-          {isEditMode ? 'Sửa bài học' : 'Thêm bài học mới'}
+          {isEditMode ? t('Sửa bài học') : t('Thêm bài học mới')}
         </h3>
 
         {validationError && (
@@ -158,7 +161,7 @@ export default function AddLessonDialog({
               htmlFor="lesson-title"
               style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6 }}
             >
-              Tiêu đề bài học <span style={{ color: '#ef4444' }}>*</span>
+              {t('Tiêu đề bài học')} <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <input
               id="lesson-title"
@@ -167,7 +170,7 @@ export default function AddLessonDialog({
               required
               value={form.title}
               onChange={e => updateField('title', e.target.value)}
-              placeholder="VD: Tổng quan về Spring Boot MVC"
+              placeholder={t('VD: Tổng quan về Spring Boot MVC')}
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -185,7 +188,7 @@ export default function AddLessonDialog({
                 htmlFor="lesson-type"
                 style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6 }}
               >
-                Loại bài học <span style={{ color: '#ef4444' }}>*</span>
+                {t('Loại bài học')} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <select
                 id="lesson-type"
@@ -200,9 +203,9 @@ export default function AddLessonDialog({
                   boxSizing: 'border-box',
                 }}
               >
-                {LESSON_TYPES.map(t => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+                {LESSON_TYPES.map(typeOption => (
+                  <option key={typeOption.value} value={typeOption.value}>
+                    {t(typeOption.label)}
                   </option>
                 ))}
               </select>
@@ -213,7 +216,7 @@ export default function AddLessonDialog({
                 htmlFor="lesson-duration"
                 style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6 }}
               >
-                Thời lượng (giây)
+                {t('Thời lượng (giây)')}
               </label>
               <input
                 id="lesson-duration"
@@ -239,7 +242,7 @@ export default function AddLessonDialog({
               <MediaUploader
                 folder="videos"
                 accept="video/*"
-                label="Tải video bài giảng lên máy chủ"
+                label={t('Tải video bài giảng lên máy chủ')}
                 maxSizeMB={200}
                 currentUrl={form.videoUrl}
                 onUploadSuccess={info => updateField('videoUrl', info.url || info.objectKey)}
@@ -257,7 +260,7 @@ export default function AddLessonDialog({
                   required
                   value={form.videoUrl}
                   onChange={e => updateField('videoUrl', e.target.value)}
-                  placeholder="https://... hoặc s3://courses/videos/lesson1.mp4"
+                  placeholder={t('https://... hoặc s3://courses/videos/lesson1.mp4')}
                   style={{
                     width: '100%',
                     padding: '8px 10px',
@@ -272,11 +275,20 @@ export default function AddLessonDialog({
           )}
 
           {form.lessonType === 'DOCUMENT' && (
-            <div style={{ display: 'grid', gap: 8, padding: 14, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: 8,
+                padding: 14,
+                background: '#f8fafc',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+              }}
+            >
               <MediaUploader
                 folder="documents"
                 accept=".pdf,.doc,.docx,.ppt,.pptx,.txt"
-                label="Tải lên tệp tài liệu bài học (PDF, Word, Slide...)"
+                label={t('Tải lên tệp tài liệu bài học (PDF, Word, Slide...)')}
                 maxSizeMB={50}
                 currentUrl={form.videoUrl}
                 onUploadSuccess={info => {
@@ -292,14 +304,14 @@ export default function AddLessonDialog({
                   htmlFor="lesson-doc-url"
                   style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}
                 >
-                  Đường dẫn tài liệu / Object Key
+                  {t('Đường dẫn tài liệu / Object Key')}
                 </label>
                 <input
                   id="lesson-doc-url"
                   type="text"
                   value={form.videoUrl}
                   onChange={e => updateField('videoUrl', e.target.value)}
-                  placeholder="https://... hoặc tệp tài liệu đã tải lên"
+                  placeholder={t('https://... hoặc tệp tài liệu đã tải lên')}
                   style={{
                     width: '100%',
                     padding: '8px 10px',
@@ -314,19 +326,37 @@ export default function AddLessonDialog({
           )}
 
           {form.lessonType === 'QUIZ' && (
-            <div style={{ display: 'grid', gap: 10, padding: 14, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: 10,
+                padding: 14,
+                background: '#f0fdf4',
+                borderRadius: 8,
+                border: '1px solid #bbf7d0',
+              }}
+            >
               <div>
                 <label
                   htmlFor="lesson-quiz-picker"
-                  style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#166534', marginBottom: 6 }}
+                  style={{
+                    display: 'block',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: '#166534',
+                    marginBottom: 6,
+                  }}
                 >
-                  Chọn bài Quiz từ danh sách đã tạo <span style={{ color: '#ef4444' }}>*</span>
+                  {t('Chọn bài Quiz từ danh sách đã tạo')} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 {loadingQuizzes ? (
-                  <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Đang tải danh sách Quiz...</p>
+                  <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+                    {t('Đang tải danh sách Quiz...')}
+                  </p>
                 ) : availableQuizzes.length === 0 ? (
                   <div style={{ fontSize: 13, color: '#b45309' }}>
-                    Chưa có bài quiz nào được tạo. Vui lòng vào trang <strong>Quản lý Quiz</strong> để tạo bài kiểm tra trước.
+                    {t('Chưa có bài quiz nào được tạo. Vui lòng vào trang')}{' '}
+                    <strong>{t('Quản lý Quiz')}</strong> {t('để tạo bài kiểm tra trước.')}
                   </div>
                 ) : (
                   <>
@@ -361,28 +391,45 @@ export default function AddLessonDialog({
                         boxSizing: 'border-box',
                       }}
                     >
-                      <option value="">-- Chọn bài kiểm tra / Quiz --</option>
+                      <option value="">{t('-- Chọn bài kiểm tra / Quiz --')}</option>
                       {availableQuizzes.map(q => (
                         <option key={q.id} value={String(q.id)}>
-                          {q.title} ({q.questions?.length ?? q.totalQuestions ?? 0} câu hỏi - Điểm đạt {q.passingScore}%)
+                          {t(q.title)} ({q.questions?.length ?? q.totalQuestions ?? 0}{' '}
+                          {t('câu hỏi - Điểm đạt')} {q.passingScore}%)
                         </option>
                       ))}
                     </select>
 
                     {(() => {
                       const currentQuizId = String(form.content || '').trim();
-                      const quiz = availableQuizzes.find(q => String(q.id) === currentQuizId || q.title === form.title);
+                      const quiz = availableQuizzes.find(
+                        q => String(q.id) === currentQuizId || q.title === form.title,
+                      );
                       if (!quiz) return null;
                       return (
-                        <div style={{ marginTop: 8, padding: '8px 12px', background: '#ecfdf5', borderRadius: 6, border: '1px solid #a7f3d0', fontSize: 13, color: '#065f46' }}>
-                          ✅ <strong>{quiz.title}</strong> — {quiz.questions?.length ?? quiz.totalQuestions ?? 0} câu hỏi • Thời gian: {quiz.timeLimitMinutes || 15} phút • Điểm đạt: {quiz.passingScore}%
+                        <div
+                          style={{
+                            marginTop: 8,
+                            padding: '8px 12px',
+                            background: '#ecfdf5',
+                            borderRadius: 6,
+                            border: '1px solid #a7f3d0',
+                            fontSize: 13,
+                            color: '#065f46',
+                          }}
+                        >
+                          ✅ <strong>{t(quiz.title)}</strong> —{' '}
+                          {quiz.questions?.length ?? quiz.totalQuestions ?? 0} {t('câu hỏi • Thời gian:')}{' '}
+                          {quiz.timeLimitMinutes || 15} {t('phút • Điểm đạt:')} {quiz.passingScore}%
                         </div>
                       );
                     })()}
                   </>
                 )}
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: '#15803d' }}>
-                  💡 Khi học viên học đến bài này, hệ thống sẽ mở bài kiểm tra đã chọn để học viên làm bài.
+                  {t(
+                    '💡 Khi học viên học đến bài này, hệ thống sẽ mở bài kiểm tra đã chọn để học viên làm bài.',
+                  )}
                 </p>
               </div>
             </div>
@@ -391,12 +438,18 @@ export default function AddLessonDialog({
           {/* Content field / Text editor for VIDEO, DOCUMENT, and TEXT lessons only */}
           {form.lessonType !== 'QUIZ' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label
-                  htmlFor="lesson-content"
-                  style={{ fontSize: 14, fontWeight: 500 }}
-                >
-                  {form.lessonType === 'TEXT' ? 'Nội dung bài học (Hỗ trợ Markdown / HTML)' : 'Nội dung chi tiết / Hướng dẫn'}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 6,
+                }}
+              >
+                <label htmlFor="lesson-content" style={{ fontSize: 14, fontWeight: 500 }}>
+                  {form.lessonType === 'TEXT'
+                    ? t('Nội dung bài học (Hỗ trợ Markdown / HTML)')
+                    : t('Nội dung chi tiết / Hướng dẫn')}
                 </label>
 
                 {form.lessonType === 'TEXT' && (
@@ -414,7 +467,7 @@ export default function AddLessonDialog({
                         cursor: 'pointer',
                       }}
                     >
-                      ✏️ Soạn thảo
+                      {t('✏️ Soạn thảo')}
                     </button>
                     <button
                       type="button"
@@ -429,7 +482,7 @@ export default function AddLessonDialog({
                         cursor: 'pointer',
                       }}
                     >
-                      👁️ Xem trước
+                      {t('👁️ Xem trước')}
                     </button>
                   </div>
                 )}
@@ -452,35 +505,75 @@ export default function AddLessonDialog({
                   <button
                     type="button"
                     onClick={() => updateField('content', (form.content || '') + '\n### Tiêu đề bài học\n')}
-                    style={{ fontSize: 11, padding: '2px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer' }}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      background: '#fff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                    }}
                   >
-                    H3 Tiêu đề
+                    {t('H3 Tiêu đề')}
                   </button>
                   <button
                     type="button"
                     onClick={() => updateField('content', (form.content || '') + ' **in đậm** ')}
-                    style={{ fontSize: 11, padding: '2px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      background: '#fff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                    }}
                   >
                     B
                   </button>
                   <button
                     type="button"
                     onClick={() => updateField('content', (form.content || '') + ' *in nghiêng* ')}
-                    style={{ fontSize: 11, padding: '2px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', fontStyle: 'italic' }}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      background: '#fff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontStyle: 'italic',
+                    }}
                   >
                     I
                   </button>
                   <button
                     type="button"
                     onClick={() => updateField('content', (form.content || '') + '\n- Ý 1\n- Ý 2\n- Ý 3\n')}
-                    style={{ fontSize: 11, padding: '2px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer' }}
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      background: '#fff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                    }}
                   >
-                    • Danh sách
+                    {t('• Danh sách')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateField('content', (form.content || '') + '\n```java\n// Code snippet\n```\n')}
-                    style={{ fontSize: 11, padding: '2px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace' }}
+                    onClick={() =>
+                      updateField('content', (form.content || '') + '\n```java\n// Code snippet\n```\n')
+                    }
+                    style={{
+                      fontSize: 11,
+                      padding: '2px 6px',
+                      background: '#fff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontFamily: 'monospace',
+                    }}
                   >
                     &lt;/&gt; Code
                   </button>
@@ -506,7 +599,7 @@ export default function AddLessonDialog({
                   {form.content ? (
                     <div>{form.content}</div>
                   ) : (
-                    <em style={{ color: '#94a3b8' }}>Chưa có nội dung để xem trước...</em>
+                    <em style={{ color: '#94a3b8' }}>{t('Chưa có nội dung để xem trước...')}</em>
                   )}
                 </div>
               ) : (
@@ -517,8 +610,8 @@ export default function AddLessonDialog({
                   onChange={e => updateField('content', e.target.value)}
                   placeholder={
                     form.lessonType === 'TEXT'
-                      ? 'Nhập nội dung bài học lý thuyết tại đây... (Hỗ trợ định dạng văn bản)'
-                      : 'Nội dung bài viết, link tài liệu đính kèm...'
+                      ? t('Nhập nội dung bài học lý thuyết tại đây... (Hỗ trợ định dạng văn bản)')
+                      : t('Nội dung bài viết, link tài liệu đính kèm...')
                   }
                   style={{
                     width: '100%',
@@ -543,13 +636,13 @@ export default function AddLessonDialog({
               style={{ width: 16, height: 16, cursor: 'pointer' }}
             />
             <label htmlFor="lesson-preview" style={{ fontSize: 14, cursor: 'pointer', userSelect: 'none' }}>
-              Cho phép học thử (Preview miễn phí cho Guest)
+              {t('Cho phép học thử (Preview miễn phí cho Guest)')}
             </label>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
             <button type="button" className="button button-soft" onClick={onCancel} disabled={submitting}>
-              Hủy
+              {t('Hủy')}
             </button>
             <button
               type="submit"
@@ -558,11 +651,11 @@ export default function AddLessonDialog({
             >
               {submitting
                 ? isEditMode
-                  ? 'Đang lưu...'
-                  : 'Đang thêm...'
+                  ? t('Đang lưu...')
+                  : t('Đang thêm...')
                 : isEditMode
-                  ? 'Lưu thay đổi'
-                  : 'Tạo bài học'}
+                  ? t('Lưu thay đổi')
+                  : t('Tạo bài học')}
             </button>
           </div>
         </form>

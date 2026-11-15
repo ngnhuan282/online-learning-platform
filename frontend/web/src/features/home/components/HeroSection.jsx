@@ -1,4 +1,6 @@
-﻿import { useState } from 'react';
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 import { Link } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
@@ -10,41 +12,43 @@ const waveform = [
 ];
 
 export default function HeroSection() {
+  useLocale();
   const [previewOpen, setPreviewOpen] = useState(false);
   return (
     <section className="hero-section">
       <div className="container hero-grid">
         <div className="hero-copy">
-          <div className="eyebrow-pill">Nền tảng học Tiếng Anh thông minh thế hệ mới</div>
+          <div className="eyebrow-pill">{t('Nền tảng học Tiếng Anh thông minh thế hệ mới')}</div>
           <h1>
             Master English without limits.
             <br />
             <span>Build your global future.</span>
           </h1>
           <p>
-            Khám phá các khóa học Tiếng Anh chất lượng cao, từ giao tiếp thực tế đến luyện thi chứng chỉ IELTS
-            & TOEIC, cùng gia sư AI luyện phát âm và phản xạ 24/7.
+            {t(
+              'Khám phá các khóa học Tiếng Anh chất lượng cao, từ giao tiếp thực tế đến luyện thi chứng chỉ IELTS & TOEIC, cùng gia sư AI luyện phát âm và phản xạ 24/7.',
+            )}
           </p>
           <div className="hero-actions">
             <a href="#courses" className="button button-primary">
-              Khám phá khóa học <Icon name="arrow" size={18} />
+              {t('Khám phá khóa học')} <Icon name="arrow" size={18} />
             </a>
             <Link to={ROUTES.AI_ASSISTANT} className="button button-outline">
-              <Icon name="language" size={18} /> Trợ lý AI
+              <Icon name="language" size={18} /> {t('Trợ lý AI')}
             </Link>
           </div>
           <div className="hero-stats">
             <div>
               <strong>50,000+</strong>
-              <span>Học viên toàn quốc</span>
+              <span>{t('Học viên toàn quốc')}</span>
             </div>
             <div>
               <strong>8.5 IELTS</strong>
-              <span>Điểm đầu ra kỷ lục</span>
+              <span>{t('Điểm đầu ra kỷ lục')}</span>
             </div>
             <div>
               <strong>98%</strong>
-              <span>Tự tin giao tiếp</span>
+              <span>{t('Tự tin giao tiếp')}</span>
             </div>
           </div>
         </div>
@@ -64,16 +68,16 @@ export default function HeroSection() {
             <button
               className="lesson-preview pronunciation-preview"
               onClick={() => setPreviewOpen(true)}
-              aria-label="Xem thử bài học Business Negotiation & Fluent Office Pitching"
+              aria-label={t('Xem thử bài học Business Negotiation & Fluent Office Pitching')}
             >
               <img
                 className="lesson-background"
                 src="/images/english-speaking.jpg"
-                alt="Thực hành tiếng Anh giao tiếp trong một buổi trao đổi nhóm"
+                alt={t('Thực hành tiếng Anh giao tiếp trong một buổi trao đổi nhóm')}
                 fetchPriority="high"
               />
               <div className="lesson-topbar">
-                <span>Bài 12: Business Negotiation & Fluent Office Pitching</span>
+                <span>{t('Bài 12: Business Negotiation & Fluent Office Pitching')}</span>
                 <b>Native Accent</b>
               </div>
               <div className="speech-visualization" aria-hidden="true">
@@ -89,7 +93,7 @@ export default function HeroSection() {
                   </span>
                   <div>
                     <strong>“Could you walk me through the key deliverables?”</strong>
-                    <small>Phát âm 92% · Trọng âm · Intonation: Perfect Rising-Falling</small>
+                    <small>{t('Phát âm 92% · Trọng âm · Intonation: Perfect Rising-Falling')}</small>
                   </div>
                   <b>Band 8.0</b>
                 </div>
@@ -108,12 +112,12 @@ export default function HeroSection() {
             </button>
             <div className="studio-course">
               <strong>IELTS Speaking Masterclass: Band 7.5+ Intensive</strong>
-              <span>78% Hoàn thành</span>
+              <span>{t('78% Hoàn thành')}</span>
             </div>
             <div
               className="progress-track"
               role="progressbar"
-              aria-label="Tiến độ minh họa"
+              aria-label={t('Tiến độ minh họa')}
               aria-valuenow={78}
               aria-valuemin={0}
               aria-valuemax={100}
@@ -121,7 +125,7 @@ export default function HeroSection() {
               <span style={{ width: '78%' }} />
             </div>
             <button className="continue-learning" onClick={() => setPreviewOpen(true)}>
-              Tiếp tục luyện nói <Icon name="arrow" size={14} />
+              {t('Tiếp tục luyện nói')} <Icon name="arrow" size={14} />
             </button>
           </div>
           <Link to={ROUTES.AI_ASSISTANT} className="tutor-status">
@@ -130,9 +134,9 @@ export default function HeroSection() {
             </span>
             <span>
               <strong>
-                Trợ lý học tập AI <i />
+                {t('Trợ lý học tập AI')} <i />
               </strong>
-              <small>Giải thích bài học và luyện tập</small>
+              <small>{t('Giải thích bài học và luyện tập')}</small>
             </span>
           </Link>
         </div>
@@ -145,8 +149,8 @@ export default function HeroSection() {
         aria-labelledby="english-preview-title"
       >
         <DialogTitle id="english-preview-title" className="dialog-heading">
-          Xem thử bài học
-          <button className="icon-button" aria-label="Đóng" onClick={() => setPreviewOpen(false)}>
+          {t('Xem thử bài học')}
+          <button className="icon-button" aria-label={t('Đóng')} onClick={() => setPreviewOpen(false)}>
             <Icon name="close" />
           </button>
         </DialogTitle>
@@ -154,24 +158,28 @@ export default function HeroSection() {
           <div className="lesson-reading english-lesson">
             <span className="eyebrow">BUSINESS ENGLISH · SPEAKING PRACTICE</span>
             <h2>Business Negotiation & Fluent Office Pitching</h2>
-            <p>Luyện cách đặt câu hỏi lịch sự và trình bày ý tưởng tự tin trong cuộc họp bằng tiếng Anh.</p>
+            <p>
+              {t('Luyện cách đặt câu hỏi lịch sự và trình bày ý tưởng tự tin trong cuộc họp bằng tiếng Anh.')}
+            </p>
             <blockquote>
               “Could you walk me through the key deliverables?”
-              <span>Bạn có thể giải thích cho tôi các hạng mục chính cần bàn giao không?</span>
+              <span>{t('Bạn có thể giải thích cho tôi các hạng mục chính cần bàn giao không?')}</span>
             </blockquote>
-            <h3>Cùng luyện tập</h3>
+            <h3>{t('Cùng luyện tập')}</h3>
             <ol>
               <li>
-                Đọc chậm từng cụm: <b>Could you / walk me through / the key deliverables?</b>
+                {t('Đọc chậm từng cụm:')} <b>Could you / walk me through / the key deliverables?</b>
               </li>
               <li>
-                Nhấn rõ các từ mang ý chính: <b>walk, key, deliverables</b>.
+                {t('Nhấn rõ các từ mang ý chính:')} <b>walk, key, deliverables</b>.
               </li>
-              <li>Thay “the key deliverables” bằng “the project timeline” để tạo câu mới.</li>
+              <li>{t('Thay “the key deliverables” bằng “the project timeline” để tạo câu mới.')}</li>
             </ol>
             <p>
-              <strong>Tình huống:</strong> Bạn vừa tham gia một dự án mới. Hãy hỏi đồng nghiệp về các mốc thời
-              gian và công việc cần hoàn thành.
+              <strong>{t('Tình huống:')}</strong>{' '}
+              {t(
+                'Bạn vừa tham gia một dự án mới. Hãy hỏi đồng nghiệp về các mốc thời gian và công việc cần hoàn thành.',
+              )}
             </p>
             <Link
               to={ROUTES.AI_ASSISTANT}
@@ -179,11 +187,12 @@ export default function HeroSection() {
               onClick={() => setPreviewOpen(false)}
             >
               <Icon name="mic" size={18} />
-              Thử luyện hội thoại
+              {t('Thử luyện hội thoại')}
             </Link>
             <p className="demo-note">
-              Nội dung và điểm phát âm trên màn hình là minh họa. Video, ghi âm và chấm phát âm chưa được kết
-              nối.
+              {t(
+                'Nội dung và điểm phát âm trên màn hình là minh họa. Video, ghi âm và chấm phát âm chưa được kết nối.',
+              )}
             </p>
           </div>
         </DialogContent>

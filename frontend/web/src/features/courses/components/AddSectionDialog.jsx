@@ -1,6 +1,9 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useState } from 'react';
 
 export default function AddSectionDialog({ onConfirm, onCancel }) {
+  useLocale();
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,14 +45,14 @@ export default function AddSectionDialog({ onConfirm, onCancel }) {
           padding: 24,
         }}
       >
-        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>Thêm chương mới</h3>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600 }}>{t('Thêm chương mới')}</h3>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
             <label
               htmlFor="section-title"
               style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6 }}
             >
-              Tên chương <span style={{ color: '#ef4444' }}>*</span>
+              {t('Tên chương')} <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <input
               id="section-title"
@@ -58,7 +61,7 @@ export default function AddSectionDialog({ onConfirm, onCancel }) {
               required
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="VD: Chương 1: Giới thiệu khóa học"
+              placeholder={t('VD: Chương 1: Giới thiệu khóa học')}
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -71,20 +74,11 @@ export default function AddSectionDialog({ onConfirm, onCancel }) {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button
-              type="button"
-              className="button button-soft"
-              onClick={onCancel}
-              disabled={submitting}
-            >
-              Hủy
+            <button type="button" className="button button-soft" onClick={onCancel} disabled={submitting}>
+              {t('Hủy')}
             </button>
-            <button
-              type="submit"
-              className="button button-primary"
-              disabled={!title.trim() || submitting}
-            >
-              {submitting ? 'Đang thêm...' : 'Tạo chương'}
+            <button type="submit" className="button button-primary" disabled={!title.trim() || submitting}>
+              {submitting ? t('Đang thêm...') : t('Tạo chương')}
             </button>
           </div>
         </form>

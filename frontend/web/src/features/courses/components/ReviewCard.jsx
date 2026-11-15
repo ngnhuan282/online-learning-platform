@@ -1,3 +1,5 @@
+import { t, getIntlLocale } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import StarRating from './StarRating';
 
 const cardStyles = {
@@ -91,7 +93,7 @@ const cardStyles = {
 function formatDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString(getIntlLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 /**
@@ -117,9 +119,10 @@ export default function ReviewCard({
   onHide,
   onShow,
 }) {
+  useLocale();
   const displayName = isOwner
-    ? (currentUser?.fullName || review.userFullName || 'Bạn')
-    : (review.userFullName || `Người dùng #${review.userId}`);
+    ? currentUser?.fullName || review.userFullName || 'Bạn'
+    : review.userFullName || `Người dùng #${review.userId}`;
 
   const initial = displayName ? displayName.trim().charAt(0).toUpperCase() : 'U';
 
@@ -130,11 +133,11 @@ export default function ReviewCard({
         <div style={cardStyles.header}>
           <span style={cardStyles.userName}>
             {displayName}
-            {isOwner && <span style={cardStyles.youBadge}>Bạn</span>}
+            {isOwner && <span style={cardStyles.youBadge}>{t('Bạn')}</span>}
           </span>
           <StarRating value={review.rating} readonly size={16} />
           <span style={cardStyles.date}>{formatDate(review.createdAt)}</span>
-          {review.hidden && <span style={cardStyles.hiddenBadge}>Đã ẩn</span>}
+          {review.hidden && <span style={cardStyles.hiddenBadge}>{t('Đã ẩn')}</span>}
         </div>
 
         {review.comment && <p style={cardStyles.comment}>{review.comment}</p>}
@@ -156,7 +159,7 @@ export default function ReviewCard({
                 e.target.style.background = '#f8fafc';
               }}
             >
-              ✏️ Sửa
+              {t('✏️ Sửa')}
             </button>
           )}
           {isOwner && onDelete && (
@@ -175,7 +178,7 @@ export default function ReviewCard({
                 e.target.style.background = '#f8fafc';
               }}
             >
-              🗑️ Xóa
+              {t('🗑️ Xóa')}
             </button>
           )}
           {isAdmin && !review.hidden && onHide && (
@@ -194,7 +197,7 @@ export default function ReviewCard({
                 e.target.style.background = '#f8fafc';
               }}
             >
-              🚫 Ẩn review
+              {t('🚫 Ẩn review')}
             </button>
           )}
           {isAdmin && review.hidden && onShow && (
@@ -213,7 +216,7 @@ export default function ReviewCard({
                 e.target.style.background = '#f8fafc';
               }}
             >
-              ✅ Bỏ ẩn
+              {t('✅ Bỏ ẩn')}
             </button>
           )}
         </div>

@@ -1,5 +1,5 @@
-import { DEFAULT_LOCALE } from '../constants/appConstants';
-export function formatDate(value, options = {}, locale = DEFAULT_LOCALE) {
+import { getIntlLocale } from '../i18n/locale.js';
+export function formatDate(value, options = {}, locale = getIntlLocale()) {
   if (value == null || value === '') return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime())

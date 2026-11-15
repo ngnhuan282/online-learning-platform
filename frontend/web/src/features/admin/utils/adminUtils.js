@@ -1,19 +1,22 @@
+import { getIntlLocale } from '../../../shared/i18n/locale.js';
 export const can = (user, permission) =>
   Boolean(
     permission &&
-      user?.status !== 'LOCKED' &&
-      user?.status !== 'DISABLED' &&
-      user?.roles?.some(role => role !== 'USER') &&
-      user?.permissions?.includes(permission),
+    user?.status !== 'LOCKED' &&
+    user?.status !== 'DISABLED' &&
+    user?.roles?.some(role => role !== 'USER') &&
+    user?.permissions?.includes(permission),
   );
-export const number = value => (value == null ? '—' : new Intl.NumberFormat('vi-VN').format(value));
+export const number = value => (value == null ? '—' : new Intl.NumberFormat(getIntlLocale()).format(value));
 export const money = value =>
   value == null
     ? '—'
-    : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(
-        value,
-      );
-export const date = value => (value ? new Date(value).toLocaleString('vi-VN') : 'Chưa đăng nhập');
+    : new Intl.NumberFormat(getIntlLocale(), {
+        style: 'currency',
+        currency: 'VND',
+        maximumFractionDigits: 0,
+      }).format(value);
+export const date = value => (value ? new Date(value).toLocaleString(getIntlLocale()) : 'Chưa đăng nhập');
 export const initials = name =>
   name
     ?.trim()

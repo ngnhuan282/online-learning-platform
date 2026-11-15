@@ -1,3 +1,5 @@
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
 import { useMemo, useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
@@ -30,6 +32,7 @@ const subscribeToSession = callback => {
 };
 
 function LearningCoursePage({ courseId }) {
+  useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const loadCourse = useCallback(options => learningApi.getLearningCourse(courseId, options), [courseId]);
@@ -162,14 +165,16 @@ function LearningCoursePage({ courseId }) {
     return (
       <section className="learning-page">
         <div className="learning-shell">
-          <LearningHeader title="Không gian học tập" />
+          <LearningHeader title={t('Không gian học tập')} />
           {snapshot.loading ? (
-            <AppLoading label="Đang tải nội dung học..." />
+            <AppLoading label={t('Đang tải nội dung học...')} />
           ) : (
             <ErrorState
               error={snapshot.error ?? new Error('Không tìm thấy nội dung khóa học.')}
               title={
-                snapshot.error?.status === 403 ? 'Bạn chưa có quyền học khóa này' : 'Không thể mở khóa học'
+                snapshot.error?.status === 403
+                  ? t('Bạn chưa có quyền học khóa này')
+                  : t('Không thể mở khóa học')
               }
               onRetry={snapshot.reload}
             />
@@ -186,7 +191,7 @@ function LearningCoursePage({ courseId }) {
       <div className="learning-shell learning-studio">
         <LearningHeader
           title={course.title || `Khóa học #${courseId}`}
-          description="Học theo từng bài, lưu tiến độ và kiểm tra kiến thức."
+          description={t('Học theo từng bài, lưu tiến độ và kiểm tra kiến thức.')}
         >
           {course.level && (
             <span
@@ -202,16 +207,16 @@ function LearningCoursePage({ courseId }) {
             </span>
           )}
           <Link className="button button-outline" to={`/courses/${courseId}`}>
-            Chi tiết khóa học
+            {t('Chi tiết khóa học')}
           </Link>
           <Link
             className="button button-outline"
             to={`${ROUTES.AI_ASSISTANT}?courseId=${encodeURIComponent(courseId)}${currentLesson ? `&lessonId=${encodeURIComponent(currentLesson.id)}` : ''}`}
           >
-            <AutoAwesomeOutlined fontSize="small" /> Trợ lý AI
+            <AutoAwesomeOutlined fontSize="small" /> {t('Trợ lý AI')}
           </Link>
           <Link className="button button-primary" to="/my-courses">
-            Khóa học của tôi
+            {t('Khóa học của tôi')}
           </Link>
         </LearningHeader>
 
@@ -222,7 +227,7 @@ function LearningCoursePage({ courseId }) {
             <div className="course-progress-summary">
               <div className="learning-progress-heading">
                 <span>
-                  Tiến độ hoàn thành: {completedCount}/{allLessons.length} bài học
+                  {t('Tiến độ hoàn thành:')} {completedCount}/{allLessons.length} {t('bài học')}
                 </span>
                 <strong>{courseProgress}%</strong>
               </div>
@@ -232,13 +237,13 @@ function LearningCoursePage({ courseId }) {
             <div className="learning-media">
               {playLoading ? (
                 <div className="learning-media-placeholder" role="status">
-                  <AppLoading label="Đang tải bài giảng..." />
+                  <AppLoading label={t('Đang tải bài giảng...')} />
                 </div>
               ) : playError ? (
                 <div className="learning-media-placeholder is-error" role="alert">
                   <p>{playError}</p>
                   <button className="button button-primary" type="button" onClick={loadPlayUrl}>
-                    Thử lại
+                    {t('Thử lại')}
                   </button>
                 </div>
               ) : playData ? (
@@ -248,7 +253,7 @@ function LearningCoursePage({ courseId }) {
                       <iframe
                         key={embedUrl}
                         src={embedUrl}
-                        title={currentLesson?.title || 'Bài học'}
+                        title={currentLesson?.title || t('Bài học')}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                         style={{ width: '100%', height: 440, border: 'none', borderRadius: 8 }}
@@ -261,7 +266,8 @@ function LearningCoursePage({ courseId }) {
                         controlsList="nodownload"
                         src={resolveMediaUrl(playData.playUrl)}
                         onPlay={() => {
-                          if (!selectedProgress || selectedProgress.status === 'NOT_STARTED') openLesson(currentLesson.id);
+                          if (!selectedProgress || selectedProgress.status === 'NOT_STARTED')
+                            openLesson(currentLesson.id);
                         }}
                         onError={() => setMediaError({ lessonId: currentLesson.id, url: playData.playUrl })}
                         style={{
@@ -272,7 +278,7 @@ function LearningCoursePage({ courseId }) {
                           display: 'block',
                         }}
                       >
-                        Trình duyệt của bạn không hỗ trợ phát video này.
+                        {t('Trình duyệt của bạn không hỗ trợ phát video này.')}
                       </video>
                     )
                   ) : playData.lessonType === 'DOCUMENT' ? (
@@ -291,8 +297,12 @@ function LearningCoursePage({ courseId }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <span style={{ fontSize: 24 }}>📄</span>
                           <div>
-                            <strong style={{ fontSize: 15, color: '#0f172a' }}>Tài liệu bài học: {currentLesson?.title}</strong>
-                            <div style={{ fontSize: 12, color: '#64748b' }}>Định dạng văn bản / PDF học tập</div>
+                            <strong style={{ fontSize: 15, color: '#0f172a' }}>
+                              {t('Tài liệu bài học:')} {currentLesson?.title}
+                            </strong>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>
+                              {t('Định dạng văn bản / PDF học tập')}
+                            </div>
                           </div>
                         </div>
                         {(playData.playUrl || currentLesson?.videoUrl) && (
@@ -303,7 +313,7 @@ function LearningCoursePage({ courseId }) {
                             className="button button-primary"
                             style={{ padding: '8px 16px', fontSize: 13, textDecoration: 'none' }}
                           >
-                            Mở tài liệu bài học
+                            {t('Mở tài liệu bài học')}
                           </a>
                         )}
                       </div>
@@ -311,13 +321,23 @@ function LearningCoursePage({ courseId }) {
                       {(playData.playUrl || currentLesson?.videoUrl)?.toLowerCase().includes('.pdf') ? (
                         <iframe
                           src={resolveMediaUrl(playData.playUrl || currentLesson?.videoUrl)}
-                          title={currentLesson?.title || 'Tài liệu PDF'}
+                          title={currentLesson?.title || t('Tài liệu PDF')}
                           style={{ width: '100%', height: 520, border: '1px solid #cbd5e1', borderRadius: 8 }}
                         />
                       ) : null}
 
                       {currentLesson?.content && (
-                        <div style={{ background: '#f8fafc', padding: 20, borderRadius: 8, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#334155' }}>
+                        <div
+                          style={{
+                            background: '#f8fafc',
+                            padding: 20,
+                            borderRadius: 8,
+                            border: '1px solid #e2e8f0',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: 1.6,
+                            color: '#334155',
+                          }}
+                        >
                           {currentLesson.content}
                         </div>
                       )}
@@ -334,15 +354,26 @@ function LearningCoursePage({ courseId }) {
                     >
                       <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>✅</span>
                       <h3 style={{ margin: '0 0 10px', color: '#166534', fontSize: 22 }}>
-                        Bài kiểm tra: {currentLesson?.title}
+                        {t('Bài kiểm tra:')} {currentLesson?.title}
                       </h3>
-                      <p style={{ color: '#15803d', fontSize: 14, maxWidth: 500, margin: '0 auto 24px', lineHeight: 1.5 }}>
-                        Hãy thực hiện bài kiểm tra này để củng cố kiến thức và ghi nhận tiến độ khóa học của bạn.
+                      <p
+                        style={{
+                          color: '#15803d',
+                          fontSize: 14,
+                          maxWidth: 500,
+                          margin: '0 auto 24px',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {t(
+                          'Hãy thực hiện bài kiểm tra này để củng cố kiến thức và ghi nhận tiến độ khóa học của bạn.',
+                        )}
                       </p>
                       {(() => {
                         const qId = currentLesson?.content?.match(/^\d+$/)
                           ? currentLesson.content
-                          : courseQuizzes.find(q => q.title === currentLesson?.title)?.id || currentLesson?.content;
+                          : courseQuizzes.find(q => q.title === currentLesson?.title)?.id ||
+                            currentLesson?.content;
                         return qId ? (
                           <Link
                             to={`/quizzes/${qId}`}
@@ -357,18 +388,34 @@ function LearningCoursePage({ courseId }) {
                               gap: 8,
                             }}
                           >
-                            🚀 Bắt đầu làm bài Quiz ngay
+                            {t('🚀 Bắt đầu làm bài Quiz ngay')}
                           </Link>
                         ) : (
-                          <p style={{ color: '#64748b', fontSize: 13 }}>Chưa liên kết bài quiz cụ thể.</p>
+                          <p style={{ color: '#64748b', fontSize: 13 }}>
+                            {t('Chưa liên kết bài quiz cụ thể.')}
+                          </p>
                         );
                       })()}
                     </div>
                   ) : (
-                    <div style={{ background: '#f8fafc', padding: 24, borderRadius: 8, border: '1px solid #e2e8f0', minHeight: 240 }}>
-                      <h4 style={{ margin: '0 0 12px', color: '#0f172a' }}>📝 Nội dung bài học lý thuyết</h4>
-                      <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: '#334155', fontSize: 15 }}>
-                        {playData.content || currentLesson?.content || 'Chưa có nội dung văn bản cho bài học này.'}
+                    <div
+                      style={{
+                        background: '#f8fafc',
+                        padding: 24,
+                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        minHeight: 240,
+                      }}
+                    >
+                      <h4 style={{ margin: '0 0 12px', color: '#0f172a' }}>
+                        {t('📝 Nội dung bài học lý thuyết')}
+                      </h4>
+                      <div
+                        style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: '#334155', fontSize: 15 }}
+                      >
+                        {playData.content ||
+                          currentLesson?.content ||
+                          t('Chưa có nội dung văn bản cho bài học này.')}
                       </div>
                     </div>
                   )}
@@ -376,14 +423,18 @@ function LearningCoursePage({ courseId }) {
               ) : (
                 <div className="learning-media-placeholder">
                   <AutoStoriesOutlined aria-hidden="true" />
-                  <p>Chọn một bài học từ danh sách để bắt đầu học.</p>
+                  <p>{t('Chọn một bài học từ danh sách để bắt đầu học.')}</p>
                 </div>
               )}
               {mediaError && mediaError.lessonId === currentLesson?.id && (
                 <div style={{ marginTop: 16 }}>
                   <ErrorState
-                    error={new Error('Không thể tải video từ máy chủ lưu trữ (Supabase Storage / S3). Có thể dự án Supabase đang tạm dừng hoặc tệp media chưa được tải lên.')}
-                    title="Không thể phát bài học"
+                    error={
+                      new Error(
+                        'Không thể tải video từ máy chủ lưu trữ (Supabase Storage / S3). Có thể dự án Supabase đang tạm dừng hoặc tệp media chưa được tải lên.',
+                      )
+                    }
+                    title={t('Không thể phát bài học')}
                     onRetry={() => {
                       setMediaError(null);
                       snapshot.reload();
@@ -398,7 +449,7 @@ function LearningCoursePage({ courseId }) {
                         className="button button-soft"
                         style={{ fontSize: 13, textDecoration: 'none' }}
                       >
-                        🔗 Mở liên kết video trực tiếp
+                        {t('🔗 Mở liên kết video trực tiếp')}
                       </a>
                     </div>
                   )}
@@ -418,17 +469,17 @@ function LearningCoursePage({ courseId }) {
                       {currentLesson.duration ? (
                         <span>
                           <AccessTimeOutlined fontSize="small" aria-hidden="true" />
-                          {Math.round(currentLesson.duration / 60)} phút
+                          {Math.round(currentLesson.duration / 60)} {t('phút')}
                         </span>
                       ) : null}
                       <span>
-                        Trạng thái:{' '}
+                        {t('Trạng thái:')}{' '}
                         <strong>
                           {lessonStatus(selectedProgress) === 'COMPLETED'
-                            ? 'Đã hoàn thành'
+                            ? t('Đã hoàn thành')
                             : lessonStatus(selectedProgress) === 'IN_PROGRESS'
-                              ? 'Đang học'
-                              : 'Chưa bắt đầu'}
+                              ? t('Đang học')
+                              : t('Chưa bắt đầu')}
                         </strong>
                       </span>
                     </div>
@@ -442,33 +493,43 @@ function LearningCoursePage({ courseId }) {
                     {lessonStatus(selectedProgress) === 'COMPLETED' ? (
                       <>
                         <CheckCircleOutline fontSize="small" aria-hidden="true" />
-                        Đã hoàn thành
+                        {t('Đã hoàn thành')}
                       </>
                     ) : updatingLessonId === currentLesson.id ? (
-                      'Đang cập nhật...'
+                      t('Đang cập nhật...')
                     ) : (
-                      'Đánh dấu hoàn thành'
+                      t('Đánh dấu hoàn thành')
                     )}
                   </button>
                 </div>
                 {currentLesson.content && playData?.lessonType === 'VIDEO' && (
                   <div className="learning-lesson-notes">
-                    <h3>Ghi chú bài giảng</h3>
+                    <h3>{t('Ghi chú bài giảng')}</h3>
                     <p>{currentLesson.content}</p>
                   </div>
                 )}
 
                 {/* Attached Lesson Resources */}
                 <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #e2e8f0' }}>
-                  <h4 style={{ margin: '0 0 12px', fontSize: 15, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    📎 Tài liệu đính kèm ({lessonResources.length})
+                  <h4
+                    style={{
+                      margin: '0 0 12px',
+                      fontSize: 15,
+                      color: '#0f172a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    {t('📎 Tài liệu đính kèm (')}
+                    {lessonResources.length})
                   </h4>
 
                   {loadingResources ? (
-                    <p style={{ fontSize: 13, color: '#64748b' }}>Đang tải danh sách tài liệu...</p>
+                    <p style={{ fontSize: 13, color: '#64748b' }}>{t('Đang tải danh sách tài liệu...')}</p>
                   ) : lessonResources.length === 0 ? (
                     <p style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
-                      Bài học này không có tệp đính kèm thêm.
+                      {t('Bài học này không có tệp đính kèm thêm.')}
                     </p>
                   ) : (
                     <div style={{ display: 'grid', gap: 8 }}>
@@ -492,7 +553,8 @@ function LearningCoursePage({ courseId }) {
                             <div>
                               <strong style={{ fontSize: 14, color: '#1e293b' }}>{res.title}</strong>
                               <div style={{ fontSize: 12, color: '#64748b' }}>
-                                {res.fileName} {res.fileSize ? `• ${(res.fileSize / 1024 / 1024).toFixed(2)} MB` : ''}
+                                {res.fileName}{' '}
+                                {res.fileSize ? `• ${(res.fileSize / 1024 / 1024).toFixed(2)} MB` : ''}
                               </div>
                             </div>
                           </div>
@@ -504,7 +566,7 @@ function LearningCoursePage({ courseId }) {
                               className="button button-soft"
                               style={{ padding: '4px 12px', fontSize: 12, textDecoration: 'none' }}
                             >
-                              ⬇️ Tải tài liệu
+                              {t('⬇️ Tải tài liệu')}
                             </a>
                           )}
                         </div>
@@ -516,25 +578,37 @@ function LearningCoursePage({ courseId }) {
             )}
           </article>
 
-          <aside className="lesson-timeline" aria-label="Nội dung khóa học">
+          <aside className="lesson-timeline" aria-label={t('Nội dung khóa học')}>
             <div className="lesson-timeline-heading">
-              <h2>Nội dung khóa học</h2>
+              <h2>{t('Nội dung khóa học')}</h2>
               <p>
-                {sections.length} chương, {allLessons.length} bài học
+                {sections.length} {t('chương,')} {allLessons.length} {t('bài học')}
               </p>
             </div>
             {sections.length === 0 && !courseLoading && (
               <div className="learning-empty">
-                <p>Khóa học này chưa có bài giảng nào.</p>
+                <p>{t('Khóa học này chưa có bài giảng nào.')}</p>
               </div>
             )}
 
             <div style={{ display: 'grid', gap: 16 }}>
               {sections.map((section, sIndex) => (
-                <div key={section.id || sIndex} style={{ border: '1px solid #f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
+                <div
+                  key={section.id || sIndex}
+                  style={{ border: '1px solid #f1f5f9', borderRadius: 8, overflow: 'hidden' }}
+                >
                   {/* Section Title */}
-                  <div style={{ background: '#f8fafc', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
-                    Chương {sIndex + 1}: {section.title}
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      padding: '10px 14px',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontWeight: 700,
+                      fontSize: 14,
+                      color: '#1e293b',
+                    }}
+                  >
+                    {t('Chương')} {sIndex + 1}: {t(section.title)}
                   </div>
 
                   {/* Lessons list inside section */}
@@ -551,7 +625,7 @@ function LearningCoursePage({ courseId }) {
                           type="button"
                           disabled={updatingLessonId != null}
                           aria-current={isSelected ? 'step' : undefined}
-                          aria-label={`${lIndex + 1}. ${item.title}${isDone ? ', đã hoàn thành' : ''}`}
+                          aria-label={`${lIndex + 1}. ${item.title}${isDone ? t(', đã hoàn thành') : ''}`}
                           style={{
                             background: isSelected ? '#eff6ff' : '#ffffff',
                             borderColor: isSelected ? '#3b82f6' : 'transparent',
@@ -569,21 +643,39 @@ function LearningCoursePage({ courseId }) {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                               <span style={{ fontSize: 14 }}>
-                                {item.lessonType === 'VIDEO' ? '🎬' : item.lessonType === 'DOCUMENT' ? '📄' : item.lessonType === 'QUIZ' ? '✅' : '📝'}
+                                {item.lessonType === 'VIDEO'
+                                  ? '🎬'
+                                  : item.lessonType === 'DOCUMENT'
+                                    ? '📄'
+                                    : item.lessonType === 'QUIZ'
+                                      ? '✅'
+                                      : '📝'}
                               </span>
-                              <strong style={{ fontSize: 13, color: isSelected ? '#1d4ed8' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {lIndex + 1}. {item.title}
+                              <strong
+                                style={{
+                                  fontSize: 13,
+                                  color: isSelected ? '#1d4ed8' : '#0f172a',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {lIndex + 1}. {t(item.title)}
                               </strong>
                             </div>
                             <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#64748b' }}>
-                              {item.duration ? <span>{Math.round(item.duration / 60)} phút</span> : null}
-                              {item.preview ? <span style={{ color: '#16a34a', fontWeight: 600 }}>Học thử</span> : null}
+                              {item.duration ? (
+                                <span>
+                                  {Math.round(item.duration / 60)} {t('phút')}
+                                </span>
+                              ) : null}
+                              {item.preview ? (
+                                <span style={{ color: '#16a34a', fontWeight: 600 }}>{t('Học thử')}</span>
+                              ) : null}
                             </div>
                           </div>
 
-                          <span style={{ fontSize: 16 }}>
-                            {isDone ? '✅' : isSelected ? '▶️' : '⚪'}
-                          </span>
+                          <span style={{ fontSize: 16 }}>{isDone ? '✅' : isSelected ? '▶️' : '⚪'}</span>
                         </button>
                       );
                     })}
@@ -596,21 +688,21 @@ function LearningCoursePage({ courseId }) {
 
         {!usingFallback && (
           <section className="course-quiz-section">
-            <h2>Bài kiểm tra & Đánh giá năng lực</h2>
-            {quizzesLoading && <p role="status">Đang tải quiz...</p>}
+            <h2>{t('Bài kiểm tra & Đánh giá năng lực')}</h2>
+            {quizzesLoading && <p role="status">{t('Đang tải quiz...')}</p>}
             {quizError && (
-              <ErrorState error={quizError} title="Không thể tải quiz" onRetry={quizzes.reload} />
+              <ErrorState error={quizError} title={t('Không thể tải quiz')} onRetry={quizzes.reload} />
             )}
             {!quizzesLoading && !quizError && courseQuizzes.length === 0 && (
-              <p>Khóa học chưa có quiz được xuất bản.</p>
+              <p>{t('Khóa học chưa có quiz được xuất bản.')}</p>
             )}
             <div className="course-quiz-list">
               {courseQuizzes.map(quiz => (
                 <Link className="course-quiz-link" to={`/quizzes/${quiz.id}`} key={quiz.id}>
-                  <strong>{quiz.title}</strong>
+                  <strong>{t(quiz.title)}</strong>
                   <span>
-                    {quiz.timeLimitMinutes ? quiz.timeLimitMinutes + ' phút — ' : ''}Điểm đạt{' '}
-                    {quiz.passingScore}%
+                    {quiz.timeLimitMinutes ? quiz.timeLimitMinutes + ' phút — ' : ''}
+                    {t('Điểm đạt')} {quiz.passingScore}%
                   </span>
                 </Link>
               ))}
@@ -623,8 +715,8 @@ function LearningCoursePage({ courseId }) {
 }
 
 export default function LearningPage() {
+  useLocale();
   const { courseId } = useParams();
   const session = useSyncExternalStore(subscribeToSession, getSessionVersion, getSessionVersion);
   return <LearningCoursePage key={courseId + ':' + session} courseId={courseId} />;
 }
-
