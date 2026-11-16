@@ -1,0 +1,1112 @@
+.toeic-app {
+  --toeic-ink: #252842;
+  --toeic-muted: #64718a;
+  --toeic-primary: #2563eb;
+  --toeic-dark: #292c56;
+  --toeic-canvas: #f8fafc;
+  --toeic-surface: #fff;
+  --toeic-line: #e1e7f0;
+  --toeic-blue-soft: #eef5ff;
+  --toeic-orange: #c25b07;
+  --toeic-orange-soft: #fff3e5;
+  --toeic-violet: #7250cd;
+  --toeic-violet-soft: #f3efff;
+  --toeic-green: #18765c;
+  --toeic-green-soft: #eaf7f1;
+  font-family: Inter, Arial, sans-serif;
+  color: var(--toeic-ink);
+  font-size: 14px;
+}
+
+.toeic-app {
+  background: var(--toeic-canvas);
+}
+.toeic-app :is(button, input, select) {
+  font: inherit;
+}
+.toeic-app :is(a, button, input, select):focus-visible {
+  outline: 3px solid var(--toeic-primary);
+  outline-offset: 3px;
+}
+.toeic-app :is(h1, h2, h3) {
+  color: var(--toeic-ink);
+  overflow-wrap: break-word;
+}
+.toeic-main {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px 32px 40px;
+  min-height: calc(100vh - 200px);
+}
+.toeic-page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+.toeic-page-heading h1 {
+  font-size: 29px;
+  line-height: 1.35;
+  letter-spacing: -0.7px;
+  font-weight: 700;
+}
+.toeic-page-heading p {
+  margin-top: 10px;
+  max-width: 760px;
+  font-size: 14px;
+  color: var(--toeic-muted);
+  line-height: 1.8;
+}
+.toeic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  color: var(--toeic-green);
+  background: var(--toeic-green-soft);
+  border-radius: 7px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.toeic-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+}
+.toeic-button-dark {
+  color: var(--toeic-surface);
+  background: var(--toeic-dark);
+  box-shadow: 0 3px 0 #171b3c;
+}
+.toeic-button-dark:hover {
+  background: #353b71;
+}
+.toeic-button-outline {
+  color: var(--toeic-ink);
+  background: var(--toeic-surface);
+  border-color: var(--toeic-line);
+}
+.toeic-button-outline:hover {
+  border-color: var(--toeic-primary);
+  color: var(--toeic-primary);
+}
+.toeic-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--toeic-muted);
+}
+.toeic-icon-button:hover {
+  background: var(--toeic-blue-soft);
+  color: var(--toeic-primary);
+}
+.toeic-featured {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 28px;
+  border: 1px solid #d9e4fb;
+  border-radius: 16px;
+  background: var(--toeic-surface);
+  box-shadow: 0 4px 0 var(--toeic-line);
+  margin-bottom: 26px;
+}
+.toeic-featured-icon {
+  width: 76px;
+  height: 86px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: var(--toeic-blue-soft);
+  color: var(--toeic-primary);
+  border-radius: 12px;
+  border-bottom: 4px solid #ccdefe;
+}
+.toeic-featured-icon > svg {
+  font-size: 38px;
+}
+.toeic-featured-copy {
+  flex: 1;
+  min-width: 0;
+}
+.toeic-featured-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.toeic-featured-tags span {
+  color: var(--toeic-muted);
+  background: var(--toeic-canvas);
+  border: 1px solid var(--toeic-line);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.toeic-featured-tags span:first-child {
+  color: var(--toeic-primary);
+  background: var(--toeic-blue-soft);
+  border-color: #d9e6fd;
+}
+.toeic-featured h2 {
+  font-size: 20px;
+  line-height: 1.5;
+}
+.toeic-featured p {
+  font-size: 12px;
+  color: var(--toeic-muted);
+  margin-top: 8px;
+}
+.toeic-featured > .toeic-button {
+  flex-shrink: 0;
+}
+.toeic-resource-types {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 32px;
+}
+.tone-blue {
+  --type-color: var(--toeic-primary);
+  --type-bg: var(--toeic-blue-soft);
+}
+.tone-orange {
+  --type-color: var(--toeic-orange);
+  --type-bg: var(--toeic-orange-soft);
+}
+.tone-violet {
+  --type-color: var(--toeic-violet);
+  --type-bg: var(--toeic-violet-soft);
+}
+.tone-green {
+  --type-color: var(--toeic-green);
+  --type-bg: var(--toeic-green-soft);
+}
+.toeic-type-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 86px;
+  padding: 16px;
+  text-align: left;
+  border: 1px solid var(--toeic-line);
+  border-radius: 12px;
+  background: var(--toeic-surface);
+}
+.toeic-type-card:hover,
+.toeic-type-card.is-selected {
+  border-color: var(--type-color);
+  box-shadow: 0 2px 0 var(--toeic-line);
+}
+.toeic-type-icon,
+.toeic-document-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 42px;
+  border-radius: 10px;
+  color: var(--type-color);
+  background: var(--type-bg);
+}
+.toeic-type-icon {
+  color: var(--type-color);
+}
+.toeic-type-card strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.toeic-type-card small {
+  display: block;
+  font-size: 11px;
+  color: var(--toeic-muted);
+  margin-top: 5px;
+}
+.toeic-type-arrow {
+  margin-left: auto;
+  color: var(--toeic-muted);
+  width: 15px !important;
+}
+.toeic-library-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--toeic-line);
+  margin-bottom: 20px;
+  gap: 12px;
+}
+.toeic-tabs {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.toeic-tabs > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 0 0 14px;
+  background: transparent;
+  color: var(--toeic-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.toeic-tabs > button.is-active {
+  border-bottom-color: var(--toeic-primary);
+  color: var(--toeic-primary);
+  font-weight: 600;
+}
+.toeic-tabs small {
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--toeic-blue-soft);
+  font-size: 10px;
+}
+.toeic-results-count {
+  padding-bottom: 14px;
+  color: var(--toeic-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.toeic-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.toeic-library-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid var(--toeic-line);
+  border-radius: 8px;
+  background: var(--toeic-surface);
+  color: var(--toeic-muted);
+}
+.toeic-library-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--toeic-ink);
+  min-width: 0;
+  font-size: 12px;
+}
+.toeic-select > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.toeic-select > select,
+.toeic-reader-back select {
+  min-height: 42px;
+  max-width: 100%;
+  background: var(--toeic-surface);
+  border: 1px solid var(--toeic-line);
+  border-radius: 8px;
+  padding: 9px 30px 9px 12px;
+  color: var(--toeic-ink);
+  font-size: 12px;
+}
+.toeic-view-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--toeic-primary);
+  border: 1px solid var(--toeic-line);
+  border-radius: 8px;
+  background: var(--toeic-surface);
+}
+.toeic-test-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.toeic-library-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+}
+.toeic-library-pagination > span {
+  color: var(--toeic-muted);
+  font-size: 12px;
+}
+.toeic-library-pagination .MuiPagination-ul {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.toeic-test-card {
+  position: relative;
+  background: var(--toeic-surface);
+  border: 1px solid var(--toeic-line);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: 0 4px 0 var(--toeic-line);
+}
+.toeic-test-card:hover {
+  border-color: #b8cef3;
+}
+.toeic-test-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.toeic-test-edition {
+  color: var(--toeic-muted);
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--toeic-canvas);
+  padding: 3px 6px;
+  border: 1px solid var(--toeic-line);
+  border-radius: 4px;
+}
+.toeic-save {
+  margin: -5px -6px 0 0;
+}
+.toeic-save.is-saved,
+.toeic-button.is-saved {
+  color: var(--toeic-primary);
+}
+.toeic-test-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.toeic-test-title h2 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.toeic-test-title p {
+  color: var(--toeic-muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+.toeic-book-symbol {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 54px;
+  border-radius: 13px;
+  background: var(--type-bg);
+  color: var(--type-color);
+  flex-shrink: 0;
+}
+.toeic-book-symbol > svg {
+  font-size: 28px;
+}
+.toeic-test-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+.toeic-test-tags > span {
+  padding: 3px 7px;
+  background: var(--toeic-canvas);
+  color: var(--toeic-muted);
+  font-size: 10px;
+  border-radius: 5px;
+}
+.toeic-test-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  color: var(--toeic-muted);
+  margin-bottom: 17px;
+  font-size: 11px;
+}
+.toeic-test-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.toeic-test-meta svg {
+  width: 15px;
+  height: 15px;
+}
+.toeic-test-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--toeic-dark);
+  font-weight: 700;
+  font-size: 12px;
+}
+.toeic-test-action:hover {
+  color: var(--toeic-primary);
+}
+.toeic-document-list {
+  display: grid;
+  gap: 12px;
+}
+.toeic-document-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px 20px;
+  background: var(--toeic-surface);
+  border: 1px solid var(--toeic-line);
+  border-radius: 12px;
+}
+.toeic-document-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.toeic-document-row h2 {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.toeic-document-row p {
+  font-size: 11px;
+  color: var(--toeic-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+}
+.toeic-format {
+  padding: 3px 6px;
+  border: 1px solid var(--toeic-line);
+  border-radius: 5px;
+  color: var(--toeic-muted);
+  font-size: 10px;
+}
+.toeic-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--toeic-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.toeic-study-guide {
+  background: var(--toeic-surface);
+  border: 1px solid var(--toeic-line);
+  border-radius: 14px;
+  margin-top: 36px;
+  padding: 24px;
+}
+.toeic-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toeic-section-title > svg {
+  width: 20px;
+  color: var(--toeic-primary);
+}
+.toeic-section-title h2 {
+  font-size: 16px;
+  line-height: 1.5;
+}
+.toeic-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  margin-top: 24px;
+}
+.toeic-guide-grid article > span {
+  display: inline-flex;
+  padding: 5px 8px;
+  color: var(--toeic-primary);
+  background: var(--toeic-blue-soft);
+  font-size: 11px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.toeic-guide-grid h3 {
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+.toeic-guide-grid p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--toeic-muted);
+}
+.toeic-library-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  color: var(--toeic-muted);
+}
+.toeic-library-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.toeic-library-note p {
+  font-size: 11px;
+  line-height: 1.8;
+}
+.toeic-empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 54px 24px;
+  color: var(--toeic-muted);
+  text-align: center;
+  background: var(--toeic-surface);
+  border: 1px solid var(--toeic-line);
+  border-radius: 12px;
+}
+.toeic-empty > svg {
+  font-size: 42px;
+  color: var(--toeic-primary);
+}
+.toeic-empty h2,
+.toeic-empty h1 {
+  font-size: 20px;
+  line-height: 1.5;
+}
+.toeic-empty p {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.toeic-reader-back {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  font-size: 12px;
+}
+.toeic-reader-back > a,
+.toeic-reader-back label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--toeic-muted);
+}
+.toeic-reader-back > a:hover {
+  color: var(--toeic-primary);
+}
+.toeic-reader-back select {
+  max-width: 220px;
+}
+.toeic-reader-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  align-items: start;
+  gap: 22px;
+}
+.toeic-reader-stage {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--toeic-surface);
+  border: 1px solid var(--toeic-line);
+  border-radius: 14px;
+}
+.toeic-reader-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--toeic-line);
+}
+.toeic-reader-toolbar > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.toeic-reader-toolbar h2 {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.toeic-reader-toolbar div > span:not(.toeic-document-icon) {
+  display: block;
+  font-size: 10px;
+  color: var(--toeic-muted);
+  margin-top: 2px;
+}
+.toeic-reader-tools {
+  display: flex;
+  gap: 5px;
+}
+.toeic-pdf-container {
+  background: #e6eaf0;
+  min-height: 680px;
+}
+.toeic-pdf-viewer {
+  display: block;
+  width: 100%;
+  min-height: 680px;
+  height: 78vh;
+  border: 0;
+}
+.toeic-pdf-loading {
+  display: grid;
+  place-items: center;
+  height: 680px;
+  padding: 24px;
+  color: var(--toeic-muted);
+}
+.toeic-pdf-help {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+  color: var(--toeic-muted);
+  font-size: 11px;
+}
+.toeic-pdf-help p {
+  flex: 1;
+  min-width: 150px;
+}
+.toeic-pdf-help > a {
+  color: var(--toeic-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.toeic-reader-sidebar {
+  display: grid;
+  gap: 18px;
+}
+.toeic-reader-resources,
+.toeic-study-timer {
+  background: var(--toeic-surface);
+  border: 1px solid var(--toeic-line);
+  border-radius: 12px;
+  padding: 20px;
+}
+.toeic-reader-resources h2 {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.toeic-reader-resources > p {
+  font-size: 11px;
+  color: var(--toeic-muted);
+  margin-top: 5px;
+}
+.toeic-reader-resources > div {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+.toeic-reader-resources button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 9px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--toeic-muted);
+  text-align: left;
+}
+.toeic-reader-resources button > span {
+  flex: 1;
+  min-width: 0;
+}
+.toeic-reader-resources button strong {
+  display: block;
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.toeic-reader-resources button small {
+  display: block;
+  font-size: 10px;
+  margin-top: 3px;
+}
+.toeic-reader-resources button > svg {
+  flex-shrink: 0;
+  width: 18px;
+}
+.toeic-reader-resources button > svg:last-child {
+  width: 14px;
+}
+.toeic-reader-resources button:hover,
+.toeic-reader-resources button.is-active {
+  color: var(--toeic-primary);
+  background: var(--toeic-blue-soft);
+  border-color: #d9e6fc;
+}
+.toeic-study-timer > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--toeic-muted);
+  font-size: 12px;
+}
+.toeic-study-timer > strong {
+  display: block;
+  font-size: 34px;
+  color: var(--toeic-ink);
+  margin: 16px 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.toeic-timer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toeic-timer-actions > .toeic-button {
+  flex: 1;
+  font-size: 12px;
+}
+.toeic-study-timer > p {
+  color: var(--toeic-orange);
+  font-size: 12px;
+  margin-top: 12px;
+}
+.toeic-reader-note {
+  display: flex;
+  gap: 8px;
+  color: var(--toeic-muted);
+  padding: 0 4px;
+}
+.toeic-reader-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.toeic-reader-note p {
+  font-size: 11px;
+  line-height: 1.8;
+}
+.toeic-inline-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.toeic-test-pagination {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  margin-top: 26px;
+}
+.toeic-test-pagination > a {
+  justify-self: start;
+}
+.toeic-test-pagination > a:last-child {
+  justify-self: end;
+}
+.toeic-test-pagination > span {
+  color: var(--toeic-muted);
+  font-size: 11px;
+}
+
+@media (min-width: 1800px) {
+  .toeic-main {
+    padding-top: 40px;
+  }
+}
+@media (max-width: 1250px) {
+  .toeic-featured {
+    flex-wrap: wrap;
+  }
+  .toeic-featured > .toeic-button {
+    margin-left: 98px;
+  }
+  .toeic-resource-types {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .toeic-reader-grid {
+    grid-template-columns: minmax(0, 1fr) 230px;
+    gap: 16px;
+  }
+  .toeic-reader-resources,
+  .toeic-study-timer {
+    padding: 16px;
+  }
+}
+@media (max-width: 1023px) {
+  .toeic-featured {
+    flex-wrap: nowrap;
+  }
+  .toeic-featured > .toeic-button {
+    margin-left: 0;
+  }
+}
+@media (max-width: 760px) {
+  .toeic-library-pagination {
+    flex-direction: column;
+    justify-content: center;
+  }
+  .toeic-main {
+    padding: 24px 20px 32px;
+  }
+  .toeic-page-heading {
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .toeic-page-heading h1 {
+    font-size: 26px;
+  }
+  .toeic-page-heading p {
+    font-size: 13px;
+  }
+  .toeic-page-heading > .toeic-pill {
+    display: none;
+  }
+  .toeic-featured {
+    flex-wrap: wrap;
+    padding: 20px;
+    gap: 16px;
+  }
+  .toeic-featured-icon {
+    width: 54px;
+    height: 66px;
+  }
+  .toeic-featured-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+  .toeic-featured-copy {
+    flex-basis: calc(100% - 76px);
+  }
+  .toeic-featured h2 {
+    font-size: 17px;
+  }
+  .toeic-featured-tags span:last-child {
+    display: none;
+  }
+  .toeic-featured > .toeic-button {
+    width: 100%;
+  }
+  .toeic-tabs {
+    gap: 16px;
+  }
+  .toeic-tabs > button {
+    font-size: 12px;
+  }
+  .toeic-results-count {
+    display: none;
+  }
+  .toeic-filter-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .toeic-library-search {
+    flex-basis: 100%;
+  }
+  .toeic-library-search input {
+    font-size: 16px;
+  }
+  .toeic-select {
+    flex: 1;
+    min-width: 0;
+  }
+  .toeic-select > select {
+    width: 100%;
+    font-size: 13px;
+  }
+  .toeic-view-indicator {
+    display: none;
+  }
+  .toeic-test-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .toeic-test-card {
+    padding: 18px 20px;
+  }
+  .toeic-test-title h2 {
+    font-size: 16px;
+  }
+  .toeic-guide-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .toeic-guide-grid article {
+    position: relative;
+    padding-left: 44px;
+  }
+  .toeic-guide-grid article > span {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  .toeic-guide-grid h3 {
+    margin-bottom: 5px;
+  }
+  .toeic-document-row {
+    gap: 10px;
+    padding: 14px;
+    flex-wrap: wrap;
+  }
+  .toeic-document-row > div {
+    min-width: 170px;
+  }
+  .toeic-document-row > .toeic-text-link {
+    margin-left: 48px;
+  }
+  .toeic-document-row > .toeic-icon-button {
+    margin-left: auto;
+  }
+  .toeic-document-row .toeic-format {
+    font-size: 9px;
+  }
+  .toeic-reader-back {
+    flex-wrap: wrap;
+  }
+  .toeic-reader-back > label {
+    margin-left: auto;
+    font-size: 0;
+  }
+  .toeic-reader-back select {
+    width: 160px;
+    padding-right: 20px;
+    font-size: 11px;
+  }
+  .toeic-reader-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .toeic-reader-sidebar {
+    display: contents;
+  }
+  .toeic-reader-resources {
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+    padding: 16px;
+  }
+  .toeic-reader-resources > p {
+    display: none;
+  }
+  .toeic-reader-resources > div {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    gap: 8px;
+  }
+  .toeic-reader-resources button {
+    flex: 0 0 160px;
+    border-color: var(--toeic-line);
+  }
+  .toeic-reader-resources button > svg:last-child {
+    display: none;
+  }
+  .toeic-study-timer {
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+  .toeic-study-timer > strong {
+    margin: 0;
+    font-size: 28px;
+  }
+  .toeic-timer-actions {
+    grid-column: 1 / -1;
+  }
+  .toeic-reader-stage {
+    grid-row: 3;
+  }
+  .toeic-reader-note {
+    grid-row: 4;
+  }
+  .toeic-reader-toolbar {
+    padding: 14px;
+    gap: 8px;
+  }
+  .toeic-reader-toolbar h2 {
+    font-size: 12px;
+  }
+  .toeic-reader-toolbar .toeic-document-icon {
+    display: none;
+  }
+  .toeic-reader-tools {
+    gap: 0;
+  }
+  .toeic-reader-tools .toeic-icon-button {
+    width: 32px;
+  }
+  .toeic-pdf-viewer,
+  .toeic-pdf-container {
+    min-height: 500px;
+  }
+  .toeic-test-pagination {
+    gap: 8px;
+  }
+  .toeic-test-pagination .toeic-button {
+    padding: 8px;
+    font-size: 10px;
+  }
+  .toeic-test-pagination > span {
+    font-size: 9px;
+    text-align: center;
+  }
+}
+@media (max-width: 380px) {
+  .toeic-main {
+    padding-inline: 16px;
+  }
+  .toeic-resource-types {
+    gap: 10px;
+  }
+  .toeic-type-card {
+    padding: 12px;
+    gap: 8px;
+  }
+  .toeic-type-icon {
+    width: 28px;
+    height: 34px;
+  }
+  .toeic-type-icon svg {
+    width: 19px;
+  }
+  .toeic-type-arrow {
+    display: none !important;
+  }
+  .toeic-type-card strong {
+    font-size: 11px;
+  }
+  .toeic-type-card small {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toeic-app * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

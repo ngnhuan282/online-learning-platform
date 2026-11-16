@@ -3,6 +3,7 @@ WORKDIR /web
 COPY frontend/web/package*.json ./
 RUN npm ci
 COPY frontend/web/ ./
+COPY docs/resources/ /docs/resources/
 # Empty uses the browser origin, so the same image works behind staging HTTPS.
 ENV VITE_API_URL=""
 RUN npm run build

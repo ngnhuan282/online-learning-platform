@@ -179,6 +179,26 @@ const router = createBrowserRouter([
     element: <MainLayout />,
     children: [
       {
+        path: 'exams/toeic',
+        lazy: async () => ({
+          Component: (await import('../features/learning/components/ToeicLayout')).default,
+        }),
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/ToeicLibraryPage')).default,
+            }),
+          },
+          {
+            path: 'tests/:testId',
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/ToeicReaderPage')).default,
+            }),
+          },
+        ],
+      },
+      {
         index: true,
         element: <HomePage />,
       },

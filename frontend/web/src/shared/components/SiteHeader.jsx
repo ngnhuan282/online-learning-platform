@@ -39,6 +39,9 @@ export default function SiteHeader() {
           <Link className={hash === '#courses' ? 'active' : ''} to="/#courses">
             {t('Khóa học')}
           </Link>
+          <Link className={pathname.startsWith(ROUTES.TOEIC) ? 'active' : ''} to={ROUTES.TOEIC}>
+            {t('Luyện thi TOEIC')}
+          </Link>
           <Link
             className={`header-secondary-link ${hash === '#categories' ? 'active' : ''}`}
             to="/#categories"

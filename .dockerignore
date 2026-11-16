@@ -7,4 +7,7 @@
 **/.env
 **/.env.*
 frontend/web/dist
-docs
+docs/*
+!docs/resources/
+docs/resources/[Aa][Uu][Dd][Ii][Oo]/
+docs/resources/**/[Aa][Uu][Dd][Ii][Oo]/
