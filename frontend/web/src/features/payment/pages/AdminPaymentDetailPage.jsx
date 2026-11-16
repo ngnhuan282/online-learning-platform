@@ -320,7 +320,9 @@ export default function AdminPaymentDetailPage() {
           <section className="admin-card">
             <div className="admin-card-heading">
               <div>
-                <h2>{t('Khóa học trong giao dịch')}</h2>
+                <h2>
+                  {t(order.productType === 'PRO' ? 'Gói Pro trong giao dịch' : 'Khóa học trong giao dịch')}
+                </h2>
                 <p>{t('Dữ liệu khóa học được lưu tại thời điểm học viên tạo thanh toán.')}</p>
               </div>
             </div>
@@ -336,7 +338,7 @@ export default function AdminPaymentDetailPage() {
                 </thead>
                 <tbody>
                   {order.items.map(item => (
-                    <tr key={item.courseId}>
+                    <tr key={item.courseId ?? order.orderCode}>
                       <td>{item.courseTitle}</td>
                       <td>{currency(item.unitPrice, order.currency)}</td>
                       <td>{currency(item.discountAmount, order.currency)}</td>

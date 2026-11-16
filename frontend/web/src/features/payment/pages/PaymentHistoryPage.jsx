@@ -211,7 +211,7 @@ export default function PaymentHistoryPage() {
                   <thead>
                     <tr>
                       <th>{t('Mã đơn')}</th>
-                      <th>{t('Khóa học')}</th>
+                      <th>{t('Khóa học / Gói Pro')}</th>
                       <th>{t('Số tiền')}</th>
                       <th>{t('Trạng thái')}</th>
                       <th>{t('Ngày tạo')}</th>

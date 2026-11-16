@@ -10,7 +10,8 @@ public record EnrollmentResponse(
     EnrollmentStatus status,
     Instant enrolledAt,
     Instant completedAt,
-    Instant lastAccessedAt
+    Instant lastAccessedAt,
+    String accessSource
 ) {
     public static EnrollmentResponse from(Enrollment enrollment) {
         return new EnrollmentResponse(
@@ -19,7 +20,8 @@ public record EnrollmentResponse(
             enrollment.getStatus(),
             enrollment.getEnrolledAt(),
             enrollment.getCompletedAt(),
-            enrollment.getLastAccessedAt()
+            enrollment.getLastAccessedAt(),
+            enrollment.getAccessSource()
         );
     }
 }

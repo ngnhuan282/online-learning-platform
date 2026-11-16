@@ -15,6 +15,8 @@ import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
 import { lessonApi } from '../api/lessonApi';
 import ErrorState from '../../../shared/components/ErrorState';
+import usePro from '../../pro/hooks/usePro';
+import { ROUTES } from '../../../shared/constants/routes';
 
 // Chuẩn hóa hiển thị giá tiền VND (B9-FE-2)
 const formatVND = amount => {
@@ -67,6 +69,7 @@ function CourseDetail({ id }) {
   useLocale();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { membership } = usePro();
 
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
@@ -92,7 +95,9 @@ function CourseDetail({ id }) {
   const [enrollment, setEnrollment] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState(null);
-  const isEnrolled = isAuthenticated && enrollment?.userId === user?.id && enrollment?.courseId === id;
+  const hasEnrollment = isAuthenticated && enrollment?.userId === user?.id && enrollment?.courseId === id;
+  const expiredPro = hasEnrollment && enrollment.accessSource === 'PRO' && membership && !membership.active;
+  const isEnrolled = hasEnrollment && !expiredPro;
   const [activeTab, setActiveTab] = useState('curriculum'); // 'curriculum' | 'reviews'
 
   // States cho Modal học thử (Preview Lesson Player)
@@ -187,8 +192,10 @@ function CourseDetail({ id }) {
       .getMyEnrollments()
       .then(({ data }) => {
         if (!active) return;
-        const enrolled = data.some(item => String(item.courseId) === id && item.status !== 'CANCELLED');
-        setEnrollment(enrolled ? { userId: user.id, courseId: id } : null);
+        const enrolled = data.find(item => String(item.courseId) === id && item.status !== 'CANCELLED');
+        setEnrollment(
+          enrolled ? { userId: user.id, courseId: id, accessSource: enrolled.accessSource } : null,
+        );
       })
       .catch(() => {
         if (active) setEnrollment(null);
@@ -812,6 +819,17 @@ function CourseDetail({ id }) {
               >
                 {t('🚀 Tiếp tục học')}
               </button>
+            ) : membership?.active && Number(item.price || 0) > 0 ? (
+              <button
+                className="button button-primary"
+                type="button"
+                id="btn-enroll-pro"
+                style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700 }}
+                onClick={handleEnroll}
+                disabled={enrolling || item.status !== 'PUBLISHED'}
+              >
+                {t('Học bằng Pro')}
+              </button>
             ) : Number(item.price || 0) === 0 ? (
               <button
                 className="button button-primary"
@@ -841,6 +859,12 @@ function CourseDetail({ id }) {
               </button>
             )}
 
+            {Number(item.price || 0) > 0 && !membership?.active && (
+              <Link className="button button-outline" to={ROUTES.PRO}>
+                {t(expiredPro ? 'Gia hạn Pro để tiếp tục học' : 'Hoặc mở khóa với Pro')}
+              </Link>
+            )}
+
             <div
               style={{
                 borderTop: '1px solid rgba(148, 163, 184, 0.2)',
@@ -851,7 +875,13 @@ function CourseDetail({ id }) {
                 color: '#64748b',
               }}
             >
-              <div>{t('✅ Truy cập trọn đời toàn bộ bài giảng')}</div>
+              <div>
+                {t(
+                  enrollment?.accessSource === 'PRO' || (membership?.active && !hasEnrollment)
+                    ? '✅ Quyền học trong thời hạn Pro'
+                    : '✅ Truy cập trọn đời toàn bộ bài giảng',
+                )}
+              </div>
               <div>{t('✅ Học trên máy tính, điện thoại, tablet')}</div>
               <div>{t('✅ Hỗ trợ giải đáp từ giảng viên')}</div>
               <div>{t('✅ Cấp chứng chỉ hoàn thành khóa học')}</div>

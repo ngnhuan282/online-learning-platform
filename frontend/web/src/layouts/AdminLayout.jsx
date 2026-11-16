@@ -18,6 +18,7 @@ import {
   Search,
   OpenInNew,
   Close,
+  WorkspacePremiumOutlined,
 } from '@mui/icons-material';
 import PermissionRoute from '../routes/PermissionRoute';
 import useAuth from '../features/auth/hooks/useAuth';
@@ -28,6 +29,13 @@ import { ROUTES } from '../shared/constants/routes';
 import '../features/admin/admin.css';
 
 const menu = [
+  {
+    to: ROUTES.ADMIN_PRO_CODES,
+    label: 'Mã kích hoạt Pro',
+    icon: WorkspacePremiumOutlined,
+    permission: 'ADMIN_ACCESS',
+    adminOnly: true,
+  },
   { to: '/admin', label: 'Tổng quan', icon: DashboardOutlined, permission: 'DASHBOARD_VIEW', end: true },
   { to: '/admin/users', label: 'Quản lý tài khoản', icon: PeopleOutlined, permission: 'USER_VIEW' },
   {

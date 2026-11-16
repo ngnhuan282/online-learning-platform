@@ -80,6 +80,57 @@ public class LearningEnrollmentClient {
 
     private record EnrollmentRequest(String orderCode, Long userId, Long courseId) {}
 
+    public void grantPro(String orderCode, Long userId, String planCode, int durationMonths) {
+        proRequest(
+            "/internal/v1/learning/pro/grants",
+            new ProGrant(orderCode, userId, planCode, durationMonths),
+            userId
+        );
+    }
+
+    public void revokePro(String orderCode, Long userId) {
+        proRequest("/internal/v1/learning/pro/revocations", new ProRevoke(orderCode, userId), userId);
+    }
+
+    private void proRequest(String path, Object body, Long userId) {
+        try {
+            ProEnvelope response = client
+                .post()
+                .uri(path)
+                .header(INTERNAL_TOKEN_HEADER, internalToken)
+                .body(body)
+                .retrieve()
+                .onStatus(
+                    status -> status.value() == 409,
+                    (request, result) -> {
+                        throw new AppException(ErrorCode.CONFLICT);
+                    }
+                )
+                .onStatus(HttpStatusCode::isError, (request, result) -> {
+                    throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+                })
+                .body(ProEnvelope.class);
+            if (
+                response == null ||
+                !response.success() ||
+                response.data() == null ||
+                !userId.equals(response.data().userId())
+            ) {
+                throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+            }
+        } catch (RestClientException exception) {
+            throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+        }
+    }
+
+    private record ProGrant(String orderCode, Long userId, String planCode, int durationMonths) {}
+
+    private record ProRevoke(String orderCode, Long userId) {}
+
+    private record ProEnvelope(boolean success, ProData data) {}
+
+    private record ProData(Long userId) {}
+
     private record EnrollmentEnvelope(boolean success, EnrollmentData data) {}
 
     private record EnrollmentData(Long courseId) {}

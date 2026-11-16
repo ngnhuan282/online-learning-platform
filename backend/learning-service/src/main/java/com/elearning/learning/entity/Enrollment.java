@@ -5,13 +5,17 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Getter
 @Setter
 @Entity
 @Table(
     name = "enrollments",
-    uniqueConstraints = @UniqueConstraint(name = "uk_enrollments_user_course", columnNames = { "user_id", "course_id" })
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_enrollments_user_course",
+        columnNames = { "user_id", "course_id" }
+    )
 )
 public class Enrollment {
 
@@ -27,6 +31,10 @@ public class Enrollment {
 
     @Column(name = "source_order_code", unique = true, length = 40)
     private String sourceOrderCode;
+
+    @Column(name = "access_source", nullable = false, length = 16)
+    @ColumnDefault("'COURSE'")
+    private String accessSource = "COURSE";
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)

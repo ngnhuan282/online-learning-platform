@@ -18,7 +18,7 @@ public class OrderItem {
     @JoinColumn(name = "order_id", nullable = false)
     private CourseOrder order;
 
-    @Column(name = "course_id", nullable = false)
+    @Column(name = "course_id")
     private Long courseId;
 
     @Column(name = "course_title", nullable = false, length = 255)

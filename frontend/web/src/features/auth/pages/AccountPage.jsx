@@ -9,6 +9,7 @@ import StatusChip from '../../../shared/components/StatusChip';
 import SignInMethods from '../components/SignInMethods';
 import { can } from '../../admin/utils/adminUtils';
 import ProfileAppearance from '../../shop/components/ProfileAppearance';
+import ProMembershipCard from '../../pro/components/ProMembershipCard';
 
 export default function AccountPage() {
   useLocale();
@@ -112,6 +113,7 @@ export default function AccountPage() {
     <section className="container section" style={{ padding: '32px 0 80px' }}>
       <div style={{ maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
         <ProfileAppearance />
+        <ProMembershipCard />
         {/* Header Section */}
         <div
           style={{

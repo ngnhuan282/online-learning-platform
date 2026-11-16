@@ -61,7 +61,10 @@ public class VnpayGateway {
         fields.put("vnp_Amount", amount);
         fields.put("vnp_CurrCode", "VND");
         fields.put("vnp_TxnRef", order.getOrderCode());
-        fields.put("vnp_OrderInfo", "Thanh toan khoa hoc " + order.getOrderCode());
+        fields.put(
+            "vnp_OrderInfo",
+            (order.isPro() ? "Nang cap ChitChatGo Pro " : "Thanh toan khoa hoc ") + order.getOrderCode()
+        );
         fields.put("vnp_OrderType", "other");
         fields.put("vnp_Locale", "vn");
         fields.put("vnp_IpAddr", clientIp);

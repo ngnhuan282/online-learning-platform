@@ -65,6 +65,18 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <AdminDashboardPage /> },
       { path: 'profile', element: <AccountPage /> },
+      {
+        path: 'pro-codes',
+        element: <RoleRoute roles={['ADMIN']} />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/pro/pages/AdminProCodesPage')).default,
+            }),
+          },
+        ],
+      },
       { path: 'analytics', element: <Navigate to="/admin" replace /> },
       {
         path: 'payments',
@@ -224,6 +236,10 @@ const router = createBrowserRouter([
             lazy: async () => ({
               Component: (await import('../features/engagement/pages/AchievementsPage')).default,
             }),
+          },
+          {
+            path: 'pro',
+            lazy: async () => ({ Component: (await import('../features/pro/pages/ProPage')).default }),
           },
           {
             path: 'shop',

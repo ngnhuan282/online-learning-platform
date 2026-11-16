@@ -13,6 +13,7 @@ import com.elearning.learning.service.CourseCatalogClient;
 import com.elearning.learning.service.EngagementService;
 import com.elearning.learning.service.LearningService;
 import com.elearning.learning.service.NotificationService;
+import com.elearning.learning.service.ProMembershipService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -31,6 +32,7 @@ public class LearningServiceImpl implements LearningService {
     private final CourseCatalogClient courseCatalog;
     private final JdbcTemplate jdbc;
     private final EngagementService engagement;
+    private final ProMembershipService pro;
 
     public LearningServiceImpl(
         EnrollmentRepository enrollments,
@@ -39,7 +41,8 @@ public class LearningServiceImpl implements LearningService {
         NotificationService notifications,
         CourseCatalogClient courseCatalog,
         JdbcTemplate jdbc,
-        EngagementService engagement
+        EngagementService engagement,
+        ProMembershipService pro
     ) {
         this.enrollments = enrollments;
         this.progress = progress;
@@ -48,6 +51,7 @@ public class LearningServiceImpl implements LearningService {
         this.courseCatalog = courseCatalog;
         this.jdbc = jdbc;
         this.engagement = engagement;
+        this.pro = pro;
     }
 
     @Override
@@ -86,12 +90,23 @@ public class LearningServiceImpl implements LearningService {
             if (enrollment.getStatus() == EnrollmentStatus.CANCELLED) {
                 throw new AppException(ErrorCode.CONFLICT);
             }
+            if ("PRO".equals(enrollment.getAccessSource()) && !pro.isActive(userId)) {
+                courseCatalog.requireFreeCourse(request.courseId());
+                enrollment.setAccessSource("COURSE");
+            }
             enrollment.setLastAccessedAt(Instant.now());
             return EnrollmentResponse.from(enrollments.save(enrollment));
         }
 
-        courseCatalog.requireFreeCourse(request.courseId());
+        boolean proAccess = pro.isActive(userId);
+        boolean free = false;
+        if (proAccess) free = courseCatalog.requirePublishedCourse(request.courseId());
+        else courseCatalog.requireFreeCourse(request.courseId());
         Enrollment saved = createEnrollmentIfAbsent(userId, request.courseId(), null);
+        if (proAccess && !free && saved.getSourceOrderCode() == null) {
+            saved.setAccessSource("PRO");
+            enrollments.saveAndFlush(saved);
+        }
         notifications.courseEnrolled(userId, request.courseId(), saved.getId());
         return EnrollmentResponse.from(saved);
     }
@@ -134,6 +149,11 @@ public class LearningServiceImpl implements LearningService {
         Enrollment saved = createEnrollmentIfAbsent(request.userId(), request.courseId(), orderCode);
         if (saved.getStatus() == EnrollmentStatus.CANCELLED) {
             throw new AppException(ErrorCode.CONFLICT);
+        }
+        if ("PRO".equals(saved.getAccessSource())) {
+            saved.setAccessSource("COURSE");
+            saved.setSourceOrderCode(orderCode);
+            enrollments.saveAndFlush(saved);
         }
         if (!existingCourse) notifications.courseEnrolled(
             request.userId(),
@@ -246,6 +266,7 @@ public class LearningServiceImpl implements LearningService {
         boolean enrolled = enrollments
             .findByUserIdAndCourseId(userId, courseId)
             .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
+            .filter(enrollment -> !"PRO".equals(enrollment.getAccessSource()) || pro.isActive(userId))
             .isPresent();
         if (!enrolled) {
             throw new AppException(ErrorCode.FORBIDDEN);
@@ -253,10 +274,14 @@ public class LearningServiceImpl implements LearningService {
     }
 
     private Enrollment ensureCourseAccessForUpdate(Long userId, Long courseId) {
-        return enrollments
+        Enrollment enrollment = enrollments
             .findForUpdateByUserIdAndCourseId(userId, courseId)
-            .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
+            .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED)
             .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN));
+        if ("PRO".equals(enrollment.getAccessSource()) && !pro.isActive(userId)) throw new AppException(
+            ErrorCode.PRO_REQUIRED
+        );
+        return enrollment;
     }
 
     private LessonProgress createLessonProgress(Long userId, Long courseId, Long lessonId) {
@@ -278,6 +303,7 @@ public class LearningServiceImpl implements LearningService {
         return enrollments
             .findByUserIdAndCourseId(userId, courseId)
             .filter(enrollment -> enrollment.getStatus() != EnrollmentStatus.CANCELLED)
+            .filter(enrollment -> !"PRO".equals(enrollment.getAccessSource()) || pro.isActive(userId))
             .map(enrollment ->
                 new EnrollmentCheckResponse(true, enrollment.getStatus().name(), userId, courseId)
             )

@@ -179,6 +179,11 @@ function LearningCoursePage({ courseId }) {
               onRetry={snapshot.reload}
             />
           )}
+          {snapshot.error?.status === 403 && (
+            <Link className="button button-outline" to={ROUTES.PRO}>
+              {t('Xem hoặc gia hạn Pro')}
+            </Link>
+          )}
         </div>
       </section>
     );

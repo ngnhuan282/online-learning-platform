@@ -30,6 +30,7 @@ public class QuizService {
     private final CourseCatalogClient courseCatalog;
     private final NotificationService notifications;
     private final EngagementService engagement;
+    private final ProMembershipService pro;
 
     public QuizService(
         QuizRepository quizzes,
@@ -37,7 +38,8 @@ public class QuizService {
         EnrollmentRepository enrollments,
         CourseCatalogClient courseCatalog,
         NotificationService notifications,
-        EngagementService engagement
+        EngagementService engagement,
+        ProMembershipService pro
     ) {
         this.quizzes = quizzes;
         this.attempts = attempts;
@@ -45,6 +47,7 @@ public class QuizService {
         this.courseCatalog = courseCatalog;
         this.notifications = notifications;
         this.engagement = engagement;
+        this.pro = pro;
     }
 
     public List<QuizListItemResponse> listPublished(Long userId, Long courseId) {
@@ -256,6 +259,7 @@ public class QuizService {
             enrollments
                 .findByUserIdAndCourseId(userId, courseId)
                 .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED)
+                .filter(item -> !"PRO".equals(item.getAccessSource()) || pro.isActive(userId))
                 .isEmpty()
         ) {
             throw new AppException(ErrorCode.FORBIDDEN);
@@ -267,6 +271,7 @@ public class QuizService {
             enrollments
                 .findForUpdateByUserIdAndCourseId(userId, courseId)
                 .filter(item -> item.getStatus() != EnrollmentStatus.CANCELLED)
+                .filter(item -> !"PRO".equals(item.getAccessSource()) || pro.isActive(userId))
                 .isEmpty()
         ) {
             throw new AppException(ErrorCode.FORBIDDEN);

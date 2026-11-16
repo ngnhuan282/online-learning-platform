@@ -29,6 +29,10 @@ Cửa hàng `/shop` và kho đồ: mua/trang bị khung avatar, ảnh nền, str
 header hiển thị thông báo, streak, số dư, avatar và cấp độ, bộ chọn ngôn ngữ có cờ.
 Quy tắc mua và vận hành: [SHOP.md](docs/learning/SHOP.md).
 
+Gói **ChitChatGo Pro** tại `/pro`: 50.000đ/tháng, 120.000đ/3 tháng, 499.000đ/năm;
+mở khóa các khóa trả phí trong thời hạn gói, gia hạn cộng dồn, thanh toán và mã kích hoạt do ADMIN cấp.
+Quy tắc quyền học, thanh toán và quản trị mã: [PRO.md](docs/learning/PRO.md).
+
 - Đăng ký tài khoản.
 - Đăng nhập bằng email và mật khẩu.
 - Phân quyền `USER` và `ADMIN`.

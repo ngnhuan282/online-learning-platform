@@ -1,5 +1,7 @@
 export const ROUTES = Object.freeze({
   HOME: '/',
+  PRO: '/pro',
+  ADMIN_PRO_CODES: '/admin/pro-codes',
   SHOP: '/shop',
   ACHIEVEMENTS: '/achievements',
   LEADERBOARD: '/leaderboard',
