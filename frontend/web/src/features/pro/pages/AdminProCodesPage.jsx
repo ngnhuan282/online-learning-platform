@@ -9,6 +9,8 @@ import { formatDate } from '../../../shared/utils/formatDate';
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
 import '../styles/pro.css';
+import useAuth from '../../auth/hooks/useAuth';
+import { can } from '../../admin/utils/adminUtils';
 
 const statusLabels = {
   AVAILABLE: 'Chưa sử dụng',
@@ -18,6 +20,7 @@ const statusLabels = {
 };
 export default function AdminProCodesPage() {
   useLocale();
+  const { user } = useAuth();
   const load = useCallback(options => proApi.codes(options), []);
   const resource = useLearningResource(load, null);
   const mutation = useWorkspaceMutation();
@@ -55,32 +58,34 @@ export default function AdminProCodesPage() {
         </div>
         <KeyOutlined />
       </header>
-      <form className="pro-admin-form" onSubmit={create}>
-        <label>
-          {t('Gói Pro')}
-          <select
-            value={planCode}
-            onChange={event => setPlanCode(event.target.value)}
-            disabled={mutation.busy}
-          >
-            <option value="PRO_MONTH">{t('1 tháng')}</option>
-            <option value="PRO_QUARTER">{t('3 tháng')}</option>
-            <option value="PRO_YEAR">{t('1 năm')}</option>
-          </select>
-        </label>
-        <label>
-          {t('Hạn sử dụng mã (tùy chọn)')}
-          <input
-            type="datetime-local"
-            value={expiresAt}
-            onChange={event => setExpiresAt(event.target.value)}
-            disabled={mutation.busy}
-          />
-        </label>
-        <button className="button button-primary" disabled={mutation.busy}>
-          {t('Tạo mã kích hoạt')}
-        </button>
-      </form>
+      {can(user, 'PRO_CODE_CREATE') && (
+        <form className="pro-admin-form" onSubmit={create}>
+          <label>
+            {t('Gói Pro')}
+            <select
+              value={planCode}
+              onChange={event => setPlanCode(event.target.value)}
+              disabled={mutation.busy}
+            >
+              <option value="PRO_MONTH">{t('1 tháng')}</option>
+              <option value="PRO_QUARTER">{t('3 tháng')}</option>
+              <option value="PRO_YEAR">{t('1 năm')}</option>
+            </select>
+          </label>
+          <label>
+            {t('Hạn sử dụng mã (tùy chọn)')}
+            <input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={event => setExpiresAt(event.target.value)}
+              disabled={mutation.busy}
+            />
+          </label>
+          <button className="button button-primary" disabled={mutation.busy}>
+            {t('Tạo mã kích hoạt')}
+          </button>
+        </form>
+      )}
       <ActionError error={mutation.error} />
       {issued && (
         <article className="pro-issued-code">
@@ -130,7 +135,7 @@ export default function AdminProCodesPage() {
                   <td>
                     <button
                       className="text-button danger"
-                      disabled={mutation.busy || item.status !== 'AVAILABLE'}
+                      disabled={mutation.busy || item.status !== 'AVAILABLE' || !can(user, 'PRO_CODE_REVOKE')}
                       onClick={() => setRevoke(item)}
                     >
                       {t('Thu hồi')}

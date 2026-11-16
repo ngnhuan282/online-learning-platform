@@ -8,9 +8,20 @@ export const backgroundAssets = {
   BACKGROUND_CAMPUS: '/images/shop/campus-sunrise.png',
   BACKGROUND_LIBRARY: '/images/shop/moonlit-library.png',
 };
-export function appearanceBackground(code) {
-  return backgroundAssets[code]
-    ? { backgroundImage: `url(${backgroundAssets[code]})` }
+export const frameArt = {
+  'kitty-scholar': frameAssets.FRAME_KITTY,
+  'koala-garden': frameAssets.FRAME_KOALA,
+  'owl-wizard': frameAssets.FRAME_OWL,
+  'bunny-bloom': frameAssets.FRAME_BUNNY,
+};
+const backgroundArt = {
+  'campus-sunrise': backgroundAssets.BACKGROUND_CAMPUS,
+  'moonlit-library': backgroundAssets.BACKGROUND_LIBRARY,
+};
+export function appearanceBackground(code, assetKey) {
+  const image = backgroundArt[assetKey] || backgroundAssets[code];
+  return image
+    ? { backgroundImage: `url(${image})` }
     : {
         backgroundImage:
           'radial-gradient(circle at 85% 20%, #ffeec7 0, transparent 35%), linear-gradient(135deg, #e1f5ff, #eee4ff)',

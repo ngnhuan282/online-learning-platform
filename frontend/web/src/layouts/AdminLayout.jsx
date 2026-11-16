@@ -19,6 +19,11 @@ import {
   OpenInNew,
   Close,
   WorkspacePremiumOutlined,
+  ShoppingBagOutlined,
+  DiamondOutlined,
+  EmojiEventsOutlined,
+  ForumOutlined,
+  CardMembershipOutlined,
 } from '@mui/icons-material';
 import PermissionRoute from '../routes/PermissionRoute';
 import useAuth from '../features/auth/hooks/useAuth';
@@ -33,10 +38,40 @@ const menu = [
     to: ROUTES.ADMIN_PRO_CODES,
     label: 'Mã kích hoạt Pro',
     icon: WorkspacePremiumOutlined,
-    permission: 'ADMIN_ACCESS',
-    adminOnly: true,
+    permission: 'PRO_CODE_VIEW',
   },
   { to: '/admin', label: 'Tổng quan', icon: DashboardOutlined, permission: 'DASHBOARD_VIEW', end: true },
+  { to: ROUTES.ADMIN_SHOP, label: 'Quản lý cửa hàng', icon: ShoppingBagOutlined, permission: 'SHOP_VIEW' },
+  {
+    to: ROUTES.ADMIN_ENGAGEMENT,
+    label: 'Gem, XP & cấp độ',
+    icon: DiamondOutlined,
+    permission: 'ENGAGEMENT_VIEW',
+  },
+  {
+    to: ROUTES.ADMIN_ENGAGEMENT_RULES,
+    label: 'Quy tắc & phần thưởng',
+    icon: EmojiEventsOutlined,
+    permission: 'ENGAGEMENT_CONFIG_VIEW',
+  },
+  {
+    to: ROUTES.ADMIN_PRO_PLANS,
+    label: 'Quản lý gói Pro',
+    icon: WorkspacePremiumOutlined,
+    permission: 'PRO_PLAN_VIEW',
+  },
+  {
+    to: ROUTES.ADMIN_PRO_MEMBERS,
+    label: 'Thành viên Pro',
+    icon: CardMembershipOutlined,
+    permission: 'PRO_MEMBER_VIEW',
+  },
+  {
+    to: ROUTES.ADMIN_COMMUNITY,
+    label: 'Kiểm duyệt diễn đàn',
+    icon: ForumOutlined,
+    permission: 'COMMUNITY_VIEW',
+  },
   { to: '/admin/users', label: 'Quản lý tài khoản', icon: PeopleOutlined, permission: 'USER_VIEW' },
   {
     to: '/admin/payments',
@@ -57,15 +92,13 @@ const menu = [
     to: ROUTES.ADMIN_QUIZZES,
     label: 'Quản lý quiz',
     icon: QuizOutlined,
-    permission: 'ADMIN_ACCESS',
-    adminOnly: true,
+    permission: 'QUIZ_VIEW',
   },
   {
     to: ROUTES.ADMIN_NOTIFICATIONS,
     label: 'Thông báo',
     icon: NotificationsOutlined,
-    permission: 'ADMIN_ACCESS',
-    adminOnly: true,
+    permission: 'NOTIFICATION_VIEW',
   },
   { to: '/admin/audit', label: 'Nhật ký quản trị', icon: HistoryOutlined, permission: 'AUDIT_VIEW' },
 ];

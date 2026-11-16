@@ -53,6 +53,7 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
           name={user.fullName}
           avatarUrl={user.avatarUrl}
           frame={summary?.activeFrame}
+          assetKey={summary?.activeFrameAssetKey}
           level={summary?.level}
           size="header"
           showLevel

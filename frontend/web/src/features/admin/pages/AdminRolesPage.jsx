@@ -366,12 +366,12 @@ export default function AdminRolesPage() {
                     {Object.entries(groups).map(([group, resources]) => (
                       <tbody key={group}>
                         <tr className="admin-module-row">
-                          <th colSpan={6}>{group}</th>
+                          <th colSpan={6}>{t(group)}</th>
                         </tr>
                         {Object.entries(resources).map(([resource, items]) => (
                           <tr key={resource}>
                             <td>
-                              <strong>{resource}</strong>
+                              <strong>{t(resource)}</strong>
                             </td>
                             {['VIEW', 'CREATE', 'UPDATE', 'DELETE'].map(action => (
                               <td key={action}>{cell(items, action)}</td>

@@ -1,11 +1,19 @@
-import { frameAssets } from '../../features/shop/utils/shopAssets';
+import { frameAssets, frameArt } from '../../features/shop/utils/shopAssets';
 import { t } from '../i18n/locale';
 import useLocale from '../i18n/useLocale';
 import './LearnerAvatar.css';
 
-export default function LearnerAvatar({ name, avatarUrl, frame, level, size = 'medium', showLevel = false }) {
+export default function LearnerAvatar({
+  name,
+  avatarUrl,
+  frame,
+  assetKey,
+  level,
+  size = 'medium',
+  showLevel = false,
+}) {
   useLocale();
-  const asset = frameAssets[frame];
+  const asset = frameArt[assetKey] || frameAssets[frame];
   const initials =
     name
       ?.trim()

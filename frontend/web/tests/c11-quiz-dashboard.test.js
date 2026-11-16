@@ -96,7 +96,15 @@ async function render(path, { userId = 1, revision = 0, unreadCount = 4, notific
         { value: cache },
         h(
           AuthContext.Provider,
-          { value: { user: { id: userId } } },
+          {
+            value: {
+              user: {
+                id: userId,
+                roles: path.startsWith('/admin') ? ['ADMIN'] : ['USER'],
+                permissions: path.startsWith('/admin') ? ['ADMIN_ACCESS', 'QUIZ_VIEW', 'QUIZ_MANAGE'] : [],
+              },
+            },
+          },
           h(
             NotificationsContext.Provider,
             {

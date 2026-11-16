@@ -41,21 +41,21 @@ public class ProController {
     }
 
     @GetMapping("/api/v1/learning/admin/pro/codes")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@learningAdmin.allowed(authentication, 'PRO_CODE_VIEW')")
     public ApiResponse<List<CodeInfo>> codes() {
         return ApiResponse.success(memberships.codes());
     }
 
     @PostMapping("/api/v1/learning/admin/pro/codes")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@learningAdmin.allowed(authentication, 'PRO_CODE_CREATE')")
     public ApiResponse<IssuedCode> issue(Principal principal, @Valid @RequestBody CreateCodeRequest request) {
         return ApiResponse.success(memberships.createCode(Long.parseLong(principal.getName()), request));
     }
 
     @DeleteMapping("/api/v1/learning/admin/pro/codes/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<CodeInfo> revokeCode(@PathVariable long id) {
-        return ApiResponse.success(memberships.revokeCode(id));
+    @PreAuthorize("@learningAdmin.allowed(authentication, 'PRO_CODE_REVOKE')")
+    public ApiResponse<CodeInfo> revokeCode(@PathVariable long id, Principal principal) {
+        return ApiResponse.success(memberships.revokeCode(id, Long.parseLong(principal.getName())));
     }
 
     @PostMapping("/internal/v1/learning/pro/grants")

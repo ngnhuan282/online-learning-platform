@@ -16,31 +16,35 @@ export default function ProMembershipCard() {
       <div>
         <strong>
           {t(
-            membership?.active
-              ? 'ChitChatGo Pro đang hoạt động'
-              : membership?.expiresAt
-                ? 'Pro đã hết hạn'
-                : membership
-                  ? 'Gói miễn phí'
-                  : 'Trạng thái thành viên',
+            membership?.suspended
+              ? 'Pro đang tạm khóa'
+              : membership?.active
+                ? 'ChitChatGo Pro đang hoạt động'
+                : membership?.expiresAt
+                  ? 'Pro đã hết hạn'
+                  : membership
+                    ? 'Gói miễn phí'
+                    : 'Trạng thái thành viên',
           )}
         </strong>
         <p>
           {error
             ? t('Chưa tải được trạng thái Pro.')
-            : loading
-              ? t('Đang tải...')
-              : membership?.expiresAt
-                ? t('Hạn Pro: {date}', {
-                    date: formatDate(membership.expiresAt, {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }),
-                  })
-                : t('Khám phá các gói Pro để mở rộng quyền học.')}
+            : membership?.suspended
+              ? t('Liên hệ quản trị viên để được hỗ trợ mở lại Pro. Thời hạn gói vẫn được tính theo lịch.')
+              : loading
+                ? t('Đang tải...')
+                : membership?.expiresAt
+                  ? t('Hạn Pro: {date}', {
+                      date: formatDate(membership.expiresAt, {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                    })
+                  : t('Khám phá các gói Pro để mở rộng quyền học.')}
         </p>
       </div>
       {error ? (

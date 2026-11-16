@@ -32,10 +32,12 @@ public class EngagementService {
     );
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final EngagementRules rules;
 
-    public EngagementService(JdbcTemplate jdbc, Clock clock) {
+    public EngagementService(JdbcTemplate jdbc, Clock clock, EngagementRules rules) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.rules = rules;
     }
 
     public void lockProfile(long userId) {
@@ -72,11 +74,11 @@ public class EngagementService {
     }
 
     public void lessonCompleted(long userId, long lessonId) {
-        record(userId, "LESSON", lessonId, 20);
+        record(userId, "LESSON", lessonId, rules.settings().lessonXp());
     }
 
     public void quizSubmitted(long userId, long quizId) {
-        record(userId, "QUIZ", quizId, 10);
+        record(userId, "QUIZ", quizId, rules.settings().quizXp());
     }
 
     private void record(long userId, String type, long sourceId, int xp) {
@@ -107,7 +109,7 @@ public class EngagementService {
             Math.max(streak, profile.longest()),
             today,
             today,
-            firstActivityToday ? 25 : 0,
+            firstActivityToday ? rules.settings().dailyGems() : 0,
             userId
         );
         long count = jdbc.queryForObject(
@@ -163,18 +165,29 @@ public class EngagementService {
                 Long.class,
                 userId
             ) > 0;
+        var rewardAmounts = new java.util.HashMap<String, Integer>();
+        jdbc.query("SELECT code,gems FROM engagement_reward_rules WHERE active=TRUE", row -> {
+            rewardAmounts.put(row.getString(1), row.getInt(2));
+        });
+        var settings = rules.settings();
         var rewards = REWARDS.stream()
+            .filter(rewardAmounts::containsKey)
             .map(code ->
-                new Reward(code, rewardGems(code), eligible(code, p, firstLesson), claimed.contains(code))
+                new Reward(
+                    code,
+                    rewardAmounts.get(code),
+                    eligible(code, p, firstLesson, settings.xpPerLevel()),
+                    claimed.contains(code)
+                )
             )
             .toList();
         return new Summary(
             userId,
             p.name(),
             p.xp(),
-            p.xp() / 100 + 1,
-            p.xp() % 100,
-            100,
+            p.xp() / settings.xpPerLevel() + 1,
+            p.xp() % settings.xpPerLevel(),
+            settings.xpPerLevel(),
             p.gems(),
             streak,
             p.longest(),
@@ -191,7 +204,12 @@ public class EngagementService {
                 today.minusDays(89)
             ),
             days,
-            rewards
+            rewards,
+            settings.dailyGems(),
+            settings.lessonXp(),
+            settings.quizXp(),
+            assetKey(p.frame()),
+            assetKey(p.background())
         );
     }
 
@@ -269,14 +287,17 @@ public class EngagementService {
                   Timestamp.from(selected.plusMonths(1).atDay(1).atStartOfDay(ZONE).toInstant()),
               }
             : new Object[0];
+        int xpPerLevel = rules.settings().xpPerLevel();
         String ranked =
             """
             SELECT ROW_NUMBER() OVER (ORDER BY SUM(e.xp) DESC, MAX(e.earned_at), e.user_id) AS ranking,
-                e.user_id, p.display_name, SUM(e.xp) AS xp, p.total_xp, p.active_frame
+                e.user_id, p.display_name, SUM(e.xp) AS xp, p.total_xp, p.active_frame, s.asset_key AS frame_asset_key,
+                FLOOR(p.total_xp / %d) + 1 AS current_level
             FROM learning_xp_events e JOIN learner_profiles p ON p.user_id = e.user_id
-            """ +
+            LEFT JOIN shop_items s ON s.code=p.active_frame
+            """.formatted(xpPerLevel) +
             filter +
-            " GROUP BY e.user_id, p.display_name, p.total_xp, p.active_frame ";
+            " GROUP BY e.user_id, p.display_name, p.total_xp, p.active_frame,s.asset_key ";
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM (" + ranked + ") ranked", Long.class, dates);
         var parameters = new java.util.ArrayList<>(java.util.Arrays.asList(dates));
         parameters.add(size);
@@ -311,8 +332,9 @@ public class EngagementService {
             row.getLong("user_id"),
             row.getString("display_name"),
             row.getLong("xp"),
-            row.getLong("total_xp") / 100 + 1,
-            row.getString("active_frame")
+            row.getLong("current_level"),
+            row.getString("active_frame"),
+            row.getString("frame_asset_key")
         );
     }
 
@@ -340,13 +362,13 @@ public class EngagementService {
         );
     }
 
-    private boolean eligible(String code, Profile p, boolean firstLesson) {
+    private boolean eligible(String code, Profile p, boolean firstLesson, int xpPerLevel) {
         return switch (code) {
             case "FIRST_LESSON" -> firstLesson;
             case "STREAK_3" -> p.longest() >= 3;
             case "STREAK_7" -> p.longest() >= 7;
             case "STREAK_30" -> p.longest() >= 30;
-            case "LEVEL_5" -> p.xp() >= 400;
+            case "LEVEL_5" -> p.xp() >= 4L * xpPerLevel;
             default -> false;
         };
     }
@@ -377,15 +399,10 @@ public class EngagementService {
         );
     }
 
-    private int rewardGems(String code) {
-        return switch (code) {
-            case "FIRST_LESSON" -> 20;
-            case "STREAK_3" -> 30;
-            case "STREAK_7" -> 70;
-            case "STREAK_30" -> 300;
-            case "LEVEL_5" -> 100;
-            default -> 0;
-        };
+    private String assetKey(String code) {
+        if (code == null) return null;
+        var result = jdbc.queryForList("SELECT asset_key FROM shop_items WHERE code=?", String.class, code);
+        return result.isEmpty() ? null : result.getFirst();
     }
 
     private record Profile(

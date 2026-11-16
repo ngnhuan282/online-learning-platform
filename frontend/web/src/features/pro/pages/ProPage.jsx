@@ -223,7 +223,7 @@ export default function ProPage() {
                   placeholder={t('Nhập mã kích hoạt của bạn')}
                   disabled={busy}
                 />
-                <button type="submit" disabled={busy || !code.trim()}>
+                <button type="submit" disabled={busy || !code.trim() || membership?.suspended}>
                   {activation.busy ? t('Đang xử lý…') : t('Kích hoạt')}
                 </button>
               </div>
@@ -267,7 +267,7 @@ export default function ProPage() {
             )}
             <button
               className="pro-primary-action"
-              disabled={busy || !plan || !selectedProvider}
+              disabled={busy || !plan || !selectedProvider || membership?.suspended}
               onClick={() => setConfirm(true)}
             >
               {t(membership?.active ? 'Gia hạn Pro' : 'Đăng ký ngay')}

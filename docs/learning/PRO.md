@@ -41,7 +41,7 @@ Ghi danh phát sinh qua Pro có `access_source = PRO`. Khi hết hạn, server c
 
 ## Mã kích hoạt
 
-ADMIN vào `/admin/pro-codes` để tạo mã 1/3/12 tháng, đặt hạn sử dụng tùy chọn và xem 100 mã gần nhất. Mỗi mã dùng một lần cho một tài khoản; nhập lại bởi đúng tài khoản đó không cộng thời gian thêm.
+ADMIN hoặc vai trò tùy chỉnh được cấp quyền vào `/admin/pro-codes`: `PRO_CODE_VIEW` xem bản che, `PRO_CODE_CREATE` phát hành mã 1/3/12 tháng và đặt hạn dùng tùy chọn, `PRO_CODE_REVOKE` thu hồi mã chưa dùng. Mỗi mã dùng một lần cho một tài khoản; nhập lại bởi đúng tài khoản đó không cộng thời gian thêm. Quản lý giá tại `/admin/pro-plans`, thành viên/cấp tặng/tạm khóa tại `/admin/pro-members`; xem [hướng dẫn quản trị](../ADMIN_GUIDE.md).
 
 - Mã được tạo bằng `SecureRandom` 128 bit. Database chỉ lưu SHA-256 và bốn ký tự cuối.
 - Mã đầy đủ chỉ được trả khi tạo và hiển thị một lần; tải lại trang chỉ thấy bản che. Nếu mất mã đầy đủ, thu hồi mã chưa dùng và tạo mã mới.

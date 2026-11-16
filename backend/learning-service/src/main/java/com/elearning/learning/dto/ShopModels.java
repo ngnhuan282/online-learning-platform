@@ -18,7 +18,8 @@ public final class ShopModels {
         Integer originalPrice,
         String assetKey,
         boolean owned,
-        boolean equipped
+        boolean equipped,
+        boolean active
     ) {}
 
     public record State(
@@ -27,7 +28,8 @@ public final class ShopModels {
         int freezeCapacity,
         String activeFrame,
         String activeBackground,
-        List<Item> items
+        List<Item> items,
+        int dailyGems
     ) {}
 
     public record PurchaseRequest(

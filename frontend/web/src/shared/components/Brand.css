@@ -1,0 +1,11 @@
+.brand .brand-icon.brand-icon-mascot {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+.brand-icon-mascot .cat-mascot-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}

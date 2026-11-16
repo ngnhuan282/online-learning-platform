@@ -9,6 +9,7 @@ import { formatDate } from '../../../shared/utils/formatDate';
 import { learningApi } from '../api/learningApi';
 import { NOTIFICATION_CATEGORIES, notificationCategory } from '../utils/notificationStream';
 import '../styles/notifications.css';
+import { can } from '../../admin/utils/adminUtils';
 
 const validUserId = value => /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value) > 0;
 const newMessage = () => ({ userId: '', title: '', body: '' });
@@ -21,6 +22,7 @@ export default function AdminNotificationsPage() {
 
 function AdminNotificationsContent() {
   useLocale();
+  const { user } = useAuth();
   const [recipient, setRecipient] = useState('');
   const [category, setCategory] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -127,53 +129,55 @@ function AdminNotificationsContent() {
         description={t('Gửi thông báo hệ thống và tra cứu lịch sử theo người nhận.')}
         navigation={false}
       />
-      <form className="notification-compose" onSubmit={send}>
-        <h2>{t('Gửi thông báo hệ thống')}</h2>
-        <p>
-          {t(
-            'Gửi tới một ID người dùng cụ thể. Các thông báo Course, Payment và Learning được tạo theo sự kiện nghiệp vụ.',
-          )}
-        </p>
-        <fieldset disabled={sending}>
-          <label>
-            {t('ID người nhận')}
-            <input
-              required
-              inputMode="numeric"
-              value={form.userId}
-              onChange={event => changeForm('userId', event.target.value)}
-            />
-          </label>
-          <label>
-            {t('Tiêu đề')}
-            <input
-              required
-              maxLength={255}
-              value={form.title}
-              onChange={event => changeForm('title', event.target.value)}
-            />
-          </label>
-          <label>
-            {t('Nội dung')}
-            <textarea
-              required
-              maxLength={1000}
-              rows={4}
-              value={form.body}
-              onChange={event => changeForm('body', event.target.value)}
-            />
-          </label>
-          <button className="button button-primary" type="submit">
-            {sending ? t('Đang gửi...') : t('Gửi thông báo')}
-          </button>
-        </fieldset>
-        {sendError && (
-          <p role="alert">
-            {t(sendError.message)} {t('Bạn có thể gửi lại; cùng yêu cầu sẽ không tạo bản trùng.')}
+      {can(user, 'NOTIFICATION_MANAGE') && (
+        <form className="notification-compose" onSubmit={send}>
+          <h2>{t('Gửi thông báo hệ thống')}</h2>
+          <p>
+            {t(
+              'Gửi tới một ID người dùng cụ thể. Các thông báo Course, Payment và Learning được tạo theo sự kiện nghiệp vụ.',
+            )}
           </p>
-        )}
-        {sent && <p role="status">{t('Đã gửi thông báo hệ thống.')}</p>}
-      </form>
+          <fieldset disabled={sending}>
+            <label>
+              {t('ID người nhận')}
+              <input
+                required
+                inputMode="numeric"
+                value={form.userId}
+                onChange={event => changeForm('userId', event.target.value)}
+              />
+            </label>
+            <label>
+              {t('Tiêu đề')}
+              <input
+                required
+                maxLength={255}
+                value={form.title}
+                onChange={event => changeForm('title', event.target.value)}
+              />
+            </label>
+            <label>
+              {t('Nội dung')}
+              <textarea
+                required
+                maxLength={1000}
+                rows={4}
+                value={form.body}
+                onChange={event => changeForm('body', event.target.value)}
+              />
+            </label>
+            <button className="button button-primary" type="submit">
+              {sending ? t('Đang gửi...') : t('Gửi thông báo')}
+            </button>
+          </fieldset>
+          {sendError && (
+            <p role="alert">
+              {t(sendError.message)} {t('Bạn có thể gửi lại; cùng yêu cầu sẽ không tạo bản trùng.')}
+            </p>
+          )}
+          {sent && <p role="status">{t('Đã gửi thông báo hệ thống.')}</p>}
+        </form>
+      )}
       <h2>{t('Lịch sử thông báo')}</h2>
       <div className="notification-filters">
         <label>

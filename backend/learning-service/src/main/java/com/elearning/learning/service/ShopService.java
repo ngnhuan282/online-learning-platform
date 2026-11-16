@@ -32,7 +32,7 @@ public class ShopService {
             jdbc.queryForList("SELECT item_code FROM shop_inventory WHERE user_id = ?", String.class, userId)
         );
         var items = jdbc.query(
-            "SELECT * FROM shop_items WHERE active = TRUE ORDER BY position, code",
+            "SELECT * FROM shop_items WHERE active = TRUE OR code IN (SELECT item_code FROM shop_inventory WHERE user_id=?) ORDER BY position, code",
             (row, i) ->
                 new Item(
                     row.getString("code"),
@@ -44,8 +44,10 @@ public class ShopService {
                     row.getString("asset_key"),
                     owned.contains(row.getString("code")),
                     row.getString("code").equals(summary.activeFrame()) ||
-                        row.getString("code").equals(summary.activeBackground())
-                )
+                        row.getString("code").equals(summary.activeBackground()),
+                    row.getBoolean("active")
+                ),
+            userId
         );
         return new State(
             summary.gems(),
@@ -53,13 +55,16 @@ public class ShopService {
             FREEZE_CAPACITY,
             summary.activeFrame(),
             summary.activeBackground(),
-            items
+            items,
+            summary.dailyGems()
         );
     }
 
     public Purchase purchase(long userId, PurchaseRequest request) {
         // Reconcile days before adding new freezes; purchases never repair an already broken streak.
         State before = state(userId);
+        jdbc.queryForList("SELECT code FROM shop_items WHERE code=? FOR UPDATE", request.itemCode());
+        before = state(userId);
         var prior = jdbc.query(
             "SELECT item_code, gems_spent FROM shop_purchases WHERE user_id = ? AND request_id = ?",
             (row, i) -> new Receipt(row.getString(1), row.getInt(2)),
@@ -75,7 +80,7 @@ public class ShopService {
         Item item = before
             .items()
             .stream()
-            .filter(value -> value.code().equals(request.itemCode()))
+            .filter(value -> value.active() && value.code().equals(request.itemCode()))
             .findFirst()
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         if (item.owned()) {

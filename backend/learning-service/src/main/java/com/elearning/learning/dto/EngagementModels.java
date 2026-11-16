@@ -29,7 +29,12 @@ public final class EngagementModels {
         int streakFreezes,
         List<LocalDate> frozenDays,
         List<ActivityDay> days,
-        List<Reward> rewards
+        List<Reward> rewards,
+        int dailyGems,
+        int lessonXp,
+        int quizXp,
+        String activeFrameAssetKey,
+        String activeBackgroundAssetKey
     ) {}
 
     public record Ranking(
@@ -38,7 +43,8 @@ public final class EngagementModels {
         String displayName,
         long xp,
         long level,
-        String activeFrame
+        String activeFrame,
+        String activeFrameAssetKey
     ) {}
 
     public record FrameRequest(

@@ -23,7 +23,9 @@ public final class ProModels {
         boolean active,
         Instant expiresAt,
         String planCode,
-        Instant serverTime
+        Instant serverTime,
+        boolean suspended,
+        long version
     ) {}
 
     public record GrantRequest(

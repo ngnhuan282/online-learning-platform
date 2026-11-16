@@ -10,6 +10,14 @@ Header không còn nút **Bắt đầu miễn phí**; logo vẫn dẫn về tran
 
 Bộ chọn ngôn ngữ dùng menu Material UI đồng bộ với header, có cờ Việt/Anh và dấu chọn ngôn ngữ hiện tại. Menu mở dưới nút, căn phải, hỗ trợ bàn phím/Escape và tự đóng sau khi chọn. Không dùng danh sách `<select>` mặc định của hệ điều hành; lựa chọn vẫn lưu bằng cơ chế `sgedu.locale` hiện có.
 
+## Nhân vật mèo và form đăng nhập
+
+Icon thương hiệu dùng mèo trắng có mảng cam trong khung xanh nhạt theo hình tham chiếu. `CatMascot.jsx` dựng SVG với các lớp thân, tay và mắt; bản icon đứng yên, bản nhân vật có animation CSS. `Brand` dùng chung icon này trên header và footer.
+
+Trang `/login` đặt nhân vật **bên phải form** từ 768px trở lên. Trên màn hình nhỏ, nhân vật thu gọn phía trên form. Mèo vẫy tay, chớp mắt và nhún nhẹ; nhìn về form khi chọn email, nhắm mắt khi chọn ô mật khẩu và hiển thị lời nhắn chờ khi đang đăng nhập. Component chỉ nhận tên trường đang focus và trạng thái xử lý, không nhận nội dung mật khẩu. Lời nhắn hỗ trợ Việt–Anh; `prefers-reduced-motion` tắt animation. Trang đăng ký giữ bố cục một cột.
+
+Kiểm chứng: production build và lint đạt; 5 test validation đạt. Chrome kiểm tra 22 tổ hợp Việt–Anh từ 320 đến 1920px: đúng vị trí bên phải ở desktop, không tràn ngang, các lớp SVG chuyển động, trạng thái focus/mật khẩu và giảm chuyển động hoạt động. Luồng form được kiểm tra với phản hồi API giả lập trên trình duyệt: validation, chống gửi trùng khi đang chờ, thông báo lỗi và bảo toàn nội dung khi đổi ngôn ngữ. Không có lỗi JavaScript và không ghi dữ liệu lên server. Bộ kiểm thử auth mở rộng bị gián đoạn trong phiên chạy thiếu bộ nhớ nên chưa có kết quả hoàn tất cho bộ này.
+
 ## Tương thích với hệ thống đã chạy
 
 Một số chuỗi tên cũ là định danh kỹ thuật có dữ liệu hoặc cấu hình phụ thuộc, được giữ ổn định:

@@ -13,13 +13,19 @@ export default function ProfileAppearance({ compact = false, background, frame }
   return (
     <div
       className={`profile-appearance ${compact ? 'compact' : ''}`}
-      style={appearanceBackground(background ?? summary?.activeBackground)}
+      style={appearanceBackground(
+        background ?? summary?.activeBackground,
+        background == null || background === summary?.activeBackground
+          ? summary?.activeBackgroundAssetKey
+          : null,
+      )}
     >
       <div className="profile-appearance-card">
         <LearnerAvatar
           name={user?.fullName}
           avatarUrl={user?.avatarUrl}
           frame={frame ?? summary?.activeFrame}
+          assetKey={frame == null || frame === summary?.activeFrame ? summary?.activeFrameAssetKey : null}
           level={summary?.level}
           showLevel
           size={compact ? 'header' : 'large'}

@@ -2,6 +2,7 @@ package com.elearning.learning.controller;
 
 import com.elearning.learning.common.response.ApiResponse;
 import com.elearning.learning.dto.CommunityModels.*;
+import com.elearning.learning.security.LearningAdminAccess;
 import com.elearning.learning.service.CommunityService;
 import com.elearning.learning.service.CurrentProfileClient;
 import jakarta.validation.Valid;
@@ -15,10 +16,16 @@ public class CommunityController {
 
     private final CommunityService community;
     private final CurrentProfileClient profiles;
+    private final LearningAdminAccess access;
 
-    public CommunityController(CommunityService community, CurrentProfileClient profiles) {
+    public CommunityController(
+        CommunityService community,
+        CurrentProfileClient profiles,
+        LearningAdminAccess access
+    ) {
         this.community = community;
         this.profiles = profiles;
+        this.access = access;
     }
 
     @GetMapping("/topics")
@@ -69,7 +76,7 @@ public class CommunityController {
     }
 
     @PatchMapping("/posts/{id}/lock")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_MODERATE')")
     public ApiResponse<Post> locked(@PathVariable long id, @Valid @RequestBody LockRequest request) {
         return ApiResponse.success(community.setLocked(id, request.locked()));
     }
@@ -134,9 +141,6 @@ public class CommunityController {
     }
 
     private boolean admin(Authentication auth) {
-        return auth
-            .getAuthorities()
-            .stream()
-            .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+        return access.allowed(auth, "COMMUNITY_MODERATE");
     }
 }

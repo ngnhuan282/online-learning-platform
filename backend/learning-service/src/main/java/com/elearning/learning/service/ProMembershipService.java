@@ -26,31 +26,35 @@ public class ProMembershipService {
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final LearningAdminAudit audit;
     private final SecureRandom random = new SecureRandom();
 
-    public ProMembershipService(JdbcTemplate jdbc, Clock clock) {
+    public ProMembershipService(JdbcTemplate jdbc, Clock clock, LearningAdminAudit audit) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
     public Membership membership(long userId) {
         Instant now = clock.instant();
         var rows = jdbc.query(
-            "SELECT expires_at, plan_code FROM pro_memberships WHERE user_id = ?",
+            "SELECT expires_at, plan_code, suspended, version FROM pro_memberships WHERE user_id = ?",
             (row, i) -> {
                 Instant expiry = row.getTimestamp(1) == null ? null : row.getTimestamp(1).toInstant();
                 return new Membership(
                     userId,
-                    expiry != null && expiry.isAfter(now),
+                    expiry != null && expiry.isAfter(now) && !row.getBoolean(3),
                     expiry,
                     row.getString(2),
-                    now
+                    now,
+                    row.getBoolean(3),
+                    row.getLong(4)
                 );
             },
             userId
         );
-        return rows.isEmpty() ? new Membership(userId, false, null, null, now) : rows.getFirst();
+        return rows.isEmpty() ? new Membership(userId, false, null, null, now, false, 0) : rows.getFirst();
     }
 
     public boolean isActive(long userId) {
@@ -91,6 +95,7 @@ public class ProMembershipService {
 
     public Membership redeem(long userId, String suppliedCode) {
         lock(userId);
+        if (membership(userId).suspended()) throw new AppException(ErrorCode.FORBIDDEN);
         String canonical = suppliedCode.strip().toUpperCase(Locale.ROOT).replace(" ", "");
         if (!canonical.matches("CCG-(?:[A-F0-9]{4}-){7}[A-F0-9]{4}")) throw new AppException(
             ErrorCode.INVALID_ACTIVATION_CODE
@@ -162,6 +167,12 @@ public class ProMembershipService {
             Long.class,
             digest
         );
+        audit.record(
+            adminId,
+            "PRO_CODE_CREATE",
+            Long.toString(id),
+            request.planCode() + "; expiry=" + request.expiresAt()
+        );
         return new IssuedCode(raw, codeInfo(id));
     }
 
@@ -186,6 +197,95 @@ public class ProMembershipService {
             id
         );
         return codeInfo(id);
+    }
+
+    public CodeInfo revokeCode(long id, long actor) {
+        var result = revokeCode(id);
+        audit.record(actor, "PRO_CODE_REVOKE", Long.toString(id), "Thu hồi mã Pro chưa sử dụng");
+        return result;
+    }
+
+    public Membership grantAdmin(
+        long userId,
+        long actor,
+        com.elearning.learning.dto.LearningAdminModels.GrantRequest request
+    ) {
+        lock(userId);
+        String reference = "ADMIN-" + actor + "-" + request.requestId();
+        var previous = jdbc.queryForList(
+            "SELECT admin_reason FROM pro_grants WHERE reference_code=?",
+            String.class,
+            reference
+        );
+        if (
+            !previous.isEmpty() && !request.reason().strip().equals(previous.getFirst())
+        ) throw new AppException(ErrorCode.CONFLICT);
+        var result = applyGrant(
+            userId,
+            reference,
+            "ADMIN",
+            request.planCode(),
+            ProModels.months(request.planCode())
+        );
+        if (previous.isEmpty()) {
+            jdbc.update(
+                "UPDATE pro_grants SET actor_id=?,admin_reason=? WHERE reference_code=?",
+                actor,
+                request.reason().strip(),
+                reference
+            );
+            audit.record(
+                actor,
+                "PRO_ADMIN_GRANT",
+                Long.toString(userId),
+                request.planCode() + "; " + request.reason().strip()
+            );
+        }
+        return result;
+    }
+
+    public Membership revokeAdmin(long userId, long grantId, long actor, String reason) {
+        lock(userId);
+        var grants = jdbc.query(
+            "SELECT reference_code,source_type,revoked_at FROM pro_grants WHERE id=? AND user_id=? FOR UPDATE",
+            (r, i) -> new Object[] { r.getString(1), r.getString(2), r.getTimestamp(3) },
+            grantId,
+            userId
+        );
+        if (grants.isEmpty()) throw new AppException(ErrorCode.NOT_FOUND);
+        var grant = grants.getFirst();
+        if (!"ADMIN".equals(grant[1])) throw new AppException(ErrorCode.FORBIDDEN);
+        var result = revoke(new RevokeRequest((String) grant[0], userId));
+        if (grant[2] == null) audit.record(
+            actor,
+            "PRO_ADMIN_REVOKE",
+            Long.toString(grantId),
+            "user=" + userId + "; " + reason.strip()
+        );
+        return result;
+    }
+
+    public Membership suspend(
+        long userId,
+        long actor,
+        com.elearning.learning.dto.LearningAdminModels.SuspensionRequest request
+    ) {
+        lock(userId);
+        if (
+            jdbc.update(
+                "UPDATE pro_memberships SET suspended=?,version=version+1 WHERE user_id=? AND version=?",
+                request.suspended(),
+                userId,
+                request.version()
+            ) != 1
+        ) throw new AppException(ErrorCode.CONFLICT);
+        audit.record(
+            actor,
+            request.suspended() ? "PRO_SUSPEND" : "PRO_RESUME",
+            Long.toString(userId),
+            request.reason().strip()
+        );
+        return membership(userId);
     }
 
     private CodeInfo codeInfo(long id) {
@@ -281,7 +381,7 @@ public class ProMembershipService {
             plan = grant.plan();
         }
         jdbc.update(
-            "UPDATE pro_memberships SET expires_at = ?, plan_code = ? WHERE user_id = ?",
+            "UPDATE pro_memberships SET expires_at = ?, plan_code = ?, version=version+1 WHERE user_id = ?",
             expiry == null ? null : Timestamp.from(expiry),
             plan,
             userId

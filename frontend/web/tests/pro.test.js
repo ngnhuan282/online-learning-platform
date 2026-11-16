@@ -57,7 +57,16 @@ async function render(path = '/pro', membership = { userId: 1, active: false }) 
         { value: cache },
         h(
           AuthContext.Provider,
-          { value: { user: { id: 1, fullName: 'Pro Learner', roles: ['ADMIN'] } } },
+          {
+            value: {
+              user: {
+                id: 1,
+                fullName: 'Pro Learner',
+                roles: ['ADMIN'],
+                permissions: ['ADMIN_ACCESS', 'PRO_CODE_VIEW', 'PRO_CODE_CREATE', 'PRO_CODE_REVOKE'],
+              },
+            },
+          },
           h(
             ProContext.Provider,
             {
