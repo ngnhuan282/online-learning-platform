@@ -19,7 +19,8 @@ const axiosClient = axios.create({ baseURL: gatewayUrl, timeout: API_TIMEOUT_MS,
 const authPaths = new Set(Object.values(ENDPOINTS.auth));
 // These lists contain only published, public data and never vary by account.
 const isPublicCatalogRequest = config =>
-  config?.method === 'get' && [ENDPOINTS.courses, ENDPOINTS.categories].includes(config.url);
+  config?.method === 'get' &&
+  [ENDPOINTS.courses, ENDPOINTS.categories, ENDPOINTS.toeic.exams].includes(config.url);
 let refreshFlight = null;
 
 export function refreshAccessToken(options = {}) {

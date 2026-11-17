@@ -1,0 +1,662 @@
+[
+  {
+    "number": 101,
+    "prompt": "Before operating your handheld device, please — the enclosed cable to charge it.",
+    "options": [
+      {
+        "id": "A",
+        "text": "plan"
+      },
+      {
+        "id": "B",
+        "text": "remain"
+      },
+      {
+        "id": "C",
+        "text": "use"
+      },
+      {
+        "id": "D",
+        "text": "finish"
+      }
+    ]
+  },
+  {
+    "number": 102,
+    "prompt": "Safile's new external hard drive can ---- store up to one terabyte of data.",
+    "options": [
+      {
+        "id": "A",
+        "text": "secure"
+      },
+      {
+        "id": "B",
+        "text": "security"
+      },
+      {
+        "id": "C",
+        "text": "securely"
+      },
+      {
+        "id": "D",
+        "text": "secured"
+      }
+    ]
+  },
+  {
+    "number": 103,
+    "prompt": "Mr. Peterson will travel — the Tokyo office for the annual meeting.",
+    "options": [
+      {
+        "id": "A",
+        "text": "to"
+      },
+      {
+        "id": "B",
+        "text": "through"
+      },
+      {
+        "id": "C",
+        "text": "in"
+      },
+      {
+        "id": "D",
+        "text": "over"
+      }
+    ]
+  },
+  {
+    "number": 104,
+    "prompt": "Yong-Soo Cosmetics will not charge for items on back order until -------- have left our warehouse.",
+    "options": [
+      {
+        "id": "A",
+        "text": "them"
+      },
+      {
+        "id": "B",
+        "text": "they"
+      },
+      {
+        "id": "C",
+        "text": "themselves"
+      },
+      {
+        "id": "D",
+        "text": "their"
+      }
+    ]
+  },
+  {
+    "number": 105,
+    "prompt": "Our premium day tour takes visitors to historic sites ------- the Aprico River.",
+    "options": [
+      {
+        "id": "A",
+        "text": "onto"
+      },
+      {
+        "id": "B",
+        "text": "since"
+      },
+      {
+        "id": "C",
+        "text": "inside"
+      },
+      {
+        "id": "D",
+        "text": "along"
+      }
+    ]
+  },
+  {
+    "number": 106,
+    "prompt": "Eighty percent of drivers surveyed said they would consider buying a vehicle that runs on -------.",
+    "options": [
+      {
+        "id": "A",
+        "text": "electricity"
+      },
+      {
+        "id": "B",
+        "text": "electrically"
+      },
+      {
+        "id": "C",
+        "text": "electricians"
+      },
+      {
+        "id": "D",
+        "text": "electrify"
+      }
+    ]
+  },
+  {
+    "number": 107,
+    "prompt": "Xinzhe Zu has — Petrin Engineering as the vice president of operations.",
+    "options": [
+      {
+        "id": "A",
+        "text": "attached"
+      },
+      {
+        "id": "B",
+        "text": "resigned"
+      },
+      {
+        "id": "C",
+        "text": "joined"
+      },
+      {
+        "id": "D",
+        "text": "combined"
+      }
+    ]
+  },
+  {
+    "number": 108,
+    "prompt": "Next month, Barder House Books will be holding ------- third author's hour in Cleveland.",
+    "options": [
+      {
+        "id": "A",
+        "text": "it"
+      },
+      {
+        "id": "B",
+        "text": "itself"
+      },
+      {
+        "id": "C",
+        "text": "its own"
+      },
+      {
+        "id": "D",
+        "text": "its"
+      }
+    ]
+  },
+  {
+    "number": 109,
+    "prompt": "Chester's Tiles — expanded to a second location in Turnington.",
+    "options": [
+      {
+        "id": "A",
+        "text": "severely"
+      },
+      {
+        "id": "B",
+        "text": "usually"
+      },
+      {
+        "id": "C",
+        "text": "recently"
+      },
+      {
+        "id": "D",
+        "text": "exactly"
+      }
+    ]
+  },
+  {
+    "number": 110,
+    "prompt": "Tabrino's has — increased the number of almonds in the Nut Medley snack pack.",
+    "options": [
+      {
+        "id": "A",
+        "text": "significant"
+      },
+      {
+        "id": "B",
+        "text": "significance"
+      },
+      {
+        "id": "C",
+        "text": "signifies"
+      },
+      {
+        "id": "D",
+        "text": "significantly"
+      }
+    ]
+  },
+  {
+    "number": 111,
+    "prompt": "------- she travels, Jacintha Flores collects samples of local fabrics and patterns.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Wherever"
+      },
+      {
+        "id": "B",
+        "text": "In addition to"
+      },
+      {
+        "id": "C",
+        "text": "Either"
+      },
+      {
+        "id": "D",
+        "text": "In contrast to"
+      }
+    ]
+  },
+  {
+    "number": 112,
+    "prompt": "Most picture ------- at Glowing Photo Lab go on sale at 3:00 P.M. today.",
+    "options": [
+      {
+        "id": "A",
+        "text": "framer"
+      },
+      {
+        "id": "B",
+        "text": "framing"
+      },
+      {
+        "id": "C",
+        "text": "framed"
+      },
+      {
+        "id": "D",
+        "text": "frames"
+      }
+    ]
+  },
+  {
+    "number": 113,
+    "prompt": "All students in the business management class hold ------- college degrees.",
+    "options": [
+      {
+        "id": "A",
+        "text": "late"
+      },
+      {
+        "id": "B",
+        "text": "developed"
+      },
+      {
+        "id": "C",
+        "text": "advanced"
+      },
+      {
+        "id": "D",
+        "text": "elated"
+      }
+    ]
+  },
+  {
+    "number": 114,
+    "prompt": "We hired Noah Wan of Shengyao Accounting Ltd. — our company's financial assets.",
+    "options": [
+      {
+        "id": "A",
+        "text": "to evaluate"
+      },
+      {
+        "id": "B",
+        "text": "to be evaluated"
+      },
+      {
+        "id": "C",
+        "text": "will be evaluated"
+      },
+      {
+        "id": "D",
+        "text": "evaluate"
+      }
+    ]
+  },
+  {
+    "number": 115,
+    "prompt": "Ms. Charisse is taking on a new account — she finishes the Morrison project.",
+    "options": [
+      {
+        "id": "A",
+        "text": "with"
+      },
+      {
+        "id": "B",
+        "text": "going"
+      },
+      {
+        "id": "C",
+        "text": "after"
+      },
+      {
+        "id": "D",
+        "text": "between"
+      }
+    ]
+  },
+  {
+    "number": 116,
+    "prompt": "Cormet Motors' profits are ------- this year than last year.",
+    "options": [
+      {
+        "id": "A",
+        "text": "higher"
+      },
+      {
+        "id": "B",
+        "text": "high"
+      },
+      {
+        "id": "C",
+        "text": "highly"
+      },
+      {
+        "id": "D",
+        "text": "highest"
+      }
+    ]
+  },
+  {
+    "number": 117,
+    "prompt": "In its — advertising campaign, Jaymor Tools demonstrates how reliable its products are.",
+    "options": [
+      {
+        "id": "A",
+        "text": "current"
+      },
+      {
+        "id": "B",
+        "text": "relative"
+      },
+      {
+        "id": "C",
+        "text": "spacious"
+      },
+      {
+        "id": "D",
+        "text": "collected"
+      }
+    ]
+  },
+  {
+    "number": 118,
+    "prompt": "Remember to submit receipts for reimbursement ------- returning from a business trip.",
+    "options": [
+      {
+        "id": "A",
+        "text": "such as"
+      },
+      {
+        "id": "B",
+        "text": "when"
+      },
+      {
+        "id": "C",
+        "text": "then"
+      },
+      {
+        "id": "D",
+        "text": "within"
+      }
+    ]
+  },
+  {
+    "number": 119,
+    "prompt": "Patrons will be able to access Westside Library's — acquired collection of books on Tuesday.",
+    "options": [
+      {
+        "id": "A",
+        "text": "instantly"
+      },
+      {
+        "id": "B",
+        "text": "newly"
+      },
+      {
+        "id": "C",
+        "text": "early"
+      },
+      {
+        "id": "D",
+        "text": "naturally"
+      }
+    ]
+  },
+  {
+    "number": 120,
+    "prompt": "Please ------- any questions about time sheets to Tabitha Jones in the payroll department.",
+    "options": [
+      {
+        "id": "A",
+        "text": "direction"
+      },
+      {
+        "id": "B",
+        "text": "directive"
+      },
+      {
+        "id": "C",
+        "text": "directed"
+      },
+      {
+        "id": "D",
+        "text": "direct"
+      }
+    ]
+  },
+  {
+    "number": 121,
+    "prompt": "Before signing a delivery -------, be sure to double-check that all the items ordered are in the shipment.",
+    "options": [
+      {
+        "id": "A",
+        "text": "decision"
+      },
+      {
+        "id": "B",
+        "text": "announcement"
+      },
+      {
+        "id": "C",
+        "text": "receipt"
+      },
+      {
+        "id": "D",
+        "text": "limit"
+      }
+    ]
+  },
+  {
+    "number": 122,
+    "prompt": "Funds have been added to the budget for expenses ------- with the new building.",
+    "options": [
+      {
+        "id": "A",
+        "text": "associated"
+      },
+      {
+        "id": "B",
+        "text": "association"
+      },
+      {
+        "id": "C",
+        "text": "associate"
+      },
+      {
+        "id": "D",
+        "text": "associates"
+      }
+    ]
+  },
+  {
+    "number": 123,
+    "prompt": "Ms. Bernard — that a deadline was approaching, so she requested some assistance.",
+    "options": [
+      {
+        "id": "A",
+        "text": "noticed"
+      },
+      {
+        "id": "B",
+        "text": "obscured"
+      },
+      {
+        "id": "C",
+        "text": "withdrew"
+      },
+      {
+        "id": "D",
+        "text": "appeared"
+      }
+    ]
+  },
+  {
+    "number": 124,
+    "prompt": "Mr. Moscowitz is — that Dr. Tanaka will agree to present the keynote speech at this year's conference.",
+    "options": [
+      {
+        "id": "A",
+        "text": "hopes"
+      },
+      {
+        "id": "B",
+        "text": "hoped"
+      },
+      {
+        "id": "C",
+        "text": "hopeful"
+      },
+      {
+        "id": "D",
+        "text": "hopefully"
+      }
+    ]
+  },
+  {
+    "number": 125,
+    "prompt": "Two Australian companies are developing new smartphones, but it is unclear ------- phone will become available first.",
+    "options": [
+      {
+        "id": "A",
+        "text": "if"
+      },
+      {
+        "id": "B",
+        "text": "which"
+      },
+      {
+        "id": "C",
+        "text": "before"
+      },
+      {
+        "id": "D",
+        "text": "because"
+      }
+    ]
+  },
+  {
+    "number": 126,
+    "prompt": "Corners Gym offers its members a free lesson in how to use ------- properly.",
+    "options": [
+      {
+        "id": "A",
+        "text": "weighs"
+      },
+      {
+        "id": "B",
+        "text": "weights"
+      },
+      {
+        "id": "C",
+        "text": "weighty"
+      },
+      {
+        "id": "D",
+        "text": "weighed"
+      }
+    ]
+  },
+  {
+    "number": 127,
+    "prompt": "------- the rules, overnight parking is not permitted at the clubhouse facility.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Prior to"
+      },
+      {
+        "id": "B",
+        "text": "Except for"
+      },
+      {
+        "id": "C",
+        "text": "Instead of"
+      },
+      {
+        "id": "D",
+        "text": "According to"
+      }
+    ]
+  },
+  {
+    "number": 128,
+    "prompt": "Once everyone -------, we can begin the conference call.",
+    "options": [
+      {
+        "id": "A",
+        "text": "arrived"
+      },
+      {
+        "id": "B",
+        "text": "is arriving"
+      },
+      {
+        "id": "C",
+        "text": "to arrive"
+      },
+      {
+        "id": "D",
+        "text": "has arrived"
+      }
+    ]
+  },
+  {
+    "number": 129,
+    "prompt": "Each summer a motivational video that highlights the past year's — is shown to all company employees.",
+    "options": [
+      {
+        "id": "A",
+        "text": "preferences"
+      },
+      {
+        "id": "B",
+        "text": "accomplishments"
+      },
+      {
+        "id": "C",
+        "text": "communications"
+      },
+      {
+        "id": "D",
+        "text": "uncertainties"
+      }
+    ]
+  },
+  {
+    "number": 130,
+    "prompt": "Employees who wish to attend the retirement dinner — Ms. Howell's 30 years of service should contact Mr. Lee.",
+    "options": [
+      {
+        "id": "A",
+        "text": "honor"
+      },
+      {
+        "id": "B",
+        "text": "to honor"
+      },
+      {
+        "id": "C",
+        "text": "will honor"
+      },
+      {
+        "id": "D",
+        "text": "will be honored"
+      }
+    ]
+  }
+]

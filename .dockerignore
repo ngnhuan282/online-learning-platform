@@ -7,4 +7,5 @@
 **/.env
 **/.env.*
 frontend/web/dist
+frontend/web/public/toeic-assets/ets2024-reading
 docs

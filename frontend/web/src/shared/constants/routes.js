@@ -1,5 +1,6 @@
 export const ROUTES = Object.freeze({
   HOME: '/',
+  TOEIC: '/exams/toeic',
   PRO: '/pro',
   ADMIN_PRO_CODES: '/admin/pro-codes',
   ADMIN_SHOP: '/admin/shop',
@@ -29,5 +30,6 @@ export const ROUTES = Object.freeze({
   ADMIN_PAYMENTS: '/admin/payments',
   ADMIN_ANALYTICS: '/admin/analytics',
   ADMIN_QUIZZES: '/admin/quizzes',
+  ADMIN_TOEIC: '/admin/toeic',
   ADMIN_NOTIFICATIONS: '/admin/notifications',
 });

@@ -1,0 +1,47 @@
+[
+  {
+    "test": 2,
+    "number": 124,
+    "correctOptionId": "C",
+    "solutionPage": 83,
+    "originalPrompt": "Mr. Moscowitz is — that Dr. Tanaka will agree to present the keynote speech at this year's conference.",
+    "explanation": "Ông Moscowitz_____rằng Tiến sĩ Tanaka sẽ đồng ý trình bày bài phát\nbiểu quan trọng tại hội nghị năm nay.\n(A) động từ chia ở dạng số ít\n\n(B) động từ chia thì quá khứ đơn\n(C) hopeful: tính từ\n(D) trạng từ\nDạng câu hỏi: Từ loại\nĐặc điểm đáp án:\n•\nChỗ trống đứng sau chủ ngữ Mr. Moscowitz và động từ to be “is”. Sau chỗ trống\nlà một mệnh đề.\n→ Đáp án là một tính từ\nTừ vựng cần lưu ý:\n•\nagree (v) đồng ý\n•\npresent (v) trình bày\n•\nkeynote (adj) quan trọng nhất\n•\nspeech (n) bài phát biểu\n•\nconference (n) hội nghị",
+    "note": "Header punctuation/numeric form not matched by original parser"
+  },
+  {
+    "test": 2,
+    "number": 138,
+    "correctOptionId": "A",
+    "solutionPage": 92,
+    "originalPrompt": "",
+    "explanation": "Dạng câu hỏi: Từ loại\nĐặc điểm đáp án:\n•\nTừ cần điền đứng sau dấu phẩy, đóng vai trò là bổ ngữ cho chủ ngữ “fair prices\nand professional work”, được bổ nghĩa bởi cụm giới từ “by our Keep Cool\nguarantee”.\n→ Đáp án là động từ chia theo thì quá khứ phân từ hoặc hiện tại phân từ.\n\nLựa chọn đáp án:\n(A) backed: động từ chia theo thì quá khứ phân từ (được bảo đảm)\n(B) backs: động từ chia theo thì hiện tại đơn ở dạng số ít (bảo đảm)\n(C) backing: động từ chia theo thì hiện tại phân từ (đang bảo đảm)\n(D) back: động từ nguyên mẫu (bảo đảm)\nTạm dịch: Chúng tôi cam kết mang đến cho bạn những mức giá hợp lý và công việc\nchuyên nghiệp, được bảo đảm bởi chương trình bảo hành Keep Cool của chúng tôi.\nTừ vựng cần lưu ý:\ncontractor (n): người thầu, nhà thầu.\nannual (adj): hàng năm, thường niên.\nensure (v): đảm bảo, bảo đảm.\ninspect (v): kiểm tra, thanh tra.\nrepair (v): sửa chữa, khắc phục.\nreplace (v): thay thế, thay mới.\ncost-efficient (adj): tiết kiệm chi phí, hiệu quả về chi phí.\nqualified (adj): có trình độ, có tư cách.\nguarantee (n): bảo hành, bảo đảm.",
+    "note": "Header punctuation/numeric form not matched by original parser"
+  },
+  {
+    "test": 7,
+    "number": 166,
+    "correctOptionId": "A",
+    "solutionPage": 100,
+    "originalPrompt": "What is indicated about registration?",
+    "explanation": "Dạng câu hỏi: Câu hỏi thông tin được đề cập\nCách định vị vùng thông tin chứa đáp án:\n•\nTừ khóa: What, indicate, registration\n•\nĐoạn cuối chứa thông tin về việc đăng ký. “The bookstore requires that attendees\nregister at least one day in advance.” (Hiệu sách yêu cầu người tham dự phải đăng\nký trước ít nhất một ngày.) chứa đáp án.\n•\nSự kiện diễn ra vào ngày 10 tháng 4 “The event will be held on Thursday, April 10,\nfrom 7:00 PM. to 8:30 PM.” Vì vậy, việc đăng ký phải được thực hiện trước ít nhất\nmột ngày là ngày 9 tháng 4.\n→ Phương án (A) là phù hợp nhất.\nLoại các phương án sai:\n•\n(B), (C), (D) chứa thông tin không được đề cập.",
+    "note": "Header punctuation/numeric form not matched by original parser"
+  },
+  {
+    "test": 8,
+    "number": 194,
+    "correctOptionId": "A",
+    "solutionPage": 134,
+    "originalPrompt": "What is indicated about a furniture cart?",
+    "explanation": "Những gì được chỉ ra về một chiếc xe đẩy đồ nội thất?\n(A) Giá thuê là 6,99 USD mỗi ngày.\n(B) Nó không cần phải được trả lại.\n(C) Nó có thể gấp lại để vận chuyển dễ dàng\n(D) Nó là một phần của một bộ\nDạng câu hỏi: Câu hỏi thông tin chi tiết\nCách định vị vùng thông tin chứa đáp án:\n- Từ khoá: What, indicated, a furniture cart\n- Thông tin “Rental: wheeled furniture cart = $6.99” (Giá thuê: xe đẩy đồ nội thất có bánh\nxe = 6,99 USD) cho thấy giá thuê xe đẩy đồ nội thất là 6,99 USD.\n→ Phương án (A) là phù hợp nhất.\nLoại các phương án sai:\n- (B), (C), (D) chứa thông tin không phù hợp.",
+    "note": "Misnumbered PDF header corrected by actual English RC prompt"
+  },
+  {
+    "test": 8,
+    "number": 195,
+    "correctOptionId": "A",
+    "solutionPage": 134,
+    "originalPrompt": "What is true about the new cost estimate?",
+    "explanation": "Điều gì đúng về ước tính chi phí mới?\n(A) Nó cao hơn ước tính ban đầu\n(B) Nó phải được thanh toán đầy đủ ngay lập tức.\n(C) Nó bao gồm chi phí nhiên liệu.\n(D) Nó hết hạn sau ba ngày\nDạng câu hỏi: Câu hỏi thông tin chi tiết\nCách định vị vùng thông tin chứa đáp án:\n- Từ khoá: What, true, new cost estimate\n- Thông tin về chi phí trong đơn đặt chỗ đầu tiên “I reserved a moving van online and was\ngiven an estimated price of $150” (Tôi đã đặt trước một chiếc xe tải chuyển hàng trực tuyến\nvà được đưa ra mức giá ước tính là 150 USD) cho thấy chi phí trước khi cập nhật đặt chỗ\nlà $150, trong khi đó, theo email phản hồi từ công ty thì tổng chi phí sau khi cập nhật đặt\nchỗ là “Total = $171.46” (Tổng cộng = $171,46). Như vậy, ước tính chi phí mới cao hơn do\nvới ban đầu.\n→ Phương án (A) là phù hợp nhất.\n\nLoại các phương án sai:\n- (B), (C), (D) chứa thông tin không được đề cập.\nTừ vựng cần lưu ý:\nreservation (n): đặt chỗ\npickup (n): điểm lấy xe\ndrop-off (n): điểm trả xe\nvehicle (n): phương tiện\ncustomer support (noun phrase): hỗ trợ khách hàng\nestimated price (noun phrase): chi phí ước tính\ncredit card (noun phrase): thẻ tín dụng",
+    "note": "Misnumbered PDF header corrected by actual English RC prompt"
+  }
+]

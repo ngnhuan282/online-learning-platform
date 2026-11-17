@@ -4,6 +4,7 @@ import MainLayout from '../layouts/MainLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import UserLayout from '../layouts/UserLayout';
 import ProtectedRoute from '../routes/ProtectedRoute';
+import RoleRoute from '../routes/RoleRoute';
 
 import HomePage from '../pages/HomePage';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -121,6 +122,18 @@ const router = createBrowserRouter([
       },
       { path: 'course', element: <Navigate to="/admin/courses" replace /> },
       {
+        path: 'toeic',
+        element: <RoleRoute roles={['ADMIN']} />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/AdminToeicPage')).default,
+            }),
+          },
+        ],
+      },
+      {
         path: 'notifications',
         element: <PermissionRoute permission="NOTIFICATION_VIEW" />,
         children: [
@@ -207,6 +220,43 @@ const router = createBrowserRouter([
     path: '/',
     element: <MainLayout />,
     children: [
+      {
+        path: 'exams/toeic',
+        lazy: async () => ({
+          Component: (await import('../features/learning/components/ToeicLayout')).default,
+        }),
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/ToeicLibraryPage')).default,
+            }),
+          },
+          {
+            element: <ProtectedRoute />,
+            children: [
+              {
+                path: 'tests/:testId',
+                lazy: async () => ({
+                  Component: (await import('../features/learning/pages/ToeicReaderPage')).default,
+                }),
+              },
+              {
+                path: 'attempts/:attemptId',
+                lazy: async () => ({
+                  Component: (await import('../features/learning/pages/ToeicAttemptPage')).default,
+                }),
+              },
+              {
+                path: 'attempts/:attemptId/result',
+                lazy: async () => ({
+                  Component: (await import('../features/learning/pages/ToeicResultPage')).default,
+                }),
+              },
+            ],
+          },
+        ],
+      },
       {
         index: true,
         element: <HomePage />,

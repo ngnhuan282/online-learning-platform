@@ -78,43 +78,70 @@ test('AI workspace and updated checkout compile with the existing layout', async
   }
 });
 
-test('header keeps primary navigation visible and groups extra tools by current route', async () => {
+test('header keeps five primary links including TOEIC and groups extra tools by current route', async () => {
   const { default: Header } = await load('shared/components/SiteHeader.jsx');
   const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
   const { NotificationsProvider } = await load('features/learning/context/NotificationsContext.jsx');
+  const primaryLinks = [
+    ['/#courses', 'Khóa học'],
+    ['/exams/toeic', 'Luyện thi TOEIC'],
+    ['/#categories', 'Danh mục'],
+    ['/#benefits', 'Lợi ích'],
+    ['/', 'Trang chủ'],
+  ];
+  const paths = [
+    '/ai-assistant',
+    '/',
+    '/exams/toeic',
+    '/exams/toeic/tests/1',
+    '/exams/toeic/attempts/7/result',
+  ];
   for (const user of [null, { id: 1, fullName: 'Nguyễn Văn A', roles: ['USER'] }]) {
-    const html = renderToStaticMarkup(
-      h(
-        AuthContext.Provider,
-        { value: { user } },
-        h(MemoryRouter, { initialEntries: ['/ai-assistant'] }, h(NotificationsProvider, null, h(Header))),
-      ),
-    );
-    const dom = new JSDOM(html);
-    try {
-      dom.window.document.querySelectorAll('style').forEach(style => style.remove());
-      const nav = dom.window.document.querySelector('nav[aria-label="Điều hướng chính"]');
-      assert.ok(nav.querySelector('a[href="/"]'));
-      assert.ok(nav.querySelector('a[href="/#courses"]'));
-      assert.ok(nav.querySelector('a[href="/#categories"]'));
-      assert.ok(nav.querySelector('a[href="/#benefits"]'));
-      assert.equal(nav.querySelectorAll(':scope > a').length, 4);
-      assert.equal(dom.window.document.querySelector('.mobile-menu'), null);
-      const utilities = nav.querySelector('.header-utilities-trigger');
-      assert.equal(utilities.textContent, 'Tiện ích khác');
-      assert.equal(utilities.getAttribute('aria-haspopup'), 'menu');
-      assert.equal(utilities.getAttribute('aria-expanded'), 'false');
-      assert.equal(dom.window.document.querySelector('.signup-link'), null);
-      const pro = dom.window.document.querySelector('.header-pro-button');
-      if (!user) {
-        assert.equal(utilities.classList.contains('active'), false);
-        assert.equal(pro, null);
-        continue;
+    for (const path of paths) {
+      const html = renderToStaticMarkup(
+        h(
+          AuthContext.Provider,
+          { value: { user } },
+          h(MemoryRouter, { initialEntries: [path] }, h(NotificationsProvider, null, h(Header))),
+        ),
+      );
+      const dom = new JSDOM(html);
+      try {
+        dom.window.document.querySelectorAll('style').forEach(style => style.remove());
+        const nav = dom.window.document.querySelector('nav[aria-label="Điều hướng chính"]');
+        assert.ok(nav, `Missing primary navigation: ${path}`);
+        assert.deepEqual(
+          [...nav.querySelectorAll(':scope > a')].map(link => [
+            link.getAttribute('href'),
+            link.textContent.trim(),
+          ]),
+          primaryLinks,
+          `Primary links changed or duplicated: ${path}`,
+        );
+        assert.equal(
+          nav.querySelector('a[href="/exams/toeic"]').classList.contains('active'),
+          path.startsWith('/exams/toeic'),
+        );
+        assert.equal(
+          nav.querySelector('a[href="/"]').getAttribute('aria-current'),
+          path === '/' ? 'page' : null,
+        );
+        assert.equal(dom.window.document.querySelector('.mobile-menu'), null);
+        const utilities = nav.querySelector('.header-utilities-trigger');
+        assert.equal(utilities.textContent, 'Tiện ích khác');
+        assert.equal(utilities.getAttribute('aria-haspopup'), 'menu');
+        assert.equal(utilities.getAttribute('aria-expanded'), 'false');
+        assert.equal(utilities.classList.contains('active'), Boolean(user) && path === '/ai-assistant');
+        assert.equal(dom.window.document.querySelector('.signup-link'), null);
+        const pro = dom.window.document.querySelector('.header-pro-button');
+        if (!user) {
+          assert.equal(pro, null);
+          continue;
+        }
+        assert.equal(pro.getAttribute('aria-label'), 'Mở khóa PRO');
+      } finally {
+        dom.window.close();
       }
-      assert.equal(pro.getAttribute('aria-label'), 'Mở khóa PRO');
-      assert.ok(utilities.classList.contains('active'));
-    } finally {
-      dom.window.close();
     }
   }
 });
