@@ -6,6 +6,52 @@ public final class LearningAdminModels {
 
     private LearningAdminModels() {}
 
+    public record DeleteRequest(@Min(0) long version, @NotBlank @Size(max = 400) String reason) {}
+
+    public record RewardDefinitionRequest(
+        @NotBlank @Pattern(regexp = "[A-Z][A-Z0-9_]{1,31}") String code,
+        @NotBlank @Size(max = 120) String label,
+        @NotBlank @Pattern(regexp = "FIRST_LESSON|STREAK|LEVEL") String metric,
+        @Min(1) @Max(10000) int threshold,
+        @Min(0) @Max(1000000) int gems,
+        boolean active,
+        @Min(0) long version,
+        @NotBlank @Size(max = 400) String reason
+    ) {
+        @AssertTrue(message = "First-lesson rewards must use threshold one")
+        public boolean isThresholdValid() {
+            return !"FIRST_LESSON".equals(metric) || threshold == 1;
+        }
+    }
+
+    public record PostContentRequest(
+        @Positive long topicId,
+        @NotBlank @Pattern(regexp = "DISCUSSION|QUESTION") String kind,
+        @NotBlank @Size(max = 160) String title,
+        @NotBlank @Size(max = 20000) String body,
+        boolean hidden,
+        @Min(0) long version,
+        @NotBlank @Size(max = 400) String reason
+    ) {}
+
+    public record CommentContentRequest(
+        @NotBlank @Size(max = 4000) String body,
+        @Min(0) long version,
+        @NotBlank @Size(max = 400) String reason
+    ) {}
+
+    public record CodeUpdateRequest(
+        java.time.Instant expiresAt,
+        @Min(0) long version,
+        @NotBlank @Size(max = 400) String reason
+    ) {}
+
+    public record GrantUpdateRequest(
+        @NotBlank @Pattern(regexp = "PRO_[A-Z0-9_]{1,28}") String planCode,
+        @Min(0) long version,
+        @NotBlank @Size(max = 400) String reason
+    ) {}
+
     public record ItemRequest(
         @NotBlank @Pattern(regexp = "[A-Z][A-Z0-9_]{1,31}") String code,
         @NotBlank @Size(max = 120) String nameKey,
@@ -49,7 +95,7 @@ public final class LearningAdminModels {
     ) {}
 
     public record GrantRequest(
-        @NotBlank @Pattern(regexp = "PRO_MONTH|PRO_QUARTER|PRO_YEAR") String planCode,
+        @NotBlank @Pattern(regexp = "PRO_[A-Z0-9_]{1,28}") String planCode,
         @NotBlank
         @Pattern(regexp = "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
         String requestId,

@@ -33,6 +33,72 @@ import tools.jackson.databind.json.JsonMapper;
 @ActiveProfiles("test")
 class ProPlanAdminIntegrationTests {
 
+    @Test
+    void customPlanCrudKeepsOrderSnapshotsAndRequiresCreateAndDeletePermissions() throws Exception {
+        var payload = Map.of(
+            "code",
+            "PRO_CRUD_TEST",
+            "name",
+            "Special quarter",
+            "durationMonths",
+            3,
+            "price",
+            110000,
+            "active",
+            true,
+            "reason",
+            "new plan"
+        );
+        String viewer = token("SUPPORT", "ADMIN_ACCESS", "PRO_PLAN_VIEW");
+        assertThat(request("POST", "/pro/plans", viewer, payload).statusCode()).isEqualTo(403);
+        assertThat(request("POST", "/pro/plans", token("ADMIN"), payload).statusCode()).isEqualTo(200);
+        var order = checkout.createProCheckout(
+            new ProPaymentModels.CheckoutRequest(
+                "PRO_CRUD_TEST",
+                PaymentProvider.MOCK,
+                UUID.randomUUID().toString(),
+                null,
+                null
+            ),
+            92L,
+            "127.0.0.1"
+        );
+        var deletion = Map.of("version", 0, "reason", "archive plan");
+        assertThat(request("DELETE", "/pro/plans/PRO_CRUD_TEST", viewer, deletion).statusCode()).isEqualTo(
+            403
+        );
+        assertThat(
+            request("DELETE", "/pro/plans/PRO_CRUD_TEST", token("ADMIN"), deletion).statusCode()
+        ).isEqualTo(200);
+        assertThat(plans.plans()).noneMatch(p -> p.code().equals("PRO_CRUD_TEST"));
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT plan_duration_months FROM orders WHERE order_code=?",
+                Integer.class,
+                order.orderCode()
+            )
+        ).isEqualTo(3);
+        assertThat(
+            request("PUT", "/pro/plans/PRO_CRUD_TEST", token("ADMIN"), update(120000, true, 1)).statusCode()
+        ).isEqualTo(409);
+        assertThat(
+            request(
+                "POST",
+                "/pro/plans/PRO_CRUD_TEST/restore",
+                token("ADMIN"),
+                Map.of("version", 1, "reason", "restore")
+            ).statusCode()
+        ).isEqualTo(200);
+        assertThat(plans.plans()).noneMatch(p -> p.code().equals("PRO_CRUD_TEST"));
+        assertThat(
+            request("PUT", "/pro/plans/PRO_CRUD_TEST", token("ADMIN"), update(120000, true, 2)).statusCode()
+        ).isEqualTo(200);
+        assertThat(plans.requirePlan("PRO_CRUD_TEST").price()).isEqualByComparingTo("120000");
+        jdbc.update(
+            "UPDATE pro_plans SET active=FALSE,deleted_at=CURRENT_TIMESTAMP WHERE code='PRO_CRUD_TEST'"
+        );
+    }
+
     static final String SECRET = "pro-plan-admin-integration-test-secret-32-bytes";
 
     @LocalServerPort

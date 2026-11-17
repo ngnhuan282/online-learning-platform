@@ -141,9 +141,9 @@ export default function AchievementsPage() {
                 key={reward.code}
               >
                 <span className="reward-icon" aria-hidden="true">
-                  {rewards[reward.code]?.[0]}
+                  {rewards[reward.code]?.[0] || '🏅'}
                 </span>
-                <h3>{t(rewards[reward.code]?.[1] || reward.code)}</h3>
+                <h3>{t(reward.label || rewards[reward.code]?.[1] || reward.code)}</h3>
                 <p>💎 +{reward.gems}</p>
                 <button
                   className="button button-primary"

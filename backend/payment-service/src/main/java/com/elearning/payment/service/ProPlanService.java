@@ -24,17 +24,19 @@ public class ProPlanService {
             "SELECT price FROM pro_plans WHERE code = 'PRO_MONTH'",
             BigDecimal.class
         );
-        return jdbc.query("SELECT * FROM pro_plans WHERE active = TRUE ORDER BY duration_months", (row, i) ->
-            new Plan(
-                row.getString("code"),
-                row.getString("name"),
-                row.getInt("duration_months"),
-                row.getBigDecimal("price"),
-                monthly
-                    .multiply(BigDecimal.valueOf(row.getInt("duration_months")))
-                    .max(row.getBigDecimal("price")),
-                "VND"
-            )
+        return jdbc.query(
+            "SELECT * FROM pro_plans WHERE active = TRUE AND deleted_at IS NULL ORDER BY duration_months,code",
+            (row, i) ->
+                new Plan(
+                    row.getString("code"),
+                    row.getString("name"),
+                    row.getInt("duration_months"),
+                    row.getBigDecimal("price"),
+                    monthly
+                        .multiply(BigDecimal.valueOf(row.getInt("duration_months")))
+                        .max(row.getBigDecimal("price")),
+                    "VND"
+                )
         );
     }
 

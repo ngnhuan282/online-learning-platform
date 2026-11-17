@@ -9,7 +9,15 @@ public final class EngagementModels {
 
     public record ActivityDay(LocalDate date, int count) {}
 
-    public record Reward(String code, int gems, boolean eligible, boolean claimed) {}
+    public record Reward(
+        String code,
+        int gems,
+        boolean eligible,
+        boolean claimed,
+        String label,
+        String metric,
+        int threshold
+    ) {}
 
     public record Summary(
         long userId,

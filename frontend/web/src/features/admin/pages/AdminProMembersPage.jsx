@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Button } from '@mui/material';
+import { Add, LockOutlined, LockOpenOutlined } from '@mui/icons-material';
+import { proApi } from '../../pro/api/proApi';
 import { commerceAdminApi as api } from '../api/commerceAdminApi';
 import useLearningResource from '../../learning/hooks/useLearningResource';
 import useAuth from '../../auth/hooks/useAuth';
@@ -12,6 +14,8 @@ import {
   CommerceSearch,
   Field,
   ReasonField,
+  AdminRowActions,
+  AdminDetailsDialog,
 } from '../components/CommerceAdminUi';
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
@@ -29,15 +33,23 @@ export default function AdminProMembersPage() {
   const [draft, setDraft] = useState(''),
     [keyword, setKeyword] = useState(''),
     [page, setPage] = useState(0),
-    [selected, setSelected] = useState(null);
-  const load = useCallback(options => api.members({ keyword, page, size: 20 }, options), [keyword, page]);
+    [size, setSize] = useState(20),
+    [selected, setSelected] = useState(null),
+    [creating, setCreating] = useState(false);
+  const load = useCallback(options => api.members({ keyword, page, size }, options), [keyword, page, size]);
   const resource = useLearningResource(load, null);
   return (
     <>
       <PageHeading
         title="Thành viên Pro"
         description="Tra cứu thời hạn, cấp Pro quản trị và quản lý trạng thái truy cập."
-      />
+      >
+        {can(user, 'PRO_MEMBER_MANAGE') && (
+          <Button variant="contained" startIcon={<Add />} onClick={() => setCreating(true)}>
+            {t('Cấp Pro')}
+          </Button>
+        )}
+      </PageHeading>
       <CommerceSearch
         value={draft}
         onChange={e => setDraft(e.target.value)}
@@ -57,12 +69,46 @@ export default function AdminProMembersPage() {
               ['Học viên', 'displayName'],
               ['Gói', 'planCode'],
               ['Hạn Pro', r => (r.expiresAt ? date(r.expiresAt) : '—')],
-              ['Trạng thái', r => t(memberStatus(r))],
-              ['Thao tác', r => <Button onClick={() => setSelected(r)}>{t('Chi tiết')}</Button>],
+              [
+                'Trạng thái',
+                r => (
+                  <span
+                    className={`admin-pill ${r.suspended ? 'amber' : r.expiresAt && Date.parse(r.expiresAt) > Date.now() ? 'green' : r.expiresAt ? 'red' : ''}`}
+                  >
+                    {t(memberStatus(r))}
+                  </span>
+                ),
+              ],
+              [
+                'Thao tác',
+                r => (
+                  <AdminRowActions
+                    actions={[{ kind: 'view', label: 'Xem chi tiết', onClick: () => setSelected(r) }]}
+                  />
+                ),
+              ],
             ]}
           />
-          <CommercePager data={resource.data} page={page} onChange={setPage} />
+          <CommercePager
+            data={resource.data}
+            page={page}
+            onChange={setPage}
+            size={size}
+            onSizeChange={value => {
+              setSize(value);
+              setPage(0);
+            }}
+          />
         </>
+      )}
+      {creating && (
+        <CreateGrant
+          onClose={() => setCreating(false)}
+          onSaved={() => {
+            setCreating(false);
+            resource.reload();
+          }}
+        />
       )}
       {selected && (
         <MemberEditor
@@ -78,11 +124,61 @@ export default function AdminProMembersPage() {
     </>
   );
 }
+function CreateGrant({ onClose, onSaved }) {
+  const load = useCallback(options => proApi.plans(options), []);
+  const resource = useLearningResource(load, null);
+  const [form, setForm] = useState({ userId: '', planCode: '', reason: '', requestId: crypto.randomUUID() });
+  const planCode = form.planCode || resource.data?.[0]?.code || '';
+  const change = key => event =>
+    setForm({ ...form, [key]: event.target.value, requestId: crypto.randomUUID() });
+  return (
+    <AdminActionDialog
+      title="Cấp Pro"
+      onClose={onClose}
+      onSubmit={() =>
+        api.grant(Number(form.userId), { planCode, requestId: form.requestId, reason: form.reason })
+      }
+      onSaved={onSaved}
+    >
+      <LoadState loading={resource.loading} error={resource.error} retry={resource.reload} />
+      <Field
+        label="ID học viên"
+        type="number"
+        required
+        min="1"
+        max="9007199254740991"
+        step="1"
+        value={form.userId}
+        onChange={change('userId')}
+      />
+      <Field label="Gói Pro">
+        <select required value={planCode} onChange={change('planCode')}>
+          <option value="" disabled>
+            {t('Chọn gói Pro')}
+          </option>
+          {resource.data?.map(plan => (
+            <option value={plan.code} key={plan.code}>
+              {t(plan.name || plan.code)} · {plan.durationMonths} {t('tháng')}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <ReasonField value={form.reason} onChange={change('reason')} />
+    </AdminActionDialog>
+  );
+}
 function MemberEditor({ member, user, onClose }) {
   const id = member.userId;
-  const load = useCallback(options => api.member(id, options), [id]);
+  const load = useCallback(
+    async options => {
+      const [member, plans] = await Promise.all([api.member(id, options), proApi.plans(options)]);
+      return { data: { ...member.data, plans: plans.data } };
+    },
+    [id],
+  );
   const resource = useLearningResource(load, null);
   const [action, setAction] = useState(null);
+  const [grantDetail, setGrantDetail] = useState(null);
   const membership = resource.data?.membership;
   return (
     <>
@@ -105,10 +201,12 @@ function MemberEditor({ member, user, onClose }) {
             {can(user, 'PRO_MEMBER_MANAGE') && (
               <div className="commerce-actions">
                 <Button
+                  startIcon={<Add />}
+                  disabled={!resource.data.plans.length}
                   onClick={() =>
                     setAction({
                       kind: 'grant',
-                      planCode: 'PRO_MONTH',
+                      planCode: resource.data.plans[0].code,
                       reason: '',
                       requestId: crypto.randomUUID(),
                     })
@@ -118,6 +216,7 @@ function MemberEditor({ member, user, onClose }) {
                 </Button>
                 {membership.expiresAt && (
                   <Button
+                    startIcon={membership.suspended ? <LockOpenOutlined /> : <LockOutlined />}
                     color={membership.suspended ? 'primary' : 'warning'}
                     onClick={() =>
                       setAction({
@@ -139,6 +238,7 @@ function MemberEditor({ member, user, onClose }) {
               )}
             </p>
             <CommerceTable
+              paginate
               rows={resource.data.grants}
               columns={[
                 ['Nguồn', 'sourceType'],
@@ -149,33 +249,54 @@ function MemberEditor({ member, user, onClose }) {
                 ['Trạng thái', r => t(r.revokedAt ? 'Đã thu hồi' : 'Đã cấp')],
                 [
                   'Thao tác',
-                  r =>
-                    can(user, 'PRO_MEMBER_MANAGE') && r.sourceType === 'ADMIN' && !r.revokedAt ? (
-                      <Button
-                        color="warning"
-                        onClick={() => setAction({ kind: 'revoke', grantId: r.id, reason: '' })}
-                      >
-                        {t('Thu hồi')}
-                      </Button>
-                    ) : (
-                      '—'
-                    ),
+                  r => (
+                    <AdminRowActions
+                      actions={[
+                        { kind: 'view', label: 'Xem chi tiết', onClick: () => setGrantDetail(r) },
+                        can(user, 'PRO_MEMBER_MANAGE') &&
+                          r.sourceType === 'ADMIN' &&
+                          !r.revokedAt && {
+                            kind: 'edit',
+                            label: 'Chỉnh sửa',
+                            onClick: () => setAction({ ...r, kind: 'edit', grantId: r.id, reason: '' }),
+                          },
+                        can(user, 'PRO_MEMBER_MANAGE') &&
+                          r.sourceType === 'ADMIN' &&
+                          !r.revokedAt && {
+                            kind: 'delete',
+                            label: 'Thu hồi',
+                            onClick: () => setAction({ kind: 'revoke', grantId: r.id, reason: '' }),
+                          },
+                      ]}
+                    />
+                  ),
                 ],
               ]}
             />
           </>
         )}
       </AdminActionDialog>
+      {grantDetail && (
+        <AdminDetailsDialog title="Chi tiết cấp Pro" onClose={() => setGrantDetail(null)}>
+          <strong>{grantDetail.planCode}</strong>
+          <p>
+            {grantDetail.sourceType} · {date(grantDetail.grantedAt)}
+          </p>
+          <p>{grantDetail.adminReason}</p>
+        </AdminDetailsDialog>
+      )}
       {action && (
         <AdminActionDialog
           title={
             action.kind === 'grant'
               ? 'Cấp Pro'
-              : action.kind === 'suspend'
-                ? action.suspended
-                  ? 'Tạm khóa Pro'
-                  : 'Mở lại Pro'
-                : 'Thu hồi Pro quản trị'
+              : action.kind === 'edit'
+                ? 'Chỉnh sửa Pro quản trị'
+                : action.kind === 'suspend'
+                  ? action.suspended
+                    ? 'Tạm khóa Pro'
+                    : 'Mở lại Pro'
+                  : 'Thu hồi Pro quản trị'
           }
           onClose={() => setAction(null)}
           onSubmit={() =>
@@ -185,13 +306,19 @@ function MemberEditor({ member, user, onClose }) {
                   requestId: action.requestId,
                   reason: action.reason,
                 })
-              : action.kind === 'suspend'
-                ? api.suspend(id, {
-                    suspended: action.suspended,
+              : action.kind === 'edit'
+                ? api.updateGrant(id, action.grantId, {
+                    planCode: action.planCode,
                     version: action.version,
                     reason: action.reason,
                   })
-                : api.revokeGrant(id, action.grantId, { reason: action.reason })
+                : action.kind === 'suspend'
+                  ? api.suspend(id, {
+                      suspended: action.suspended,
+                      version: action.version,
+                      reason: action.reason,
+                    })
+                  : api.revokeGrant(id, action.grantId, { reason: action.reason })
           }
           onSaved={() => {
             setAction(null);
@@ -201,7 +328,7 @@ function MemberEditor({ member, user, onClose }) {
           <strong>
             {member.displayName} · #{id}
           </strong>
-          {action.kind === 'grant' && (
+          {['grant', 'edit'].includes(action.kind) && (
             <Field label="Gói Pro">
               <select
                 value={action.planCode}
@@ -209,13 +336,14 @@ function MemberEditor({ member, user, onClose }) {
                   setAction({ ...action, planCode: e.target.value, requestId: crypto.randomUUID() })
                 }
               >
-                {[
-                  ['PRO_MONTH', '1 tháng'],
-                  ['PRO_QUARTER', '3 tháng'],
-                  ['PRO_YEAR', '1 năm'],
-                ].map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {t(label)}
+                {action.planCode && !resource.data.plans.some(plan => plan.code === action.planCode) && (
+                  <option value={action.planCode}>
+                    {action.planCode} · {t('Ngừng bán')}
+                  </option>
+                )}
+                {resource.data.plans.map(plan => (
+                  <option key={plan.code} value={plan.code}>
+                    {t(plan.name || plan.code)} · {plan.durationMonths} {t('tháng')}
                   </option>
                 ))}
               </select>

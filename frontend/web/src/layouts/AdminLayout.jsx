@@ -1,6 +1,6 @@
 import { t } from '../shared/i18n/locale';
 import useLocale from '../shared/i18n/useLocale';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { IconButton } from '@mui/material';
 import {
@@ -28,18 +28,14 @@ import {
 import PermissionRoute from '../routes/PermissionRoute';
 import useAuth from '../features/auth/hooks/useAuth';
 import { can } from '../features/admin/utils/adminUtils';
+import { notifyAdminFailure } from '../shared/utils/adminFeedback';
 import AccountMenu from '../shared/components/AccountMenu';
 import LanguageSwitcher from '../shared/components/LanguageSwitcher';
+import Brand from '../shared/components/Brand';
 import { ROUTES } from '../shared/constants/routes';
 import '../features/admin/admin.css';
 
 const menu = [
-  {
-    to: ROUTES.ADMIN_PRO_CODES,
-    label: 'Mã kích hoạt Pro',
-    icon: WorkspacePremiumOutlined,
-    permission: 'PRO_CODE_VIEW',
-  },
   { to: '/admin', label: 'Tổng quan', icon: DashboardOutlined, permission: 'DASHBOARD_VIEW', end: true },
   { to: ROUTES.ADMIN_SHOP, label: 'Quản lý cửa hàng', icon: ShoppingBagOutlined, permission: 'SHOP_VIEW' },
   {
@@ -65,6 +61,12 @@ const menu = [
     label: 'Thành viên Pro',
     icon: CardMembershipOutlined,
     permission: 'PRO_MEMBER_VIEW',
+  },
+  {
+    to: ROUTES.ADMIN_PRO_CODES,
+    label: 'Mã kích hoạt Pro',
+    icon: WorkspacePremiumOutlined,
+    permission: 'PRO_CODE_VIEW',
   },
   {
     to: ROUTES.ADMIN_COMMUNITY,
@@ -109,9 +111,19 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const lastInvalidNotice = useRef(0);
   return (
     <PermissionRoute permission="ADMIN_ACCESS">
-      <div className="admin-shell">
+      <div
+        className="admin-shell"
+        onInvalidCapture={() => {
+          const now = Date.now();
+          if (now - lastInvalidNotice.current > 250) {
+            lastInvalidNotice.current = now;
+            notifyAdminFailure(new Error('Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường.'));
+          }
+        }}
+      >
         {open && (
           <button
             className="admin-backdrop"
@@ -120,15 +132,10 @@ export default function AdminLayout() {
           />
         )}
         <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
-          <Link className="admin-brand" to="/admin">
-            <span className="admin-brand-icon">
-              <SchoolOutlined />
-            </span>
-            <span>
-              ChitChatGo<small>ENGLISH PLATFORM</small>
-            </span>
+          <div className="admin-brand">
+            <Brand to="/admin" label="ChitChatGo Admin" />
             <b>Admin</b>
-          </Link>
+          </div>
           <div className="admin-menu-label">{t('QUẢN TRỊ HỆ THỐNG')}</div>
           <nav aria-label={t('Quản trị')}>
             {menu

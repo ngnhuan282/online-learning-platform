@@ -165,22 +165,26 @@ public class EngagementService {
                 Long.class,
                 userId
             ) > 0;
-        var rewardAmounts = new java.util.HashMap<String, Integer>();
-        jdbc.query("SELECT code,gems FROM engagement_reward_rules WHERE active=TRUE", row -> {
-            rewardAmounts.put(row.getString(1), row.getInt(2));
-        });
         var settings = rules.settings();
-        var rewards = REWARDS.stream()
-            .filter(rewardAmounts::containsKey)
-            .map(code ->
+        var rewards = jdbc.query(
+            "SELECT * FROM engagement_reward_rules WHERE active=TRUE AND deleted_at IS NULL ORDER BY threshold,code",
+            (row, i) ->
                 new Reward(
-                    code,
-                    rewardAmounts.get(code),
-                    eligible(code, p, firstLesson, settings.xpPerLevel()),
-                    claimed.contains(code)
+                    row.getString("code"),
+                    row.getInt("gems"),
+                    eligible(
+                        row.getString("metric"),
+                        row.getInt("threshold"),
+                        p,
+                        firstLesson,
+                        settings.xpPerLevel()
+                    ),
+                    claimed.contains(row.getString("code")),
+                    row.getString("label"),
+                    row.getString("metric"),
+                    row.getInt("threshold")
                 )
-            )
-            .toList();
+        );
         return new Summary(
             userId,
             p.name(),
@@ -215,6 +219,15 @@ public class EngagementService {
 
     public Summary claim(long userId, String code) {
         lockProfile(userId);
+        var rule = jdbc.queryForList(
+            "SELECT gems,active,deleted_at FROM engagement_reward_rules WHERE code=? FOR UPDATE",
+            code
+        );
+        if (
+            rule.isEmpty() ||
+            !Boolean.TRUE.equals(rule.getFirst().get("active")) ||
+            rule.getFirst().get("deleted_at") != null
+        ) throw new AppException(ErrorCode.NOT_FOUND);
         Reward reward = summary(userId)
             .rewards()
             .stream()
@@ -227,12 +240,12 @@ public class EngagementService {
                 "INSERT INTO learner_rewards (user_id, reward_code, gems, claimed_at) VALUES (?, ?, ?, ?)",
                 userId,
                 code,
-                reward.gems(),
+                ((Number) rule.getFirst().get("gems")).intValue(),
                 Timestamp.from(clock.instant())
             );
             jdbc.update(
                 "UPDATE learner_profiles SET gems = gems + ? WHERE user_id = ?",
-                reward.gems(),
+                ((Number) rule.getFirst().get("gems")).intValue(),
                 userId
             );
         }
@@ -244,7 +257,6 @@ public class EngagementService {
         if (
             code != null &&
             !(
-                REWARDS.contains(code) &&
                 jdbc.queryForObject(
                     "SELECT COUNT(*) FROM learner_rewards WHERE user_id = ? AND reward_code = ?",
                     Long.class,
@@ -362,13 +374,11 @@ public class EngagementService {
         );
     }
 
-    private boolean eligible(String code, Profile p, boolean firstLesson, int xpPerLevel) {
-        return switch (code) {
+    private boolean eligible(String metric, int threshold, Profile p, boolean firstLesson, int xpPerLevel) {
+        return switch (metric) {
             case "FIRST_LESSON" -> firstLesson;
-            case "STREAK_3" -> p.longest() >= 3;
-            case "STREAK_7" -> p.longest() >= 7;
-            case "STREAK_30" -> p.longest() >= 30;
-            case "LEVEL_5" -> p.xp() >= 4L * xpPerLevel;
+            case "STREAK" -> p.longest() >= threshold;
+            case "LEVEL" -> p.xp() / xpPerLevel + 1 >= threshold;
             default -> false;
         };
     }

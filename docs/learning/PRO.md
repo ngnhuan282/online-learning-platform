@@ -12,6 +12,8 @@ Truy cập `/pro` sau khi đăng nhập hoặc nhấn **Mở khóa PRO** trên h
 
 Giá lấy từ bảng `payment_db.pro_plans`, không nhận giá hoặc user ID do client tự khai. Mỗi đơn chụp lại mã gói, thời hạn và số tiền tại thời điểm tạo. Giá tham chiếu khi chọn nhiều tháng được tính từ giá gói một tháng, không phải chương trình giảm giá có thời hạn. Chưa có gói trọn đời trong danh mục.
 
+Admin có thể thêm gói với mã riêng và thời hạn 1/3/12 tháng, sửa tên/giá hoặc xóa/khôi phục danh mục. Mã và thời hạn không đổi sau khi tạo. Gói bị xóa không còn bán; đơn đang chờ xác nhận và quyền/mã đã phát hành giữ snapshot cũ. Learning đọc metadata gói tùy chỉnh qua API Payment khi cấp Pro/mã, không đọc chéo database. Các gói chuẩn vẫn dùng được cho hỗ trợ thủ công khi ngừng bán. Chi tiết quyền và thao tác xem [ADMIN_GUIDE.md](../ADMIN_GUIDE.md).
+
 **Miễn phí:** học các khóa miễn phí đã công bố, quiz của các khóa được phép học, tiến độ, XP/streak/phần thưởng, cửa hàng, diễn đàn và bảng xếp hạng.
 
 **Pro:** toàn bộ quyền miễn phí và quyền học tất cả khóa trả phí đang công bố trong thời hạn gói, gồm bài học, quiz và tài liệu thuộc các khóa đó. Chọn **Học bằng Pro** tại chi tiết khóa để ghi danh. Các khóa đã mua riêng và khóa miễn phí giữ quyền truy cập độc lập với Pro.

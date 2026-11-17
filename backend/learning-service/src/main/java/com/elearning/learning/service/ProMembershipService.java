@@ -27,12 +27,19 @@ public class ProMembershipService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final LearningAdminAudit audit;
+    private final ProPlanCatalog catalog;
     private final SecureRandom random = new SecureRandom();
 
-    public ProMembershipService(JdbcTemplate jdbc, Clock clock, LearningAdminAudit audit) {
+    public ProMembershipService(
+        JdbcTemplate jdbc,
+        Clock clock,
+        LearningAdminAudit audit,
+        ProPlanCatalog catalog
+    ) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.audit = audit;
+        this.catalog = catalog;
     }
 
     @Transactional(readOnly = true)
@@ -62,9 +69,11 @@ public class ProMembershipService {
     }
 
     public Membership grant(GrantRequest request) {
-        if (request.durationMonths() != ProModels.months(request.planCode())) throw new AppException(
-            ErrorCode.BAD_REQUEST
-        );
+        if (
+            !List.of(1, 3, 12).contains(request.durationMonths()) ||
+            (List.of("PRO_MONTH", "PRO_QUARTER", "PRO_YEAR").contains(request.planCode()) &&
+                request.durationMonths() != ProModels.months(request.planCode()))
+        ) throw new AppException(ErrorCode.BAD_REQUEST);
         lock(request.userId());
         return applyGrant(
             request.userId(),
@@ -135,7 +144,7 @@ public class ProMembershipService {
     }
 
     public IssuedCode createCode(long adminId, CreateCodeRequest request) {
-        int months = ProModels.months(request.planCode());
+        int months = catalog.months(request.planCode());
         Instant now = clock.instant();
         if (request.expiresAt() != null && !request.expiresAt().isAfter(now)) throw new AppException(
             ErrorCode.BAD_REQUEST
@@ -183,6 +192,32 @@ public class ProMembershipService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public com.elearning.learning.common.response.PageResponse<CodeInfo> codesPage(int page, int size) {
+        if (page < 0 || page > 100000 || !List.of(5, 10, 20, 50).contains(size)) throw new AppException(
+            ErrorCode.BAD_REQUEST
+        );
+        long total = jdbc.queryForObject("SELECT COUNT(*) FROM pro_activation_codes", Long.class);
+        var content = jdbc
+            .queryForList(
+                "SELECT id FROM pro_activation_codes ORDER BY id DESC LIMIT ? OFFSET ?",
+                Long.class,
+                size,
+                (long) page * size
+            )
+            .stream()
+            .map(this::codeInfo)
+            .toList();
+        return new com.elearning.learning.common.response.PageResponse<>(
+            content,
+            page,
+            size,
+            total,
+            (int) ((total + size - 1) / size),
+            ((long) page + 1) * size >= total
+        );
+    }
+
     public CodeInfo revokeCode(long id) {
         var used = jdbc.query(
             "SELECT redeemed_by FROM pro_activation_codes WHERE id = ? FOR UPDATE",
@@ -212,20 +247,27 @@ public class ProMembershipService {
     ) {
         lock(userId);
         String reference = "ADMIN-" + actor + "-" + request.requestId();
-        var previous = jdbc.queryForList(
-            "SELECT admin_reason FROM pro_grants WHERE reference_code=?",
-            String.class,
+        var previous = jdbc.query(
+            "SELECT user_id,plan_code,admin_reason,source_type FROM pro_grants WHERE reference_code=? FOR UPDATE",
+            (row, i) -> new Object[] { row.getLong(1), row.getString(2), row.getString(3), row.getString(4) },
             reference
         );
-        if (
-            !previous.isEmpty() && !request.reason().strip().equals(previous.getFirst())
-        ) throw new AppException(ErrorCode.CONFLICT);
+        if (!previous.isEmpty()) {
+            var prior = previous.getFirst();
+            if (
+                !Long.valueOf(userId).equals(prior[0]) ||
+                !request.planCode().equals(prior[1]) ||
+                !request.reason().strip().equals(prior[2]) ||
+                !"ADMIN".equals(prior[3])
+            ) throw new AppException(ErrorCode.CONFLICT);
+            return membership(userId);
+        }
         var result = applyGrant(
             userId,
             reference,
             "ADMIN",
             request.planCode(),
-            ProModels.months(request.planCode())
+            catalog.months(request.planCode())
         );
         if (previous.isEmpty()) {
             jdbc.update(
@@ -263,6 +305,75 @@ public class ProMembershipService {
             "user=" + userId + "; " + reason.strip()
         );
         return result;
+    }
+
+    public Membership updateAdminGrant(
+        long userId,
+        long grantId,
+        long actor,
+        com.elearning.learning.dto.LearningAdminModels.GrantUpdateRequest request
+    ) {
+        lock(userId);
+        var sources = jdbc.query(
+            "SELECT source_type,plan_code,duration_months FROM pro_grants WHERE id=? AND user_id=? FOR UPDATE",
+            (row, i) -> new Object[] { row.getString(1), row.getString(2), row.getInt(3) },
+            grantId,
+            userId
+        );
+        if (sources.isEmpty()) throw new AppException(ErrorCode.NOT_FOUND);
+        var old = sources.getFirst();
+        if (!"ADMIN".equals(old[0])) throw new AppException(ErrorCode.FORBIDDEN);
+        int months = request.planCode().equals(old[1])
+            ? (Integer) old[2]
+            : catalog.months(request.planCode());
+        if (
+            jdbc.update(
+                "UPDATE pro_grants SET plan_code=?,duration_months=?,admin_reason=?,version=version+1 WHERE id=? AND user_id=? AND version=? AND revoked_at IS NULL",
+                request.planCode(),
+                months,
+                request.reason().strip(),
+                grantId,
+                userId,
+                request.version()
+            ) != 1
+        ) throw new AppException(ErrorCode.CONFLICT);
+        rebuild(userId);
+        audit.record(
+            actor,
+            "PRO_ADMIN_UPDATE",
+            Long.toString(grantId),
+            "user=" + userId + "; " + request.reason().strip()
+        );
+        return membership(userId);
+    }
+
+    public CodeInfo updateCode(
+        long id,
+        long actor,
+        com.elearning.learning.dto.LearningAdminModels.CodeUpdateRequest request
+    ) {
+        if (
+            jdbc
+                .queryForList("SELECT id FROM pro_activation_codes WHERE id=? FOR UPDATE", Long.class, id)
+                .isEmpty()
+        ) throw new AppException(ErrorCode.NOT_FOUND);
+        var old = codeInfo(id);
+        if (!"AVAILABLE".equals(old.status()) && !"EXPIRED".equals(old.status())) throw new AppException(
+            ErrorCode.CONFLICT
+        );
+        if (
+            request.expiresAt() != null && !request.expiresAt().isAfter(clock.instant())
+        ) throw new AppException(ErrorCode.BAD_REQUEST);
+        if (
+            jdbc.update(
+                "UPDATE pro_activation_codes SET expires_at=?,version=version+1 WHERE id=? AND version=? AND redeemed_by IS NULL AND revoked_at IS NULL",
+                request.expiresAt() == null ? null : Timestamp.from(request.expiresAt()),
+                id,
+                request.version()
+            ) != 1
+        ) throw new AppException(ErrorCode.CONFLICT);
+        audit.record(actor, "PRO_CODE_UPDATE", Long.toString(id), request.reason().strip());
+        return codeInfo(id);
     }
 
     public Membership suspend(
@@ -317,7 +428,8 @@ public class ProMembershipService {
                     expires,
                     row.getObject("redeemed_by", Long.class),
                     redeemed,
-                    status
+                    status,
+                    row.getLong("version")
                 );
             },
             id

@@ -1,6 +1,7 @@
 package com.elearning.learning;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import com.elearning.learning.dto.LearningAdminModels.*;
 import com.elearning.learning.dto.ShopModels.*;
@@ -21,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -34,6 +36,236 @@ import tools.jackson.databind.json.JsonMapper;
 )
 @ActiveProfiles("test")
 class CommerceAdminIntegrationTests {
+
+    @MockitoSpyBean
+    ProPlanCatalog planCatalog;
+
+    @Test
+    void archivedCustomPlanDoesNotBreakGrantReplayOrEditingExistingGrantReason() {
+        doReturn(3).when(planCatalog).months("PRO_CUSTOM_GIFT");
+        var request = new GrantRequest("PRO_CUSTOM_GIFT", UUID.randomUUID().toString(), "gift");
+        pro.grantAdmin(7, 99, request);
+        var expiry = pro.membership(7).expiresAt();
+        doThrow(
+            new com.elearning.learning.common.exception.AppException(
+                com.elearning.learning.common.exception.ErrorCode.NOT_FOUND
+            )
+        )
+            .when(planCatalog)
+            .months("PRO_CUSTOM_GIFT");
+        pro.grantAdmin(7, 99, request);
+        long id = jdbc.queryForObject("SELECT id FROM pro_grants WHERE user_id=7", Long.class);
+        pro.updateAdminGrant(7, id, 99, new GrantUpdateRequest("PRO_CUSTOM_GIFT", 0, "correct support note"));
+        assertThat(pro.membership(7).expiresAt()).isEqualTo(expiry);
+        assertThat(
+            jdbc.queryForObject("SELECT COUNT(*) FROM pro_grants WHERE user_id=7", Integer.class)
+        ).isEqualTo(1);
+        verify(planCatalog, times(1)).months("PRO_CUSTOM_GIFT");
+    }
+
+    @Test
+    void catalogDeleteAndRestorePreserveOwnershipAndRequireDeletePermission() throws Exception {
+        admin.saveItem(
+            null,
+            new ItemRequest(
+                "FRAME_CRUD_TEST",
+                "CRUD frame",
+                "FRAME",
+                "RARE",
+                0,
+                null,
+                "classic",
+                5,
+                true,
+                0,
+                "create"
+            ),
+            99
+        );
+        admin.saveInventory(7, "FRAME_CRUD_TEST", new InventoryRequest(true, "gift"), 99);
+        shop.equip(7, new EquipRequest("FRAME", "FRAME_CRUD_TEST"));
+        assertThat(
+            request(
+                "DELETE",
+                "/shop/items/FRAME_CRUD_TEST",
+                token("SUPPORT", "ADMIN_ACCESS", "SHOP_VIEW", "SHOP_UPDATE"),
+                new DeleteRequest(0, "delete")
+            ).statusCode()
+        ).isEqualTo(403);
+        assertThat(
+            request(
+                "DELETE",
+                "/shop/items/FRAME_CRUD_TEST",
+                token("ADMIN"),
+                new DeleteRequest(0, "delete")
+            ).statusCode()
+        ).isEqualTo(200);
+        assertThat(engagement.summary(7).activeFrame()).isEqualTo("FRAME_CRUD_TEST");
+        assertThat(shop.state(7).items()).anyMatch(
+            item -> item.code().equals("FRAME_CRUD_TEST") && item.owned()
+        );
+        assertThat(
+            request(
+                "POST",
+                "/shop/items/FRAME_CRUD_TEST/restore",
+                token("ADMIN"),
+                new DeleteRequest(0, "stale")
+            ).statusCode()
+        ).isEqualTo(409);
+        assertThat(
+            request(
+                "POST",
+                "/shop/items/FRAME_CRUD_TEST/restore",
+                token("ADMIN"),
+                new DeleteRequest(1, "restore")
+            ).statusCode()
+        ).isEqualTo(200);
+        assertThat(
+            jdbc.queryForObject("SELECT active FROM shop_items WHERE code='FRAME_CRUD_TEST'", Boolean.class)
+        ).isFalse();
+    }
+
+    @Test
+    void customRewardsUseConfiguredCriteriaAndRestoringDoesNotPayAgain() throws Exception {
+        var definition = new RewardDefinitionRequest(
+            "CRUD_REWARD",
+            "Reach level 4",
+            "LEVEL",
+            4,
+            19,
+            true,
+            0,
+            "create"
+        );
+        assertThat(
+            request(
+                "POST",
+                "/engagement/rewards",
+                token("SUPPORT", "ADMIN_ACCESS", "ENGAGEMENT_CONFIG_VIEW"),
+                definition
+            ).statusCode()
+        ).isEqualTo(403);
+        admin.createReward(definition, 99);
+        admin.adjust(
+            7,
+            new AdjustmentRequest(UUID.randomUUID().toString(), 0, 300L, null, 0, null, "level"),
+            actor("XP_ADJUST")
+        );
+        assertThat(engagement.summary(7).rewards()).anyMatch(
+            r -> r.code().equals("CRUD_REWARD") && r.eligible()
+        );
+        engagement.claim(7, "CRUD_REWARD");
+        assertThat(engagement.summary(7).gems()).isEqualTo(19);
+        admin.deleteReward("CRUD_REWARD", new DeleteRequest(0, "delete"), 99, false);
+        assertThat(engagement.summary(7).rewards()).noneMatch(r -> r.code().equals("CRUD_REWARD"));
+        admin.deleteReward("CRUD_REWARD", new DeleteRequest(1, "restore"), 99, true);
+        admin.updateRewardDefinition(
+            "CRUD_REWARD",
+            new RewardDefinitionRequest(
+                "CRUD_REWARD",
+                "Restored",
+                "LEVEL",
+                4,
+                100,
+                true,
+                2,
+                "restore active"
+            ),
+            99
+        );
+        engagement.claim(7, "CRUD_REWARD");
+        assertThat(engagement.summary(7).gems()).isEqualTo(19);
+    }
+
+    @Test
+    void forumContentCrudRejectsStaleEditsAndPreservesAuthorAndHiddenState() throws Exception {
+        var post = admin.savePost(
+            null,
+            new PostContentRequest(3, "QUESTION", "Admin question", "Original body", true, 0, "create"),
+            99
+        );
+        long id = ((Number) post.get("id")).longValue();
+        var edit = new PostContentRequest(3, "QUESTION", "Edited question", "Edited body", true, 0, "edit");
+        assertThat(
+            request(
+                "PUT",
+                "/community/posts/" + id,
+                token("SUPPORT", "ADMIN_ACCESS", "COMMUNITY_VIEW"),
+                edit
+            ).statusCode()
+        ).isEqualTo(403);
+        admin.savePost(id, edit, 99);
+        assertThat(request("PUT", "/community/posts/" + id, token("ADMIN"), edit).statusCode()).isEqualTo(
+            409
+        );
+        var comment = admin.saveComment(
+            id,
+            null,
+            new CommentContentRequest("Answer", 0, "create comment"),
+            99
+        );
+        long commentId = ((Number) comment.get("id")).longValue();
+        admin.saveComment(id, commentId, new CommentContentRequest("Revised answer", 0, "edit comment"), 99);
+        admin.deleteComment(id, commentId, new DeleteRequest(1, "remove comment"), 99, false);
+        admin.deleteComment(id, commentId, new DeleteRequest(2, "restore comment"), 99, true);
+        admin.deletePost(id, new DeleteRequest(1, "archive"), 99, false);
+        assertThat(admin.posts(true, 0, 20).content()).anyMatch(
+            r -> ((Number) r.get("id")).longValue() == id && ((Number) r.get("authorId")).longValue() == 99
+        );
+    }
+
+    @Test
+    void adminGrantsAndUnusedCodesSupportVersionedEditsAndCodesHaveRealPagination() throws Exception {
+        pro.grantAdmin(7, 99, new GrantRequest("PRO_MONTH", UUID.randomUUID().toString(), "gift"));
+        long grantId = jdbc.queryForObject("SELECT id FROM pro_grants WHERE user_id=7", Long.class);
+        var expiry = pro.membership(7).expiresAt();
+        pro.updateAdminGrant(7, grantId, 99, new GrantUpdateRequest("PRO_QUARTER", 0, "correct duration"));
+        assertThat(pro.membership(7).expiresAt()).isAfter(expiry.plusSeconds(40 * 86400));
+        assertThat(
+            request(
+                "PUT",
+                "/pro/members/7/grants/" + grantId,
+                token("ADMIN"),
+                new GrantUpdateRequest("PRO_YEAR", 0, "stale")
+            ).statusCode()
+        ).isEqualTo(409);
+        for (int i = 0; i < 23; i++) pro.createCode(
+            99,
+            new com.elearning.learning.dto.ProModels.CreateCodeRequest("PRO_MONTH", null)
+        );
+        var page = pro.codesPage(1, 10);
+        assertThat(page.totalElements()).isEqualTo(23);
+        assertThat(page.content()).hasSize(10);
+        var firstFive = pro.codesPage(0, 5);
+        var secondFive = pro.codesPage(1, 5);
+        assertThat(firstFive.totalPages()).isEqualTo(5);
+        assertThat(firstFive.content()).hasSize(5);
+        assertThat(secondFive.content()).doesNotContainAnyElementsOf(firstFive.content());
+        assertThat(secondFive.content()).hasSize(5);
+        assertThat(pro.codesPage(4, 5).content()).hasSize(3);
+        assertThat(pro.codesPage(4, 5).last()).isTrue();
+        assertThat(request("GET", "/pro/codes?page=0&size=5", token("ADMIN"), null).statusCode()).isEqualTo(
+            200
+        );
+        var code = page.content().getFirst();
+        var update = new CodeUpdateRequest(Instant.now().plusSeconds(86400), 0, "set expiry");
+        assertThat(
+            request(
+                "PUT",
+                "/pro/codes/" + code.id(),
+                token("SUPPORT", "ADMIN_ACCESS", "PRO_CODE_VIEW"),
+                update
+            ).statusCode()
+        ).isEqualTo(403);
+        pro.updateCode(code.id(), 99, update);
+        assertThat(request("PUT", "/pro/codes/" + code.id(), token("ADMIN"), update).statusCode()).isEqualTo(
+            409
+        );
+        pro.grant(
+            new com.elearning.learning.dto.ProModels.GrantRequest("PAID-CUSTOM-PLAN", 8L, "PRO_CUSTOM", 3)
+        );
+        assertThat(pro.membership(8).active()).isTrue();
+    }
 
     @Test
     void inventoryGrantsAreIdempotentAndRevocationUnequipsWithoutChangingGems() {
@@ -112,6 +344,8 @@ class CommerceAdminIntegrationTests {
         ))
             jdbc.update("DELETE FROM " + table);
         jdbc.update("DELETE FROM shop_items WHERE code='FRAME_ADMIN_TEST'");
+        jdbc.update("DELETE FROM shop_items WHERE code LIKE 'FRAME_CRUD_%'");
+        jdbc.update("DELETE FROM engagement_reward_rules WHERE code LIKE 'CRUD_%'");
         jdbc.update("UPDATE shop_items SET active=TRUE WHERE code='FRAME_KITTY'");
         jdbc.update(
             "UPDATE engagement_settings SET lesson_xp=20,quiz_xp=10,daily_gems=25,xp_per_level=100,version=0 WHERE id=1"

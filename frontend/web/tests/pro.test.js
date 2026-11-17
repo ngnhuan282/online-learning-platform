@@ -229,6 +229,7 @@ test('admin issuance shows the full code once and keeps only masked codes after 
   };
   await render('/admin/pro-codes');
   await click('Tạo mã kích hoạt');
+  await click('Tạo mã');
   assert.match(document.querySelector('.pro-issued-code').textContent, /CCG-1111/);
   await act(async () => root.unmount());
   root = null;

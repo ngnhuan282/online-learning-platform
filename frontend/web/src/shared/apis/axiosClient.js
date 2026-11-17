@@ -9,6 +9,7 @@ import {
 } from '../utils/tokenUtils';
 import { normalizeApiError } from '../utils/errorUtils';
 import { ENDPOINTS } from './endpoints';
+import { isAdminMutation, notifyAdminSuccess, notifyAdminFailure } from '../utils/adminFeedback';
 
 const gatewayUrl = (import.meta.env.VITE_API_URL?.trim() || globalThis.window?.location?.origin)?.replace(
   /\/$/,
@@ -54,6 +55,7 @@ export async function waitForRefresh() {
 }
 
 axiosClient.interceptors.request.use(config => {
+  config.adminFeedback ??= isAdminMutation(config);
   // Keep public/demo UI usable without configuration; reject only actual API requests.
   if (!gatewayUrl || !/^https?:\/\/[^/]+$/.test(gatewayUrl)) {
     throw Object.assign(new Error('Cần cấu hình VITE_API_URL là địa chỉ API Gateway.'), {
@@ -93,6 +95,7 @@ axiosClient.interceptors.response.use(
     if (!isPublicCatalogRequest(response.config) && response.config.sessionVersion !== getSessionVersion()) {
       throw normalizeApiError(Object.assign(new Error('Session changed.'), { code: 'ERR_CANCELED' }));
     }
+    notifyAdminSuccess(response.config);
     return response.data;
   },
   async error => {
@@ -136,11 +139,15 @@ axiosClient.interceptors.response.use(
           return axiosClient(config);
         } catch (refreshError) {
           clearTokens();
-          return Promise.reject(normalizeApiError(refreshError));
+          const failure = normalizeApiError(refreshError);
+          if (config.adminFeedback) notifyAdminFailure(failure);
+          return Promise.reject(failure);
         }
       }
     }
-    return Promise.reject(normalizeApiError(error));
+    const failure = normalizeApiError(error);
+    if (config?.adminFeedback) notifyAdminFailure(failure);
+    return Promise.reject(failure);
   },
 );
 export default axiosClient;

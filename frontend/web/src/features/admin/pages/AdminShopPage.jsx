@@ -12,9 +12,13 @@ import {
   CommercePager,
   Field,
   ReasonField,
+  AdminRowActions,
+  AdminDeleteDialog,
+  AdminDetailsDialog,
 } from '../components/CommerceAdminUi';
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
+import useAdminPagination from '../hooks/useAdminPagination';
 
 const assets = {
   FRAME: ['classic', 'kitty-scholar', 'koala-garden', 'owl-wizard', 'bunny-bloom'],
@@ -24,19 +28,32 @@ const assets = {
 export default function AdminShopPage() {
   useLocale();
   const { user } = useAuth();
+  const tablePagination = useAdminPagination();
   const [tab, setTab] = useState('items'),
     [page, setPage] = useState(0),
+    [size, setSize] = useState(20),
+    [trash, setTrash] = useState(false),
+    [detail, setDetail] = useState(null),
+    [removing, setRemoving] = useState(null),
     [userId, setUserId] = useState(''),
     [filter, setFilter] = useState(''),
     [form, setForm] = useState(null);
+  const requestKey = `${tab}:${page}:${size}:${filter}`;
   const load = useCallback(
-    options =>
-      tab === 'items'
+    async options => {
+      const response = await (tab === 'items'
         ? api.items(options)
-        : api.purchases({ page, size: 20, ...(filter ? { userId: filter } : {}) }, options),
-    [tab, page, filter],
+        : api.purchases({ page, size, ...(filter ? { userId: filter } : {}) }, options));
+      const data = response?.data;
+      if (tab === 'items' ? !Array.isArray(data) : !Array.isArray(data?.content)) {
+        throw new Error('Dữ liệu cửa hàng không hợp lệ. Vui lòng thử lại.');
+      }
+      return { data: { requestKey, value: data } };
+    },
+    [tab, page, size, filter, requestKey],
   );
   const resource = useLearningResource(load, null);
+  const data = resource.data?.requestKey === requestKey ? resource.data.value : null;
   function edit(item) {
     setForm(
       item
@@ -72,6 +89,11 @@ export default function AdminShopPage() {
         )}
       </PageHeading>
       <div className="commerce-toolbar">
+        {tab === 'items' && (
+          <Button variant={trash ? 'contained' : 'outlined'} onClick={() => setTrash(value => !value)}>
+            {t(trash ? 'Xem danh sách' : 'Thùng rác')}
+          </Button>
+        )}
         <Button variant={tab === 'items' ? 'contained' : 'outlined'} onClick={() => setTab('items')}>
           {t('Vật phẩm')}
         </Button>
@@ -98,37 +120,60 @@ export default function AdminShopPage() {
           <Button type="submit">{t('Lọc')}</Button>
         </form>
       )}
-      <LoadState loading={resource.loading} error={resource.error} retry={resource.reload} />
-      {resource.data &&
+      <LoadState
+        loading={resource.loading || (!data && !resource.error)}
+        error={resource.error}
+        retry={resource.reload}
+      />
+      {data &&
         !resource.error &&
         (tab === 'items' ? (
           <CommerceTable
+            paginate
+            pagination={tablePagination}
             rowKey="code"
-            rows={resource.data}
+            rows={data.filter(item => Boolean(item.deletedAt) === trash)}
             columns={[
               ['Mã vật phẩm', 'code'],
               ['Tên', row => t(row.nameKey)],
               ['Loại', 'itemType'],
               ['Độ hiếm', 'rarity'],
               ['Giá gem', row => number(row.price)],
-              ['Trạng thái', row => t(row.active ? 'Đang hiển thị' : 'Đã ẩn')],
+              [
+                'Trạng thái',
+                row => (
+                  <span className={`admin-pill ${row.active ? 'green' : ''}`}>
+                    {t(row.active ? 'Đang hiển thị' : 'Đã ẩn')}
+                  </span>
+                ),
+              ],
               [
                 'Thao tác',
-                row =>
-                  can(user, 'SHOP_UPDATE') ? (
-                    <Button size="small" onClick={() => edit(row)}>
-                      {t('Chỉnh sửa')}
-                    </Button>
-                  ) : (
-                    '—'
-                  ),
+                row => (
+                  <AdminRowActions
+                    actions={[
+                      { kind: 'view', label: 'Xem chi tiết', onClick: () => setDetail(row) },
+                      !row.deletedAt &&
+                        can(user, 'SHOP_UPDATE') && {
+                          kind: 'edit',
+                          label: 'Chỉnh sửa',
+                          onClick: () => edit(row),
+                        },
+                      can(user, 'SHOP_DELETE') && {
+                        kind: row.deletedAt ? 'restore' : 'delete',
+                        label: row.deletedAt ? 'Khôi phục' : 'Xóa vật phẩm',
+                        onClick: () => setRemoving(row),
+                      },
+                    ]}
+                  />
+                ),
               ],
             ]}
           />
         ) : (
           <>
             <CommerceTable
-              rows={resource.data.content}
+              rows={data.content}
               columns={[
                 ['ID học viên', 'userId'],
                 ['Vật phẩm', r => t(r.nameKey)],
@@ -137,9 +182,53 @@ export default function AdminShopPage() {
                 ['Mã yêu cầu', 'requestId'],
               ]}
             />
-            <CommercePager data={resource.data} page={page} onChange={setPage} />
+            <CommercePager
+              data={data}
+              page={page}
+              size={size}
+              onChange={setPage}
+              onSizeChange={value => {
+                setSize(value);
+                setPage(0);
+              }}
+            />
           </>
         ))}
+      {detail && (
+        <AdminDetailsDialog title="Chi tiết vật phẩm" onClose={() => setDetail(null)}>
+          <dl className="admin-detail-list">
+            {[
+              ['Mã vật phẩm', detail.code],
+              ['Tên', t(detail.nameKey)],
+              ['Loại', detail.itemType],
+              ['Độ hiếm', detail.rarity],
+              ['Giá gem', number(detail.price)],
+              ['Hình minh họa', detail.assetKey],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{t(label)}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </AdminDetailsDialog>
+      )}
+      {removing && (
+        <AdminDeleteDialog
+          item={removing}
+          restore={Boolean(removing.deletedAt)}
+          onClose={() => setRemoving(null)}
+          onSubmit={payload =>
+            removing.deletedAt
+              ? api.restoreItem(removing.code, payload)
+              : api.deleteItem(removing.code, payload)
+          }
+          onSaved={() => {
+            setRemoving(null);
+            resource.reload();
+          }}
+        />
+      )}
       {form && (
         <AdminActionDialog
           title={form.create ? 'Thêm vật phẩm' : 'Chỉnh sửa vật phẩm'}

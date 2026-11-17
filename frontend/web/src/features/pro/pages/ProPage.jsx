@@ -37,11 +37,13 @@ const proBenefits = [
   'Kích hoạt bằng thanh toán hoặc mã Pro',
 ];
 const planLabel = plan =>
-  plan.durationMonths === 12
-    ? t('1 năm')
-    : plan.durationMonths === 1
-      ? t('1 tháng')
-      : t('{months} tháng', { months: plan.durationMonths });
+  !['PRO_MONTH', 'PRO_QUARTER', 'PRO_YEAR'].includes(plan.code)
+    ? t(plan.name || plan.code)
+    : plan.durationMonths === 12
+      ? t('1 năm')
+      : plan.durationMonths === 1
+        ? t('1 tháng')
+        : t('{months} tháng', { months: plan.durationMonths });
 const codeMessages = {
   INVALID_ACTIVATION_CODE: 'Mã không hợp lệ, đã dùng, hết hạn hoặc đã bị thu hồi.',
   ACTIVATION_RATE_LIMITED: 'Bạn đã thử quá nhiều mã. Vui lòng thử lại sau 15 phút.',

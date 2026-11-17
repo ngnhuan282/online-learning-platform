@@ -18,7 +18,7 @@ public final class ProPaymentModels {
     ) {}
 
     public record CheckoutRequest(
-        @NotBlank @Pattern(regexp = "PRO_MONTH|PRO_QUARTER|PRO_YEAR") String planCode,
+        @NotBlank @Pattern(regexp = "PRO_[A-Z0-9_]{1,28}") String planCode,
         PaymentProvider provider,
         @NotBlank @Size(min = 16, max = 64) @Pattern(regexp = "[A-Za-z0-9_-]+") String idempotencyKey,
         @Size(max = 512) String returnUrl,

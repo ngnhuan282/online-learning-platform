@@ -348,7 +348,7 @@ class AuthFlowTests {
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
             )
-        ).isEqualTo(12);
+        ).isEqualTo(13);
         assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id=rp.role_id WHERE r.name='ADMIN'",

@@ -8,6 +8,7 @@ import { date } from '../utils/adminUtils';
 import { LoadState, PageHeading } from '../components/AdminUi';
 import { commerceAdminApi } from '../api/commerceAdminApi';
 import { Alert } from '@mui/material';
+import { CommerceTable } from '../components/CommerceAdminUi';
 
 export default function AdminAuditPage() {
   useLocale();
@@ -59,35 +60,19 @@ export default function AdminAuditPage() {
           {t('Chưa tải được một số nguồn nhật ký:')} {state.unavailable.join(', ')}
         </Alert>
       )}
-      <section className="admin-card admin-table-scroll">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>{t('THỜI GIAN')}</th>
-              <th>{t('Nguồn')}</th>
-              <th>{t('NGƯỜI THỰC HIỆN')}</th>
-              <th>{t('THAO TÁC')}</th>
-              <th>{t('ĐỐI TƯỢNG')}</th>
-              <th>{t('CHI TIẾT')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {state.data.map(item => (
-              <tr key={`${item.source}:${item.id}`}>
-                <td>{date(item.createdAt)}</td>
-                <td>{item.source}</td>
-                <td>{item.actorName || `#${item.actorId}`}</td>
-                <td>{item.action}</td>
-                <td>{item.target}</td>
-                <td>{t(item.description)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!state.loading && !state.error && !state.data.length && (
-          <div className="admin-empty">{t('Chưa có thao tác quản trị được ghi nhận.')}</div>
-        )}
-      </section>
+      <CommerceTable
+        paginate
+        rowKey="auditKey"
+        rows={state.data.map(row => ({ ...row, auditKey: row.source + ':' + row.id }))}
+        columns={[
+          ['THỜI GIAN', row => date(row.createdAt)],
+          ['Nguồn', 'source'],
+          ['NGƯỜI THỰC HIỆN', row => row.actorName || '#' + row.actorId],
+          ['THAO TÁC', 'action'],
+          ['ĐỐI TƯỢNG', 'target'],
+          ['CHI TIẾT', row => t(row.description)],
+        ]}
+      />
     </>
   );
 }

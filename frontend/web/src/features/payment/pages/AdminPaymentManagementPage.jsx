@@ -1,5 +1,6 @@
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
+import { PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Alert, Button, IconButton, MenuItem, Pagination, TextField, Tooltip, Skeleton } from '@mui/material';
@@ -45,7 +46,7 @@ export default function AdminPaymentManagementPage() {
   const keyword = params.get('q') || '';
   const status = params.get('status') || '';
   const page = Math.max(0, Number(params.get('page')) || 0);
-  const size = [10, 20, 50].includes(Number(params.get('size'))) ? Number(params.get('size')) : 10;
+  const size = PAGE_SIZE_OPTIONS.includes(Number(params.get('size'))) ? Number(params.get('size')) : 10;
   const [searchDraft, setSearchDraft] = useState({ source: keyword, value: keyword });
   const query = searchDraft.source === keyword ? searchDraft.value : keyword;
   const [state, setState] = useState({
@@ -273,7 +274,7 @@ export default function AdminPaymentManagementPage() {
               value={size}
               onChange={event => filter({ size: event.target.value })}
             >
-              {[10, 20, 50].map(value => (
+              {PAGE_SIZE_OPTIONS.map(value => (
                 <MenuItem key={value} value={value}>
                   {value} {t('dòng / trang')}
                 </MenuItem>

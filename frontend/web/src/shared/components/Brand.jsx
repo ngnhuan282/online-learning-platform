@@ -4,10 +4,10 @@ import { Link } from 'react-router-dom';
 import CatMascot from './CatMascot';
 import './Brand.css';
 
-export default function Brand() {
+export default function Brand({ to = '/', label = 'ChitChatGo — Trang chủ' }) {
   useLocale();
   return (
-    <Link to="/" className="brand" aria-label={t('ChitChatGo — Trang chủ')}>
+    <Link to={to} className="brand" aria-label={t(label)}>
       <span className="brand-icon brand-icon-mascot">
         <CatMascot variant="icon" />
       </span>

@@ -45,6 +45,150 @@ public class LearningAdminService {
         return rows("SELECT * FROM shop_items ORDER BY position,code");
     }
 
+    public void deleteItem(String code, DeleteRequest request, long actor, boolean restore) {
+        var old = one("SELECT * FROM shop_items WHERE code=? FOR UPDATE", code);
+        if (number(old, "version") != request.version()) throw new AppException(ErrorCode.CONFLICT);
+        jdbc.update(
+            "UPDATE shop_items SET active=FALSE,deleted_at=?,version=version+1 WHERE code=?",
+            restore ? null : Timestamp.from(clock.instant()),
+            code
+        );
+        audit.record(actor, restore ? "SHOP_RESTORE" : "SHOP_DELETE", code, request.reason().strip());
+    }
+
+    public Map<String, Object> createReward(RewardDefinitionRequest request, long actor) {
+        if (
+            !rows("SELECT code FROM engagement_reward_rules WHERE code=?", request.code()).isEmpty()
+        ) throw new AppException(ErrorCode.CONFLICT);
+        jdbc.update(
+            "INSERT INTO engagement_reward_rules(code,label,metric,threshold,gems,active) VALUES(?,?,?,?,?,?)",
+            request.code(),
+            request.label().strip(),
+            request.metric(),
+            request.threshold(),
+            request.gems(),
+            request.active()
+        );
+        audit.record(actor, "REWARD_CREATE", request.code(), request.reason().strip());
+        return one("SELECT * FROM engagement_reward_rules WHERE code=?", request.code());
+    }
+
+    public Map<String, Object> updateRewardDefinition(
+        String code,
+        RewardDefinitionRequest request,
+        long actor
+    ) {
+        var old = one("SELECT * FROM engagement_reward_rules WHERE code=? FOR UPDATE", code);
+        if (!code.equals(request.code()) || old.get("deletedAt") != null) throw new AppException(
+            ErrorCode.CONFLICT
+        );
+        if (
+            jdbc.update(
+                "UPDATE engagement_reward_rules SET label=?,metric=?,threshold=?,gems=?,active=?,version=version+1 WHERE code=? AND version=?",
+                request.label().strip(),
+                request.metric(),
+                request.threshold(),
+                request.gems(),
+                request.active(),
+                code,
+                request.version()
+            ) != 1
+        ) throw new AppException(ErrorCode.CONFLICT);
+        audit.record(actor, "REWARD_UPDATE", code, request.reason().strip());
+        return one("SELECT * FROM engagement_reward_rules WHERE code=?", code);
+    }
+
+    public void deleteReward(String code, DeleteRequest request, long actor, boolean restore) {
+        one("SELECT code FROM engagement_reward_rules WHERE code=? FOR UPDATE", code);
+        if (
+            jdbc.update(
+                "UPDATE engagement_reward_rules SET active=FALSE,deleted_at=?,version=version+1 WHERE code=? AND version=?",
+                restore ? null : Timestamp.from(clock.instant()),
+                code,
+                request.version()
+            ) != 1
+        ) throw new AppException(ErrorCode.CONFLICT);
+        audit.record(actor, restore ? "REWARD_RESTORE" : "REWARD_DELETE", code, request.reason().strip());
+    }
+
+    public Map<String, Object> savePost(Long id, PostContentRequest request, long actor) {
+        one("SELECT id FROM community_topics WHERE id=?", request.topicId());
+        if (id == null) {
+            engagement.syncProfile(actor, null);
+            id = insertId(
+                "INSERT INTO community_posts(author_id,topic_id,kind,title,body,created_at,updated_at,deleted_at) VALUES(?,?,?,?,?,?,?,?)",
+                actor,
+                request.topicId(),
+                request.kind(),
+                request.title().strip(),
+                request.body().strip(),
+                Timestamp.from(clock.instant()),
+                Timestamp.from(clock.instant()),
+                request.hidden() ? Timestamp.from(clock.instant()) : null
+            );
+        } else {
+            var old = one("SELECT * FROM community_posts WHERE id=? FOR UPDATE", id);
+            if ((old.get("deletedAt") != null) != request.hidden()) throw new AppException(
+                ErrorCode.CONFLICT
+            );
+            if (
+                jdbc.update(
+                    "UPDATE community_posts SET topic_id=?,kind=?,title=?,body=?,updated_at=?,version=version+1 WHERE id=? AND version=?",
+                    request.topicId(),
+                    request.kind(),
+                    request.title().strip(),
+                    request.body().strip(),
+                    Timestamp.from(clock.instant()),
+                    id,
+                    request.version()
+                ) != 1
+            ) throw new AppException(ErrorCode.CONFLICT);
+        }
+        audit.record(actor, "COMMUNITY_SAVE", Long.toString(id), request.reason().strip());
+        return one("SELECT * FROM community_posts WHERE id=?", id);
+    }
+
+    public Map<String, Object> saveComment(long postId, Long id, CommentContentRequest request, long actor) {
+        one("SELECT id FROM community_posts WHERE id=? FOR UPDATE", postId);
+        if (id == null) {
+            engagement.syncProfile(actor, null);
+            id = insertId(
+                "INSERT INTO community_comments(post_id,author_id,body,created_at,updated_at) VALUES(?,?,?,?,?)",
+                postId,
+                actor,
+                request.body().strip(),
+                Timestamp.from(clock.instant()),
+                Timestamp.from(clock.instant())
+            );
+        } else if (
+            jdbc.update(
+                "UPDATE community_comments SET body=?,updated_at=?,version=version+1 WHERE id=? AND post_id=? AND version=?",
+                request.body().strip(),
+                Timestamp.from(clock.instant()),
+                id,
+                postId,
+                request.version()
+            ) != 1
+        ) throw new AppException(ErrorCode.CONFLICT);
+        audit.record(
+            actor,
+            "COMMENT_SAVE",
+            Long.toString(id),
+            "post=" + postId + "; " + request.reason().strip()
+        );
+        return one("SELECT * FROM community_comments WHERE id=?", id);
+    }
+
+    private long insertId(String sql, Object... arguments) {
+        var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        jdbc.update(connection -> {
+            var statement = connection.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS);
+            for (int i = 0; i < arguments.length; i++) statement.setObject(i + 1, arguments[i]);
+            return statement;
+        }, keys);
+        return java.util.Objects.requireNonNull(keys.getKey()).longValue();
+    }
+
     public Map<String, Object> saveItem(String code, ItemRequest request, long actor) {
         Set<String> assets = switch (request.itemType()) {
             case "FRAME" -> Set.of("classic", "kitty-scholar", "koala-garden", "owl-wizard", "bunny-bloom");
@@ -79,6 +223,7 @@ public class LearningAdminService {
             );
         } else {
             var old = one("SELECT * FROM shop_items WHERE code=? FOR UPDATE", code);
+            if (old.get("deletedAt") != null) throw new AppException(ErrorCode.CONFLICT);
             if (
                 !code.equals(request.code()) || !old.get("itemType").equals(request.itemType())
             ) throw new AppException(ErrorCode.BAD_REQUEST);
@@ -139,7 +284,7 @@ public class LearningAdminService {
     public List<Map<String, Object>> adjustments(long userId) {
         requireProfile(userId);
         return rows(
-            "SELECT * FROM learner_admin_adjustments WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 100",
+            "SELECT * FROM learner_admin_adjustments WHERE user_id=? ORDER BY created_at DESC,id DESC",
             userId
         );
     }
@@ -160,7 +305,8 @@ public class LearningAdminService {
     ) {
         requireProfile(userId);
         engagement.lockProfile(userId);
-        var item = one("SELECT item_type FROM shop_items WHERE code=? FOR UPDATE", code);
+        var item = one("SELECT item_type,deleted_at FROM shop_items WHERE code=? FOR UPDATE", code);
+        if (request.owned() && item.get("deletedAt") != null) throw new AppException(ErrorCode.CONFLICT);
         if ("FREEZE".equals(item.get("itemType"))) throw new AppException(ErrorCode.BAD_REQUEST);
         boolean owned = !rows(
             "SELECT item_code FROM shop_inventory WHERE user_id=? AND item_code=?",
@@ -383,10 +529,7 @@ public class LearningAdminService {
 
     public List<Map<String, Object>> grants(long userId) {
         requireProTarget(userId);
-        return rows(
-            "SELECT * FROM pro_grants WHERE user_id=? ORDER BY granted_at DESC,id DESC LIMIT 100",
-            userId
-        );
+        return rows("SELECT * FROM pro_grants WHERE user_id=? ORDER BY granted_at DESC,id DESC", userId);
     }
 
     public PageResponse<Map<String, Object>> posts(boolean hidden, int page, int size) {
@@ -403,7 +546,7 @@ public class LearningAdminService {
     public void moderate(long postId, ModerationRequest request, long actor) {
         one("SELECT id FROM community_posts WHERE id=? FOR UPDATE", postId);
         jdbc.update(
-            "UPDATE community_posts SET locked=?,deleted_at=?,updated_at=? WHERE id=?",
+            "UPDATE community_posts SET locked=?,deleted_at=?,updated_at=?,version=version+1 WHERE id=?",
             request.locked(),
             request.hidden() ? Timestamp.from(clock.instant()) : null,
             Timestamp.from(clock.instant()),
@@ -417,9 +560,19 @@ public class LearningAdminService {
         );
     }
 
+    public void deletePost(long postId, DeleteRequest request, long actor, boolean restore) {
+        var old = one("SELECT * FROM community_posts WHERE id=? FOR UPDATE", postId);
+        if (number(old, "version") != request.version()) throw new AppException(ErrorCode.CONFLICT);
+        moderate(
+            postId,
+            new ModerationRequest(!restore, Boolean.TRUE.equals(old.get("locked")), request.reason()),
+            actor
+        );
+    }
+
     public List<Map<String, Object>> comments(long postId) {
         return rows(
-            "SELECT c.*,p.display_name FROM community_comments c JOIN learner_profiles p ON p.user_id=c.author_id WHERE c.post_id=? ORDER BY c.created_at DESC LIMIT 100",
+            "SELECT c.*,p.display_name FROM community_comments c JOIN learner_profiles p ON p.user_id=c.author_id WHERE c.post_id=? ORDER BY c.created_at DESC",
             postId
         );
     }
@@ -428,7 +581,7 @@ public class LearningAdminService {
         one("SELECT id FROM community_posts WHERE id=? FOR UPDATE", postId);
         one("SELECT id FROM community_comments WHERE id=? AND post_id=? FOR UPDATE", commentId, postId);
         jdbc.update(
-            "UPDATE community_comments SET deleted_at=?,updated_at=? WHERE id=?",
+            "UPDATE community_comments SET deleted_at=?,updated_at=?,version=version+1 WHERE id=?",
             request.hidden() ? Timestamp.from(clock.instant()) : null,
             Timestamp.from(clock.instant()),
             commentId
@@ -444,6 +597,23 @@ public class LearningAdminService {
             Long.toString(commentId),
             "post=" + postId + "; hidden=" + request.hidden() + "; " + request.reason().strip()
         );
+    }
+
+    public void deleteComment(
+        long postId,
+        long commentId,
+        DeleteRequest request,
+        long actor,
+        boolean restore
+    ) {
+        one("SELECT id FROM community_posts WHERE id=? FOR UPDATE", postId);
+        var old = one(
+            "SELECT * FROM community_comments WHERE id=? AND post_id=? FOR UPDATE",
+            commentId,
+            postId
+        );
+        if (number(old, "version") != request.version()) throw new AppException(ErrorCode.CONFLICT);
+        moderateComment(postId, commentId, new ModerationRequest(!restore, false, request.reason()), actor);
     }
 
     public List<Map<String, Object>> audit() {

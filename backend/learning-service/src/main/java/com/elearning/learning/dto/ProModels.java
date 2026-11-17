@@ -31,7 +31,7 @@ public final class ProModels {
     public record GrantRequest(
         @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{8,40}") String orderCode,
         @NotNull @Positive Long userId,
-        @NotBlank @Pattern(regexp = "PRO_MONTH|PRO_QUARTER|PRO_YEAR") String planCode,
+        @NotBlank @Pattern(regexp = "PRO_[A-Z0-9_]{1,28}") String planCode,
         @Min(1) @Max(12) int durationMonths
     ) {}
 
@@ -48,7 +48,7 @@ public final class ProModels {
     }
 
     public record CreateCodeRequest(
-        @NotBlank @Pattern(regexp = "PRO_MONTH|PRO_QUARTER|PRO_YEAR") String planCode,
+        @NotBlank @Pattern(regexp = "PRO_[A-Z0-9_]{1,28}") String planCode,
         Instant expiresAt
     ) {}
 
@@ -61,7 +61,8 @@ public final class ProModels {
         Instant expiresAt,
         Long redeemedBy,
         Instant redeemedAt,
-        String status
+        String status,
+        long version
     ) {}
 
     public record IssuedCode(String code, CodeInfo info) {

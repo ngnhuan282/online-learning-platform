@@ -6,6 +6,63 @@
   gap: 18px;
   min-width: 0;
 }
+.admin-dialog .MuiButton-root {
+  text-transform: none;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: none;
+  min-height: 38px;
+}
+.admin-dialog .MuiDialog-paper {
+  border: 1px solid #e2eaf4;
+  border-radius: 14px;
+}
+.admin-dialog .MuiDialogTitle-root {
+  font-size: 20px;
+  font-weight: 700;
+  padding: 24px 24px 16px;
+}
+.admin-dialog .MuiDialogActions-root {
+  padding: 16px 24px;
+  border-top: 1px solid #e2eaf4;
+}
+.admin-dialog .admin-table {
+  font-size: 12px;
+}
+.admin-dialog .admin-table th {
+  white-space: nowrap;
+  font-size: 10px;
+}
+.admin-dialog .admin-row-actions {
+  flex-wrap: nowrap;
+}
+.admin-dialog .admin-row-actions .MuiIconButton-root {
+  padding: 7px;
+}
+.admin-text-preview {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-table-card + .admin-pagination {
+  margin-top: -1px;
+  border: 1px solid #e2eaf4;
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  background: white;
+}
+.admin-row-actions {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.admin-row-actions .MuiIconButton-colorError {
+  color: #dc3545;
+}
+.admin-dialog .admin-pagination {
+  gap: 10px;
+  padding: 16px 0;
+}
 .commerce-field {
   display: grid;
   gap: 7px;

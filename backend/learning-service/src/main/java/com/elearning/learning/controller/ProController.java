@@ -42,8 +42,11 @@ public class ProController {
 
     @GetMapping("/api/v1/learning/admin/pro/codes")
     @PreAuthorize("@learningAdmin.allowed(authentication, 'PRO_CODE_VIEW')")
-    public ApiResponse<List<CodeInfo>> codes() {
-        return ApiResponse.success(memberships.codes());
+    public ApiResponse<?> codes(
+        @RequestParam(required = false) Integer page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(page == null ? memberships.codes() : memberships.codesPage(page, size));
     }
 
     @PostMapping("/api/v1/learning/admin/pro/codes")
@@ -56,6 +59,16 @@ public class ProController {
     @PreAuthorize("@learningAdmin.allowed(authentication, 'PRO_CODE_REVOKE')")
     public ApiResponse<CodeInfo> revokeCode(@PathVariable long id, Principal principal) {
         return ApiResponse.success(memberships.revokeCode(id, Long.parseLong(principal.getName())));
+    }
+
+    @PutMapping("/api/v1/learning/admin/pro/codes/{id}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'PRO_CODE_UPDATE')")
+    public ApiResponse<CodeInfo> updateCode(
+        @PathVariable long id,
+        Principal principal,
+        @Valid @RequestBody com.elearning.learning.dto.LearningAdminModels.CodeUpdateRequest request
+    ) {
+        return ApiResponse.success(memberships.updateCode(id, Long.parseLong(principal.getName()), request));
     }
 
     @PostMapping("/internal/v1/learning/pro/grants")

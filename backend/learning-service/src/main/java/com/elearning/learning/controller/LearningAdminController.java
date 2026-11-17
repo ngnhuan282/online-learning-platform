@@ -17,6 +17,163 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/learning/admin")
 public class LearningAdminController {
 
+    @DeleteMapping("/community/posts/{id}/comments/{commentId}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_DELETE')")
+    public ApiResponse<?> deleteComment(
+        @PathVariable @Positive long id,
+        @PathVariable @Positive long commentId,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deleteComment(id, commentId, request, actor(auth), false);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/community/posts/{id}/comments/{commentId}/restore")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_DELETE')")
+    public ApiResponse<?> restoreComment(
+        @PathVariable @Positive long id,
+        @PathVariable @Positive long commentId,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deleteComment(id, commentId, request, actor(auth), true);
+        return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/shop/items/{code}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'SHOP_DELETE')")
+    public ApiResponse<?> deleteItem(
+        @PathVariable String code,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deleteItem(code, request, actor(auth), false);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/shop/items/{code}/restore")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'SHOP_DELETE')")
+    public ApiResponse<?> restoreItem(
+        @PathVariable String code,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deleteItem(code, request, actor(auth), true);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/engagement/rewards")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'REWARD_CREATE')")
+    public ApiResponse<?> createReward(
+        @Valid @RequestBody RewardDefinitionRequest request,
+        Authentication auth
+    ) {
+        return ApiResponse.success(service.createReward(request, actor(auth)));
+    }
+
+    @PutMapping("/engagement/rewards/{code}/definition")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'ENGAGEMENT_CONFIG_UPDATE')")
+    public ApiResponse<?> updateReward(
+        @PathVariable String code,
+        @Valid @RequestBody RewardDefinitionRequest request,
+        Authentication auth
+    ) {
+        return ApiResponse.success(service.updateRewardDefinition(code, request, actor(auth)));
+    }
+
+    @DeleteMapping("/engagement/rewards/{code}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'REWARD_DELETE')")
+    public ApiResponse<?> deleteReward(
+        @PathVariable String code,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deleteReward(code, request, actor(auth), false);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/engagement/rewards/{code}/restore")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'REWARD_DELETE')")
+    public ApiResponse<?> restoreReward(
+        @PathVariable String code,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deleteReward(code, request, actor(auth), true);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/community/posts")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_CREATE')")
+    public ApiResponse<?> createPost(@Valid @RequestBody PostContentRequest request, Authentication auth) {
+        return ApiResponse.success(service.savePost(null, request, actor(auth)));
+    }
+
+    @PutMapping("/community/posts/{id}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_UPDATE')")
+    public ApiResponse<?> updatePost(
+        @PathVariable @Positive long id,
+        @Valid @RequestBody PostContentRequest request,
+        Authentication auth
+    ) {
+        return ApiResponse.success(service.savePost(id, request, actor(auth)));
+    }
+
+    @DeleteMapping("/community/posts/{id}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_DELETE')")
+    public ApiResponse<?> deletePost(
+        @PathVariable @Positive long id,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deletePost(id, request, actor(auth), false);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/community/posts/{id}/restore")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_DELETE')")
+    public ApiResponse<?> restorePost(
+        @PathVariable @Positive long id,
+        @Valid @RequestBody DeleteRequest request,
+        Authentication auth
+    ) {
+        service.deletePost(id, request, actor(auth), true);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/community/posts/{id}/comments")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_CREATE')")
+    public ApiResponse<?> createComment(
+        @PathVariable @Positive long id,
+        @Valid @RequestBody CommentContentRequest request,
+        Authentication auth
+    ) {
+        return ApiResponse.success(service.saveComment(id, null, request, actor(auth)));
+    }
+
+    @PutMapping("/community/posts/{id}/comments/{commentId}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'COMMUNITY_UPDATE')")
+    public ApiResponse<?> updateComment(
+        @PathVariable @Positive long id,
+        @PathVariable @Positive long commentId,
+        @Valid @RequestBody CommentContentRequest request,
+        Authentication auth
+    ) {
+        return ApiResponse.success(service.saveComment(id, commentId, request, actor(auth)));
+    }
+
+    @PutMapping("/pro/members/{userId}/grants/{id}")
+    @PreAuthorize("@learningAdmin.allowed(authentication,'PRO_MEMBER_MANAGE')")
+    public ApiResponse<?> updateGrant(
+        @PathVariable @Positive long userId,
+        @PathVariable @Positive long id,
+        @Valid @RequestBody GrantUpdateRequest request,
+        Authentication auth
+    ) {
+        return ApiResponse.success(pro.updateAdminGrant(userId, id, actor(auth), request));
+    }
+
     @GetMapping("/engagement/learners/{userId}/inventory")
     @PreAuthorize("@learningAdmin.allowed(authentication,'INVENTORY_VIEW')")
     public ApiResponse<?> inventory(@PathVariable @Positive long userId) {

@@ -10,6 +10,32 @@ const changed = promise =>
     return response;
   });
 export const commerceAdminApi = {
+  deleteComment: (postId, id, payload) =>
+    client.delete(`${learning}/community/posts/${postId}/comments/${id}`, { data: payload }),
+  restoreComment: (postId, id, payload) =>
+    client.post(`${learning}/community/posts/${postId}/comments/${id}/restore`, payload),
+  deleteItem: (code, payload) => changed(client.delete(`${learning}/shop/items/${code}`, { data: payload })),
+  restoreItem: (code, payload) => changed(client.post(`${learning}/shop/items/${code}/restore`, payload)),
+  createReward: payload => changed(client.post(`${learning}/engagement/rewards`, payload)),
+  updateReward: (code, payload) =>
+    changed(client.put(`${learning}/engagement/rewards/${code}/definition`, payload)),
+  deleteReward: (code, payload) =>
+    changed(client.delete(`${learning}/engagement/rewards/${code}`, { data: payload })),
+  restoreReward: (code, payload) =>
+    changed(client.post(`${learning}/engagement/rewards/${code}/restore`, payload)),
+  createPlan: payload => changed(client.post(`${payment}/pro/plans`, payload)),
+  deletePlan: (code, payload) => changed(client.delete(`${payment}/pro/plans/${code}`, { data: payload })),
+  restorePlan: (code, payload) => changed(client.post(`${payment}/pro/plans/${code}/restore`, payload)),
+  updateGrant: (userId, id, payload) =>
+    changed(client.put(`${learning}/pro/members/${userId}/grants/${id}`, payload)),
+  createPost: payload => client.post(`${learning}/community/posts`, payload),
+  updatePost: (id, payload) => client.put(`${learning}/community/posts/${id}`, payload),
+  deletePost: (id, payload) => client.delete(`${learning}/community/posts/${id}`, { data: payload }),
+  restorePost: (id, payload) => client.post(`${learning}/community/posts/${id}/restore`, payload),
+  createComment: (id, payload) => client.post(`${learning}/community/posts/${id}/comments`, payload),
+  updateComment: (postId, id, payload) =>
+    client.put(`${learning}/community/posts/${postId}/comments/${id}`, payload),
+  updateCode: (id, payload) => client.put(`${learning}/pro/codes/${id}`, payload),
   inventory: (id, options) => client.get(`${learning}/engagement/learners/${id}/inventory`, options),
   saveInventory: (id, code, payload) =>
     changed(client.put(`${learning}/engagement/learners/${id}/inventory/${code}`, payload)),

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Button } from '@mui/material';
+import { Add, EditOutlined } from '@mui/icons-material';
 import { commerceAdminApi as api } from '../api/commerceAdminApi';
 import useLearningResource from '../../learning/hooks/useLearningResource';
 import useAuth from '../../auth/hooks/useAuth';
@@ -12,6 +13,7 @@ import {
   CommerceSearch,
   Field,
   ReasonField,
+  AdminRowActions,
 } from '../components/CommerceAdminUi';
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
@@ -22,8 +24,9 @@ export default function AdminEngagementPage() {
   const [draft, setDraft] = useState(''),
     [keyword, setKeyword] = useState(''),
     [page, setPage] = useState(0),
+    [size, setSize] = useState(20),
     [selected, setSelected] = useState(null);
-  const load = useCallback(options => api.learners({ keyword, page, size: 20 }, options), [keyword, page]);
+  const load = useCallback(options => api.learners({ keyword, page, size }, options), [keyword, page, size]);
   const resource = useLearningResource(load, null);
   return (
     <>
@@ -56,14 +59,23 @@ export default function AdminEngagementPage() {
               [
                 'Thao tác',
                 r => (
-                  <Button size="small" onClick={() => setSelected(r.userId)}>
-                    {t('Chi tiết')}
-                  </Button>
+                  <AdminRowActions
+                    actions={[{ kind: 'view', label: 'Xem chi tiết', onClick: () => setSelected(r.userId) }]}
+                  />
                 ),
               ],
             ]}
           />
-          <CommercePager data={resource.data} page={page} onChange={setPage} />
+          <CommercePager
+            data={resource.data}
+            page={page}
+            onChange={setPage}
+            size={size}
+            onSizeChange={value => {
+              setSize(value);
+              setPage(0);
+            }}
+          />
         </>
       )}
       {selected && (
@@ -110,7 +122,9 @@ function LearnerEditor({ id, user, onClose }) {
   const giftItems =
     resource.data?.items.filter(
       item =>
-        item.itemType !== 'FREEZE' && !resource.data.inventory.some(owned => owned.itemCode === item.code),
+        item.itemType !== 'FREEZE' &&
+        !item.deletedAt &&
+        !resource.data.inventory.some(owned => owned.itemCode === item.code),
     ) || [];
   const p = resource.data?.profile;
   return (
@@ -144,6 +158,7 @@ function LearnerEditor({ id, user, onClose }) {
             </div>
             {!!operations.length && (
               <Button
+                startIcon={<EditOutlined />}
                 type="button"
                 variant="outlined"
                 onClick={() =>
@@ -168,6 +183,7 @@ function LearnerEditor({ id, user, onClose }) {
                 <h3>{t('Kho đồ học viên')}</h3>
                 {manageInventory && (
                   <Button
+                    startIcon={<Add />}
                     disabled={!giftItems.length}
                     onClick={() => setInventoryAction({ code: giftItems[0]?.code, owned: true, reason: '' })}
                   >
@@ -175,6 +191,7 @@ function LearnerEditor({ id, user, onClose }) {
                   </Button>
                 )}
                 <CommerceTable
+                  paginate
                   rowKey="itemCode"
                   rows={resource.data.inventory}
                   columns={[
@@ -185,12 +202,16 @@ function LearnerEditor({ id, user, onClose }) {
                       'Thao tác',
                       r =>
                         manageInventory ? (
-                          <Button
-                            color="warning"
-                            onClick={() => setInventoryAction({ code: r.itemCode, owned: false, reason: '' })}
-                          >
-                            {t('Thu hồi vật phẩm')}
-                          </Button>
+                          <AdminRowActions
+                            actions={[
+                              {
+                                kind: 'delete',
+                                label: 'Thu hồi vật phẩm',
+                                onClick: () =>
+                                  setInventoryAction({ code: r.itemCode, owned: false, reason: '' }),
+                              },
+                            ]}
+                          />
                         ) : (
                           '—'
                         ),
@@ -200,6 +221,7 @@ function LearnerEditor({ id, user, onClose }) {
               </section>
             )}
             <CommerceTable
+              paginate
               rows={resource.data.history}
               columns={[
                 ['Thời gian', r => date(r.createdAt)],

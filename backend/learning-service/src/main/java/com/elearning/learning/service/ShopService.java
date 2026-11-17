@@ -60,6 +60,7 @@ public class ShopService {
         );
     }
 
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Purchase purchase(long userId, PurchaseRequest request) {
         // Reconcile days before adding new freezes; purchases never repair an already broken streak.
         State before = state(userId);

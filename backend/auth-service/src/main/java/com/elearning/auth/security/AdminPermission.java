@@ -27,6 +27,15 @@ public enum AdminPermission {
     CATEGORY_DELETE("Khóa học & danh mục", "Danh mục", "DELETE", "Xóa danh mục", false),
     LEARNING_REPORT_VIEW("Học tập", "Kết quả học tập", "VIEW", "Xem thống kê học tập", false),
     PAYMENT_REPORT_VIEW("Thanh toán", "Doanh thu", "VIEW", "Xem thống kê thanh toán", false),
+    SHOP_DELETE("Cửa hàng & thành viên", "Vật phẩm", "DELETE", "Xóa / khôi phục vật phẩm", false),
+    REWARD_CREATE("Học tập", "Quy tắc & phần thưởng", "CREATE", "Thêm mốc thưởng", false),
+    REWARD_DELETE("Học tập", "Quy tắc & phần thưởng", "DELETE", "Xóa / khôi phục mốc thưởng", false),
+    PRO_PLAN_CREATE("Cửa hàng & thành viên", "Gói Pro", "CREATE", "Thêm gói Pro", false),
+    PRO_PLAN_DELETE("Cửa hàng & thành viên", "Gói Pro", "DELETE", "Xóa / khôi phục gói Pro", false),
+    PRO_CODE_UPDATE("Cửa hàng & thành viên", "Mã Pro", "UPDATE", "Sửa hạn mã Pro chưa dùng", false),
+    COMMUNITY_CREATE("Học tập", "Diễn đàn", "CREATE", "Thêm bài viết / bình luận", false),
+    COMMUNITY_UPDATE("Học tập", "Diễn đàn", "UPDATE", "Sửa bài viết / bình luận", false),
+    COMMUNITY_DELETE("Học tập", "Diễn đàn", "DELETE", "Xóa / khôi phục nội dung", false),
     SHOP_VIEW("Cửa hàng & thành viên", "Vật phẩm", "VIEW", "Xem vật phẩm và giao dịch gem", false),
     SHOP_CREATE("Cửa hàng & thành viên", "Vật phẩm", "CREATE", "Thêm vật phẩm", false),
     SHOP_UPDATE("Cửa hàng & thành viên", "Vật phẩm", "UPDATE", "Sửa / ẩn vật phẩm", false),
@@ -104,13 +113,14 @@ public enum AdminPermission {
             "SHOP_VIEW"
         );
         String view = switch (this) {
-            case SHOP_CREATE, SHOP_UPDATE -> "SHOP_VIEW";
+            case SHOP_CREATE, SHOP_UPDATE, SHOP_DELETE -> "SHOP_VIEW";
+            case REWARD_CREATE, REWARD_DELETE -> "ENGAGEMENT_CONFIG_VIEW";
             case GEM_ADJUST, XP_ADJUST, STREAK_ADJUST -> "ENGAGEMENT_VIEW";
             case ENGAGEMENT_CONFIG_UPDATE -> "ENGAGEMENT_CONFIG_VIEW";
-            case PRO_PLAN_UPDATE -> "PRO_PLAN_VIEW";
+            case PRO_PLAN_CREATE, PRO_PLAN_UPDATE, PRO_PLAN_DELETE -> "PRO_PLAN_VIEW";
             case PRO_MEMBER_MANAGE -> "PRO_MEMBER_VIEW";
-            case PRO_CODE_CREATE, PRO_CODE_REVOKE -> "PRO_CODE_VIEW";
-            case COMMUNITY_MODERATE -> "COMMUNITY_VIEW";
+            case PRO_CODE_CREATE, PRO_CODE_REVOKE, PRO_CODE_UPDATE -> "PRO_CODE_VIEW";
+            case COMMUNITY_MODERATE, COMMUNITY_CREATE, COMMUNITY_UPDATE, COMMUNITY_DELETE -> "COMMUNITY_VIEW";
             case QUIZ_MANAGE -> "QUIZ_VIEW";
             case NOTIFICATION_MANAGE -> "NOTIFICATION_VIEW";
             default -> null;

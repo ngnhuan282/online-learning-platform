@@ -1,0 +1,14 @@
+ALTER TABLE shop_items ADD COLUMN deleted_at TIMESTAMP(6) NULL;
+ALTER TABLE engagement_reward_rules ADD COLUMN deleted_at TIMESTAMP(6) NULL;
+ALTER TABLE engagement_reward_rules ADD COLUMN label VARCHAR(120) NOT NULL DEFAULT '';
+ALTER TABLE engagement_reward_rules ADD COLUMN metric VARCHAR(20) NOT NULL DEFAULT 'STREAK';
+ALTER TABLE engagement_reward_rules ADD COLUMN threshold INT NOT NULL DEFAULT 1;
+UPDATE engagement_reward_rules SET label='Bài học đầu tiên',metric='FIRST_LESSON',threshold=1 WHERE code='FIRST_LESSON';
+UPDATE engagement_reward_rules SET label='Chuỗi 3 ngày',threshold=3 WHERE code='STREAK_3';
+UPDATE engagement_reward_rules SET label='Chuỗi 7 ngày',threshold=7 WHERE code='STREAK_7';
+UPDATE engagement_reward_rules SET label='Chuỗi 30 ngày',threshold=30 WHERE code='STREAK_30';
+UPDATE engagement_reward_rules SET label='Đạt cấp độ 5',metric='LEVEL',threshold=5 WHERE code='LEVEL_5';
+ALTER TABLE pro_grants ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE pro_activation_codes ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE community_posts ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE community_comments ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

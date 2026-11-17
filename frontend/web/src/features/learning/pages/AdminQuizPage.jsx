@@ -3,14 +3,16 @@ import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, FormControlLabel, MenuItem, TextField } from '@mui/material';
 import Add from '@mui/icons-material/Add';
-import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
+import DeleteOutlined from '@mui/icons-material/DeleteOutlineOutlined';
 import SaveOutlined from '@mui/icons-material/SaveOutlined';
 import PublishOutlined from '@mui/icons-material/PublishOutlined';
 import { learningApi } from '../api/learningApi';
 import { courseApi } from '../../courses/api/courseApi';
 import ErrorState from '../../../shared/components/ErrorState';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
-import LearningHeader from '../components/LearningHeader';
+import { PageHeading } from '../../admin/components/AdminUi';
+import { CommercePager } from '../../admin/components/CommerceAdminUi';
+import { notifyAdminFailure } from '../../../shared/utils/adminFeedback';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import '../styles/quiz.css';
 import useAuth from '../../auth/hooks/useAuth';
@@ -87,6 +89,8 @@ export default function AdminQuizPage() {
   const mounted = useRef(false);
   const pending = useRef(false);
   const [quizzes, setQuizzes] = useState([]);
+  const [listPage, setListPage] = useState(0),
+    [listSize, setListSize] = useState(10);
   const [courses, setCourses] = useState([]);
   const [form, setForm] = useState(blankQuiz);
   const [editingId, setEditingId] = useState(null);
@@ -230,6 +234,7 @@ export default function AdminQuizPage() {
     const validation = definitionError(form);
     if (validation) {
       setError(new Error(validation));
+      notifyAdminFailure(new Error(validation));
       return;
     }
     if (!editorRef.current?.reportValidity()) return;
@@ -255,6 +260,7 @@ export default function AdminQuizPage() {
     const validation = definitionError(form);
     if (validation) {
       setError(new Error(validation));
+      notifyAdminFailure(new Error(validation));
       return;
     }
     if (!editorRef.current?.reportValidity()) return;
@@ -296,15 +302,14 @@ export default function AdminQuizPage() {
 
   return (
     <section className="admin-quiz-page learning-admin-workspace">
-      <LearningHeader
+      <PageHeading
         title={t('Quản lý quiz')}
         description={t('Soạn câu hỏi, lưu bản nháp và xuất bản bài kiểm tra.')}
-        navigation={false}
       >
         <Button variant="outlined" startIcon={<Add />} onClick={startNew} disabled={busy || !writable}>
           {t('Quiz mới')}
         </Button>
-      </LearningHeader>
+      </PageHeading>
       {error && <ErrorState error={error} title={t('Không thể xử lý quiz')} />}
       {listError && (
         <ErrorState
@@ -326,21 +331,40 @@ export default function AdminQuizPage() {
           <h2>{t('Danh sách quiz')}</h2>
           {loading && <p>{t('Đang tải...')}</p>}
           {!loading && !listError && quizzes.length === 0 && <p>{t('Chưa có quiz.')}</p>}
-          {quizzes.map(quiz => (
-            <button
-              key={quiz.id}
-              type="button"
-              className={editingId === quiz.id ? 'is-selected' : ''}
-              onClick={() => selectQuiz(quiz.id)}
-              disabled={busy}
-            >
-              <strong>{t(quiz.title)}</strong>
-              <span>
-                {t('Khóa #')}
-                {quiz.courseId} · {quiz.published ? t('Đã xuất bản') : t('Bản nháp')}
-              </span>
-            </button>
-          ))}
+          {quizzes
+            .slice(
+              Math.min(listPage, Math.max(0, Math.ceil(quizzes.length / listSize) - 1)) * listSize,
+              (Math.min(listPage, Math.max(0, Math.ceil(quizzes.length / listSize) - 1)) + 1) * listSize,
+            )
+            .map(quiz => (
+              <button
+                key={quiz.id}
+                type="button"
+                className={editingId === quiz.id ? 'is-selected' : ''}
+                onClick={() => selectQuiz(quiz.id)}
+                disabled={busy}
+              >
+                <strong>{t(quiz.title)}</strong>
+                <span>
+                  {t('Khóa #')}
+                  {quiz.courseId} · {quiz.published ? t('Đã xuất bản') : t('Bản nháp')}
+                </span>
+              </button>
+            ))}
+          <CommercePager
+            data={{
+              content: quizzes.slice(listPage * listSize, (listPage + 1) * listSize),
+              totalElements: quizzes.length,
+              totalPages: Math.ceil(quizzes.length / listSize),
+            }}
+            page={Math.min(listPage, Math.max(0, Math.ceil(quizzes.length / listSize) - 1))}
+            size={listSize}
+            onChange={setListPage}
+            onSizeChange={value => {
+              setListSize(value);
+              setListPage(0);
+            }}
+          />
         </aside>
         <form ref={editorRef} className="quiz-editor" onSubmit={save}>
           <fieldset className="quiz-permission-editor" disabled={!writable}>
