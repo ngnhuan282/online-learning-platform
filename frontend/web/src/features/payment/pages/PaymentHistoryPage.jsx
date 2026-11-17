@@ -8,12 +8,11 @@ import EmptyState from '../../../shared/components/EmptyState';
 import ErrorState from '../../../shared/components/ErrorState';
 import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
+import { PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { paymentApi } from '../api/paymentApi';
 import { formatDemoPrice } from '../data/paymentDemo';
 import { getPaymentDisplayStatus } from '../utils/paymentFlow';
 import '../styles/payment.css';
-
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 const statusLabel = {
   PENDING: 'Đang chờ',
@@ -43,7 +42,7 @@ export default function PaymentHistoryPage() {
   useLocale();
   const [history, setHistory] = useState(null);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSize] = useState(10);
   const [keyword, setKeyword] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -211,7 +210,7 @@ export default function PaymentHistoryPage() {
                   <thead>
                     <tr>
                       <th>{t('Mã đơn')}</th>
-                      <th>{t('Khóa học')}</th>
+                      <th>{t('Khóa học / Gói Pro')}</th>
                       <th>{t('Số tiền')}</th>
                       <th>{t('Trạng thái')}</th>
                       <th>{t('Ngày tạo')}</th>

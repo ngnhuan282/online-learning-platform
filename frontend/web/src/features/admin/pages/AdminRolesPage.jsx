@@ -24,7 +24,6 @@ import {
   DeleteOutlined,
 } from '@mui/icons-material';
 import useAuth from '../../auth/hooks/useAuth';
-import useToast from '../../../shared/hooks/useToast';
 import { adminApi } from '../api/adminApi';
 import { can, download, togglePermission } from '../utils/adminUtils';
 import { LoadState, PageHeading, StatCard } from '../components/AdminUi';
@@ -32,7 +31,6 @@ import { LoadState, PageHeading, StatCard } from '../components/AdminUi';
 export default function AdminRolesPage() {
   useLocale();
   const { user } = useAuth();
-  const toast = useToast();
   const [state, setState] = useState({ loading: true, roles: [], catalog: [], error: null });
   const [retry, setRetry] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
@@ -132,7 +130,6 @@ export default function AdminRolesPage() {
         setState(s => ({ ...s, roles: s.roles.map(r => (r.id === selected.id ? response.data : r)) }));
         setDraft(null);
       }
-      toast('Đã lưu thay đổi phân quyền.');
       setRetry(r => r + 1);
     } catch (failure) {
       setError(failure);
@@ -366,12 +363,12 @@ export default function AdminRolesPage() {
                     {Object.entries(groups).map(([group, resources]) => (
                       <tbody key={group}>
                         <tr className="admin-module-row">
-                          <th colSpan={6}>{group}</th>
+                          <th colSpan={6}>{t(group)}</th>
                         </tr>
                         {Object.entries(resources).map(([resource, items]) => (
                           <tr key={resource}>
                             <td>
-                              <strong>{resource}</strong>
+                              <strong>{t(resource)}</strong>
                             </td>
                             {['VIEW', 'CREATE', 'UPDATE', 'DELETE'].map(action => (
                               <td key={action}>{cell(items, action)}</td>

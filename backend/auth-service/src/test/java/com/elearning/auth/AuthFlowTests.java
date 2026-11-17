@@ -98,7 +98,11 @@ class AuthFlowTests {
     void disabledMailReturnsSameUnavailableErrorWithoutIssuingAnyResetTokens() throws Exception {
         String local = registerUser();
         for (String email : List.of(local, email())) {
-            error(request("/api/v1/auth/forgot-password", Map.of("email", email), "broken"), 503, "PASSWORD_RESET_UNAVAILABLE");
+            error(
+                request("/api/v1/auth/forgot-password", Map.of("email", email), "broken"),
+                503,
+                "PASSWORD_RESET_UNAVAILABLE"
+            );
         }
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM password_reset_tokens", Long.class)).isZero();
         assertThat(login(local, PASSWORD).statusCode()).isEqualTo(200);
@@ -122,8 +126,9 @@ class AuthFlowTests {
         assertThat(spec.get("paths").get("/api/v1/auth/login")).isNotNull();
         assertThat(spec.get("paths").get("/api/v1/admin/users")).isNotNull();
         assertThat(spec.get("paths").get("/api/v1/users/me")).isNotNull();
-        assertThat(spec.get("paths").get("/api/v1/auth/login").get("post").get("responses").get("401"))
-            .isNotNull();
+        assertThat(
+            spec.get("paths").get("/api/v1/auth/login").get("post").get("responses").get("401")
+        ).isNotNull();
         assertThat(response.body()).doesNotContain("passwordHash", "password_hash", SECRET);
     }
 
@@ -343,15 +348,23 @@ class AuthFlowTests {
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
             )
-        ).isEqualTo(11);
+        ).isEqualTo(13);
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id=rp.role_id WHERE r.name='ADMIN'",
+                Integer.class
+            )
+        ).isEqualTo(com.elearning.auth.security.AdminPermission.allCodes().size());
         assertThat(jdbc.queryForList("SELECT name FROM roles", String.class)).containsExactlyInAnyOrder(
             "USER",
             "ADMIN"
         );
-        assertThat(jdbc.queryForObject(
-            "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'USER'",
-            Integer.class
-        )).isZero();
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'USER'",
+                Integer.class
+            )
+        ).isZero();
     }
 
     @Test

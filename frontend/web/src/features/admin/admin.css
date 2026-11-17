@@ -64,6 +64,8 @@
   margin: 14px 0;
 }
 .admin-sidebar {
+  overflow-y: auto;
+  overscroll-behavior: contain;
   position: fixed;
   inset: 0 auto 0 0;
   width: 254px;
@@ -75,33 +77,31 @@
 }
 .admin-brand {
   display: flex;
-  gap: 9px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   height: 80px;
+  align-content: center;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--admin-border);
-  font-size: 21px;
+  font-size: 18px;
   font-weight: 750;
   letter-spacing: -0.7px;
   flex-shrink: 0;
 }
-.admin-brand-icon {
-  display: grid;
-  place-items: center;
-  background: var(--admin-blue);
-  color: white;
-  width: 37px;
-  height: 39px;
-  border-radius: 10px;
+.admin-brand .brand {
+  flex-shrink: 0;
+  gap: 6px;
+  font-size: inherit;
 }
-.admin-brand small {
-  display: block;
-  font-size: 9px;
-  color: var(--admin-blue);
-  letter-spacing: 0.8px;
-  line-height: 1.5;
+.admin-brand .brand-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
 }
 .admin-brand b {
+  flex-shrink: 0;
+  white-space: nowrap;
   border-radius: 20px;
   background: #e3eeff;
   color: var(--admin-blue);
@@ -566,6 +566,7 @@
   font-size: 12px;
 }
 .admin-table th {
+  text-transform: uppercase;
   color: #7b8ba5;
   font-size: 10px;
   letter-spacing: 0.4px;
@@ -628,6 +629,9 @@
 }
 .admin-row-actions .MuiIconButton-root:disabled {
   opacity: 0.3;
+}
+.admin-row-actions .MuiIconButton-colorError {
+  color: #dc3545;
 }
 .admin-pill {
   display: inline-flex;
@@ -1098,4 +1102,104 @@
 
 .admin-shell .MuiButton-contained:not(.Mui-disabled) {
   color: white;
+}
+
+/* Older modules share the same admin frame while retaining their editor behavior. */
+.admin-main > .container,
+.admin-main > .section,
+.admin-main .learning-admin-workspace {
+  width: 100%;
+  max-width: none;
+  padding: 0 !important;
+  margin: 0;
+}
+.admin-main > .section > .container {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+.admin-main .course-card,
+.admin-main .notification-compose,
+.admin-main .notification-filters,
+.admin-main .quiz-admin-list,
+.admin-main .quiz-editor {
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: white;
+  box-shadow: none;
+}
+.admin-shell .admin-main .button {
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+}
+.admin-main .button-primary {
+  background: var(--admin-blue);
+  color: white;
+  border-color: var(--admin-blue);
+}
+.admin-main .button-soft,
+.admin-main .button-outline {
+  color: var(--admin-blue);
+  background: white;
+  border: 1px solid var(--admin-border);
+}
+.admin-main .notification-compose {
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.admin-main .notification-compose fieldset {
+  border: 0;
+  padding: 0;
+}
+.admin-main .notification-compose input,
+.admin-main .notification-compose textarea,
+.admin-main .notification-filters input,
+.admin-main .notification-filters select {
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  padding: 11px 12px;
+  font: inherit;
+  background: #f9fbfd;
+}
+.admin-main .notification-filters {
+  padding: 20px;
+  margin: 20px 0;
+}
+.admin-main .quiz-admin-list .admin-pagination {
+  padding: 14px 0 0;
+  gap: 12px;
+}
+.admin-main .quiz-admin-list .admin-pagination span {
+  font-size: 12px;
+}
+body:has(.admin-shell) .MuiDialog-paper {
+  border: 1px solid #e2eaf4;
+  border-radius: 14px;
+}
+body:has(.admin-shell) .MuiDialogTitle-root {
+  font-size: 20px;
+  font-weight: 700;
+  padding: 24px 24px 16px;
+}
+body:has(.admin-shell) .MuiDialogActions-root {
+  padding: 16px 24px;
+  border-top: 1px solid #e2eaf4;
+}
+body:has(.admin-shell) .MuiDialogActions-root .MuiButton-root {
+  text-transform: none;
+  border-radius: 8px;
+  font-weight: 600;
+  min-height: 38px;
+}
+body:has(.admin-shell) .MuiDialog-paper > form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+body:has(.admin-shell) .MuiDialogContent-root {
+  min-height: 0;
 }

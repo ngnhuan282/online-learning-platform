@@ -1,0 +1,3 @@
+ALTER TABLE pro_plans DROP CONSTRAINT chk_pro_plan_identity;
+ALTER TABLE pro_plans ADD COLUMN deleted_at TIMESTAMP(6) NULL;
+ALTER TABLE pro_plans MODIFY COLUMN name VARCHAR(120) NOT NULL;

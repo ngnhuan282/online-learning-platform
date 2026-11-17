@@ -10,6 +10,7 @@ import PostEditor from '../components/PostEditor';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
 import { t, getIntlLocale } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
+import { can } from '../../admin/utils/adminUtils';
 
 const emptyTopics = [];
 function PostDetail({ id }) {
@@ -31,7 +32,7 @@ function PostDetail({ id }) {
   const comments = useLearningResource(loadComments, null);
   const topics = useLearningResource(communityApi.topics, emptyTopics);
   const post = postResource.data;
-  const admin = user?.roles?.includes('ADMIN');
+  const admin = user?.roles?.includes('ADMIN') || can(user, 'COMMUNITY_MODERATE');
   const owner = post && user?.id === post.authorId;
   const canWrite = post && (!post.locked || admin);
   const refresh = () => {

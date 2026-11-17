@@ -4,11 +4,19 @@ import { useEffect, useRef, useState } from 'react';
 import useAuth from '../../auth/hooks/useAuth';
 import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
-import LearningHeader from '../components/LearningHeader';
+import { PageHeading } from '../../admin/components/AdminUi';
+import {
+  CommerceTable,
+  CommercePager,
+  AdminRowActions,
+  AdminDetailsDialog,
+} from '../../admin/components/CommerceAdminUi';
+import { notifyAdminFailure } from '../../../shared/utils/adminFeedback';
 import { formatDate } from '../../../shared/utils/formatDate';
 import { learningApi } from '../api/learningApi';
 import { NOTIFICATION_CATEGORIES, notificationCategory } from '../utils/notificationStream';
 import '../styles/notifications.css';
+import { can } from '../../admin/utils/adminUtils';
 
 const validUserId = value => /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value) > 0;
 const newMessage = () => ({ userId: '', title: '', body: '' });
@@ -21,10 +29,13 @@ export default function AdminNotificationsPage() {
 
 function AdminNotificationsContent() {
   useLocale();
+  const { user } = useAuth();
   const [recipient, setRecipient] = useState('');
   const [category, setCategory] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(0);
+  const [size, setSize] = useState(20),
+    [detail, setDetail] = useState(null);
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState({ data: null, loading: true, error: null, query: null });
   const [form, setForm] = useState(newMessage);
@@ -33,7 +44,7 @@ function AdminNotificationsContent() {
   const [sent, setSent] = useState(false);
   const pending = useRef(null);
   const mounted = useRef(false);
-  const query = `${recipient}:${category}:${unreadOnly}:${page}`;
+  const query = `${recipient}:${category}:${unreadOnly}:${page}:${size}`;
   const recipientInvalid = recipient !== '' && !validUserId(recipient);
 
   useEffect(() => {
@@ -60,7 +71,7 @@ function AdminNotificationsContent() {
       .getAdminNotifications(
         {
           page,
-          size: 20,
+          size,
           unreadOnly,
           ...(recipient ? { userId: Number(recipient) } : {}),
           ...(category ? { category } : {}),
@@ -79,7 +90,7 @@ function AdminNotificationsContent() {
         if (!controller.signal.aborted) setState({ data: null, query, loading: false, error });
       });
     return () => controller.abort();
-  }, [recipient, category, unreadOnly, page, revision, query, recipientInvalid]);
+  }, [recipient, category, unreadOnly, page, size, revision, query, recipientInvalid]);
 
   function changeForm(field, value) {
     setForm(previous => ({ ...previous, [field]: value }));
@@ -92,7 +103,9 @@ function AdminNotificationsContent() {
     event.preventDefault();
     if (sending) return;
     if (!validUserId(form.userId) || !form.title.trim() || !form.body.trim()) {
-      setSendError(new Error('Nhập ID người nhận hợp lệ, tiêu đề và nội dung.'));
+      const failure = new Error('Nhập ID người nhận hợp lệ, tiêu đề và nội dung.');
+      setSendError(failure);
+      notifyAdminFailure(failure);
       return;
     }
     pending.current ??= {
@@ -122,58 +135,59 @@ function AdminNotificationsContent() {
   const data = current ? state.data : null;
   return (
     <section className="admin-notifications learning-admin-workspace">
-      <LearningHeader
+      <PageHeading
         title={t('Quản lý thông báo')}
         description={t('Gửi thông báo hệ thống và tra cứu lịch sử theo người nhận.')}
-        navigation={false}
       />
-      <form className="notification-compose" onSubmit={send}>
-        <h2>{t('Gửi thông báo hệ thống')}</h2>
-        <p>
-          {t(
-            'Gửi tới một ID người dùng cụ thể. Các thông báo Course, Payment và Learning được tạo theo sự kiện nghiệp vụ.',
-          )}
-        </p>
-        <fieldset disabled={sending}>
-          <label>
-            {t('ID người nhận')}
-            <input
-              required
-              inputMode="numeric"
-              value={form.userId}
-              onChange={event => changeForm('userId', event.target.value)}
-            />
-          </label>
-          <label>
-            {t('Tiêu đề')}
-            <input
-              required
-              maxLength={255}
-              value={form.title}
-              onChange={event => changeForm('title', event.target.value)}
-            />
-          </label>
-          <label>
-            {t('Nội dung')}
-            <textarea
-              required
-              maxLength={1000}
-              rows={4}
-              value={form.body}
-              onChange={event => changeForm('body', event.target.value)}
-            />
-          </label>
-          <button className="button button-primary" type="submit">
-            {sending ? t('Đang gửi...') : t('Gửi thông báo')}
-          </button>
-        </fieldset>
-        {sendError && (
-          <p role="alert">
-            {t(sendError.message)} {t('Bạn có thể gửi lại; cùng yêu cầu sẽ không tạo bản trùng.')}
+      {can(user, 'NOTIFICATION_MANAGE') && (
+        <form className="notification-compose" onSubmit={send}>
+          <h2>{t('Gửi thông báo hệ thống')}</h2>
+          <p>
+            {t(
+              'Gửi tới một ID người dùng cụ thể. Các thông báo Course, Payment và Learning được tạo theo sự kiện nghiệp vụ.',
+            )}
           </p>
-        )}
-        {sent && <p role="status">{t('Đã gửi thông báo hệ thống.')}</p>}
-      </form>
+          <fieldset disabled={sending}>
+            <label>
+              {t('ID người nhận')}
+              <input
+                required
+                inputMode="numeric"
+                value={form.userId}
+                onChange={event => changeForm('userId', event.target.value)}
+              />
+            </label>
+            <label>
+              {t('Tiêu đề')}
+              <input
+                required
+                maxLength={255}
+                value={form.title}
+                onChange={event => changeForm('title', event.target.value)}
+              />
+            </label>
+            <label>
+              {t('Nội dung')}
+              <textarea
+                required
+                maxLength={1000}
+                rows={4}
+                value={form.body}
+                onChange={event => changeForm('body', event.target.value)}
+              />
+            </label>
+            <button className="button button-primary" type="submit">
+              {sending ? t('Đang gửi...') : t('Gửi thông báo')}
+            </button>
+          </fieldset>
+          {sendError && (
+            <p role="alert">
+              {t(sendError.message)} {t('Bạn có thể gửi lại; cùng yêu cầu sẽ không tạo bản trùng.')}
+            </p>
+          )}
+          {sent && <p role="status">{t('Đã gửi thông báo hệ thống.')}</p>}
+        </form>
+      )}
       <h2>{t('Lịch sử thông báo')}</h2>
       <div className="notification-filters">
         <label>
@@ -232,49 +246,47 @@ function AdminNotificationsContent() {
       {current && !state.loading && !state.error && data?.content.length === 0 && (
         <EmptyState title={t('Chưa có thông báo phù hợp')} />
       )}
-      <div className="notification-list">
-        {data?.content.map(notification => (
-          <article
-            className={`notification-item ${notification.read ? '' : 'is-unread'}`}
-            key={notification.id}
-          >
-            <div className="notification-meta">
-              <span>
-                {NOTIFICATION_CATEGORIES[notificationCategory(notification)]} {t('· Người nhận #')}
-                {notification.userId}
-              </span>
-              <span>{notification.read ? t('Đã đọc') : t('Chưa đọc')}</span>
-            </div>
-            <h3>{t(notification.title)}</h3>
-            <p>{notification.body}</p>
-            <time dateTime={notification.createdAt}>
-              {formatDate(notification.createdAt, { dateStyle: 'short', timeStyle: 'short' })}
-            </time>
-          </article>
-        ))}
-      </div>
-      {data && data.totalPages > 0 && (
-        <nav className="notification-pagination" aria-label={t('Phân trang thông báo quản trị')}>
-          <button
-            className="button button-outline"
-            type="button"
-            disabled={page === 0 || state.loading}
-            onClick={() => setPage(value => value - 1)}
-          >
-            {t('Trang trước')}
-          </button>
-          <span>
-            Trang {page + 1} / {data.totalPages} · {data.totalElements} {t('thông báo')}
-          </span>
-          <button
-            className="button button-outline"
-            type="button"
-            disabled={data.last || state.loading}
-            onClick={() => setPage(value => value + 1)}
-          >
-            Trang sau
-          </button>
-        </nav>
+      {data && (
+        <>
+          <CommerceTable
+            rows={data.content}
+            columns={[
+              ['ID người nhận', 'userId'],
+              ['Tiêu đề', 'title'],
+              ['Loại thông báo', row => t(NOTIFICATION_CATEGORIES[notificationCategory(row)])],
+              ['Trạng thái', row => t(row.read ? 'Đã đọc' : 'Chưa đọc')],
+              ['Ngày tạo', row => formatDate(row.createdAt, { dateStyle: 'short', timeStyle: 'short' })],
+              [
+                'Thao tác',
+                row => (
+                  <AdminRowActions
+                    actions={[{ kind: 'view', label: 'Xem chi tiết', onClick: () => setDetail(row) }]}
+                  />
+                ),
+              ],
+            ]}
+          />
+          <CommercePager
+            data={data}
+            page={page}
+            size={size}
+            onChange={setPage}
+            onSizeChange={value => {
+              setSize(value);
+              setPage(0);
+            }}
+          />
+        </>
+      )}
+      {detail && (
+        <AdminDetailsDialog title="Chi tiết thông báo" onClose={() => setDetail(null)}>
+          <strong>{detail.title}</strong>
+          <p>{detail.body}</p>
+          <p>
+            {t('Người nhận #')}
+            {detail.userId}
+          </p>
+        </AdminDetailsDialog>
       )}
     </section>
   );

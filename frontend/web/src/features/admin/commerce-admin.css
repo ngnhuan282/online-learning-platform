@@ -1,0 +1,195 @@
+.commerce-form {
+  border: 0;
+  padding: 8px 0;
+  margin: 0;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.admin-dialog .MuiButton-root {
+  text-transform: none;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: none;
+  min-height: 38px;
+}
+.admin-dialog .MuiDialog-paper {
+  border: 1px solid #e2eaf4;
+  border-radius: 14px;
+}
+.admin-dialog .MuiDialogTitle-root {
+  font-size: 20px;
+  font-weight: 700;
+  padding: 24px 24px 16px;
+}
+.admin-dialog .MuiDialogActions-root {
+  padding: 16px 24px;
+  border-top: 1px solid #e2eaf4;
+}
+.admin-dialog .admin-table {
+  font-size: 12px;
+}
+.admin-dialog .admin-table th {
+  white-space: nowrap;
+  font-size: 10px;
+}
+.admin-dialog .admin-row-actions {
+  flex-wrap: nowrap;
+}
+.admin-dialog .admin-row-actions .MuiIconButton-root {
+  padding: 7px;
+}
+.admin-text-preview {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-table-card + .admin-pagination {
+  margin-top: -1px;
+  border: 1px solid #e2eaf4;
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  background: white;
+}
+.admin-row-actions {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.admin-row-actions .MuiIconButton-colorError {
+  color: #dc3545;
+}
+.admin-dialog .admin-pagination {
+  gap: 10px;
+  padding: 16px 0;
+}
+.commerce-field {
+  display: grid;
+  gap: 7px;
+  color: #3e506b;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.commerce-field input,
+.commerce-field select,
+.commerce-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d9e2ef;
+  border-radius: 9px;
+  background: white;
+  padding: 11px 12px;
+  font: inherit;
+  color: #1c2b43;
+}
+.commerce-field input:focus,
+.commerce-field select:focus,
+.commerce-field textarea:focus {
+  outline: 2px solid #b8d1ff;
+  outline-offset: 1px;
+}
+.commerce-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 14px;
+}
+.commerce-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+.commerce-search {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin: 20px 0;
+}
+.commerce-search .commerce-field {
+  width: min(450px, 100%);
+}
+.commerce-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 18px 0;
+  color: #63728b;
+  font-size: 14px;
+}
+.commerce-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.commerce-section {
+  padding: 24px;
+  margin: 20px 0;
+}
+.commerce-section h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.commerce-info {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.commerce-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+.commerce-stat {
+  border: 1px solid #e1e8f0;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 16px;
+}
+.commerce-stat span {
+  display: block;
+  color: #6d7c92;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+.commerce-stat strong {
+  font-size: 23px;
+  color: #26436b;
+}
+.commerce-post-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 12px 0;
+  max-height: 250px;
+  overflow: auto;
+}
+.commerce-comment {
+  border-top: 1px solid #e2e8f0;
+  padding: 14px 0;
+}
+.commerce-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .commerce-search {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .commerce-pager {
+    gap: 4px;
+    font-size: 12px;
+  }
+  .commerce-section {
+    padding: 16px;
+  }
+}

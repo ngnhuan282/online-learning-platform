@@ -126,7 +126,7 @@ public class CommunityService {
             ErrorCode.CONFLICT
         );
         jdbc.update(
-            "UPDATE community_posts SET topic_id = ?, kind = ?, title = ?, body = ?, updated_at = ? WHERE id = ?",
+            "UPDATE community_posts SET version=version+1, topic_id = ?, kind = ?, title = ?, body = ?, updated_at = ? WHERE id = ?",
             request.topicId(),
             request.kind(),
             request.title().strip(),
@@ -143,7 +143,7 @@ public class CommunityService {
         requireOwner(userId, admin, post.authorId());
         requireOpen(post, admin);
         jdbc.update(
-            "UPDATE community_posts SET deleted_at = ?, updated_at = ? WHERE id = ?",
+            "UPDATE community_posts SET version=version+1, deleted_at = ?, updated_at = ? WHERE id = ?",
             now(),
             now(),
             id
@@ -153,7 +153,12 @@ public class CommunityService {
     @Transactional
     public Post setLocked(long id, boolean locked) {
         lockPost(id);
-        jdbc.update("UPDATE community_posts SET locked = ?, updated_at = ? WHERE id = ?", locked, now(), id);
+        jdbc.update(
+            "UPDATE community_posts SET version=version+1, locked = ?, updated_at = ? WHERE id = ?",
+            locked,
+            now(),
+            id
+        );
         return get(id);
     }
 
@@ -211,7 +216,7 @@ public class CommunityService {
         Comment comment = comment(postId, id);
         requireOwner(userId, admin, comment.authorId());
         jdbc.update(
-            "UPDATE community_comments SET body = ?, updated_at = ? WHERE id = ?",
+            "UPDATE community_comments SET version=version+1, body = ?, updated_at = ? WHERE id = ?",
             request.body().strip(),
             now(),
             id
@@ -226,14 +231,14 @@ public class CommunityService {
         Comment comment = comment(postId, id);
         requireOwner(userId, admin, comment.authorId());
         jdbc.update(
-            "UPDATE community_comments SET deleted_at = ?, updated_at = ? WHERE id = ?",
+            "UPDATE community_comments SET version=version+1, deleted_at = ?, updated_at = ? WHERE id = ?",
             now(),
             now(),
             id
         );
         if (Long.valueOf(id).equals(post.acceptedCommentId())) {
             jdbc.update(
-                "UPDATE community_posts SET accepted_comment_id = NULL, updated_at = ? WHERE id = ?",
+                "UPDATE community_posts SET version=version+1, accepted_comment_id = NULL, updated_at = ? WHERE id = ?",
                 now(),
                 postId
             );
@@ -248,7 +253,7 @@ public class CommunityService {
         if (!"QUESTION".equals(post.kind())) throw new AppException(ErrorCode.CONFLICT);
         if (commentId != null) comment(postId, commentId);
         jdbc.update(
-            "UPDATE community_posts SET accepted_comment_id = ?, updated_at = ? WHERE id = ?",
+            "UPDATE community_posts SET version=version+1, accepted_comment_id = ?, updated_at = ? WHERE id = ?",
             commentId,
             now(),
             postId

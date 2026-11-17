@@ -39,7 +39,7 @@ export default function ShopPage() {
     data?.items.filter(
       item =>
         item.itemType !== 'FREEZE' &&
-        (tab === 'shop' || item.owned) &&
+        (tab === 'shop' ? item.active !== false : item.owned) &&
         (category === 'ALL' || item.itemType === category),
     ) || [];
   const number = value => value.toLocaleString(getIntlLocale());
@@ -141,7 +141,9 @@ export default function ShopPage() {
           )}
           <p className="shop-earning">
             <DiamondRounded fontSize="small" />
-            {t('Nhận 25 kim cương cho ngày học đầu tiên trong ngày. Nhận thêm phần thưởng tại')}{' '}
+            {t('Nhận {gems} kim cương cho ngày học đầu tiên trong ngày. Nhận thêm phần thưởng tại', {
+              gems: data.dailyGems ?? 25,
+            })}{' '}
             <Link to="/achievements">{t('Thành tích học tập')}</Link>.
           </p>
           <div className="shop-filters" aria-label={t('Loại vật phẩm')}>
@@ -187,13 +189,18 @@ export default function ShopPage() {
               >
                 <div
                   className={`shop-item-preview ${item.itemType === 'BACKGROUND' ? 'is-background' : ''}`}
-                  style={item.itemType === 'BACKGROUND' ? appearanceBackground(item.code) : undefined}
+                  style={
+                    item.itemType === 'BACKGROUND'
+                      ? appearanceBackground(item.code, item.assetKey)
+                      : undefined
+                  }
                 >
                   {item.itemType === 'FRAME' ? (
                     <LearnerAvatar
                       name={user?.fullName}
                       avatarUrl={user?.avatarUrl}
                       frame={item.code}
+                      assetKey={item.assetKey}
                       size="large"
                     />
                   ) : (
@@ -202,6 +209,7 @@ export default function ShopPage() {
                         name={user?.fullName}
                         avatarUrl={user?.avatarUrl}
                         frame={data.activeFrame}
+                        assetKey={data.items.find(value => value.code === data.activeFrame)?.assetKey}
                         size="medium"
                       />
                       <span>{user?.fullName}</span>

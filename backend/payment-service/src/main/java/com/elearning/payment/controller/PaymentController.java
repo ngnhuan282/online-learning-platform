@@ -11,6 +11,7 @@ import com.elearning.payment.security.AuthenticatedUser;
 import com.elearning.payment.service.PaymentAnalyticsService;
 import com.elearning.payment.service.PaymentCheckoutService;
 import com.elearning.payment.service.PaymentCoreService;
+import com.elearning.payment.service.ProPlanService;
 import com.elearning.payment.vnpay.VnpayGateway;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -35,6 +36,7 @@ public class PaymentController {
     private final VnpayGateway vnpay;
     private final PaidCourseActivationService activation;
     private final PaymentProviderPolicy providers;
+    private final ProPlanService proPlans;
 
     public PaymentController(
         PaymentCoreService payments,
@@ -43,7 +45,8 @@ public class PaymentController {
         VnpayGateway vnpay,
         PaidCourseActivationService activation,
         PaymentProviderPolicy providers,
-        PaymentCheckoutService checkout
+        PaymentCheckoutService checkout,
+        ProPlanService proPlans
     ) {
         this.payments = payments;
         this.analytics = analytics;
@@ -52,6 +55,7 @@ public class PaymentController {
         this.activation = activation;
         this.providers = providers;
         this.checkout = checkout;
+        this.proPlans = proPlans;
     }
 
     @PostMapping("/checkout")
@@ -83,6 +87,22 @@ public class PaymentController {
                 )
             )
         );
+    }
+
+    @GetMapping("/pro/plans")
+    ApiResponse<List<ProPaymentModels.Plan>> proPlans() {
+        return ApiResponse.success(proPlans.plans());
+    }
+
+    @PostMapping("/pro/checkout")
+    ApiResponse<CheckoutResponse> createProCheckout(
+        @Valid @RequestBody ProPaymentModels.CheckoutRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        String clientIp = httpRequest.getHeader("X-Payment-Client-IP");
+        if (clientIp == null || !clientIp.matches("[0-9a-fA-F:.]{3,45}")) clientIp =
+            httpRequest.getRemoteAddr();
+        return ApiResponse.success(checkout.createProCheckout(request, user.userId(), clientIp));
     }
 
     @GetMapping("/orders/{orderCode}")

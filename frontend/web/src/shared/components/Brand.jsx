@@ -1,14 +1,15 @@
 import { t } from '../i18n/locale';
 import useLocale from '../i18n/useLocale';
 import { Link } from 'react-router-dom';
-import Icon from './Icon';
+import CatMascot from './CatMascot';
+import './Brand.css';
 
-export default function Brand() {
+export default function Brand({ to = '/', label = 'ChitChatGo — Trang chủ' }) {
   useLocale();
   return (
-    <Link to="/" className="brand" aria-label={t('ChitChatGo — Trang chủ')}>
-      <span className="brand-icon">
-        <Icon name="language" size={23} />
+    <Link to={to} className="brand" aria-label={t(label)}>
+      <span className="brand-icon brand-icon-mascot">
+        <CatMascot variant="icon" />
       </span>
       <span className="brand-wordmark">
         <span>

@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -27,6 +28,16 @@ public class CourseOrder {
 
     @Column(name = "idempotency_key", length = 64)
     private String idempotencyKey;
+
+    @Column(name = "product_type", nullable = false, length = 16)
+    @ColumnDefault("'COURSE'")
+    private String productType = "COURSE";
+
+    @Column(name = "plan_code", length = 32)
+    private String planCode;
+
+    @Column(name = "plan_duration_months")
+    private Integer planDurationMonths;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -77,6 +88,16 @@ public class CourseOrder {
 
     public void changeStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    public boolean isPro() {
+        return "PRO".equals(productType);
+    }
+
+    public void assignProPlan(String code, int months) {
+        productType = "PRO";
+        planCode = code;
+        planDurationMonths = months;
     }
 
     @PrePersist

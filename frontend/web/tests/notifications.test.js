@@ -82,7 +82,17 @@ async function renderProvider(auth = { user: { id: 1 } }, strict = false) {
   );
 }
 
-async function renderPage(Page, context, auth = { user: { id: 1, roles: ['ADMIN'] } }) {
+async function renderPage(
+  Page,
+  context,
+  auth = {
+    user: {
+      id: 1,
+      roles: ['ADMIN'],
+      permissions: ['ADMIN_ACCESS', 'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE'],
+    },
+  },
+) {
   root ??= createRoot(document.getElementById('root'));
   await act(async () =>
     root.render(

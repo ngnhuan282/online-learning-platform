@@ -2,6 +2,7 @@ package com.elearning.payment.service;
 
 import com.elearning.payment.dto.CheckoutRequest;
 import com.elearning.payment.dto.CheckoutResponse;
+import com.elearning.payment.dto.ProPaymentModels;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,18 @@ public class PaymentCheckoutService {
             // The failed write transaction has ended. Read the winning checkout in a fresh transaction.
             // Other integrity errors must still reach the normal error handler.
             return payments.findExistingCheckout(request, userId).orElseThrow(() -> collision);
+        }
+    }
+
+    public CheckoutResponse createProCheckout(
+        ProPaymentModels.CheckoutRequest request,
+        Long userId,
+        String clientIp
+    ) {
+        try {
+            return payments.createProCheckout(request, userId, clientIp);
+        } catch (DataIntegrityViolationException collision) {
+            return payments.findExistingProCheckout(request, userId).orElseThrow(() -> collision);
         }
     }
 }

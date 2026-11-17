@@ -22,8 +22,10 @@ import Icon from '../../../shared/components/Icon';
 import PolicyDialog from '../../../shared/components/PolicyDialog';
 import AuthField from './AuthField';
 import SocialAuthButtons from './SocialAuthButtons';
+import LoginCompanion from './LoginCompanion';
 import { getPasswordStrength, validateAuth } from '../schemas/authValidation';
 import '../styles/auth.css';
+import '../styles/login-companion.css';
 
 export default function AuthForm({ mode }) {
   useLocale();
@@ -50,6 +52,7 @@ export default function AuthForm({ mode }) {
       : '',
   );
   const [policy, setPolicy] = useState(null);
+  const [focusedField, setFocusedField] = useState(null);
   const noticeRef = useRef(null);
   const strength = getPasswordStrength(values.password);
 
@@ -184,7 +187,27 @@ export default function AuthForm({ mode }) {
             {t('Hoặc')} {registering ? t('đăng ký') : t('đăng nhập')} {t('bằng Email')}
           </span>
         </div>
-        <form className="auth-form" onSubmit={submit} noValidate aria-busy={submitting}>
+        <form
+          className="auth-form"
+          onSubmit={submit}
+          noValidate
+          aria-busy={submitting}
+          onFocusCapture={
+            registering
+              ? undefined
+              : event =>
+                  setFocusedField(
+                    event.target.closest('.auth-password-group') ? 'password' : event.target.name || null,
+                  )
+          }
+          onBlurCapture={
+            registering
+              ? undefined
+              : event => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) setFocusedField(null);
+                }
+          }
+        >
           {registering && (
             <AuthField
               {...fieldProps('fullName')}
@@ -320,6 +343,7 @@ export default function AuthForm({ mode }) {
           </div>
         )}
       </div>
+      {!registering && <LoginCompanion focusedField={focusedField} busy={submitting} />}
       <PolicyDialog topic={policy} onClose={() => setPolicy(null)} />
     </section>
   );

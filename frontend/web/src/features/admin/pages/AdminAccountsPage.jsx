@@ -1,5 +1,6 @@
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
+import { PAGE_SIZE_OPTIONS } from '../../../shared/constants/pagination';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -33,7 +34,6 @@ import {
   VerifiedUserOutlined,
 } from '@mui/icons-material';
 import useAuth from '../../auth/hooks/useAuth';
-import useToast from '../../../shared/hooks/useToast';
 import { userApi } from '../../auth/api/userApi';
 import { adminApi } from '../api/adminApi';
 import { can, csvCell, date, download, initials, number } from '../utils/adminUtils';
@@ -45,13 +45,12 @@ const emptyForm = { fullName: '', email: '', password: '', status: 'ACTIVE' };
 export default function AdminAccountsPage() {
   useLocale();
   const { user } = useAuth();
-  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const keyword = params.get('q') || '',
     role = params.get('role') || '',
     status = params.get('status') || '';
   const page = Math.max(0, Number(params.get('page')) || 0),
-    size = [10, 20, 50].includes(Number(params.get('size'))) ? Number(params.get('size')) : 10;
+    size = PAGE_SIZE_OPTIONS.includes(Number(params.get('size'))) ? Number(params.get('size')) : 10;
   const [searchDraft, setSearchDraft] = useState({ source: keyword, value: keyword });
   const query = searchDraft.source === keyword ? searchDraft.value : keyword;
   const setQuery = value => setSearchDraft({ source: keyword, value });
@@ -150,7 +149,6 @@ export default function AdminAccountsPage() {
           modal.target.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE',
         );
       else return;
-      toast(modal?.type === 'delete' ? 'Đã xóa mềm tài khoản.' : 'Đã lưu thay đổi tài khoản.');
       setModal(null);
       setForm(emptyForm);
       if (params.has('create')) {
@@ -417,7 +415,7 @@ export default function AdminAccountsPage() {
               value={size}
               onChange={event => filter({ size: event.target.value })}
             >
-              {[10, 20, 50].map(value => (
+              {PAGE_SIZE_OPTIONS.map(value => (
                 <MenuItem key={value} value={value}>
                   {value} {t('dòng / trang')}
                 </MenuItem>

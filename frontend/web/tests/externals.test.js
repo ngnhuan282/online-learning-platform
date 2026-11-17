@@ -78,7 +78,7 @@ test('AI workspace and updated checkout compile with the existing layout', async
   }
 });
 
-test('header places the protected AI entry after Payment and marks the current route', async () => {
+test('header keeps primary navigation visible and groups extra tools by current route', async () => {
   const { default: Header } = await load('shared/components/SiteHeader.jsx');
   const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
   const { NotificationsProvider } = await load('features/learning/context/NotificationsContext.jsx');
@@ -92,16 +92,27 @@ test('header places the protected AI entry after Payment and marks the current r
     );
     const dom = new JSDOM(html);
     try {
+      dom.window.document.querySelectorAll('style').forEach(style => style.remove());
       const nav = dom.window.document.querySelector('nav[aria-label="Điều hướng chính"]');
-      const ai = nav.querySelector('a[href="/ai-assistant"]');
+      assert.ok(nav.querySelector('a[href="/"]'));
+      assert.ok(nav.querySelector('a[href="/#courses"]'));
+      assert.ok(nav.querySelector('a[href="/#categories"]'));
+      assert.ok(nav.querySelector('a[href="/#benefits"]'));
+      assert.equal(nav.querySelectorAll(':scope > a').length, 4);
+      assert.equal(dom.window.document.querySelector('.mobile-menu'), null);
+      const utilities = nav.querySelector('.header-utilities-trigger');
+      assert.equal(utilities.textContent, 'Tiện ích khác');
+      assert.equal(utilities.getAttribute('aria-haspopup'), 'menu');
+      assert.equal(utilities.getAttribute('aria-expanded'), 'false');
+      assert.equal(dom.window.document.querySelector('.signup-link'), null);
+      const pro = dom.window.document.querySelector('.header-pro-button');
       if (!user) {
-        assert.equal(ai, null);
+        assert.equal(utilities.classList.contains('active'), false);
+        assert.equal(pro, null);
         continue;
       }
-      assert.equal(ai.textContent, 'Trợ lý AI');
-      assert.equal(ai.previousElementSibling.getAttribute('href'), '/payment/history');
-      assert.equal(ai.getAttribute('aria-current'), 'page');
-      assert.ok(ai.classList.contains('active'));
+      assert.equal(pro.getAttribute('aria-label'), 'Mở khóa PRO');
+      assert.ok(utilities.classList.contains('active'));
     } finally {
       dom.window.close();
     }

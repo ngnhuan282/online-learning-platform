@@ -3,16 +3,20 @@ import useLocale from '../../../shared/i18n/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, FormControlLabel, MenuItem, TextField } from '@mui/material';
 import Add from '@mui/icons-material/Add';
-import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
+import DeleteOutlined from '@mui/icons-material/DeleteOutlineOutlined';
 import SaveOutlined from '@mui/icons-material/SaveOutlined';
 import PublishOutlined from '@mui/icons-material/PublishOutlined';
 import { learningApi } from '../api/learningApi';
 import { courseApi } from '../../courses/api/courseApi';
 import ErrorState from '../../../shared/components/ErrorState';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
-import LearningHeader from '../components/LearningHeader';
+import { PageHeading } from '../../admin/components/AdminUi';
+import { CommercePager } from '../../admin/components/CommerceAdminUi';
+import { notifyAdminFailure } from '../../../shared/utils/adminFeedback';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import '../styles/quiz.css';
+import useAuth from '../../auth/hooks/useAuth';
+import { can } from '../../admin/utils/adminUtils';
 
 const blankOption = () => ({ optionText: '', correct: false });
 const blankQuestion = () => ({
@@ -79,10 +83,14 @@ function definitionError(form) {
 
 export default function AdminQuizPage() {
   useLocale();
+  const { user } = useAuth();
+  const writable = can(user, 'QUIZ_MANAGE');
   const editorRef = useRef(null);
   const mounted = useRef(false);
   const pending = useRef(false);
   const [quizzes, setQuizzes] = useState([]);
+  const [listPage, setListPage] = useState(0),
+    [listSize, setListSize] = useState(10);
   const [courses, setCourses] = useState([]);
   const [form, setForm] = useState(blankQuiz);
   const [editingId, setEditingId] = useState(null);
@@ -226,6 +234,7 @@ export default function AdminQuizPage() {
     const validation = definitionError(form);
     if (validation) {
       setError(new Error(validation));
+      notifyAdminFailure(new Error(validation));
       return;
     }
     if (!editorRef.current?.reportValidity()) return;
@@ -251,6 +260,7 @@ export default function AdminQuizPage() {
     const validation = definitionError(form);
     if (validation) {
       setError(new Error(validation));
+      notifyAdminFailure(new Error(validation));
       return;
     }
     if (!editorRef.current?.reportValidity()) return;
@@ -292,15 +302,14 @@ export default function AdminQuizPage() {
 
   return (
     <section className="admin-quiz-page learning-admin-workspace">
-      <LearningHeader
+      <PageHeading
         title={t('Quản lý quiz')}
         description={t('Soạn câu hỏi, lưu bản nháp và xuất bản bài kiểm tra.')}
-        navigation={false}
       >
-        <Button variant="outlined" startIcon={<Add />} onClick={startNew} disabled={busy}>
+        <Button variant="outlined" startIcon={<Add />} onClick={startNew} disabled={busy || !writable}>
           {t('Quiz mới')}
         </Button>
-      </LearningHeader>
+      </PageHeading>
       {error && <ErrorState error={error} title={t('Không thể xử lý quiz')} />}
       {listError && (
         <ErrorState
@@ -322,236 +331,257 @@ export default function AdminQuizPage() {
           <h2>{t('Danh sách quiz')}</h2>
           {loading && <p>{t('Đang tải...')}</p>}
           {!loading && !listError && quizzes.length === 0 && <p>{t('Chưa có quiz.')}</p>}
-          {quizzes.map(quiz => (
-            <button
-              key={quiz.id}
-              type="button"
-              className={editingId === quiz.id ? 'is-selected' : ''}
-              onClick={() => selectQuiz(quiz.id)}
-              disabled={busy}
-            >
-              <strong>{t(quiz.title)}</strong>
-              <span>
-                {t('Khóa #')}
-                {quiz.courseId} · {quiz.published ? t('Đã xuất bản') : t('Bản nháp')}
-              </span>
-            </button>
-          ))}
+          {quizzes
+            .slice(
+              Math.min(listPage, Math.max(0, Math.ceil(quizzes.length / listSize) - 1)) * listSize,
+              (Math.min(listPage, Math.max(0, Math.ceil(quizzes.length / listSize) - 1)) + 1) * listSize,
+            )
+            .map(quiz => (
+              <button
+                key={quiz.id}
+                type="button"
+                className={editingId === quiz.id ? 'is-selected' : ''}
+                onClick={() => selectQuiz(quiz.id)}
+                disabled={busy}
+              >
+                <strong>{t(quiz.title)}</strong>
+                <span>
+                  {t('Khóa #')}
+                  {quiz.courseId} · {quiz.published ? t('Đã xuất bản') : t('Bản nháp')}
+                </span>
+              </button>
+            ))}
+          <CommercePager
+            data={{
+              content: quizzes.slice(listPage * listSize, (listPage + 1) * listSize),
+              totalElements: quizzes.length,
+              totalPages: Math.ceil(quizzes.length / listSize),
+            }}
+            page={Math.min(listPage, Math.max(0, Math.ceil(quizzes.length / listSize) - 1))}
+            size={listSize}
+            onChange={setListPage}
+            onSizeChange={value => {
+              setListSize(value);
+              setListPage(0);
+            }}
+          />
         </aside>
         <form ref={editorRef} className="quiz-editor" onSubmit={save}>
-          <div className="quiz-editor-heading">
-            <h2>{editingId ? `Quiz #${editingId}` : t('Tạo quiz')}</h2>
-            {published && <span className="learning-chip is-success">{t('Đã xuất bản')}</span>}
-          </div>
-          <div className="quiz-form-grid">
-            <TextField
-              label={t('Khóa học')}
-              select={courses.length > 0}
-              type={courses.length ? undefined : 'number'}
-              value={form.courseId}
-              onChange={event => setForm({ ...form, courseId: event.target.value })}
-              required
-              slotProps={{ htmlInput: { min: 1, step: 1 } }}
-              disabled={published || busy}
-            >
-              {courses.map(course => (
-                <MenuItem key={course.id} value={String(course.id)}>
-                  {course.title}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              label={t('Bài học (tùy chọn)')}
-              type="number"
-              slotProps={{ htmlInput: { min: 1 } }}
-              value={form.lessonId}
-              onChange={event => setForm({ ...form, lessonId: event.target.value })}
-              disabled={published || busy}
-            />
-            <TextField
-              label={t('Tên quiz')}
-              value={form.title}
-              required
-              slotProps={{ htmlInput: { maxLength: 255 } }}
-              onChange={event => setForm({ ...form, title: event.target.value })}
-              disabled={published || busy}
-            />
-            <TextField
-              label={t('Điểm đạt (%)')}
-              type="number"
-              slotProps={{ htmlInput: { min: 0, max: 100 } }}
-              value={form.passingScore}
-              onChange={event => setForm({ ...form, passingScore: event.target.value })}
-              required
-              disabled={published || busy}
-            />
-            <TextField
-              label={t('Giới hạn thời gian (phút)')}
-              type="number"
-              slotProps={{ htmlInput: { min: 1 } }}
-              value={form.timeLimitMinutes}
-              onChange={event => setForm({ ...form, timeLimitMinutes: event.target.value })}
-              disabled={published || busy}
-            />
-            <TextField
-              label={t('Mô tả')}
-              multiline
-              rows={2}
-              slotProps={{ htmlInput: { maxLength: 1000 } }}
-              value={form.description}
-              onChange={event => setForm({ ...form, description: event.target.value })}
-              disabled={published || busy}
-            />
-          </div>
-          <div className="quiz-editor-heading">
-            <h3>{t('Câu hỏi')}</h3>
-          </div>
-          {form.questions.map((question, questionIndex) => (
-            <fieldset className="quiz-question-editor" key={questionIndex} disabled={published || busy}>
-              <legend>
-                {t('Câu')} {questionIndex + 1}
-              </legend>
-              <div className="quiz-form-grid">
-                <TextField
-                  label={t('Nội dung câu hỏi')}
-                  value={question.questionText}
-                  required
-                  slotProps={{ htmlInput: { maxLength: 1000 } }}
-                  onChange={event =>
-                    updateQuestion(questionIndex, { ...question, questionText: event.target.value })
-                  }
-                />
-                <TextField
-                  select
-                  label={t('Loại câu hỏi')}
-                  value={question.questionType}
-                  onChange={event =>
-                    updateQuestion(questionIndex, {
-                      ...question,
-                      questionType: event.target.value,
-                      options:
-                        event.target.value === 'SINGLE_CHOICE'
-                          ? question.options.map((option, index) => ({
-                              ...option,
-                              correct: index === question.options.findIndex(item => item.correct),
-                            }))
-                          : question.options,
-                    })
-                  }
-                >
-                  <MenuItem value="SINGLE_CHOICE">{t('Một đáp án')}</MenuItem>
-                  <MenuItem value="MULTIPLE_CHOICE">{t('Nhiều đáp án')}</MenuItem>
-                </TextField>
-                <TextField
-                  label={t('Điểm')}
-                  type="number"
-                  slotProps={{ htmlInput: { min: 1 } }}
-                  value={question.points}
-                  onChange={event =>
-                    updateQuestion(questionIndex, { ...question, points: event.target.value })
-                  }
-                />
-              </div>
-              <div className="quiz-option-list">
-                {question.options.map((option, optionIndex) => (
-                  <div className="quiz-option-editor" key={optionIndex}>
-                    <FormControlLabel
-                      label={t('Đúng')}
-                      control={
-                        <Checkbox
-                          checked={option.correct}
-                          onChange={event =>
-                            updateOption(questionIndex, optionIndex, { correct: event.target.checked })
-                          }
-                        />
-                      }
-                    />
-                    <TextField
-                      label={`Đáp án ${optionIndex + 1}`}
-                      value={option.optionText}
-                      required
-                      slotProps={{ htmlInput: { maxLength: 1000 } }}
-                      onChange={event =>
-                        updateOption(questionIndex, optionIndex, { optionText: event.target.value })
-                      }
-                    />
-                    <Button
-                      aria-label={`Xóa đáp án ${optionIndex + 1}`}
-                      disabled={question.options.length <= 2}
-                      onClick={() =>
-                        updateQuestion(questionIndex, {
-                          ...question,
-                          options: question.options.filter((_, index) => index !== optionIndex),
-                        })
-                      }
-                    >
-                      <DeleteOutlined />
-                    </Button>
-                  </div>
+          <fieldset className="quiz-permission-editor" disabled={!writable}>
+            <div className="quiz-editor-heading">
+              <h2>{editingId ? `Quiz #${editingId}` : t('Tạo quiz')}</h2>
+              {published && <span className="learning-chip is-success">{t('Đã xuất bản')}</span>}
+            </div>
+            <div className="quiz-form-grid">
+              <TextField
+                label={t('Khóa học')}
+                select={courses.length > 0}
+                type={courses.length ? undefined : 'number'}
+                value={form.courseId}
+                onChange={event => setForm({ ...form, courseId: event.target.value })}
+                required
+                slotProps={{ htmlInput: { min: 1, step: 1 } }}
+                disabled={published || busy}
+              >
+                {courses.map(course => (
+                  <MenuItem key={course.id} value={String(course.id)}>
+                    {course.title}
+                  </MenuItem>
                 ))}
-              </div>
+              </TextField>
+              <TextField
+                label={t('Bài học (tùy chọn)')}
+                type="number"
+                slotProps={{ htmlInput: { min: 1 } }}
+                value={form.lessonId}
+                onChange={event => setForm({ ...form, lessonId: event.target.value })}
+                disabled={published || busy}
+              />
+              <TextField
+                label={t('Tên quiz')}
+                value={form.title}
+                required
+                slotProps={{ htmlInput: { maxLength: 255 } }}
+                onChange={event => setForm({ ...form, title: event.target.value })}
+                disabled={published || busy}
+              />
+              <TextField
+                label={t('Điểm đạt (%)')}
+                type="number"
+                slotProps={{ htmlInput: { min: 0, max: 100 } }}
+                value={form.passingScore}
+                onChange={event => setForm({ ...form, passingScore: event.target.value })}
+                required
+                disabled={published || busy}
+              />
+              <TextField
+                label={t('Giới hạn thời gian (phút)')}
+                type="number"
+                slotProps={{ htmlInput: { min: 1 } }}
+                value={form.timeLimitMinutes}
+                onChange={event => setForm({ ...form, timeLimitMinutes: event.target.value })}
+                disabled={published || busy}
+              />
+              <TextField
+                label={t('Mô tả')}
+                multiline
+                rows={2}
+                slotProps={{ htmlInput: { maxLength: 1000 } }}
+                value={form.description}
+                onChange={event => setForm({ ...form, description: event.target.value })}
+                disabled={published || busy}
+              />
+            </div>
+            <div className="quiz-editor-heading">
+              <h3>{t('Câu hỏi')}</h3>
+            </div>
+            {form.questions.map((question, questionIndex) => (
+              <fieldset className="quiz-question-editor" key={questionIndex} disabled={published || busy}>
+                <legend>
+                  {t('Câu')} {questionIndex + 1}
+                </legend>
+                <div className="quiz-form-grid">
+                  <TextField
+                    label={t('Nội dung câu hỏi')}
+                    value={question.questionText}
+                    required
+                    slotProps={{ htmlInput: { maxLength: 1000 } }}
+                    onChange={event =>
+                      updateQuestion(questionIndex, { ...question, questionText: event.target.value })
+                    }
+                  />
+                  <TextField
+                    select
+                    label={t('Loại câu hỏi')}
+                    value={question.questionType}
+                    onChange={event =>
+                      updateQuestion(questionIndex, {
+                        ...question,
+                        questionType: event.target.value,
+                        options:
+                          event.target.value === 'SINGLE_CHOICE'
+                            ? question.options.map((option, index) => ({
+                                ...option,
+                                correct: index === question.options.findIndex(item => item.correct),
+                              }))
+                            : question.options,
+                      })
+                    }
+                  >
+                    <MenuItem value="SINGLE_CHOICE">{t('Một đáp án')}</MenuItem>
+                    <MenuItem value="MULTIPLE_CHOICE">{t('Nhiều đáp án')}</MenuItem>
+                  </TextField>
+                  <TextField
+                    label={t('Điểm')}
+                    type="number"
+                    slotProps={{ htmlInput: { min: 1 } }}
+                    value={question.points}
+                    onChange={event =>
+                      updateQuestion(questionIndex, { ...question, points: event.target.value })
+                    }
+                  />
+                </div>
+                <div className="quiz-option-list">
+                  {question.options.map((option, optionIndex) => (
+                    <div className="quiz-option-editor" key={optionIndex}>
+                      <FormControlLabel
+                        label={t('Đúng')}
+                        control={
+                          <Checkbox
+                            checked={option.correct}
+                            onChange={event =>
+                              updateOption(questionIndex, optionIndex, { correct: event.target.checked })
+                            }
+                          />
+                        }
+                      />
+                      <TextField
+                        label={`Đáp án ${optionIndex + 1}`}
+                        value={option.optionText}
+                        required
+                        slotProps={{ htmlInput: { maxLength: 1000 } }}
+                        onChange={event =>
+                          updateOption(questionIndex, optionIndex, { optionText: event.target.value })
+                        }
+                      />
+                      <Button
+                        aria-label={`Xóa đáp án ${optionIndex + 1}`}
+                        disabled={question.options.length <= 2}
+                        onClick={() =>
+                          updateQuestion(questionIndex, {
+                            ...question,
+                            options: question.options.filter((_, index) => index !== optionIndex),
+                          })
+                        }
+                      >
+                        <DeleteOutlined />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="quiz-editor-actions">
+                  <Button
+                    startIcon={<Add />}
+                    onClick={() =>
+                      updateQuestion(questionIndex, {
+                        ...question,
+                        options: [...question.options, blankOption()],
+                      })
+                    }
+                  >
+                    {t('Đáp án')}
+                  </Button>
+                  <Button
+                    color="error"
+                    startIcon={<DeleteOutlined />}
+                    disabled={form.questions.length <= 1}
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        questions: form.questions.filter((_, index) => index !== questionIndex),
+                      })
+                    }
+                  >
+                    {t('Xóa câu hỏi')}
+                  </Button>
+                </div>
+              </fieldset>
+            ))}
+            {!published && (
               <div className="quiz-editor-actions">
                 <Button
                   startIcon={<Add />}
-                  onClick={() =>
-                    updateQuestion(questionIndex, {
-                      ...question,
-                      options: [...question.options, blankOption()],
-                    })
-                  }
+                  disabled={busy}
+                  onClick={() => setForm({ ...form, questions: [...form.questions, blankQuestion()] })}
                 >
-                  {t('Đáp án')}
+                  {t('Thêm câu hỏi')}
                 </Button>
-                <Button
-                  color="error"
-                  startIcon={<DeleteOutlined />}
-                  disabled={form.questions.length <= 1}
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      questions: form.questions.filter((_, index) => index !== questionIndex),
-                    })
-                  }
-                >
-                  {t('Xóa câu hỏi')}
+                <Button type="submit" variant="contained" startIcon={<SaveOutlined />} disabled={busy}>
+                  {editingId ? t('Lưu thay đổi') : t('Tạo bản nháp')}
                 </Button>
-              </div>
-            </fieldset>
-          ))}
-          {!published && (
-            <div className="quiz-editor-actions">
-              <Button
-                startIcon={<Add />}
-                disabled={busy}
-                onClick={() => setForm({ ...form, questions: [...form.questions, blankQuestion()] })}
-              >
-                {t('Thêm câu hỏi')}
-              </Button>
-              <Button type="submit" variant="contained" startIcon={<SaveOutlined />} disabled={busy}>
-                {editingId ? t('Lưu thay đổi') : t('Tạo bản nháp')}
-              </Button>
-              <Button
-                type="button"
-                variant="outlined"
-                startIcon={<PublishOutlined />}
-                onClick={publish}
-                disabled={!editingId || busy}
-              >
-                {t('Xuất bản')}
-              </Button>
-              {editingId && (
                 <Button
                   type="button"
-                  color="error"
-                  startIcon={<DeleteOutlined />}
-                  onClick={() => setConfirmDelete(true)}
-                  disabled={busy}
+                  variant="outlined"
+                  startIcon={<PublishOutlined />}
+                  onClick={publish}
+                  disabled={!editingId || busy}
                 >
-                  {t('Xóa bản nháp')}
+                  {t('Xuất bản')}
                 </Button>
-              )}
-            </div>
-          )}
+                {editingId && (
+                  <Button
+                    type="button"
+                    color="error"
+                    startIcon={<DeleteOutlined />}
+                    onClick={() => setConfirmDelete(true)}
+                    disabled={busy}
+                  >
+                    {t('Xóa bản nháp')}
+                  </Button>
+                )}
+              </div>
+            )}
+          </fieldset>
         </form>
       </div>
       <ConfirmDialog

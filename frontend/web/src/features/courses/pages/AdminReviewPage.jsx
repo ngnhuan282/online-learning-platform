@@ -5,6 +5,7 @@ import { useParams, Link } from 'react-router-dom';
 import { courseApi } from '../api/courseApi';
 import { reviewApi } from '../api/reviewApi';
 import StarRating from '../components/StarRating';
+import { notifyAdminFailure } from '../../../shared/utils/adminFeedback';
 
 export default function AdminReviewPage() {
   useLocale();
@@ -113,11 +114,7 @@ function ReviewsManager({ initialCourseId }) {
       }
       await loadData(pagination.page, selectedCourseId);
     } catch (err) {
-      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-        window.alert(err?.response?.data?.message || 'Thao tác thất bại');
-      } else {
-        console.error(err?.response?.data?.message || 'Thao tác thất bại');
-      }
+      notifyAdminFailure(err);
     } finally {
       setActionLoading(null);
     }

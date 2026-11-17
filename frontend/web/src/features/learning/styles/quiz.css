@@ -189,7 +189,9 @@
   padding: 24px;
   margin: 0;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
   width: 100%;
   box-sizing: border-box;
 }
@@ -633,4 +635,12 @@
     grid-column: 2;
     text-align: left;
   }
+}
+.quiz-permission-editor {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 20px;
 }

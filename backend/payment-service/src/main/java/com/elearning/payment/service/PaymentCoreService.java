@@ -49,6 +49,7 @@ public class PaymentCoreService {
     private final LearningEnrollmentClient learning;
     private final VnpayGateway vnpay;
     private final PaymentProviderPolicy providers;
+    private final ProPlanService proPlans;
 
     public PaymentCoreService(
         CourseOrderRepository orders,
@@ -57,7 +58,8 @@ public class PaymentCoreService {
         CourseSnapshotProvider courses,
         LearningEnrollmentClient learning,
         VnpayGateway vnpay,
-        PaymentProviderPolicy providers
+        PaymentProviderPolicy providers,
+        ProPlanService proPlans
     ) {
         this.orders = orders;
         this.payments = payments;
@@ -66,6 +68,7 @@ public class PaymentCoreService {
         this.learning = learning;
         this.vnpay = vnpay;
         this.providers = providers;
+        this.proPlans = proPlans;
     }
 
     @Transactional
@@ -101,13 +104,110 @@ public class PaymentCoreService {
                 course.price()
             )
         );
+        return persistCheckout(
+            order,
+            provider,
+            course.price(),
+            course.currency(),
+            request.returnUrl(),
+            request.cancelUrl(),
+            clientIp
+        );
+    }
+
+    @Transactional
+    public CheckoutResponse createProCheckout(
+        ProPaymentModels.CheckoutRequest request,
+        Long userId,
+        String clientIp
+    ) {
+        PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        if (provider == PaymentProvider.VNPAY) vnpay.requireAvailable();
+        else providers.requireAvailable(provider);
+        CourseOrder existing = orders
+            .findByUserIdAndIdempotencyKey(userId, request.idempotencyKey().strip())
+            .orElse(null);
+        if (existing != null) return existingProCheckout(existing, request.planCode(), provider);
+        var plan = proPlans.requirePlan(request.planCode());
+        CourseOrder order = new CourseOrder(
+            generateOrderCode(),
+            userId,
+            request.idempotencyKey().strip(),
+            plan.price(),
+            "VND",
+            Instant.now().plusSeconds((provider == PaymentProvider.VNPAY ? vnpay.expireMinutes() : 15) * 60L)
+        );
+        order.assignProPlan(plan.code(), plan.durationMonths());
+        order.addItem(
+            new OrderItem(
+                null,
+                plan.name(),
+                plan.originalPrice(),
+                plan.originalPrice().subtract(plan.price()),
+                plan.price()
+            )
+        );
+        return persistCheckout(
+            order,
+            provider,
+            plan.price(),
+            "VND",
+            request.returnUrl(),
+            request.cancelUrl(),
+            clientIp
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CheckoutResponse> findExistingProCheckout(
+        ProPaymentModels.CheckoutRequest request,
+        Long userId
+    ) {
+        PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        return orders
+            .findByUserIdAndIdempotencyKey(userId, request.idempotencyKey().strip())
+            .map(order -> existingProCheckout(order, request.planCode(), provider));
+    }
+
+    private CheckoutResponse existingProCheckout(
+        CourseOrder order,
+        String planCode,
+        PaymentProvider provider
+    ) {
+        Payment payment = latestPayment(order);
+        if (
+            !order.isPro() ||
+            !planCode.equals(order.getPlanCode()) ||
+            payment == null ||
+            payment.getProvider() != provider
+        ) {
+            throw new AppException(ErrorCode.CONFLICT);
+        }
+        requireUnexpiredCheckout(order, payment);
+        return new CheckoutResponse(
+            order.getOrderCode(),
+            toOrderResponse(order, payment),
+            toPaymentSummary(payment),
+            payment.getCheckoutUrl()
+        );
+    }
+
+    private CheckoutResponse persistCheckout(
+        CourseOrder order,
+        PaymentProvider provider,
+        BigDecimal amount,
+        String currency,
+        String returnUrl,
+        String cancelUrl,
+        String clientIp
+    ) {
         orders.saveAndFlush(order);
 
-        Payment payment = new Payment(order, provider, course.price(), course.currency());
+        Payment payment = new Payment(order, provider, amount, currency);
         payment.assignCheckoutUrl(
             provider == PaymentProvider.VNPAY
                 ? vnpay.createUrl(order, clientIp)
-                : buildCheckoutUrl(provider, request.returnUrl(), request.cancelUrl(), order.getOrderCode())
+                : buildCheckoutUrl(provider, returnUrl, cancelUrl, order.getOrderCode())
         );
         payments.saveAndFlush(payment);
         transactions.saveAndFlush(
@@ -142,6 +242,7 @@ public class PaymentCoreService {
         Long requestedCourseId,
         PaymentProvider requestedProvider
     ) {
+        if (order.isPro()) throw new AppException(ErrorCode.CONFLICT);
         OrderItem item = firstItem(order);
         Payment payment = latestPayment(order);
         if (
@@ -152,6 +253,16 @@ public class PaymentCoreService {
         ) {
             throw new AppException(ErrorCode.CONFLICT);
         }
+        requireUnexpiredCheckout(order, payment);
+        return new CheckoutResponse(
+            order.getOrderCode(),
+            toOrderResponse(order, payment),
+            toPaymentSummary(payment),
+            payment.getCheckoutUrl()
+        );
+    }
+
+    private void requireUnexpiredCheckout(CourseOrder order, Payment payment) {
         if (
             payment.getProvider() == PaymentProvider.VNPAY &&
             payment.getStatus() == PaymentStatus.PENDING &&
@@ -160,12 +271,6 @@ public class PaymentCoreService {
         ) {
             throw new AppException(ErrorCode.CHECKOUT_EXPIRED);
         }
-        return new CheckoutResponse(
-            order.getOrderCode(),
-            toOrderResponse(order, payment),
-            toPaymentSummary(payment),
-            payment.getCheckoutUrl()
-        );
     }
 
     @Transactional
@@ -322,6 +427,9 @@ public class PaymentCoreService {
         if (nextStatus == PaymentStatus.SUCCESS) {
             enrollPaidCourse(order);
         }
+        if (nextStatus == PaymentStatus.REFUNDED && order.isPro()) {
+            learning.revokePro(order.getOrderCode(), order.getUserId());
+        }
 
         String transactionCode =
             providerTransactionCode == null
@@ -346,6 +454,15 @@ public class PaymentCoreService {
     }
 
     private void enrollPaidCourse(CourseOrder order) {
+        if (order.isPro()) {
+            learning.grantPro(
+                order.getOrderCode(),
+                order.getUserId(),
+                order.getPlanCode(),
+                order.getPlanDurationMonths()
+            );
+            return;
+        }
         OrderItem item = firstItem(order);
         if (item == null) {
             throw new AppException(ErrorCode.CONFLICT);
@@ -445,7 +562,9 @@ public class PaymentCoreService {
             payment == null ? null : toPaymentSummary(payment),
             order.getExpiresAt(),
             order.getCreatedAt(),
-            order.getUpdatedAt()
+            order.getUpdatedAt(),
+            order.getProductType(),
+            order.getPlanCode()
         );
     }
 

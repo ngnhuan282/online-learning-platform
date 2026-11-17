@@ -76,7 +76,11 @@ export default function AchievementsPage() {
           </div>
           <article className="workspace-card level-card">
             <h2>
-              <LearnerAvatar name={data.displayName} frame={data.activeFrame} />{' '}
+              <LearnerAvatar
+                name={data.displayName}
+                frame={data.activeFrame}
+                assetKey={data.activeFrameAssetKey}
+              />{' '}
               {t('Cấp độ {level}', { level: data.level })}
             </h2>
             <progress max={data.xpPerLevel} value={data.xpInLevel} aria-label={t('Cấp độ')} />
@@ -137,9 +141,9 @@ export default function AchievementsPage() {
                 key={reward.code}
               >
                 <span className="reward-icon" aria-hidden="true">
-                  {rewards[reward.code]?.[0]}
+                  {rewards[reward.code]?.[0] || '🏅'}
                 </span>
-                <h3>{t(rewards[reward.code]?.[1] || reward.code)}</h3>
+                <h3>{t(reward.label || rewards[reward.code]?.[1] || reward.code)}</h3>
                 <p>💎 +{reward.gems}</p>
                 <button
                   className="button button-primary"
@@ -169,10 +173,19 @@ export default function AchievementsPage() {
             <h2>{t('Quy tắc tính điểm')}</h2>
             <p>
               {t(
-                'Hoàn thành bài học lần đầu: +20 XP. Nộp quiz có trả lời lần đầu: +10 XP. Mỗi 100 XP lên một cấp.',
+                'Hoàn thành bài học lần đầu: +{lessonXp} XP. Nộp quiz có trả lời lần đầu: +{quizXp} XP. Mỗi {xpPerLevel} XP lên một cấp.',
+                {
+                  lessonXp: data.lessonXp ?? 20,
+                  quizXp: data.quizXp ?? 10,
+                  xpPerLevel: data.xpPerLevel ?? 100,
+                },
               )}
             </p>
-            <p>{t('Mỗi ngày có hoạt động học hợp lệ nhận 25 kim cương, tối đa một lần mỗi ngày.')}</p>
+            <p>
+              {t('Mỗi ngày có hoạt động học hợp lệ nhận {gems} kim cương, tối đa một lần mỗi ngày.', {
+                gems: data.dailyGems ?? 25,
+              })}
+            </p>
             <p>
               {t(
                 'Ngày học tính theo giờ Việt Nam. Làm lại quiz có trả lời vẫn duy trì streak, nhưng không cộng lại XP. Kim cương là phần thưởng trong ứng dụng.',

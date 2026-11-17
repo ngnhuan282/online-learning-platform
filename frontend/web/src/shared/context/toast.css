@@ -1,0 +1,92 @@
+.app-toast-stack {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 2000;
+  display: grid;
+  gap: 12px;
+  width: min(410px, calc(100vw - 24px));
+  pointer-events: none;
+}
+.app-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: hidden;
+  padding: 16px 14px 19px 16px;
+  border: 1px solid;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px #14233c1a;
+  pointer-events: auto;
+  animation: toast-enter 0.18s ease-out;
+}
+.app-toast--success {
+  background: #effbf3;
+  border-color: #bce5cb;
+  color: #166534;
+}
+.app-toast--error {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
+}
+.app-toast-icon {
+  display: flex;
+  padding-top: 2px;
+}
+.app-toast-content {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.app-toast-content strong {
+  display: block;
+  font-weight: 700;
+}
+.app-toast-content p {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+.app-toast .MuiIconButton-root {
+  color: inherit;
+  margin: -4px -4px 0 0;
+}
+.app-toast-countdown {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: currentColor;
+  opacity: 0.65;
+  transform-origin: left;
+  animation: toast-countdown linear forwards;
+}
+@keyframes toast-countdown {
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 600px) {
+  .app-toast-stack {
+    top: 12px;
+    right: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-toast {
+    animation: none;
+  }
+}

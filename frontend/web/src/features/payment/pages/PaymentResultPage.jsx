@@ -10,6 +10,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { formatCurrency } from '../../../shared/utils/formatCurrency';
 import { paymentApi } from '../api/paymentApi';
 import { learningApi } from '../../learning/api/learningApi';
+import { notifyProChanged } from '../../pro/api/proApi';
 import { getPaymentDisplayStatus, getResumePaymentUrl, needsPaymentRefresh } from '../utils/paymentFlow';
 import '../styles/payment.css';
 
@@ -98,7 +99,13 @@ export default function PaymentResultPage() {
         const response = await paymentApi.getOrder(orderCode);
         if (!active) return;
         setRemoteResult({ orderCode, order: response.data, error: null });
-        if (response.data.payment?.status === 'SUCCESS' && response.data.payment.provider === 'MOCK') {
+        if (response.data.productType === 'PRO' && response.data.payment?.status === 'SUCCESS')
+          notifyProChanged();
+        if (
+          response.data.productType !== 'PRO' &&
+          response.data.payment?.status === 'SUCCESS' &&
+          response.data.payment.provider === 'MOCK'
+        ) {
           try {
             const enrollments = await learningApi.getMyEnrollments();
             if (active)
@@ -213,14 +220,21 @@ export default function PaymentResultPage() {
   }
 
   const paymentStatus = getPaymentDisplayStatus(order);
-  const copy = paymentTone(paymentStatus, order.payment.provider);
+  const isPro = order.productType === 'PRO';
+  const copy = { ...paymentTone(paymentStatus, order.payment.provider) };
+  if (isPro && paymentStatus === 'SUCCESS')
+    copy.description = t('Thanh toán Pro đã được xác nhận. Bạn có thể xem hạn thành viên tại trang Pro.');
+  if (isPro && paymentStatus === 'FAILED')
+    copy.description = t('Giao dịch Pro chưa thành công. Bạn có thể chọn lại gói khi sẵn sàng.');
   const courseTitle = order.items?.[0]?.courseTitle || 'Khóa học';
   const amount = order.payment?.amount ?? order.totalAmount;
   const provider = order.payment?.provider;
-  const retryCheckoutUrl = `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
+  const retryCheckoutUrl = isPro
+    ? ROUTES.PRO
+    : `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = getResumePaymentUrl(order, window.location.origin);
   const enrollmentReady =
-    provider === 'VNPAY'
+    provider === 'VNPAY' || isPro
       ? order.payment.enrollmentReady === true
       : enrollmentState.orderCode === orderCode && enrollmentState.ready;
   const awaitingActivation = paymentStatus === 'SUCCESS' && !enrollmentReady;
@@ -232,10 +246,13 @@ export default function PaymentResultPage() {
     try {
       const response = await paymentApi.retryActivation(orderCode);
       setRemoteResult({ orderCode, order: response.data, error: null });
+      if (response.data.productType === 'PRO') notifyProChanged();
     } catch {
       setActivationError(
         new Error(
-          'Khóa học chưa thể kích hoạt lúc này. Thanh toán của bạn đã được ghi nhận, vui lòng thử lại sau.',
+          isPro
+            ? 'Pro chưa thể kích hoạt lúc này. Thanh toán đã được ghi nhận, vui lòng thử lại sau.'
+            : 'Khóa học chưa thể kích hoạt lúc này. Thanh toán của bạn đã được ghi nhận, vui lòng thử lại sau.',
         ),
       );
     } finally {
@@ -254,13 +271,22 @@ export default function PaymentResultPage() {
           <h1>{t(copy.title)}</h1>
           <p>
             {awaitingActivation
-              ? t('Thanh toán đã thành công. Đang chờ quyền học được đồng bộ, bạn không cần thanh toán lại.')
+              ? t(
+                  isPro
+                    ? 'Thanh toán đã thành công. Đang chờ kích hoạt Pro, bạn không cần thanh toán lại.'
+                    : 'Thanh toán đã thành công. Đang chờ quyền học được đồng bộ, bạn không cần thanh toán lại.',
+                )
               : copy.description}
           </p>
           {error && (
             <ErrorState error={error} title={t('Chưa thể cập nhật kết quả')} onRetry={retryResultLoad} />
           )}
-          {activationError && <ErrorState error={activationError} title={t('Đang chờ kích hoạt khóa học')} />}
+          {activationError && (
+            <ErrorState
+              error={activationError}
+              title={t(isPro ? 'Đang chờ kích hoạt Pro' : 'Đang chờ kích hoạt khóa học')}
+            />
+          )}
           {awaitingActivation && enrollmentState.error && (
             <p role="status">{t('Chưa kiểm tra được quyền học. Vui lòng kiểm tra lại.')}</p>
           )}
@@ -271,8 +297,8 @@ export default function PaymentResultPage() {
               <dd>{order.orderCode}</dd>
             </div>
             <div>
-              <dt>{t('Khóa học')}</dt>
-              <dd>{courseTitle}</dd>
+              <dt>{t(isPro ? 'Gói Pro' : 'Khóa học')}</dt>
+              <dd>{isPro ? t(courseTitle) : courseTitle}</dd>
             </div>
             <div>
               <dt>{t('Số tiền')}</dt>
@@ -294,13 +320,13 @@ export default function PaymentResultPage() {
                 {activating
                   ? t('Đang kích hoạt...')
                   : provider === 'VNPAY'
-                    ? t('Thử kích hoạt khóa học')
+                    ? t(isPro ? 'Thử kích hoạt Pro' : 'Thử kích hoạt khóa học')
                     : t('Kiểm tra lại quyền học')}{' '}
                 <RefreshOutlined sx={{ fontSize: 17 }} />
               </button>
             ) : paymentStatus === 'SUCCESS' ? (
-              <Link className="button button-primary" to="/my-courses">
-                {t('Vào khu học tập')} <Icon name="arrow" size={17} />
+              <Link className="button button-primary" to={isPro ? ROUTES.PRO : '/my-courses'}>
+                {t(isPro ? 'Xem Pro của bạn' : 'Vào khu học tập')} <Icon name="arrow" size={17} />
               </Link>
             ) : paymentStatus === 'EXPIRED' ? (
               <>

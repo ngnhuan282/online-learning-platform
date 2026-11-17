@@ -295,6 +295,31 @@ test('failure and cancellation use distinct result copy', async () => {
   assert.match(document.body.textContent, /Bạn đã hủy thanh toán/);
 });
 
+test('successful Pro orders open membership management and never use a null course checkout', async () => {
+  const pro = {
+    ...order('SUCCESS', { provider: 'MOCK' }),
+    productType: 'PRO',
+    planCode: 'PRO_YEAR',
+    items: [{ courseId: null, courseTitle: 'ChitChatGo Pro · 1 năm' }],
+  };
+  await mount(pro);
+  assert.ok(document.querySelector('a[href="/pro"]'));
+  assert.equal(document.querySelector('a[href="/my-courses"]'), null);
+  assert.match(document.body.textContent, /Thanh toán Pro đã được xác nhận/);
+  assert.equal(document.body.textContent.includes('Đang chờ quyền học'), false);
+});
+
+test('failed Pro orders return to the plan page for a new checkout', async () => {
+  const pro = {
+    ...order('FAILED'),
+    productType: 'PRO',
+    items: [{ courseId: null, courseTitle: 'ChitChatGo Pro · 1 tháng' }],
+  };
+  await mount(pro);
+  assert.ok(document.querySelector('a[href="/pro"]'));
+  assert.equal(document.querySelector('a[href^="/checkout"]'), null);
+});
+
 test('result uses the plain VNPay name and preserves the Mock method label', async () => {
   await mount(order('CANCELLED'));
   assert.equal(document.querySelector('.result-details div:last-child dd').textContent, 'VNPay');

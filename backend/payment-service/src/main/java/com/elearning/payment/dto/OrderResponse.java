@@ -16,7 +16,9 @@ public record OrderResponse(
     PaymentSummaryResponse payment,
     Instant expiresAt,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    String productType,
+    String planCode
 ) {
     public OrderResponse {
         items = List.copyOf(items);

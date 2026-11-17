@@ -79,7 +79,12 @@ export default function LeaderboardPage() {
                   <tr key={entry.userId} className={entry.userId === data.me?.userId ? 'is-me' : ''}>
                     <td>{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}</td>
                     <td>
-                      <LearnerAvatar name={entry.displayName} frame={entry.activeFrame} size="small" />{' '}
+                      <LearnerAvatar
+                        name={entry.displayName}
+                        frame={entry.activeFrame}
+                        assetKey={entry.activeFrameAssetKey}
+                        size="small"
+                      />{' '}
                       {entry.displayName} {entry.userId === data.me?.userId && <small>({t('Bạn')})</small>}
                     </td>
                     <td>{entry.level}</td>

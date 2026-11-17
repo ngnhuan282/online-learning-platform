@@ -43,12 +43,21 @@ public class PaidCourseActivationService {
             throw new AppException(ErrorCode.CONFLICT);
         }
         if (payment.getEnrollmentActivatedAt() != null) return;
-        var item = order
-            .getItems()
-            .stream()
-            .min(Comparator.comparing(OrderItem::getId))
-            .orElseThrow(() -> new AppException(ErrorCode.CONFLICT));
-        learning.enroll(orderCode, order.getUserId(), item.getCourseId());
+        if (order.isPro()) {
+            learning.grantPro(
+                orderCode,
+                order.getUserId(),
+                order.getPlanCode(),
+                order.getPlanDurationMonths()
+            );
+        } else {
+            var item = order
+                .getItems()
+                .stream()
+                .min(Comparator.comparing(OrderItem::getId))
+                .orElseThrow(() -> new AppException(ErrorCode.CONFLICT));
+            learning.enroll(orderCode, order.getUserId(), item.getCourseId());
+        }
         payment.markEnrollmentActivated();
     }
 }

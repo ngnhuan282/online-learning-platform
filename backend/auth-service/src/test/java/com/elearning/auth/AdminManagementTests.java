@@ -23,6 +23,60 @@ import tools.jackson.databind.json.JsonMapper;
 @ActiveProfiles("test")
 class AdminManagementTests {
 
+    @Test
+    void commercePermissionsAreCataloguedAndAddViewDependenciesToCustomRoles() throws Exception {
+        String admin = token(user("ADMIN"), "ADMIN");
+        var catalog = data(request("GET", "/admin/permissions", admin, null));
+        Set<String> codes = new HashSet<>();
+        catalog.forEach(row -> codes.add(row.get("code").asString()));
+        assertThat(codes).contains(
+            "SHOP_VIEW",
+            "GEM_ADJUST",
+            "XP_ADJUST",
+            "STREAK_ADJUST",
+            "PRO_PLAN_UPDATE",
+            "PRO_MEMBER_MANAGE",
+            "PRO_CODE_REVOKE",
+            "COMMUNITY_MODERATE"
+        );
+        var saved = data(
+            request(
+                "POST",
+                "/admin/roles",
+                admin,
+                Map.of(
+                    "name",
+                    "COMMERCE_" + System.nanoTime(),
+                    "label",
+                    "Commerce support",
+                    "description",
+                    "Scoped operations",
+                    "version",
+                    0,
+                    "permissions",
+                    List.of("GEM_ADJUST", "PRO_CODE_CREATE", "PRO_PLAN_UPDATE")
+                )
+            )
+        );
+        Set<String> assigned = new HashSet<>();
+        saved.get("permissions").forEach(value -> assigned.add(value.asString()));
+        assertThat(assigned).contains(
+            "ADMIN_ACCESS",
+            "ENGAGEMENT_VIEW",
+            "GEM_ADJUST",
+            "PRO_CODE_VIEW",
+            "PRO_CODE_CREATE",
+            "PRO_PLAN_VIEW",
+            "PRO_PLAN_UPDATE"
+        );
+        assertThat(assigned).doesNotContain(
+            "XP_ADJUST",
+            "ROLE_MANAGE",
+            "USER_ROLES_ASSIGN",
+            "PRO_MEMBER_MANAGE"
+        );
+    }
+
     static final String SECRET = UUID.randomUUID().toString() + UUID.randomUUID();
 
     @DynamicPropertySource
@@ -269,7 +323,8 @@ class AdminManagementTests {
                 "USER",
                 "label",
                 userRole.getLabel(),
-                "permissions", List.of("ADMIN_ACCESS", "AUDIT_VIEW"),
+                "permissions",
+                List.of("ADMIN_ACCESS", "AUDIT_VIEW"),
                 "version",
                 userRole.getVersion()
             )
@@ -278,10 +333,17 @@ class AdminManagementTests {
         try {
             assertThat(request("PUT", path, existingToken, payload).statusCode()).isEqualTo(403);
             assertThat(request("PUT", path, admin, payload).statusCode()).isEqualTo(403);
-            userRole.update(userRole.getLabel(), userRole.getDescription(), Set.of("ADMIN_ACCESS", "AUDIT_VIEW"));
+            userRole.update(
+                userRole.getLabel(),
+                userRole.getDescription(),
+                Set.of("ADMIN_ACCESS", "AUDIT_VIEW")
+            );
             roles.saveAndFlush(userRole);
-            assertThat(data(request("GET", "/users/me", existingToken, null)).get("permissions").size())
-                .isZero();
+            assertThat(
+                data(request("GET", "/users/me", existingToken, null))
+                    .get("permissions")
+                    .size()
+            ).isZero();
             assertThat(request("GET", "/admin/overview", existingToken, null).statusCode()).isEqualTo(403);
             assertThat(request("GET", "/admin/audit", existingToken, null).statusCode()).isEqualTo(403);
 

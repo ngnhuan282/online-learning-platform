@@ -12,6 +12,7 @@ import {
   ShoppingBagOutlined,
   LeaderboardOutlined,
   ForumOutlined,
+  WorkspacePremiumOutlined,
 } from '@mui/icons-material';
 import useAuth from '../../features/auth/hooks/useAuth';
 import { ROUTES } from '../constants/routes';
@@ -52,6 +53,7 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
           name={user.fullName}
           avatarUrl={user.avatarUrl}
           frame={summary?.activeFrame}
+          assetKey={summary?.activeFrameAssetKey}
           level={summary?.level}
           size="header"
           showLevel
@@ -101,6 +103,12 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
             <ShoppingBagOutlined fontSize="small" />
           </ListItemIcon>
           <ListItemText>{t('Cửa hàng & kho đồ')}</ListItemText>
+        </MenuItem>
+        <MenuItem component={Link} to={ROUTES.PRO} onClick={() => setAnchor(null)}>
+          <ListItemIcon>
+            <WorkspacePremiumOutlined fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>{t('Gói Pro của bạn')}</ListItemText>
         </MenuItem>
         <MenuItem component={Link} to={ROUTES.LEADERBOARD} onClick={() => setAnchor(null)}>
           <ListItemIcon>

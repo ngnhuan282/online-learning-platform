@@ -139,6 +139,32 @@ class VnpayIntegrationTests {
             .compact();
     }
 
+    @Test
+    void signedProIpnUsesPlanAmountAndActivatesMembershipSnapshot() throws Exception {
+        var response = request(
+            BASE + "/pro/checkout",
+            token(ownerId, "USER"),
+            "POST",
+            "{\"planCode\":\"PRO_YEAR\",\"provider\":\"VNPAY\",\"idempotencyKey\":\"" +
+                UUID.randomUUID() +
+                "\"}"
+        );
+        assertThat(response.statusCode()).isEqualTo(200);
+        var data = mapper.readTree(response.body()).path("data");
+        String orderCode = data.path("orderCode").asString();
+        var fields = callback(orderCode, "00", "00");
+        fields.put("vnp_Amount", "100");
+        assertThat(ipn(signed(fields))).isEqualTo("04");
+        then(learning).should(never()).grantPro(anyString(), anyLong(), anyString(), anyInt());
+        fields.put("vnp_Amount", "49900000");
+        String valid = signed(fields);
+        assertThat(ipn(valid)).isEqualTo("00");
+        assertThat(ipn(valid)).isEqualTo("02");
+        then(learning).should().grantPro(orderCode, ownerId, "PRO_YEAR", 12);
+        then(learning).should(never()).enroll(anyString(), anyLong(), anyLong());
+        assertThat(core.getOrder(orderCode, ownerId, false).payment().enrollmentReady()).isTrue();
+    }
+
     HttpRequest http(String path, String access, String method, String body) {
         var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
         if (access != null) builder.header("Authorization", "Bearer " + access);

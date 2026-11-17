@@ -1,0 +1,14 @@
+INSERT INTO permissions(code) VALUES
+('SHOP_VIEW'), ('SHOP_CREATE'), ('SHOP_UPDATE'),
+('INVENTORY_VIEW'), ('INVENTORY_MANAGE'),
+('ENGAGEMENT_VIEW'), ('GEM_ADJUST'), ('XP_ADJUST'), ('STREAK_ADJUST'),
+('ENGAGEMENT_CONFIG_VIEW'), ('ENGAGEMENT_CONFIG_UPDATE'),
+('PRO_PLAN_VIEW'), ('PRO_PLAN_UPDATE'), ('PRO_MEMBER_VIEW'), ('PRO_MEMBER_MANAGE'),
+('PRO_CODE_VIEW'), ('PRO_CODE_CREATE'), ('PRO_CODE_REVOKE'),
+('COMMUNITY_VIEW'), ('COMMUNITY_MODERATE'), ('QUIZ_VIEW'), ('QUIZ_MANAGE'),
+('NOTIFICATION_VIEW'), ('NOTIFICATION_MANAGE');
+INSERT INTO role_permissions(role_id, permission_code)
+SELECT r.id, p.code FROM roles r CROSS JOIN permissions p
+WHERE r.name = 'ADMIN' AND NOT EXISTS (
+    SELECT 1 FROM role_permissions rp WHERE rp.role_id = r.id AND rp.permission_code = p.code
+);

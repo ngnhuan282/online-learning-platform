@@ -15,7 +15,6 @@ import useAuth from '../../auth/hooks/useAuth';
 import { PageHeading, StatCard, LoadState } from '../../admin/components/AdminUi';
 import { date, money, number } from '../../admin/utils/adminUtils';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
-import useToast from '../../../shared/hooks/useToast';
 import { paymentApi } from '../api/paymentApi';
 import { getPaymentDisplayStatus } from '../utils/paymentFlow';
 import '../styles/payment-admin.css';
@@ -104,7 +103,6 @@ export default function AdminPaymentDetailPage() {
   useLocale();
   const { orderCode } = useParams();
   const { user } = useAuth();
-  const toast = useToast();
   const [state, setState] = useState({ loading: true, data: null, error: null });
   const [retry, setRetry] = useState(0);
   const [form, setForm] = useState({ status: '', note: '' });
@@ -166,7 +164,6 @@ export default function AdminPaymentDetailPage() {
       setState({ loading: false, data: response.data, error: null });
       setForm({ status: '', note: '' });
       setStatusConfirmOpen(false);
-      toast('Đã cập nhật trạng thái giao dịch.');
     } catch (error) {
       setStatusConfirmOpen(false);
       setMutationError(error);
@@ -320,7 +317,9 @@ export default function AdminPaymentDetailPage() {
           <section className="admin-card">
             <div className="admin-card-heading">
               <div>
-                <h2>{t('Khóa học trong giao dịch')}</h2>
+                <h2>
+                  {t(order.productType === 'PRO' ? 'Gói Pro trong giao dịch' : 'Khóa học trong giao dịch')}
+                </h2>
                 <p>{t('Dữ liệu khóa học được lưu tại thời điểm học viên tạo thanh toán.')}</p>
               </div>
             </div>
@@ -336,7 +335,7 @@ export default function AdminPaymentDetailPage() {
                 </thead>
                 <tbody>
                   {order.items.map(item => (
-                    <tr key={item.courseId}>
+                    <tr key={item.courseId ?? order.orderCode}>
                       <td>{item.courseTitle}</td>
                       <td>{currency(item.unitPrice, order.currency)}</td>
                       <td>{currency(item.discountAmount, order.currency)}</td>

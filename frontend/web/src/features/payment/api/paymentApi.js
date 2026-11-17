@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../../shared/apis/endpoints';
 export const paymentApi = {
   getMethods: () => axiosClient.get(`${ENDPOINTS.payments}/methods`),
   createCheckout: payload => axiosClient.post(`${ENDPOINTS.payments}/checkout`, payload),
+  createProCheckout: payload => axiosClient.post(`${ENDPOINTS.payments}/pro/checkout`, payload),
   getOrder: orderCode => axiosClient.get(`${ENDPOINTS.payments}/orders/${encodeURIComponent(orderCode)}`),
   retryActivation: orderCode =>
     axiosClient.post(`${ENDPOINTS.payments}/orders/${encodeURIComponent(orderCode)}/activation`),

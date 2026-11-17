@@ -17,6 +17,7 @@ Object.assign(globalThis, {
   document: dom.window.document,
   Event: dom.window.Event,
   HTMLElement: dom.window.HTMLElement,
+  Node: dom.window.Node,
   DocumentFragment: dom.window.DocumentFragment,
   ShadowRoot: dom.window.ShadowRoot,
   getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
@@ -118,6 +119,10 @@ function button(text) {
 }
 async function click(text) {
   await act(async () => button(text).click());
+}
+async function switchLanguage(value) {
+  await act(async () => document.querySelector('.language-switcher').click());
+  await act(async () => document.querySelector(`.language-menu-paper [lang="${value}"]`).click());
 }
 async function input(element, value) {
   const proto =
@@ -239,7 +244,7 @@ test('inventory filters items and equips or removes the owned appearance', async
   await click('Ảnh nền');
   assert.equal(document.querySelectorAll('.shop-card').length, 0);
   await click('Khám phá cửa hàng');
-  await input(document.querySelector('.language-switcher'), 'en');
+  await switchLanguage('en');
   assert.match(document.body.textContent, /Kitty scholar/);
   assert.match(document.body.textContent, /Claim free/);
 });
@@ -286,7 +291,7 @@ test('header renders the live streak, diamond balance, framed level avatar and n
   );
   assert.match(document.querySelector('.header-gems').textContent, /50/);
   assert.equal(document.querySelector('.learner-avatar-level').textContent, 'Lv.5');
-  await input(document.querySelector('.language-switcher'), 'en');
+  await switchLanguage('en');
   assert.equal(document.querySelector('.header-gems').getAttribute('aria-label'), 'Shop: 50 diamonds');
 });
 
@@ -294,7 +299,7 @@ test('language switch persists the preference and preserves a draft post without
   await render('/community');
   await click('Viết bài mới');
   await input(document.querySelector('input[name="title"]'), 'My unsaved question');
-  await input(document.querySelector('.language-switcher'), 'en');
+  await switchLanguage('en');
   assert.equal(document.documentElement.lang, 'en');
   assert.equal(window.localStorage.getItem('sgedu.locale'), 'en');
   assert.equal(getIntlLocale(), 'en-US');

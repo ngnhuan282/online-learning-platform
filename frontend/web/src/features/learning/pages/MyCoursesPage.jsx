@@ -11,12 +11,15 @@ import useNotifications from '../hooks/useNotifications';
 import AppLoading from '../../../shared/components/AppLoading';
 import ErrorState from '../../../shared/components/ErrorState';
 import { formatDate } from '../../../shared/utils/formatDate';
+import usePro from '../../pro/hooks/usePro';
+import { ROUTES } from '../../../shared/constants/routes';
 
 const EMPTY_ENROLLMENTS = [];
 
 export default function MyCoursesPage() {
   useLocale();
   const notifications = useNotifications();
+  const { membership } = usePro();
   const { data, error, loading, reload } = useLearningResource(
     learningApi.getMyEnrollments,
     EMPTY_ENROLLMENTS,
@@ -55,7 +58,7 @@ export default function MyCoursesPage() {
       active = false;
       controller.abort();
     };
-  }, [data]);
+  }, [data, membership?.active]);
 
   const visibleEnrollments = data.filter(enrollment => {
     const detail = details.enrollments === data ? details.values[enrollment.courseId] : null;
@@ -139,6 +142,7 @@ export default function MyCoursesPage() {
             const detail = details.enrollments === data ? details.values[enrollment.courseId] : null;
             const title = detail?.course?.title || enrollment.course?.title;
             const description = detail?.course?.description || enrollment.course?.description;
+            const expiredPro = enrollment.accessSource === 'PRO' && membership && !membership.active;
 
             return (
               <article className="my-course-card" key={enrollment.id}>
@@ -170,7 +174,10 @@ export default function MyCoursesPage() {
                   </div>
                 )}
 
-                {detail?.error && (
+                {expiredPro && (
+                  <p className="workspace-muted">{t('Pro đã hết hạn. Tiến độ học của bạn vẫn được giữ.')}</p>
+                )}
+                {detail?.error && !expiredPro && (
                   <ErrorState error={detail.error} title={t('Không thể tải tiến độ')} onRetry={reload} />
                 )}
 
@@ -188,8 +195,15 @@ export default function MyCoursesPage() {
                 </div>
 
                 {enrollment.status !== 'CANCELLED' && (
-                  <Link className="button button-primary" to={'/learning/' + enrollment.courseId}>
-                    {enrollment.status === 'COMPLETED' ? t('Ôn tập khóa học') : t('Tiếp tục học')}
+                  <Link
+                    className="button button-primary"
+                    to={expiredPro ? ROUTES.PRO : '/learning/' + enrollment.courseId}
+                  >
+                    {expiredPro
+                      ? t('Gia hạn Pro')
+                      : enrollment.status === 'COMPLETED'
+                        ? t('Ôn tập khóa học')
+                        : t('Tiếp tục học')}
                   </Link>
                 )}
               </article>

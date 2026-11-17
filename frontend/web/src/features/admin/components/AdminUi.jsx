@@ -42,11 +42,15 @@ export function LoadState({ loading, error, retry }) {
     const message =
       error.code === 'EMAIL_ALREADY_EXISTS'
         ? 'Email này đã được đăng ký.'
-        : error.status === 403
-          ? 'Bạn không có quyền thực hiện thao tác này.'
-          : error.status === 409
-            ? 'Dữ liệu đã thay đổi hoặc đang được sử dụng. Hãy tải lại trước khi tiếp tục.'
-            : error.message || 'Không thể tải dữ liệu. Vui lòng thử lại.';
+        : error.code === 'BAD_REQUEST'
+          ? 'Giá trị không hợp lệ hoặc vượt giới hạn cho phép.'
+          : error.status === 404
+            ? 'Không tìm thấy dữ liệu được yêu cầu.'
+            : error.status === 403
+              ? 'Bạn không có quyền thực hiện thao tác này.'
+              : error.status === 409
+                ? 'Dữ liệu đã thay đổi hoặc đang được sử dụng. Hãy tải lại trước khi tiếp tục.'
+                : error.message || 'Không thể tải dữ liệu. Vui lòng thử lại.';
     return (
       <Alert
         severity="error"

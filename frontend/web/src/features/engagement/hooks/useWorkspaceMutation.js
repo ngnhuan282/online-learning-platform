@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
+import { notifyAdminFailure } from '../../../shared/utils/adminFeedback';
 
 export default function useWorkspaceMutation() {
   const [busy, setBusy] = useState(false);
@@ -22,7 +23,10 @@ export default function useWorkspaceMutation() {
       const response = await operation();
       if (mounted.current && session === getSessionVersion()) onSuccess?.(response);
     } catch (failure) {
-      if (mounted.current && session === getSessionVersion()) setError(failure);
+      if (mounted.current && session === getSessionVersion()) {
+        setError(failure);
+        notifyAdminFailure(failure);
+      }
     } finally {
       pending.current = false;
       if (mounted.current && session === getSessionVersion()) setBusy(false);

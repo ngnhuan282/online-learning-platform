@@ -15,11 +15,27 @@ import PaymentHistoryPage from '../features/payment/pages/PaymentHistoryPage';
 import MockPaymentPage from '../features/payment/pages/MockPaymentPage';
 import PaymentResultPage from '../features/payment/pages/PaymentResultPage';
 import PermissionRoute from '../routes/PermissionRoute';
-import RoleRoute from '../routes/RoleRoute';
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
 import AdminAccountsPage from '../features/admin/pages/AdminAccountsPage';
 import AdminRolesPage from '../features/admin/pages/AdminRolesPage';
 import AdminAuditPage from '../features/admin/pages/AdminAuditPage';
+
+const commerceAdminRoutes = [
+  ['shop', 'SHOP_VIEW', () => import('../features/admin/pages/AdminShopPage')],
+  ['engagement', 'ENGAGEMENT_VIEW', () => import('../features/admin/pages/AdminEngagementPage')],
+  [
+    'engagement-rules',
+    'ENGAGEMENT_CONFIG_VIEW',
+    () => import('../features/admin/pages/AdminEngagementRulesPage'),
+  ],
+  ['pro-plans', 'PRO_PLAN_VIEW', () => import('../features/admin/pages/AdminProPlansPage')],
+  ['pro-members', 'PRO_MEMBER_VIEW', () => import('../features/admin/pages/AdminProMembersPage')],
+  ['community', 'COMMUNITY_VIEW', () => import('../features/admin/pages/AdminCommunityPage')],
+].map(([path, permission, load]) => ({
+  path,
+  element: <PermissionRoute permission={permission} />,
+  children: [{ index: true, lazy: async () => ({ Component: (await load()).default }) }],
+}));
 
 const router = createBrowserRouter([
   {
@@ -65,6 +81,19 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <AdminDashboardPage /> },
       { path: 'profile', element: <AccountPage /> },
+      ...commerceAdminRoutes,
+      {
+        path: 'pro-codes',
+        element: <PermissionRoute permission="PRO_CODE_VIEW" />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/pro/pages/AdminProCodesPage')).default,
+            }),
+          },
+        ],
+      },
       { path: 'analytics', element: <Navigate to="/admin" replace /> },
       {
         path: 'payments',
@@ -105,7 +134,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'notifications',
-        element: <RoleRoute roles={['ADMIN']} />,
+        element: <PermissionRoute permission="NOTIFICATION_VIEW" />,
         children: [
           {
             index: true,
@@ -117,7 +146,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'quizzes',
-        element: <RoleRoute roles={['ADMIN']} />,
+        element: <PermissionRoute permission="QUIZ_VIEW" />,
         children: [
           {
             index: true,
@@ -273,6 +302,10 @@ const router = createBrowserRouter([
             lazy: async () => ({
               Component: (await import('../features/engagement/pages/AchievementsPage')).default,
             }),
+          },
+          {
+            path: 'pro',
+            lazy: async () => ({ Component: (await import('../features/pro/pages/ProPage')).default }),
           },
           {
             path: 'shop',
