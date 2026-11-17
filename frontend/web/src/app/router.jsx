@@ -4,6 +4,7 @@ import MainLayout from '../layouts/MainLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import UserLayout from '../layouts/UserLayout';
 import ProtectedRoute from '../routes/ProtectedRoute';
+import RoleRoute from '../routes/RoleRoute';
 
 import HomePage from '../pages/HomePage';
 import NotFoundPage from '../pages/NotFoundPage';

@@ -9,11 +9,13 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
+@Profile("!test")
 public class ToeicSeedConfig {
 
     private static final Logger log = LoggerFactory.getLogger(ToeicSeedConfig.class);

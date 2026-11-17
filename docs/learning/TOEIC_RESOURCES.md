@@ -57,13 +57,14 @@ Hướng dẫn chi tiết về mẫu và chuyển đổi tài liệu: [Cách t�
 
 ## Dữ liệu và khởi động
 
-Flyway `V10__create_toeic_learning.sql` tạo ba bảng trong **learning_db**:
+Flyway `V12__create_toeic_learning.sql` tạo ba bảng trong **learning_db**:
 `toeic_exams`, `toeic_attempts`, `toeic_lesson_progress`.
 Không sửa bảng Quiz, Enrollment hoặc dữ liệu Course/Payment cho chức năng này.
 
 Learning Service nhập bộ dữ liệu đã số hóa từ classpath `toeic/ets2024-reading.json` khi khởi động.
 Seed chỉ thêm các `seedKey` chưa tồn tại; không ghi đè nội dung Admin đã sửa và không phục hồi bộ đề Admin đã xóa.
 Có thể tắt nhập bằng cấu hình Spring `toeic.seed.enabled=false`.
+Seeder bỏ qua profile `test`; các kiểm thử tự chuẩn bị dữ liệu riêng.
 
 ```powershell
 docker compose --profile backend up --build -d --no-deps learning-service
@@ -74,6 +75,62 @@ Với frontend dev, chạy `npm run dev` trong `frontend/web`. Nếu dùng image
 Các PDF/Word gốc không còn được đóng gói trong image web hoặc được Vite phục vụ cho học viên.
 Ảnh nội dung được commit thành 10 gói trong `frontend/web/resources/toeic`. Frontend
 tự giải nén trước khi chạy dev/build/test; không cần commit các ảnh sinh trong `public`.
+
+### Máy đã chạy migration TOEIC V10 trước khi gộp main
+
+TOEIC dùng V12 vì main đã có V9, V10 và V11 cho các chức năng khác. Database mới
+và CI chạy migration bình thường. Chỉ làm các bước sau trên database phát triển
+đã chạy `V10__create_toeic_learning.sql` cũ; không xóa volume hoặc bảng TOEIC.
+
+1. Dừng Learning Service và sao lưu `learning_db` trước khi chỉnh lịch sử migration:
+
+   ```powershell
+   docker compose --profile backend stop learning-service
+   New-Item -ItemType Directory -Force backups | Out-Null
+   docker compose exec -T mysql sh -c 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysqldump -uroot --single-transaction --no-tablespaces --set-gtid-purged=OFF --databases learning_db > /tmp/learning-before-toeic-v12.sql'
+   if ($LASTEXITCODE -ne 0) { throw 'Backup failed; stop here.' }
+   docker compose cp mysql:/tmp/learning-before-toeic-v12.sql backups/learning-before-toeic-v12.sql
+   if ($LASTEXITCODE -ne 0) { throw 'Backup copy failed; stop here.' }
+   ```
+
+2. Đổi **đúng bản ghi TOEIC cũ** từ V10 sang V12. SQL chỉ khớp khi tên file,
+   mô tả, checksum và trạng thái thành công đúng với bản đã phát hành; không sửa
+   checksum hay bản ghi V10 của Commerce. Kết quả `moved` phải bằng `1` ở lần đầu.
+   Nếu bằng `0`, dừng và kiểm tra lịch sử, không chạy Flyway repair để bỏ qua lỗi.
+
+   ```powershell
+   @'
+   UPDATE flyway_schema_history old_entry
+   LEFT JOIN flyway_schema_history new_entry ON new_entry.version = '12'
+   SET old_entry.version = '12', old_entry.script = 'V12__create_toeic_learning.sql'
+   WHERE old_entry.version = '10' AND old_entry.type = 'SQL'
+     AND old_entry.description = 'create toeic learning'
+     AND old_entry.script = 'V10__create_toeic_learning.sql'
+     AND old_entry.checksum = 525189811 AND old_entry.success = 1
+     AND new_entry.installed_rank IS NULL;
+   SELECT ROW_COUNT() AS moved;
+   SELECT version, description, script, checksum, success
+   FROM flyway_schema_history ORDER BY installed_rank;
+   '@ | docker compose exec -T mysql sh -c 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -uroot learning_db'
+   ```
+
+3. Cho phép áp dụng các migration V9–V11 còn thiếu **một lần**, rồi chạy lại bằng
+   cấu hình bình thường. Tệp override dưới đây chỉ nằm trong `.tmp`, không commit:
+
+   ```powershell
+   New-Item -ItemType Directory -Force .tmp | Out-Null
+   @'
+   services:
+     learning-service:
+       command: ["--spring.flyway.out-of-order=true"]
+   '@ | Set-Content -Encoding UTF8 .tmp/toeic-v12-once.yaml
+   docker compose -f compose.yaml -f .tmp/toeic-v12-once.yaml --profile backend up --build -d --no-deps --wait --wait-timeout 180 learning-service
+   if ($LASTEXITCODE -ne 0) { throw 'Migration failed; inspect Learning Service logs before continuing.' }
+   docker compose --profile backend up -d --no-deps --force-recreate --wait --wait-timeout 120 learning-service
+   ```
+
+Quy trình đã được kiểm chứng trên MySQL 8.4 tạm: đủ 12 migration, giữ nguyên nội dung,
+bài làm đã chấm và tiến độ bài học; Flyway validate thành công khi tắt `out-of-order`.
 
 ## API
 
@@ -99,7 +156,7 @@ Hướng dẫn số hóa tài liệu và bổ sung dữ liệu nằm trong `TOEI
 
 - 15 kiểm thử frontend riêng cho nội dung và luồng TOEIC: đạt.
 - 3 kiểm thử đóng gói ảnh, giải nén từ đầu, phục hồi ảnh thiếu và kiểm tra đường dẫn: đạt.
-- 7 kiểm thử HTTP Learning Service trên MySQL 8.4: đạt, bao gồm migration V10.
+- 7 kiểm thử HTTP Learning Service trên MySQL 8.4: đạt, bao gồm migration TOEIC.
 - 2 kiểm thử Gateway cho catalog công khai và các đường dẫn phải đăng nhập: đạt.
 - Build frontend và lint các file liên quan: đạt. Bản build không chứa PDF, Word hoặc audio.
 - Kiểm thử trình duyệt qua Gateway → Learning Service → MySQL tạm: học/hoàn thành bài,
