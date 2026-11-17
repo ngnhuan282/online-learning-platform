@@ -92,6 +92,18 @@ const router = createBrowserRouter([
       },
       { path: 'course', element: <Navigate to="/admin/courses" replace /> },
       {
+        path: 'toeic',
+        element: <RoleRoute roles={['ADMIN']} />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/AdminToeicPage')).default,
+            }),
+          },
+        ],
+      },
+      {
         path: 'notifications',
         element: <RoleRoute roles={['ADMIN']} />,
         children: [
@@ -191,10 +203,27 @@ const router = createBrowserRouter([
             }),
           },
           {
-            path: 'tests/:testId',
-            lazy: async () => ({
-              Component: (await import('../features/learning/pages/ToeicReaderPage')).default,
-            }),
+            element: <ProtectedRoute />,
+            children: [
+              {
+                path: 'tests/:testId',
+                lazy: async () => ({
+                  Component: (await import('../features/learning/pages/ToeicReaderPage')).default,
+                }),
+              },
+              {
+                path: 'attempts/:attemptId',
+                lazy: async () => ({
+                  Component: (await import('../features/learning/pages/ToeicAttemptPage')).default,
+                }),
+              },
+              {
+                path: 'attempts/:attemptId/result',
+                lazy: async () => ({
+                  Component: (await import('../features/learning/pages/ToeicResultPage')).default,
+                }),
+              },
+            ],
           },
         ],
       },

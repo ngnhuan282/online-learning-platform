@@ -1,0 +1,279 @@
+[
+  {
+    "test": 1,
+    "number": 139,
+    "prompt": "Chọn phương án phù hợp cho chỗ trống (139) trong đoạn văn.",
+    "options": [
+      {
+        "id": "A",
+        "text": "It"
+      },
+      {
+        "id": "B",
+        "text": "You"
+      },
+      {
+        "id": "C",
+        "text": "Our"
+      },
+      {
+        "id": "D",
+        "text": "Each"
+      }
+    ]
+  },
+  {
+    "test": 1,
+    "number": 197,
+    "prompt": "Why most likely did Green Canyon receive a discount on its order dated June 10?"
+  },
+  {
+    "test": 1,
+    "number": 200,
+    "prompt": "What does Mr. Singh ask Ms. Peterson to do?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Make a bill payment"
+      },
+      {
+        "id": "B",
+        "text": "Solve a problem"
+      },
+      {
+        "id": "C",
+        "text": "Confirm an order"
+      },
+      {
+        "id": "D",
+        "text": "Update an account number"
+      }
+    ]
+  },
+  {
+    "test": 3,
+    "number": 154,
+    "prompt": "How many tickets did Mr. Califf purchase?",
+    "options": [
+      {
+        "id": "A",
+        "text": "1"
+      },
+      {
+        "id": "B",
+        "text": "3"
+      },
+      {
+        "id": "C",
+        "text": "4"
+      },
+      {
+        "id": "D",
+        "text": "7"
+      }
+    ]
+  },
+  {
+    "test": 7,
+    "number": 146,
+    "prompt": "Chọn phương án phù hợp cho chỗ trống (146) trong đoạn văn.",
+    "options": [
+      {
+        "id": "A",
+        "text": "to see"
+      },
+      {
+        "id": "B",
+        "text": "will see"
+      },
+      {
+        "id": "C",
+        "text": "who saw"
+      },
+      {
+        "id": "D",
+        "text": "by seeing"
+      }
+    ]
+  },
+  {
+    "test": 4,
+    "number": 103,
+    "prompt": "The annual report will be ready after ------- make the necessary revisions.",
+    "options": [
+      {
+        "id": "A",
+        "text": "I"
+      },
+      {
+        "id": "B",
+        "text": "me"
+      },
+      {
+        "id": "C",
+        "text": "myself"
+      },
+      {
+        "id": "D",
+        "text": "my"
+      }
+    ]
+  },
+  {
+    "test": 5,
+    "number": 101,
+    "prompt": "After upgrading to Pro Data Whiz, our clients began ------- problems with spreadsheets.",
+    "options": [
+      {
+        "id": "A",
+        "text": "has"
+      },
+      {
+        "id": "B",
+        "text": "had"
+      },
+      {
+        "id": "C",
+        "text": "have"
+      },
+      {
+        "id": "D",
+        "text": "having"
+      }
+    ]
+  },
+  {
+    "test": 5,
+    "number": 106,
+    "prompt": "------- of all cosmetics are final, and refunds will not be given under any circumstances.",
+    "options": [
+      {
+        "id": "A",
+        "text": "Sale"
+      },
+      {
+        "id": "B",
+        "text": "Sales"
+      },
+      {
+        "id": "C",
+        "text": "Sells"
+      },
+      {
+        "id": "D",
+        "text": "Selling"
+      }
+    ]
+  },
+  {
+    "test": 5,
+    "number": 140,
+    "options": [
+      {
+        "id": "A",
+        "text": "asked"
+      },
+      {
+        "id": "B",
+        "text": "is asking"
+      },
+      {
+        "id": "C",
+        "text": "has asked"
+      },
+      {
+        "id": "D",
+        "text": "will ask"
+      }
+    ]
+  },
+  {
+    "test": 6,
+    "number": 131,
+    "options": [
+      {
+        "id": "A",
+        "text": "is"
+      },
+      {
+        "id": "B",
+        "text": "or"
+      },
+      {
+        "id": "C",
+        "text": "likely"
+      },
+      {
+        "id": "D",
+        "text": "from"
+      }
+    ]
+  },
+  {
+    "test": 9,
+    "number": 132,
+    "options": [
+      {
+        "id": "A",
+        "text": "at"
+      },
+      {
+        "id": "B",
+        "text": "on"
+      },
+      {
+        "id": "C",
+        "text": "by"
+      },
+      {
+        "id": "D",
+        "text": "to"
+      }
+    ]
+  },
+  {
+    "test": 10,
+    "number": 123,
+    "prompt": "Mr. Nayar ------- the need for enhanced safety protocols long before the government issued a report on the topic.",
+    "options": [
+      {
+        "id": "A",
+        "text": "stresses"
+      },
+      {
+        "id": "B",
+        "text": "stressing"
+      },
+      {
+        "id": "C",
+        "text": "will stress"
+      },
+      {
+        "id": "D",
+        "text": "had stressed"
+      }
+    ]
+  },
+  {
+    "test": 10,
+    "number": 137,
+    "options": [
+      {
+        "id": "A",
+        "text": "issues"
+      },
+      {
+        "id": "B",
+        "text": "clients"
+      },
+      {
+        "id": "C",
+        "text": "articles"
+      },
+      {
+        "id": "D",
+        "text": "proposals"
+      }
+    ]
+  }
+]

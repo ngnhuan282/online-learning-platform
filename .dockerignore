@@ -7,7 +7,5 @@
 **/.env
 **/.env.*
 frontend/web/dist
-docs/*
-!docs/resources/
-docs/resources/[Aa][Uu][Dd][Ii][Oo]/
-docs/resources/**/[Aa][Uu][Dd][Ii][Oo]/
+frontend/web/public/toeic-assets/ets2024-reading
+docs
