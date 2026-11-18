@@ -31,44 +31,7 @@
   padding: 0 32px;
 }
 
-/* Tactile Pill Sub-navigation */
-.learning-navigation {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px;
-  background: #ffffff;
-  border: 1.5px solid var(--learn-line);
-  border-radius: 16px;
-  box-shadow: 0 3px 0 #e2eaf3;
-  margin-bottom: 28px;
-}
 
-.learning-navigation a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  border-radius: 11px;
-  border-bottom: 0;
-  color: var(--learn-muted);
-  font-family: var(--learn-heading);
-  font-size: 13.5px;
-  font-weight: 700;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease;
-}
-
-.learning-navigation a:hover {
-  color: var(--learn-accent);
-  background: #f4f8fe;
-}
-
-.learning-navigation a.is-active {
-  color: var(--learn-accent);
-  background: var(--learn-accent-soft);
-}
 
 .learning-page .learning-page-header,
 .learning-admin-workspace .learning-page-header {
@@ -964,18 +927,7 @@
     padding: 0 16px;
   }
 
-  .learning-navigation {
-    display: flex;
-    width: 100%;
-    margin-bottom: 20px;
-  }
 
-  .learning-navigation a {
-    flex: 1;
-    justify-content: center;
-    font-size: 12.5px;
-    padding: 8px 10px;
-  }
 
   .learning-page .learning-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
