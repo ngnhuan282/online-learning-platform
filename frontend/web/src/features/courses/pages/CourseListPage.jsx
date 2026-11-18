@@ -178,252 +178,244 @@ function CourseListPage() {
     }
   }
 
+  const hasActiveFilters =
+    Boolean(category) ||
+    Boolean(query) ||
+    (Boolean(filter) && filter !== 'all') ||
+    Boolean(params.get('sort')) ||
+    params.has('minPrice') ||
+    params.has('maxPrice') ||
+    params.has('minRating');
+
   return (
-    <main className="container" style={{ padding: '32px 0 80px' }}>
-      <div className="section-heading" style={{ alignItems: 'end' }}>
-        <div>
-          <span className="eyebrow">{t('KHÓA HỌC')}</span>
-          <h2>{t('Danh sách khóa học')}</h2>
-          <p>{t('Tìm kiếm, lọc và lựa chọn khóa học phù hợp với mục tiêu học tập.')}</p>
+    <div className="catalog-page">
+      <div className="container">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">{t('KHÓA HỌC')}</span>
+            <h2>{t('Danh sách khóa học')}</h2>
+            <p>{t('Tìm kiếm, lọc và lựa chọn khóa học phù hợp với mục tiêu học tập.')}</p>
+          </div>
+          <div className="course-filters" role="group" aria-label={t('Lọc khóa học')}>
+            {filters.map(item => (
+              <button
+                key={item.id}
+                className={filter === item.id ? 'selected' : ''}
+                aria-pressed={filter === item.id}
+                onClick={() => updateFilters({ filter: item.id === 'all' ? '' : item.id })}
+              >
+                {t(item.label)}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="course-filters" role="group" aria-label={t('Lọc khóa học')}>
-          {filters.map(item => (
-            <button
-              key={item.id}
-              className={filter === item.id ? 'selected' : ''}
-              aria-pressed={filter === item.id}
-              onClick={() => updateFilters({ filter: item.id === 'all' ? '' : item.id })}
-            >
-              {t(item.label)}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 20px' }}>
-        <input
-          value={keyword}
-          onChange={event => setKeyword(event.target.value)}
-          placeholder={t('Tìm khóa học theo tên, kỹ năng, nhãn...')}
-          style={{
-            flex: 1,
-            minWidth: 240,
-            padding: '12px 16px',
-            borderRadius: 10,
-            border: '1px solid #dfe3ea',
-          }}
-        />
-        <select
-          value={category}
-          onChange={event => updateFilters({ category: event.target.value })}
-          style={{
-            minWidth: 200,
-            padding: '12px 16px',
-            borderRadius: 10,
-            border: '1px solid #dfe3ea',
-            background: '#fff',
-          }}
-        >
-          <option value="">
-            {t('Tất cả danh mục (')}
-            {categories.length})
-          </option>
-          {categories.map(item => (
-            <option key={item.id} value={item.id}>
-              {t(item.name)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={params.get('sort') || ''}
-          onChange={event => updateFilters({ sort: event.target.value })}
-          style={{
-            minWidth: 180,
-            padding: '12px 16px',
-            borderRadius: 10,
-            border: '1px solid #dfe3ea',
-            background: '#fff',
-          }}
-        >
-          <option value="">{t('Sắp xếp: Mặc định')}</option>
-          <option value="rating_desc">{t('⭐ Đánh giá cao nhất')}</option>
-          <option value="price_asc">{t('💵 Giá: Thấp đến cao')}</option>
-          <option value="price_desc">{t('💵 Giá: Cao đến thấp')}</option>
-        </select>
-      </div>
-
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
-        <label>
-          {t('Giá từ')}{' '}
-          <input
-            type="number"
-            min="0"
-            aria-label={t('Giá tối thiểu')}
-            value={params.get('minPrice') || ''}
-            onChange={event => updateFilters({ minPrice: event.target.value })}
-          />
-        </label>
-        <label>
-          {t('Giá đến')}{' '}
-          <input
-            type="number"
-            min="0"
-            aria-label={t('Giá tối đa')}
-            value={params.get('maxPrice') || ''}
-            onChange={event => updateFilters({ maxPrice: event.target.value })}
-          />
-        </label>
-        <label>
-          {t('Đánh giá')}{' '}
-          <select
-            aria-label={t('Đánh giá tối thiểu')}
-            value={params.get('minRating') || ''}
-            onChange={event => updateFilters({ minRating: event.target.value })}
-          >
-            <option value="">{t('Tất cả')}</option>
-            <option value="4">{t('Từ 4 sao')}</option>
-            <option value="3">{t('Từ 3 sao')}</option>
-            <option value="2">{t('Từ 2 sao')}</option>
-          </select>
-        </label>
-      </div>
-      <div
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}
-      >
-        <span style={{ fontSize: 13, color: '#64748b' }}>
-          {t('Hiển thị')} <strong>{pagination.totalElements}</strong> {t('khóa học phù hợp')}
-        </span>
-        {(Boolean(category) ||
-          Boolean(query) ||
-          (Boolean(filter) && filter !== 'all') ||
-          Boolean(params.get('sort')) ||
-          params.has('minPrice') ||
-          params.has('maxPrice') ||
-          params.has('minRating')) && (
-          <button
-            type="button"
-            className="button button-soft"
-            style={{ fontSize: 12, padding: '4px 10px' }}
-            onClick={() => {
-              setKeyword('');
-              setParams(new URLSearchParams());
-            }}
-          >
-            {t('✕ Xóa tất cả bộ lọc')}
-          </button>
-        )}
-      </div>
-
-      {categoryError && (
-        <ErrorState error={categoryError} title={t('Không thể tải danh mục')} onRetry={retry} />
-      )}
-      {error ? (
-        <ErrorState error={error} title={t('Không thể tải khóa học')} onRetry={retry} />
-      ) : loading ? (
-        <div className="empty-courses" role="status">
-          <Icon name="search" size={32} />
-          <h3>{t('Đang tải khóa học...')}</h3>
-        </div>
-      ) : filteredCourses.length ? (
-        <div className="course-grid">
-          {filteredCourses.map(course => {
-            const courseId = numericCourseId(course);
-            return (
-              <CourseCard
-                key={course.id}
-                course={course}
-                canEnroll={Boolean(courseId)}
-                enrolled={enrolledCourseIds.has(courseId)}
-                enrolling={enrollingCourseId === course.id}
-                onEnroll={enrollFreeCourse}
-                onSelect={selectCourse}
+        <div className="catalog-filter-panel">
+          <div className="catalog-primary-controls">
+            <div className="catalog-search-field">
+              <Icon name="search" size={19} />
+              <input
+                value={keyword}
+                onChange={event => setKeyword(event.target.value)}
+                placeholder={t('Tìm khóa học theo tên, kỹ năng, nhãn...')}
               />
-            );
-          })}
-        </div>
-      ) : (
-        <div className="empty-courses" role="status">
-          <Icon name="search" size={32} />
-          <h3>{t('Không tìm thấy khóa học phù hợp')}</h3>
-          <p>{t('Hãy đổi bộ lọc hoặc từ khóa để xem thêm khóa học.')}</p>
-        </div>
-      )}
-
-      {!error && pagination.totalPages > 1 && (
-        <nav
-          aria-label={t('Phân trang khóa học')}
-          style={{ display: 'flex', justifyContent: 'center', gap: 16, margin: '24px 0' }}
-        >
-          <button
-            className="button button-soft"
-            disabled={loading || pagination.page <= 0}
-            onClick={() => updateFilters({ page: String(pagination.page - 1) })}
-          >
-            {t('Trang trước')}
-          </button>
-          <span>
-            Trang {pagination.page + 1} / {pagination.totalPages}
-          </span>
-          <button
-            className="button button-soft"
-            disabled={loading || pagination.page + 1 >= pagination.totalPages}
-            onClick={() => updateFilters({ page: String(pagination.page + 1) })}
-          >
-            Trang sau
-          </button>
-        </nav>
-      )}
-      <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} maxWidth="sm" fullWidth>
-        <DialogTitle className="dialog-heading">
-          {t('Thông tin khóa học')}
-          <button className="icon-button" aria-label={t('Đóng')} onClick={() => setSelected(null)}>
-            <Icon name="close" />
-          </button>
-        </DialogTitle>
-        {selected && (
-          <DialogContent>
-            {enrollError && <p role="alert">{enrollError}</p>}
-            <img className="detail-image" src={selected.image} alt={selected.title} />
-            <h2 className="detail-title">{t(selected.title)}</h2>
-            <p>{t(selected.description)}</p>
-            <div className="detail-meta">
-              <span>★ {selected.rating}</span>
-              <span>
-                {selected.hours} {t('giờ học')}
-              </span>
-              <span>{selected.level}</span>
             </div>
-            <div className="detail-enroll" style={{ marginBottom: 12 }}>
-              <strong>{selected.price ? formatPrice(selected.price) : t('Miễn phí')}</strong>
-              {selected.price === 0 ? (
-                <button
-                  className="button button-success"
-                  disabled={!selectedCourseId || enrollingCourseId === selected.id || selectedIsEnrolled}
-                  onClick={() => enrollFreeCourse(selected)}
-                >
-                  {selectedEnrollLabel}
-                </button>
-              ) : (
-                <button
-                  className="button button-primary"
-                  onClick={() => navigate(`/checkout?course=${encodeURIComponent(selectedCourseId)}`)}
-                >
-                  {t('Thanh toán')}
-                </button>
-              )}
-            </div>
-            <Link
-              className="button button-primary"
-              to={`/courses/${selected.id}`}
-              onClick={() => setSelected(null)}
-              style={{ display: 'inline-flex', textDecoration: 'none' }}
+            <select
+              className="catalog-select"
+              value={category}
+              onChange={event => updateFilters({ category: event.target.value })}
             >
-              {t('Xem chi tiết khóa học')}
-            </Link>
-          </DialogContent>
+              <option value="">
+                {t('Tất cả danh mục (')}
+                {categories.length})
+              </option>
+              {categories.map(item => (
+                <option key={item.id} value={item.id}>
+                  {t(item.name)}
+                </option>
+              ))}
+            </select>
+            <select
+              className="catalog-select"
+              value={params.get('sort') || ''}
+              onChange={event => updateFilters({ sort: event.target.value })}
+            >
+              <option value="">{t('Sắp xếp: Mặc định')}</option>
+              <option value="rating_desc">{t('Đánh giá cao nhất')}</option>
+              <option value="price_asc">{t('Giá: Thấp đến cao')}</option>
+              <option value="price_desc">{t('Giá: Cao đến thấp')}</option>
+            </select>
+          </div>
+
+          <div className="catalog-secondary-controls">
+            <label className="catalog-inline-field">
+              <span>{t('Giá từ')}</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="0đ"
+                aria-label={t('Giá tối thiểu')}
+                value={params.get('minPrice') || ''}
+                onChange={event => updateFilters({ minPrice: event.target.value })}
+              />
+            </label>
+            <label className="catalog-inline-field">
+              <span>{t('Giá đến')}</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="VND"
+                aria-label={t('Giá tối đa')}
+                value={params.get('maxPrice') || ''}
+                onChange={event => updateFilters({ maxPrice: event.target.value })}
+              />
+            </label>
+            <label className="catalog-inline-field">
+              <span>{t('Đánh giá')}</span>
+              <select
+                aria-label={t('Đánh giá tối thiểu')}
+                value={params.get('minRating') || ''}
+                onChange={event => updateFilters({ minRating: event.target.value })}
+              >
+                <option value="">{t('Tất cả')}</option>
+                <option value="4">{t('Từ 4 sao')}</option>
+                <option value="3">{t('Từ 3 sao')}</option>
+                <option value="2">{t('Từ 2 sao')}</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div className="catalog-results-bar">
+          <span className="catalog-results-count">
+            {t('Hiển thị')} <strong>{pagination.totalElements}</strong> {t('khóa học phù hợp')}
+          </span>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="button button-soft"
+              onClick={() => {
+                setKeyword('');
+                setParams(new URLSearchParams());
+              }}
+            >
+              {t('✕ Xóa tất cả bộ lọc')}
+            </button>
+          )}
+        </div>
+
+        {categoryError && (
+          <ErrorState error={categoryError} title={t('Không thể tải danh mục')} onRetry={retry} />
         )}
-      </Dialog>
-    </main>
+        {error ? (
+          <ErrorState error={error} title={t('Không thể tải khóa học')} onRetry={retry} />
+        ) : loading ? (
+          <div className="empty-courses" role="status">
+            <Icon name="search" size={32} />
+            <h3>{t('Đang tải khóa học...')}</h3>
+          </div>
+        ) : filteredCourses.length ? (
+          <div className="course-grid">
+            {filteredCourses.map(course => {
+              const courseId = numericCourseId(course);
+              return (
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                  canEnroll={Boolean(courseId)}
+                  enrolled={enrolledCourseIds.has(courseId)}
+                  enrolling={enrollingCourseId === course.id}
+                  onEnroll={enrollFreeCourse}
+                  onSelect={selectCourse}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-courses" role="status">
+            <Icon name="search" size={32} />
+            <h3>{t('Không tìm thấy khóa học phù hợp')}</h3>
+            <p>{t('Hãy đổi bộ lọc hoặc từ khóa để xem thêm khóa học.')}</p>
+          </div>
+        )}
+
+        {!error && pagination.totalPages > 1 && (
+          <nav className="catalog-pagination" aria-label={t('Phân trang khóa học')}>
+            <button
+              className="button button-outline"
+              disabled={loading || pagination.page <= 0}
+              onClick={() => updateFilters({ page: String(pagination.page - 1) })}
+            >
+              {t('Trang trước')}
+            </button>
+            <span>
+              Trang {pagination.page + 1} / {pagination.totalPages}
+            </span>
+            <button
+              className="button button-outline"
+              disabled={loading || pagination.page + 1 >= pagination.totalPages}
+              onClick={() => updateFilters({ page: String(pagination.page + 1) })}
+            >
+              Trang sau
+            </button>
+          </nav>
+        )}
+
+        <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} maxWidth="sm" fullWidth>
+          <DialogTitle className="dialog-heading">
+            {t('Thông tin khóa học')}
+            <button className="icon-button" aria-label={t('Đóng')} onClick={() => setSelected(null)}>
+              <Icon name="close" />
+            </button>
+          </DialogTitle>
+          {selected && (
+            <DialogContent>
+              {enrollError && (
+                <p className="account-feedback is-error" role="alert" style={{ marginBottom: 14 }}>
+                  {enrollError}
+                </p>
+              )}
+              <img className="detail-image" src={selected.image} alt={selected.title} />
+              <h2 className="detail-title">{t(selected.title)}</h2>
+              <p>{t(selected.description)}</p>
+              <div className="detail-meta">
+                <span>★ {selected.rating}</span>
+                <span>
+                  {selected.hours} {t('giờ học')}
+                </span>
+                <span>{selected.level}</span>
+              </div>
+              <div className="detail-enroll">
+                <strong>{selected.price ? formatPrice(selected.price) : t('Miễn phí')}</strong>
+                {selected.price === 0 ? (
+                  <button
+                    className="button button-success"
+                    disabled={!selectedCourseId || enrollingCourseId === selected.id || selectedIsEnrolled}
+                    onClick={() => enrollFreeCourse(selected)}
+                  >
+                    {selectedEnrollLabel}
+                  </button>
+                ) : (
+                  <button
+                    className="button button-primary"
+                    onClick={() => navigate(`/checkout?course=${encodeURIComponent(selectedCourseId)}`)}
+                  >
+                    {t('Thanh toán')}
+                  </button>
+                )}
+              </div>
+              <Link
+                className="button button-outline"
+                to={`/courses/${selected.id}`}
+                onClick={() => setSelected(null)}
+              >
+                {t('Xem chi tiết khóa học')}
+              </Link>
+            </DialogContent>
+          )}
+        </Dialog>
+      </div>
+    </div>
   );
 }
 

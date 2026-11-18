@@ -15,7 +15,6 @@ export default function AccountPage() {
   useLocale();
   const { user, updateCurrentUser } = useAuth();
 
-  // Profile Form State
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [profile, setProfile] = useState({
     avatarUrl: user?.avatarUrl || '',
@@ -27,7 +26,6 @@ export default function AccountPage() {
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
 
-  // Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -110,115 +108,52 @@ export default function AccountPage() {
   }
 
   return (
-    <section className="container section" style={{ padding: '32px 0 80px' }}>
-      <div style={{ maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 32 }}>
-        <ProfileAppearance />
-        <ProMembershipCard />
-        {/* Header Section */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            flexWrap: 'wrap',
-            gap: 16,
-          }}
-        >
+    <section className="account-page">
+      <div className="container account-shell">
+        <div className="account-header">
           <div>
             <span className="eyebrow">
               {hasAdminAccess ? t('KHÔNG GIAN QUẢN TRỊ') : t('THÔNG TIN CÁ NHÂN')}
             </span>
-            <h1 style={{ marginTop: 8, fontSize: '1.875rem' }}>{t('Hồ sơ cá nhân')}</h1>
-            <p style={{ color: 'var(--muted)', marginTop: 4 }}>
-              {t('Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.')}
-            </p>
+            <h1>{t('Hồ sơ cá nhân')}</h1>
+            <p>{t('Quản lý thông tin hồ sơ cá nhân và bảo mật tài khoản.')}</p>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <div className="account-header-actions">
             <Link className="button button-soft" to="/payment/history">
-              <Icon name="assignment" size={15} /> {t('Lịch sử thanh toán')}
+              <Icon name="assignment" size={16} /> {t('Lịch sử thanh toán')}
             </Link>
             <Link className="button button-outline" to="/">
-              <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)', marginRight: 6 }} />{' '}
               {t('Về trang chủ')}
             </Link>
           </div>
         </div>
 
-        {/* Quick links for granted administration permissions */}
+        <ProfileAppearance />
+        <ProMembershipCard />
+
         {hasAdminAccess && (
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-              color: '#fff',
-              borderRadius: 'var(--radius)',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              boxShadow: 'var(--shadow)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 20 }}>🛡️</span>
-              <strong style={{ fontSize: 17, color: '#fff' }}>{t('Bảng điều khiển Quản trị viên')}</strong>
-            </div>
-            <p style={{ color: '#cbd5e1', fontSize: 14, margin: 0 }}>
-              {t('Truy cập nhanh các tính năng quản trị bạn được cấp quyền:')}
-            </p>
+          <div className="account-admin-card">
+            <strong>{t('Bảng điều khiển Quản trị viên')}</strong>
+            <p>{t('Truy cập nhanh các tính năng quản trị bạn được cấp quyền:')}</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
               {can(user, 'USER_VIEW') && (
-                <Link className="button button-primary" to="/admin/users" style={{ background: '#3b82f6' }}>
-                  {t('👥 Quản lý người dùng')}
+                <Link className="button button-primary" to="/admin/users">
+                  {t('Quản lý người dùng')}
                 </Link>
               )}
               {can(user, 'COURSE_VIEW') && (
-                <Link
-                  className="button button-outline"
-                  to="/admin/courses"
-                  style={{ color: '#fff', borderColor: '#475569' }}
-                >
-                  {t('📚 Quản lý khóa học')}
+                <Link className="button button-soft" to="/admin/courses">
+                  {t('Quản lý khóa học')}
                 </Link>
               )}
             </div>
           </div>
         )}
 
-        {/* User Card Info */}
-        <div
-          style={{
-            background: 'var(--canvas)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 20,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 24,
-              fontWeight: 700,
-              flexShrink: 0,
-            }}
-          >
+        <div className="account-identity-card">
+          <div className="account-identity-avatar">
             {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={t('Ảnh đại diện')}
-                referrerPolicy="no-referrer"
-                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-              />
+              <img src={user.avatarUrl} alt={t('Ảnh đại diện')} referrerPolicy="no-referrer" />
             ) : user?.fullName ? (
               user.fullName.charAt(0).toUpperCase()
             ) : (
@@ -226,25 +161,15 @@ export default function AccountPage() {
             )}
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <h2 style={{ fontSize: 20, margin: 0, fontWeight: 700 }}>{user?.fullName || t('Người dùng')}</h2>
-            <p style={{ color: 'var(--muted)', margin: '4px 0 8px', fontSize: 14 }}>{user?.email}</p>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800 }}>{user?.fullName || t('Người dùng')}</h2>
+            <p style={{ color: 'var(--muted)', margin: '4px 0 10px', fontSize: 14 }}>{user?.email}</p>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <StatusChip
                 status={user?.status || 'ACTIVE'}
                 label={user?.status === 'LOCKED' ? t('Bị khóa') : t('Đang hoạt động')}
               />
               {user?.roles?.map(role => (
-                <span
-                  key={role}
-                  style={{
-                    fontSize: 12,
-                    padding: '2px 8px',
-                    borderRadius: 999,
-                    fontWeight: 600,
-                    background: role === 'ADMIN' ? '#e0e7ff' : '#f1f5f9',
-                    color: role === 'ADMIN' ? '#4338ca' : '#475569',
-                  }}
-                >
+                <span key={role} className={`account-role-pill ${role === 'ADMIN' ? 'is-admin' : ''}`}>
                   {role}
                 </span>
               ))}
@@ -254,309 +179,154 @@ export default function AccountPage() {
 
         <SignInMethods onStatus={setMethods} />
 
-        {/* Grid 2 Forms: Profile & Change Password */}
-        <div
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24 }}
-        >
-          {/* Card 1: Cập nhật thông tin */}
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: 24,
-              boxShadow: 'var(--shadow)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}
-          >
+        <div className="account-forms-grid">
+          <div className="account-form-card">
             <div>
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>{t('Cập nhật hồ sơ')}</h3>
-              <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-                {t('Cập nhật thông tin cá nhân và liên hệ của bạn.')}
-              </p>
+              <h3>{t('Cập nhật hồ sơ')}</h3>
+              <p>{t('Cập nhật thông tin cá nhân và liên hệ của bạn.')}</p>
             </div>
 
-            {profileSuccess && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background: '#ecfdf5',
-                  color: '#065f46',
-                  fontSize: 13,
-                }}
-              >
-                ✓ {profileSuccess}
-              </div>
-            )}
-            {profileError && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background: '#fef2f2',
-                  color: '#991b1b',
-                  fontSize: 13,
-                }}
-              >
-                ✕ {profileError}
-              </div>
-            )}
+            {profileSuccess && <div className="account-feedback is-success">✓ {profileSuccess}</div>}
+            {profileError && <div className="account-feedback is-error">✕ {profileError}</div>}
 
             <form
               onSubmit={handleProfileSubmit}
               style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
             >
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  {t('Email đăng ký (Read-only)')}
-                </label>
-                <input
-                  type="email"
-                  disabled
-                  value={user?.email || ''}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    background: '#f8fafc',
-                    color: '#64748b',
-                    fontSize: 14,
-                  }}
-                />
-              </div>
+              <label className="account-field-label">
+                {t('Email đăng ký (Read-only)')}
+                <input className="account-input" type="email" disabled value={user?.email || ''} />
+              </label>
 
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  {t('Họ và tên')}
-                </label>
+              <label className="account-field-label">
+                {t('Họ và tên')}
                 <input
+                  className="account-input"
                   type="text"
                   required
                   maxLength={100}
                   placeholder={t('Nhập họ và tên đầy đủ')}
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    fontSize: 14,
-                  }}
                 />
-              </div>
+              </label>
 
               {[
                 ['avatarUrl', 'URL ảnh đại diện', 'url', 500],
                 ['phone', 'Số điện thoại', 'tel', 25],
                 ['dateOfBirth', 'Ngày sinh', 'date'],
               ].map(([field, label, type, maxLength]) => (
-                <label key={field} style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
+                <label key={field} className="account-field-label">
                   {t(label)}
                   <input
+                    className="account-input"
                     name={field}
                     type={type}
                     value={profile[field]}
                     maxLength={maxLength}
                     max={type === 'date' ? new Date().toLocaleDateString('en-CA') : undefined}
                     onChange={event => setProfile(previous => ({ ...previous, [field]: event.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      border: '1px solid var(--border)',
-                      fontSize: 14,
-                    }}
                   />
                 </label>
               ))}
-              <label style={{ display: 'grid', gap: 6, fontSize: 13, fontWeight: 600 }}>
+
+              <label className="account-field-label">
                 {t('Giới thiệu bản thân')}
                 <textarea
+                  className="account-input"
                   name="biography"
                   rows={4}
                   maxLength={1000}
                   value={profile.biography}
                   onChange={event => setProfile(previous => ({ ...previous, biography: event.target.value }))}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    fontSize: 14,
-                    resize: 'vertical',
-                  }}
+                  style={{ resize: 'vertical', minHeight: 96 }}
                 />
               </label>
+
               <button
                 type="submit"
                 className="button button-primary"
                 disabled={profileLoading || !fullName.trim()}
-                style={{ marginTop: 8 }}
+                style={{ marginTop: 6 }}
               >
                 {profileLoading ? t('Đang lưu...') : t('Lưu thông tin')}
               </button>
             </form>
           </div>
 
-          {/* Card 2: Đổi mật khẩu */}
           {methods?.passwordEnabled !== false && (
-            <div
-              style={{
-                background: '#fff',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 24,
-                boxShadow: 'var(--shadow)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
-            >
+            <div className="account-form-card">
               <div>
-                <h3 style={{ fontSize: 18, fontWeight: 700 }}>{t('Đổi mật khẩu')}</h3>
-                <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-                  {t('Bảo vệ tài khoản với mật khẩu tối thiểu 8 ký tự.')}
-                </p>
+                <h3>{t('Đổi mật khẩu')}</h3>
+                <p>{t('Bảo vệ tài khoản với mật khẩu tối thiểu 8 ký tự.')}</p>
               </div>
 
-              {passwordSuccess && (
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: 8,
-                    background: '#ecfdf5',
-                    color: '#065f46',
-                    fontSize: 13,
-                  }}
-                >
-                  ✓ {passwordSuccess}
-                </div>
-              )}
-              {passwordError && (
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: 8,
-                    background: '#fef2f2',
-                    color: '#991b1b',
-                    fontSize: 13,
-                  }}
-                >
-                  ✕ {passwordError}
-                </div>
-              )}
+              {passwordSuccess && <div className="account-feedback is-success">✓ {passwordSuccess}</div>}
+              {passwordError && <div className="account-feedback is-error">✕ {passwordError}</div>}
 
               <form
                 onSubmit={handlePasswordSubmit}
                 style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
               >
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    {t('Mật khẩu hiện tại')}
-                  </label>
-                  <div style={{ position: 'relative' }}>
+                <label className="account-field-label">
+                  {t('Mật khẩu hiện tại')}
+                  <div className="account-pw-wrap">
                     <input
+                      className="account-input"
                       type={showCurrentPassword ? 'text' : 'password'}
                       required
                       placeholder={t('Mật khẩu đang dùng')}
                       value={currentPassword}
                       onChange={e => setCurrentPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 40px 10px 12px',
-                        borderRadius: 8,
-                        border: '1px solid var(--border)',
-                        fontSize: 14,
-                      }}
                     />
                     <button
                       type="button"
+                      className="account-pw-toggle"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: 10,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--muted)',
-                        padding: 4,
-                        fontSize: 12,
-                      }}
                     >
                       {showCurrentPassword ? t('Ẩn') : t('Hiện')}
                     </button>
                   </div>
-                </div>
+                </label>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    {t('Mật khẩu mới')}
-                  </label>
-                  <div style={{ position: 'relative' }}>
+                <label className="account-field-label">
+                  {t('Mật khẩu mới')}
+                  <div className="account-pw-wrap">
                     <input
+                      className="account-input"
                       type={showNewPassword ? 'text' : 'password'}
                       required
                       placeholder={t('Tối thiểu 8 ký tự, gồm HOA, thường, số')}
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 40px 10px 12px',
-                        borderRadius: 8,
-                        border: '1px solid var(--border)',
-                        fontSize: 14,
-                      }}
                     />
                     <button
                       type="button"
+                      className="account-pw-toggle"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: 10,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--muted)',
-                        padding: 4,
-                        fontSize: 12,
-                      }}
                     >
                       {showNewPassword ? t('Ẩn') : t('Hiện')}
                     </button>
                   </div>
-                </div>
+                </label>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    {t('Xác nhận mật khẩu mới')}
-                  </label>
+                <label className="account-field-label">
+                  {t('Xác nhận mật khẩu mới')}
                   <input
+                    className="account-input"
                     type="password"
                     required
                     placeholder={t('Nhập lại mật khẩu mới')}
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      border: '1px solid var(--border)',
-                      fontSize: 14,
-                    }}
                   />
-                </div>
+                </label>
 
                 <button
                   type="submit"
                   className="button button-primary"
                   disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword}
-                  style={{ marginTop: 8 }}
+                  style={{ marginTop: 6 }}
                 >
                   {passwordLoading ? t('Đang đổi...') : t('Đổi mật khẩu')}
                 </button>

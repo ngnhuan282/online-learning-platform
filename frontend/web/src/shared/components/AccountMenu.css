@@ -2,29 +2,30 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 5px;
-  border-radius: 12px;
-  color: #23324b;
+  padding: 5px 8px 5px 5px;
+  border-radius: 14px;
+  color: #132238;
   flex-shrink: 0;
 }
 .account-menu-trigger:hover {
-  background: #f1f5fc;
+  background: #f1f6fd;
 }
 .account-menu-trigger.Mui-focusVisible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 .account-menu-trigger .account-menu-avatar {
   width: 38px;
   height: 38px;
-  background: #e3edff;
-  color: #2563eb;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
 }
 .account-menu-details {
   text-align: left;
-  max-width: 200px;
+  max-width: 190px;
 }
 .account-menu-details strong,
 .account-menu-details small {
@@ -34,44 +35,58 @@
   white-space: nowrap;
 }
 .account-menu-details strong {
-  font-size: 13px;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
 }
 .account-menu-details small {
-  margin-top: 4px;
-  color: #7b8ba5;
+  margin-top: 2px;
+  color: #64748b;
   font-size: 11px;
 }
 .account-menu-chevron {
-  color: #7b8ba5;
+  color: #64748b;
 }
 .account-menu-paper.MuiPaper-root {
-  min-width: 264px;
+  min-width: 268px;
   max-width: calc(100vw - 32px);
   margin-top: 8px;
-  border: 1px solid #e2eaf4;
-  border-radius: 12px;
-  box-shadow: 0 10px 35px #1722381c;
+  border: 1.5px solid #dce5f0;
+  border-radius: 18px;
+  padding: 4px 0;
+  box-shadow:
+    0 4px 0 #e2eaf3,
+    0 18px 38px rgb(19 34 56 / 13%);
 }
 .account-menu-paper .MuiMenuItem-root {
-  min-height: 49px;
-  padding: 11px 18px;
+  min-height: 46px;
+  padding: 10px 14px;
+  margin: 2px 8px;
+  border-radius: 11px;
   gap: 12px;
-  font-size: 15px;
+  font-size: 14.5px;
 }
 .account-menu-paper .MuiListItemIcon-root {
   min-width: 24px;
-  color: #65718b;
+  color: #5b6c85;
 }
 .account-menu-paper .MuiListItemText-primary {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: inherit;
-  font-weight: 500;
+  font-weight: 600;
+}
+.account-menu-paper .MuiMenuItem-root:not(.account-menu-logout):hover {
+  background: #f2f7fe;
 }
 .account-menu-paper .MuiMenuItem-root:not(.account-menu-logout):hover .MuiListItemIcon-root {
-  color: #2563eb;
+  color: var(--primary);
 }
 .account-menu-paper .account-menu-logout,
 .account-menu-paper .account-menu-logout .MuiListItemIcon-root {
-  color: #dc3545;
+  color: #dc2626;
+}
+.account-menu-paper .account-menu-logout:hover {
+  background: #fef2f2;
 }
 @media (max-width: 700px) {
   .account-menu-details {

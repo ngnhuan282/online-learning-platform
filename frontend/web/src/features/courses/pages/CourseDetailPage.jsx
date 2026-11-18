@@ -15,10 +15,10 @@ import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
 import { lessonApi } from '../api/lessonApi';
 import ErrorState from '../../../shared/components/ErrorState';
+import Icon from '../../../shared/components/Icon';
 import usePro from '../../pro/hooks/usePro';
 import { ROUTES } from '../../../shared/constants/routes';
 
-// Chuẩn hóa hiển thị giá tiền VND (B9-FE-2)
 const formatVND = amount => {
   if (!amount || Number(amount) === 0) return 'Miễn phí';
   return new Intl.NumberFormat(getIntlLocale(), { style: 'currency', currency: 'VND' }).format(
@@ -98,9 +98,8 @@ function CourseDetail({ id }) {
   const hasEnrollment = isAuthenticated && enrollment?.userId === user?.id && enrollment?.courseId === id;
   const expiredPro = hasEnrollment && enrollment.accessSource === 'PRO' && membership && !membership.active;
   const isEnrolled = hasEnrollment && !expiredPro;
-  const [activeTab, setActiveTab] = useState('curriculum'); // 'curriculum' | 'reviews'
+  const [activeTab, setActiveTab] = useState('curriculum');
 
-  // States cho Modal học thử (Preview Lesson Player)
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [activePreviewLesson, setActivePreviewLesson] = useState(null);
   const [previewPlayData, setPreviewPlayData] = useState(null);
@@ -112,7 +111,6 @@ function CourseDetail({ id }) {
   const [courseNotFound, setCourseNotFound] = useState(false);
   const [courseError, setCourseError] = useState(null);
 
-  // Load course details & curriculum
   const loadCourseData = useCallback(async () => {
     setCourseError(null);
     try {
@@ -145,7 +143,6 @@ function CourseDetail({ id }) {
     }
   }, [id]);
 
-  // Load reviews
   const loadReviews = useCallback(
     async (page = 0) => {
       setReviewsLoading(true);
@@ -169,7 +166,6 @@ function CourseDetail({ id }) {
     [id],
   );
 
-  // Load my review if logged in
   const loadMyReview = useCallback(async () => {
     if (!isAuthenticated || user?.id == null) {
       setMyReview(null);
@@ -223,7 +219,6 @@ function CourseDetail({ id }) {
   const handleReviewSuccess = async savedReview => {
     setEditingReview(null);
     setMyReview(savedReview);
-    // Reload reviews & course to refresh avgRating and reviewCount
     await Promise.all([loadCourseData(), loadReviews(0), loadMyReview()]);
   };
 
@@ -257,7 +252,6 @@ function CourseDetail({ id }) {
     }
   };
 
-  // B9-FE-1: Đăng ký học miễn phí (price === 0)
   const handleEnroll = async () => {
     if (enrolling) return;
     if (!isAuthenticated) {
@@ -277,7 +271,6 @@ function CourseDetail({ id }) {
     }
   };
 
-  // B9-FE-1: Mua khóa học trả phí → Điều hướng sang Checkout (không tin FE price)
   const handleBuyCourse = async () => {
     const destination = `/checkout?course=${encodeURIComponent(id)}`;
     if (!isAuthenticated) {
@@ -312,772 +305,538 @@ function CourseDetail({ id }) {
 
   if (loading) {
     return (
-      <main className="container" style={{ padding: '32px 0 80px' }}>
-        <div className="empty-courses" role="status">
-          <h3>{t('Đang tải khóa học...')}</h3>
+      <div className="course-detail-page">
+        <div className="container">
+          <div className="empty-courses" role="status">
+            <h3>{t('Đang tải khóa học...')}</h3>
+          </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (courseNotFound) {
     return (
-      <main className="container" style={{ padding: '60px 0 100px', textAlign: 'center' }}>
-        <div className="course-card" style={{ maxWidth: 500, margin: '0 auto', padding: '40px 24px' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px' }}>
-            {t('Không tìm thấy khóa học')}
-          </h2>
-          <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+      <section className="status-screen container">
+        <div className="status-screen-card">
+          <span className="eyebrow-pill">COURSE NOT FOUND</span>
+          <h2>{t('Không tìm thấy khóa học')}</h2>
+          <p>
             {t('Khóa học với mã ID')} <strong>#{id}</strong>{' '}
             {t('không tồn tại trong hệ thống. Vui lòng chọn một khóa học đang có trong danh sách.')}
           </p>
-          <Link to="/courses" className="button button-primary" style={{ textDecoration: 'none' }}>
+          <Link to="/courses" className="button button-primary">
             {t('Xem danh sách khóa học')}
           </Link>
         </div>
-      </main>
+      </section>
     );
   }
 
   if (courseError || !course) {
     return (
-      <main className="container" style={{ padding: '32px 0 80px' }}>
-        <ErrorState
-          error={courseError}
-          title={t('Không thể tải khóa học')}
-          onRetry={async () => {
-            setLoading(true);
-            await loadCourseData();
-            setLoading(false);
-          }}
-        />
-      </main>
+      <div className="course-detail-page">
+        <div className="container">
+          <ErrorState
+            error={courseError}
+            title={t('Không thể tải khóa học')}
+            onRetry={async () => {
+              setLoading(true);
+              await loadCourseData();
+              setLoading(false);
+            }}
+          />
+        </div>
+      </div>
     );
   }
 
   const item = course;
   const totalLessons = sections.reduce((sum, sec) => sum + (sec.lessons?.length || 0), 0);
+  const isFreeCourse = Number(item.price || 0) === 0;
 
   return (
-    <main className="container" style={{ padding: '32px 0 80px' }}>
-      {enrollmentError && (
-        <ErrorState error={enrollmentError} title={t('Không thể đăng ký khóa học')} onRetry={handleEnroll} />
-      )}
-      <div
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}
-      >
-        <Link
-          to="/courses"
-          style={{ color: '#3b82f6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          {t('← Quay lại danh sách')}
-        </Link>
-        {isAdmin && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Link
-              to={`/admin/courses/${item.id}/curriculum`}
-              className="button button-soft"
-              style={{ fontSize: 13, textDecoration: 'none' }}
-            >
-              {t('⚙️ Quản lý giáo trình')}
-            </Link>
-            <Link
-              to={`/admin/courses/${item.id}/reviews`}
-              className="button button-soft"
-              style={{ fontSize: 13, textDecoration: 'none' }}
-            >
-              {t('⭐ Quản lý đánh giá')}
-            </Link>
+    <div className="course-detail-page">
+      <div className="container">
+        {enrollmentError && (
+          <div style={{ marginBottom: 20 }}>
+            <ErrorState
+              error={enrollmentError}
+              title={t('Không thể đăng ký khóa học')}
+              onRetry={handleEnroll}
+            />
+          </div>
+        )}
+
+        <div className="course-detail-topbar">
+          <Link to="/courses" className="course-back-link">
+            {t('← Quay lại danh sách')}
+          </Link>
+          {isAdmin && (
+            <div className="course-admin-shortcuts">
+              <Link to={`/admin/courses/${item.id}/curriculum`} className="button button-soft">
+                {t('Quản lý giáo trình')}
+              </Link>
+              <Link to={`/admin/courses/${item.id}/reviews`} className="button button-soft">
+                {t('Quản lý đánh giá')}
+              </Link>
+            </div>
+          )}
+        </div>
+
+        <div className="course-detail-layout">
+          {/* Main Content Column */}
+          <div>
+            <article className="course-hero-card">
+              <div className="course-hero-media">
+                <img src={resolveMediaUrl(item.thumbnailUrl || '/images/english-ielts.jpg')} alt={item.title} />
+              </div>
+              <div className="course-hero-header">
+                <span className="eyebrow-pill">{item.categoryName || t('Khóa học')}</span>
+                <div className="course-hero-rating">
+                  <StarRating value={item.avgRating} readonly size={17} showLabel />
+                  <span>
+                    ({item.reviewCount} {t('đánh giá)')}
+                  </span>
+                </div>
+              </div>
+              <h1>{t(item.title)}</h1>
+              <p className="course-hero-desc">{t(item.description)}</p>
+
+              <div className="detail-meta">
+                <span>
+                  {t('Trình độ:')} <strong>{String(item.level || 'Beginner').toUpperCase()}</strong>
+                </span>
+                <span>
+                  {t('Trạng thái:')} <strong>{item.status || 'PUBLISHED'}</strong>
+                </span>
+                <span>
+                  {t('Thời lượng:')}{' '}
+                  <strong>
+                    {sections.length} {t('chương (')}
+                    {totalLessons} {t('bài học)')}
+                  </strong>
+                </span>
+              </div>
+            </article>
+
+            {/* Navigation Tabs */}
+            <div className="course-tabs-bar" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'curriculum'}
+                className={`course-tab-btn ${activeTab === 'curriculum' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('curriculum')}
+              >
+                {t('Giáo trình')} ({sections.length} {t('chương)')}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'reviews'}
+                className={`course-tab-btn ${activeTab === 'reviews' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('reviews')}
+              >
+                {t('Đánh giá & Nhận xét')} ({item.reviewCount})
+              </button>
+            </div>
+
+            {/* Tab 1: Curriculum */}
+            {activeTab === 'curriculum' && (
+              <section className="course-content-panel">
+                <h3 style={{ marginBottom: 16, fontSize: 19, fontWeight: 800 }}>{t('Nội dung khóa học')}</h3>
+                {sections.length === 0 ? (
+                  <div>
+                    <p style={{ color: 'var(--muted)' }}>
+                      {t('Khóa học đang được cập nhật chi tiết giáo trình.')}
+                    </p>
+                    {(item.lessons || courseDefaults.lessons).length > 0 && (
+                      <ul style={{ paddingLeft: 18, marginTop: 12, display: 'grid', gap: 8 }}>
+                        {(item.lessons || courseDefaults.lessons).map((lesson, index) => (
+                          <li key={`${item.id}-lesson-${index}`}>{lesson}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="curriculum-section-list">
+                    {sections.map((section, sIndex) => (
+                      <div key={section.id} className="curriculum-section-box">
+                        <div className="curriculum-section-head">
+                          <span>
+                            {t('Chương')} {sIndex + 1}: {t(section.title)}
+                          </span>
+                          <span>
+                            {section.lessons?.length || 0} {t('bài học')}
+                          </span>
+                        </div>
+                        {section.lessons && section.lessons.length > 0 && (
+                          <div className="curriculum-lessons">
+                            {section.lessons.map(lesson => {
+                              const interactive = Boolean(lesson.preview || isEnrolled);
+                              return (
+                                <div
+                                  key={lesson.id}
+                                  onClick={() => handlePlayLesson(lesson)}
+                                  className={`curriculum-lesson-row ${interactive ? 'is-interactive' : ''}`}
+                                >
+                                  <div className="curriculum-lesson-main">
+                                    <span className="curriculum-lesson-type">
+                                      <Icon name={lesson.lessonType === 'VIDEO' ? 'play' : 'book'} size={16} />
+                                    </span>
+                                    <span className="curriculum-lesson-title">{t(lesson.title)}</span>
+                                    {lesson.preview ? (
+                                      <span className="curriculum-preview-pill">{t('Học thử')}</span>
+                                    ) : !isEnrolled ? (
+                                      <span className="curriculum-lock-badge" title={t('Nội dung trả phí')}>
+                                        🔒
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {lesson.duration ? (
+                                    <span className="curriculum-duration">
+                                      {Math.round(lesson.duration / 60)} {t('phút')}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Tab 2: Reviews */}
+            {activeTab === 'reviews' && (
+              <section className="course-content-panel">
+                <div className="review-summary-banner">
+                  <div className="review-summary-score">
+                    <div className="review-summary-number">
+                      {item.avgRating ? item.avgRating.toFixed(1) : '0.0'}
+                    </div>
+                    <StarRating value={item.avgRating} readonly size={18} />
+                    <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 4, fontWeight: 600 }}>
+                      {item.reviewCount} {t('đánh giá')}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ marginBottom: 6, fontSize: 16.5, fontWeight: 800 }}>
+                      {t('Đánh giá từ học viên')}
+                    </h4>
+                    <p style={{ fontSize: 13.5, color: 'var(--muted)' }}>
+                      {t(
+                        'Mỗi học viên chỉ được gửi 1 đánh giá cho khóa học. Đánh giá giúp cải thiện chất lượng bài giảng và hỗ trợ các bạn học sau.',
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {isAuthenticated ? (
+                  myReview && !editingReview ? (
+                    <div className="my-review-box">
+                      <span className="eyebrow">{t('Đánh giá của bạn')}</span>
+                      <ReviewCard
+                        review={myReview}
+                        currentUser={user}
+                        isOwner={true}
+                        onEdit={rev => setEditingReview(rev)}
+                        onDelete={handleDeleteReview}
+                      />
+                    </div>
+                  ) : (
+                    <ReviewForm
+                      courseId={id}
+                      existingReview={editingReview}
+                      onSubmitSuccess={handleReviewSuccess}
+                      onCancel={() => setEditingReview(null)}
+                    />
+                  )
+                ) : (
+                  <div className="review-form-box" style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                    {t('Vui lòng')}{' '}
+                    <Link to="/login" className="text-link">
+                      {t('đăng nhập')}
+                    </Link>{' '}
+                    {t('để viết đánh giá cho khóa học này.')}
+                  </div>
+                )}
+
+                <h4 style={{ margin: '0 0 12px', fontSize: 16.5, fontWeight: 800 }}>
+                  {t('Tất cả nhận xét (')}
+                  {reviewPagination.totalElements})
+                </h4>
+
+                {reviewsLoading ? (
+                  <p style={{ textAlign: 'center', color: 'var(--muted)', padding: 20 }}>
+                    {t('Đang tải nhận xét...')}
+                  </p>
+                ) : reviews.length === 0 ? (
+                  <p style={{ textAlign: 'center', color: 'var(--muted)', padding: 20 }}>
+                    {t('Chưa có đánh giá nào cho khóa học này. Hãy là người đầu tiên để lại nhận xét!')}
+                  </p>
+                ) : (
+                  <div>
+                    {reviews.map(rev => (
+                      <ReviewCard
+                        key={rev.id}
+                        review={rev}
+                        currentUser={user}
+                        isOwner={user?.id && String(rev.userId) === String(user.id)}
+                        isAdmin={isAdmin}
+                        onEdit={r => {
+                          setEditingReview(r);
+                          window.scrollTo({ top: 400, behavior: 'smooth' });
+                        }}
+                        onDelete={handleDeleteReview}
+                        onHide={handleAdminHide}
+                        onShow={handleAdminShow}
+                      />
+                    ))}
+
+                    {reviewPagination.totalPages > 1 && (
+                      <div className="catalog-pagination">
+                        <button
+                          className="button button-outline"
+                          disabled={reviewPagination.page <= 0 || reviewsLoading}
+                          onClick={() => loadReviews(reviewPagination.page - 1)}
+                        >
+                          {t('Trang trước')}
+                        </button>
+                        <span>
+                          Trang {reviewPagination.page + 1} / {reviewPagination.totalPages}
+                        </span>
+                        <button
+                          className="button button-outline"
+                          disabled={reviewPagination.page >= reviewPagination.totalPages - 1 || reviewsLoading}
+                          onClick={() => loadReviews(reviewPagination.page + 1)}
+                        >
+                          Trang sau
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+
+          {/* Sticky Enrollment Sidebar */}
+          <aside className="course-enroll-sidebar">
+            <h3>{t('Thông tin khóa học')}</h3>
+            <div className="course-enroll-stack">
+              <div className="course-price-tag">
+                <small>{t('Học phí')}</small>
+                <div className={`course-price-value ${isFreeCourse ? 'is-free' : ''}`}>
+                  {formatVND(Number(item.price || 0))}
+                </div>
+                {Number(item.originalPrice || 0) > Number(item.price || 0) && (
+                  <div className="course-price-original">
+                    <del>{formatVND(Number(item.originalPrice || 0))}</del>
+                    <span>
+                      {t('Tiết kiệm')} {formatVND(Number(item.originalPrice || 0) - Number(item.price || 0))}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {isEnrolled ? (
+                <button
+                  className="button button-success course-cta-btn"
+                  type="button"
+                  id="btn-continue-learning"
+                  onClick={() => navigate(`/learning/${item.id}`)}
+                >
+                  {t('Tiếp tục học')}
+                  <Icon name="arrow" size={18} />
+                </button>
+              ) : membership?.active && Number(item.price || 0) > 0 ? (
+                <button
+                  className="button button-primary course-cta-btn"
+                  type="button"
+                  id="btn-enroll-pro"
+                  onClick={handleEnroll}
+                  disabled={enrolling || item.status !== 'PUBLISHED'}
+                >
+                  {t('Học bằng Pro')}
+                </button>
+              ) : isFreeCourse ? (
+                <button
+                  className="button button-success course-cta-btn"
+                  type="button"
+                  id="btn-enroll-free"
+                  onClick={handleEnroll}
+                  disabled={enrolling || !course || course.status !== 'PUBLISHED'}
+                >
+                  {t('Đăng ký học miễn phí')}
+                  <Icon name="cap" size={18} />
+                </button>
+              ) : (
+                <button
+                  className="button button-primary course-cta-btn"
+                  type="button"
+                  id="btn-buy-course"
+                  onClick={handleBuyCourse}
+                >
+                  {t('Mua khóa học —')} {formatVND(Number(item.price || 0))}
+                </button>
+              )}
+
+              {Number(item.price || 0) > 0 && !membership?.active && (
+                <Link className="button button-outline course-cta-btn" to={ROUTES.PRO}>
+                  {t(expiredPro ? 'Gia hạn Pro để tiếp tục học' : 'Hoặc mở khóa với Pro')}
+                </Link>
+              )}
+
+              <div className="course-perks-list">
+                <div>
+                  <span className="course-perks-dot">✓</span>
+                  <span>
+                    {t(
+                      enrollment?.accessSource === 'PRO' || (membership?.active && !hasEnrollment)
+                        ? 'Quyền học trong thời hạn Pro'
+                        : 'Truy cập trọn đời toàn bộ bài giảng',
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="course-perks-dot">✓</span>
+                  <span>{t('Học trên máy tính, điện thoại, tablet')}</span>
+                </div>
+                <div>
+                  <span className="course-perks-dot">✓</span>
+                  <span>{t('Hỗ trợ giải đáp từ giảng viên & AI')}</span>
+                </div>
+                <div>
+                  <span className="course-perks-dot">✓</span>
+                  <span>{t('Tích lũy XP, chuỗi học & huy hiệu')}</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {/* Preview Lesson Modal */}
+        {previewModalOpen && (
+          <div
+            className="preview-modal-backdrop"
+            onClick={() => {
+              setPreviewModalOpen(false);
+              setPreviewPlayData(null);
+            }}
+          >
+            <div className="preview-modal-card" onClick={e => e.stopPropagation()}>
+              <div className="preview-modal-head">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span className="curriculum-preview-pill">{t('HỌC THỬ MIỄN PHÍ')}</span>
+                  <strong>{activePreviewLesson?.title}</strong>
+                </div>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t('Đóng')}
+                  onClick={() => {
+                    setPreviewModalOpen(false);
+                    setPreviewPlayData(null);
+                  }}
+                >
+                  <Icon name="close" />
+                </button>
+              </div>
+
+              <div className="preview-modal-body">
+                {previewLoading && (
+                  <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>
+                    <p>{t('Đang cấp link phát bài học bảo mật...')}</p>
+                  </div>
+                )}
+
+                {previewError && (
+                  <div className="account-feedback is-error" style={{ textAlign: 'center' }}>
+                    <p>{previewError}</p>
+                  </div>
+                )}
+
+                {!previewLoading && !previewError && previewPlayData && (
+                  <div>
+                    {previewPlayData.lessonType === 'VIDEO' ? (
+                      previewPlayData.playUrl?.includes('youtube.com') ||
+                      previewPlayData.playUrl?.includes('youtu.be') ? (
+                        <iframe
+                          src={previewPlayData.playUrl
+                            .replace('watch?v=', 'embed/')
+                            .replace('youtu.be/', 'www.youtube.com/embed/')}
+                          title={activePreviewLesson?.title}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          style={{ width: '100%', height: 380, border: 'none', borderRadius: 12 }}
+                        />
+                      ) : (
+                        <video
+                          controls
+                          autoPlay
+                          controlsList="nodownload"
+                          src={resolveMediaUrl(previewPlayData.playUrl)}
+                          onError={e => {
+                            if (!e.currentTarget.dataset.fallbackTried) {
+                              e.currentTarget.dataset.fallbackTried = 'true';
+                              e.currentTarget.src = 'https://vjs.zencdn.net/v/oceans.mp4';
+                              e.currentTarget.load();
+                              e.currentTarget.play().catch(() => {});
+                            }
+                          }}
+                          style={{ width: '100%', borderRadius: 12, maxHeight: 420, background: '#000' }}
+                        >
+                          {t('Trình duyệt của bạn không hỗ trợ phát video này.')}
+                        </video>
+                      )
+                    ) : (
+                      <div
+                        style={{
+                          background: 'var(--canvas)',
+                          padding: 20,
+                          borderRadius: 12,
+                          maxHeight: 380,
+                          overflowY: 'auto',
+                        }}
+                      >
+                        <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+                          {previewPlayData.content || t('Nội dung bài học dạng tài liệu/văn bản.')}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="preview-modal-foot">
+                      <small style={{ color: 'var(--muted)' }}>
+                        {t('Pre-signed URL bảo vệ có thời hạn:')}{' '}
+                        {Math.round(previewPlayData.expiresInSeconds / 60)} {t('phút')}
+                      </small>
+                      <button
+                        className="button button-primary"
+                        type="button"
+                        onClick={() => {
+                          setPreviewModalOpen(false);
+                          if (isFreeCourse) handleEnroll();
+                          else handleBuyCourse();
+                        }}
+                      >
+                        {isFreeCourse
+                          ? t('Đăng ký học toàn bộ')
+                          : `${t('Mua khóa học —')} ${formatVND(Number(course?.price || 0))}`}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      <div className="course-grid" style={{ gridTemplateColumns: '1.4fr 0.6fr', gap: 32 }}>
-        {/* Main Content Column */}
-        <div>
-          <article className="course-card" style={{ padding: 24, marginBottom: 24 }}>
-            <img
-              src={resolveMediaUrl(item.thumbnailUrl || '/images/english-ielts.jpg')}
-              alt={item.title}
-              style={{
-                width: '100%',
-                maxHeight: 380,
-                borderRadius: 12,
-                objectFit: 'cover',
-                marginBottom: 20,
-              }}
-            />
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 8,
-              }}
-            >
-              <span className="eyebrow">{item.categoryName || t('Khóa học')}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <StarRating value={item.avgRating} readonly size={18} showLabel />
-                <span style={{ fontSize: 13, color: '#64748b' }}>
-                  ({item.reviewCount} {t('đánh giá)')}
-                </span>
-              </div>
-            </div>
-            <h1 style={{ margin: '8px 0 12px', fontSize: 26, fontWeight: 700 }}>{t(item.title)}</h1>
-            <p style={{ color: '#475569', lineHeight: 1.6 }}>{t(item.description)}</p>
-
-            <div
-              className="detail-meta"
-              style={{ marginTop: 20, display: 'flex', gap: 16, flexWrap: 'wrap' }}
-            >
-              <span>
-                {t('Trình độ:')} <strong>{String(item.level || 'Beginner').toUpperCase()}</strong>
-              </span>
-              <span>
-                {t('Trạng thái:')} <strong>{item.status || 'PUBLISHED'}</strong>
-              </span>
-              <span>
-                {t('Thời lượng:')}{' '}
-                <strong>
-                  {sections.length} {t('chương (')}
-                  {totalLessons} {t('bài học)')}
-                </strong>
-              </span>
-            </div>
-          </article>
-
-          {/* Navigation Tabs */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              borderBottom: '2px solid rgba(148,163,184,0.2)',
-              marginBottom: 24,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setActiveTab('curriculum')}
-              style={{
-                padding: '10px 20px',
-                background: 'none',
-                border: 'none',
-                borderBottom: activeTab === 'curriculum' ? '3px solid #3b82f6' : '3px solid transparent',
-                color: activeTab === 'curriculum' ? '#3b82f6' : '#64748b',
-                fontWeight: 600,
-                fontSize: 15,
-                cursor: 'pointer',
-                marginBottom: -2,
-              }}
-            >
-              {t('📚 Giáo trình (')}
-              {sections.length} {t('chương)')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('reviews')}
-              style={{
-                padding: '10px 20px',
-                background: 'none',
-                border: 'none',
-                borderBottom: activeTab === 'reviews' ? '3px solid #3b82f6' : '3px solid transparent',
-                color: activeTab === 'reviews' ? '#3b82f6' : '#64748b',
-                fontWeight: 600,
-                fontSize: 15,
-                cursor: 'pointer',
-                marginBottom: -2,
-              }}
-            >
-              {t('⭐ Đánh giá & Nhận xét (')}
-              {item.reviewCount})
-            </button>
-          </div>
-
-          {/* Tab 1: Curriculum / Syllabus */}
-          {activeTab === 'curriculum' && (
-            <section className="course-card" style={{ padding: 24 }}>
-              <h3 style={{ marginBottom: 16 }}>{t('Nội dung khóa học')}</h3>
-              {sections.length === 0 ? (
-                <div>
-                  <p style={{ color: '#64748b' }}>{t('Khóa học đang được cập nhật chi tiết giáo trình.')}</p>
-                  <ul style={{ paddingLeft: 18, margin: 0, display: 'grid', gap: 8 }}>
-                    {(item.lessons || courseDefaults.lessons).map((lesson, index) => (
-                      <li key={`${item.id}-lesson-${index}`}>{lesson}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {sections.map((section, sIndex) => (
-                    <div
-                      key={section.id}
-                      style={{
-                        border: '1px solid rgba(148, 163, 184, 0.2)',
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: 'rgba(241, 245, 249, 0.6)',
-                          padding: '12px 16px',
-                          fontWeight: 600,
-                          fontSize: 15,
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <span>
-                          {t('Chương')} {sIndex + 1}: {t(section.title)}
-                        </span>
-                        <span style={{ fontSize: 13, color: '#64748b', fontWeight: 400 }}>
-                          {section.lessons?.length || 0} {t('bài học')}
-                        </span>
-                      </div>
-                      {section.lessons && section.lessons.length > 0 && (
-                        <div style={{ padding: '8px 16px' }}>
-                          {section.lessons.map((lesson, lIndex) => (
-                            <div
-                              key={lesson.id}
-                              onClick={() => handlePlayLesson(lesson)}
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                padding: '10px 12px',
-                                borderRadius: 8,
-                                borderBottom:
-                                  lIndex < section.lessons.length - 1
-                                    ? '1px solid rgba(148, 163, 184, 0.1)'
-                                    : 'none',
-                                fontSize: 14,
-                                cursor: lesson.preview || isEnrolled ? 'pointer' : 'default',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={e =>
-                                (lesson.preview || isEnrolled) &&
-                                (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)')
-                              }
-                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <span style={{ fontSize: 16 }}>
-                                  {lesson.lessonType === 'VIDEO' ? '🎥' : '📄'}
-                                </span>
-                                <span style={{ fontWeight: lesson.preview ? 500 : 400, color: '#1e293b' }}>
-                                  {t(lesson.title)}
-                                </span>
-                                {lesson.preview ? (
-                                  <span
-                                    style={{
-                                      fontSize: 11,
-                                      background: 'rgba(34, 197, 94, 0.12)',
-                                      color: '#16a34a',
-                                      padding: '3px 8px',
-                                      borderRadius: 6,
-                                      fontWeight: 600,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 4,
-                                    }}
-                                  >
-                                    {t('👁️ Học thử')}
-                                  </span>
-                                ) : !isEnrolled ? (
-                                  <span
-                                    title={t('Nội dung trả phí')}
-                                    style={{
-                                      fontSize: 13,
-                                      color: '#94a3b8',
-                                    }}
-                                  >
-                                    🔒
-                                  </span>
-                                ) : null}
-                              </div>
-                              {lesson.duration ? (
-                                <span style={{ fontSize: 13, color: '#94a3b8' }}>
-                                  {Math.round(lesson.duration / 60)} {t('phút')}
-                                </span>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* Tab 2: Reviews / Ratings */}
-          {activeTab === 'reviews' && (
-            <section className="course-card" style={{ padding: 24 }}>
-              {/* Summary Header */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 24,
-                  padding: '20px 24px',
-                  borderRadius: 12,
-                  background: 'rgba(248, 250, 252, 0.8)',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
-                  marginBottom: 24,
-                }}
-              >
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 40, fontWeight: 800, color: '#f59e0b', lineHeight: 1 }}>
-                    {item.avgRating ? item.avgRating.toFixed(1) : '0.0'}
-                  </div>
-                  <StarRating value={item.avgRating} readonly size={18} />
-                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-                    {item.reviewCount} {t('đánh giá')}
-                  </div>
-                </div>
-                <div style={{ flex: 1, borderLeft: '1px solid rgba(148,163,184,0.2)', paddingLeft: 20 }}>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 16 }}>{t('Đánh giá từ học viên')}</h4>
-                  <p style={{ margin: 0, fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
-                    {t(
-                      'Mỗi học viên chỉ được gửi 1 đánh giá cho khóa học. Đánh giá giúp cải thiện chất lượng bài giảng và hỗ trợ các bạn học sau.',
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Review Form / My Review Section */}
-              {isAuthenticated ? (
-                myReview && !editingReview ? (
-                  <div
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.05)',
-                      border: '1px solid rgba(59, 130, 246, 0.2)',
-                      borderRadius: 12,
-                      padding: 16,
-                      marginBottom: 24,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, color: '#3b82f6', fontSize: 14 }}>
-                        {t('Đánh giá của bạn')}
-                      </span>
-                    </div>
-                    <ReviewCard
-                      review={myReview}
-                      currentUser={user}
-                      isOwner={true}
-                      onEdit={rev => setEditingReview(rev)}
-                      onDelete={handleDeleteReview}
-                    />
-                  </div>
-                ) : (
-                  <ReviewForm
-                    courseId={id}
-                    existingReview={editingReview}
-                    onSubmitSuccess={handleReviewSuccess}
-                    onCancel={() => setEditingReview(null)}
-                  />
-                )
-              ) : (
-                <div
-                  style={{
-                    padding: 16,
-                    borderRadius: 8,
-                    background: 'rgba(241, 245, 249, 0.8)',
-                    textAlign: 'center',
-                    marginBottom: 24,
-                    fontSize: 14,
-                    color: '#64748b',
-                  }}
-                >
-                  {t('Vui lòng')}{' '}
-                  <Link to="/login" style={{ color: '#3b82f6', fontWeight: 600 }}>
-                    {t('đăng nhập')}
-                  </Link>{' '}
-                  {t('để viết đánh giá cho khóa học này.')}
-                </div>
-              )}
-
-              {/* Reviews List */}
-              <h4 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>
-                {t('Tất cả nhận xét (')}
-                {reviewPagination.totalElements})
-              </h4>
-
-              {reviewsLoading ? (
-                <p style={{ textAlign: 'center', color: '#64748b', padding: 20 }}>
-                  {t('Đang tải nhận xét...')}
-                </p>
-              ) : reviews.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#64748b', padding: 20 }}>
-                  {t('Chưa có đánh giá nào cho khóa học này. Hãy là người đầu tiên để lại nhận xét!')}
-                </p>
-              ) : (
-                <div>
-                  {reviews.map(rev => (
-                    <ReviewCard
-                      key={rev.id}
-                      review={rev}
-                      currentUser={user}
-                      isOwner={user?.id && String(rev.userId) === String(user.id)}
-                      isAdmin={isAdmin}
-                      onEdit={r => {
-                        setEditingReview(r);
-                        window.scrollTo({ top: 400, behavior: 'smooth' });
-                      }}
-                      onDelete={handleDeleteReview}
-                      onHide={handleAdminHide}
-                      onShow={handleAdminShow}
-                    />
-                  ))}
-
-                  {/* Reviews Pagination */}
-                  {reviewPagination.totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-                      <button
-                        className="button button-soft"
-                        disabled={reviewPagination.page <= 0 || reviewsLoading}
-                        onClick={() => loadReviews(reviewPagination.page - 1)}
-                      >
-                        {t('Trang trước')}
-                      </button>
-                      <span
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '0 12px',
-                          fontSize: 14,
-                          color: '#64748b',
-                        }}
-                      >
-                        Trang {reviewPagination.page + 1} / {reviewPagination.totalPages}
-                      </span>
-                      <button
-                        className="button button-soft"
-                        disabled={reviewPagination.page >= reviewPagination.totalPages - 1 || reviewsLoading}
-                        onClick={() => loadReviews(reviewPagination.page + 1)}
-                      >
-                        Trang sau
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
-        </div>
-
-        {/* Sidebar Column */}
-        <aside
-          className="course-card"
-          style={{ padding: 24, alignSelf: 'start', position: 'sticky', top: 24 }}
-        >
-          <h3>{t('Thông tin khóa học')}</h3>
-          <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
-            <div>
-              <small style={{ color: '#64748b' }}>{t('Học phí')}</small>
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  color: Number(item.price || 0) === 0 ? '#16a34a' : '#0f172a',
-                }}
-              >
-                {formatVND(Number(item.price || 0))}
-              </div>
-            </div>
-            {Number(item.originalPrice || 0) > Number(item.price || 0) ? (
-              <div>
-                <small style={{ color: '#64748b' }}>{t('Giá gốc')}</small>
-                <div style={{ textDecoration: 'line-through', color: '#94a3b8' }}>
-                  {formatVND(Number(item.originalPrice || 0))}
-                </div>
-                <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 600, marginTop: 2 }}>
-                  {t('Tiết kiệm')} {formatVND(Number(item.originalPrice || 0) - Number(item.price || 0))}
-                </div>
-              </div>
-            ) : null}
-
-            {/* B9-FE-1: CTA Button — Tiếp tục học / Đăng ký miễn phí / Mua ngay */}
-            {isEnrolled ? (
-              <button
-                className="button button-success"
-                type="button"
-                id="btn-continue-learning"
-                style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700 }}
-                onClick={() => navigate(`/learning/${item.id}`)}
-              >
-                {t('🚀 Tiếp tục học')}
-              </button>
-            ) : membership?.active && Number(item.price || 0) > 0 ? (
-              <button
-                className="button button-primary"
-                type="button"
-                id="btn-enroll-pro"
-                style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700 }}
-                onClick={handleEnroll}
-                disabled={enrolling || item.status !== 'PUBLISHED'}
-              >
-                {t('Học bằng Pro')}
-              </button>
-            ) : Number(item.price || 0) === 0 ? (
-              <button
-                className="button button-primary"
-                type="button"
-                id="btn-enroll-free"
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  fontSize: 15,
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #16a34a, #15803d)',
-                }}
-                onClick={handleEnroll}
-                disabled={enrolling || !course || course.status !== 'PUBLISHED'}
-              >
-                {t('🎓 Đăng ký học miễn phí')}
-              </button>
-            ) : (
-              <button
-                className="button button-primary"
-                type="button"
-                id="btn-buy-course"
-                style={{ width: '100%', padding: '14px', fontSize: 15, fontWeight: 700 }}
-                onClick={handleBuyCourse}
-              >
-                {t('💳 Mua khóa học —')} {formatVND(Number(item.price || 0))}
-              </button>
-            )}
-
-            {Number(item.price || 0) > 0 && !membership?.active && (
-              <Link className="button button-outline" to={ROUTES.PRO}>
-                {t(expiredPro ? 'Gia hạn Pro để tiếp tục học' : 'Hoặc mở khóa với Pro')}
-              </Link>
-            )}
-
-            <div
-              style={{
-                borderTop: '1px solid rgba(148, 163, 184, 0.2)',
-                paddingTop: 16,
-                display: 'grid',
-                gap: 10,
-                fontSize: 13,
-                color: '#64748b',
-              }}
-            >
-              <div>
-                {t(
-                  enrollment?.accessSource === 'PRO' || (membership?.active && !hasEnrollment)
-                    ? '✅ Quyền học trong thời hạn Pro'
-                    : '✅ Truy cập trọn đời toàn bộ bài giảng',
-                )}
-              </div>
-              <div>{t('✅ Học trên máy tính, điện thoại, tablet')}</div>
-              <div>{t('✅ Hỗ trợ giải đáp từ giảng viên')}</div>
-              <div>{t('✅ Cấp chứng chỉ hoàn thành khóa học')}</div>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      {/* Modal Học thử bài giảng với Pre-signed URL (T8) */}
-      {previewModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: 16,
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={() => {
-            setPreviewModalOpen(false);
-            setPreviewPlayData(null);
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 16,
-              maxWidth: 720,
-              width: '100%',
-              overflow: 'hidden',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e2e8f0',
-              }}
-            >
-              <div>
-                <span
-                  style={{
-                    fontSize: 12,
-                    background: '#dcfce7',
-                    color: '#15803d',
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    fontWeight: 600,
-                    marginRight: 8,
-                  }}
-                >
-                  {t('HỌC THỬ MIỄN PHÍ')}
-                </span>
-                <strong style={{ fontSize: 16, color: '#0f172a' }}>{activePreviewLesson?.title}</strong>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPreviewModalOpen(false);
-                  setPreviewPlayData(null);
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: 22,
-                  cursor: 'pointer',
-                  color: '#64748b',
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div
-              style={{
-                padding: 20,
-                minHeight: 280,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-              }}
-            >
-              {previewLoading && (
-                <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>
-                  <p>{t('⏳ Đang cấp link phát bài học bảo mật...')}</p>
-                </div>
-              )}
-
-              {previewError && (
-                <div
-                  style={{
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    padding: 16,
-                    borderRadius: 8,
-                    textAlign: 'center',
-                  }}
-                >
-                  <p>{previewError}</p>
-                </div>
-              )}
-
-              {!previewLoading && !previewError && previewPlayData && (
-                <div>
-                  {previewPlayData.lessonType === 'VIDEO' ? (
-                    previewPlayData.playUrl?.includes('youtube.com') ||
-                    previewPlayData.playUrl?.includes('youtu.be') ? (
-                      <iframe
-                        src={previewPlayData.playUrl
-                          .replace('watch?v=', 'embed/')
-                          .replace('youtu.be/', 'www.youtube.com/embed/')}
-                        title={activePreviewLesson?.title}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        style={{ width: '100%', height: 380, border: 'none', borderRadius: 8 }}
-                      />
-                    ) : (
-                      <video
-                        controls
-                        autoPlay
-                        controlsList="nodownload"
-                        src={resolveMediaUrl(previewPlayData.playUrl)}
-                        onError={e => {
-                          if (!e.currentTarget.dataset.fallbackTried) {
-                            e.currentTarget.dataset.fallbackTried = 'true';
-                            e.currentTarget.src = 'https://vjs.zencdn.net/v/oceans.mp4';
-                            e.currentTarget.load();
-                            e.currentTarget.play().catch(() => {});
-                          }
-                        }}
-                        style={{ width: '100%', borderRadius: 8, maxHeight: 420, background: '#000' }}
-                      >
-                        {t('Trình duyệt của bạn không hỗ trợ phát video này.')}
-                      </video>
-                    )
-                  ) : (
-                    <div
-                      style={{
-                        background: '#f8fafc',
-                        padding: 20,
-                        borderRadius: 8,
-                        maxHeight: 380,
-                        overflowY: 'auto',
-                      }}
-                    >
-                      <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#334155' }}>
-                        {previewPlayData.content || t('Nội dung bài học dạng tài liệu/văn bản.')}
-                      </p>
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      marginTop: 16,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 10,
-                    }}
-                  >
-                    <small style={{ color: '#94a3b8' }}>
-                      {t('🛡️ Pre-signed URL bảo vệ có thời hạn:')}{' '}
-                      {Math.round(previewPlayData.expiresInSeconds / 60)} {t('phút')}
-                    </small>
-                    <button
-                      className="button button-primary"
-                      type="button"
-                      onClick={() => {
-                        setPreviewModalOpen(false);
-                        handleEnroll();
-                      }}
-                    >
-                      {Number(course?.price || 0) === 0
-                        ? t('🎓 Đăng ký học toàn bộ')
-                        : `💳 Mua khóa học — ${formatVND(Number(course?.price || 0))}`}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
+    </div>
   );
 }
 

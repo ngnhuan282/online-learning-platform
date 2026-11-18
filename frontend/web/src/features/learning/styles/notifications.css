@@ -4,19 +4,22 @@
 
 .notification-badge {
   position: absolute;
-  top: -3px;
+  top: -4px;
   right: -5px;
-  min-width: 19px;
+  min-width: 20px;
   padding: 2px 5px;
-  border-radius: 12px;
-  background: #dc2626;
-  color: white;
-  font-size: 11px;
-  line-height: 15px;
+  border-radius: 999px;
+  background: #ef4444;
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 14px;
 }
 
 .notification-wrap .notification-panel {
-  width: min(380px, calc(100vw - 32px));
+  width: min(390px, calc(100vw - 32px));
   max-height: min(640px, 75vh);
   overflow-y: auto;
   z-index: 100;
@@ -24,9 +27,10 @@
 
 .notification-item time {
   display: block;
-  margin-top: 12px;
+  margin-top: 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .notification-meta,
@@ -42,11 +46,12 @@
 .notification-meta {
   justify-content: space-between;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .notification-actions {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .notification-actions a {
@@ -64,11 +69,11 @@
 
 .notification-preview .notification-item h2 {
   font-size: 15px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .notification-preview .notification-item p {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .notification-preview .notification-actions a {
@@ -77,7 +82,8 @@
 
 .notification-preview .button {
   font-size: 12px;
-  padding: 7px 10px;
+  padding: 7px 11px;
+  min-height: 36px;
 }
 
 .notification-filters {
@@ -88,13 +94,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  font-weight: 600;
 }
 
 .notification-filters select {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: white;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  background: #ffffff;
   color: var(--text);
 }
 
@@ -103,7 +110,7 @@
   margin-bottom: 28px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: white;
+  background: #ffffff;
 }
 
 .notification-compose fieldset {
@@ -124,7 +131,7 @@
 .notification-filters input:not([type='checkbox']) {
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   font: inherit;
 }
@@ -135,7 +142,17 @@
 
 .notification-pagination {
   justify-content: center;
-  margin-top: 24px;
+  margin-top: 28px;
+}
+
+.notification-pagination > span {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
 }
 
 @media (max-width: 600px) {
