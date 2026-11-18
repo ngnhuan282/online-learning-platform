@@ -12,7 +12,7 @@ import {
 import StatComparisonCard from '../../components/analytics/StatComparisonCard';
 import TrendChart from '../../components/analytics/TrendChart';
 import { analyticsApi } from '../analyticsApi';
-import { exportAnalyticsToCsv } from '../analyticsUtils';
+import { exportAnalyticsToExcel } from '../analyticsUtils';
 import { number } from '../../utils/adminUtils';
 
 export default function GemAnalyticsTab({ range, compare, onExportReady }) {
@@ -36,7 +36,7 @@ export default function GemAnalyticsTab({ range, compare, onExportReady }) {
   // Export handler
   useEffect(() => {
     if (!onExportReady) return;
-    onExportReady(() => {
+    onExportReady(async () => {
       if (!data) return;
       const { current, sourceBreakdown, anomalyLog } = data;
       const rows = [
@@ -60,7 +60,7 @@ export default function GemAnalyticsTab({ range, compare, onExportReady }) {
           a.date, a.type, a.userId, a.userName, a.gemDelta, a.reason,
         ]),
       ];
-      exportAnalyticsToCsv(rows, 'thong-ke-gem.csv');
+      await exportAnalyticsToExcel(rows, 'thong-ke-gem.xlsx', 'Thống kê Gem');
     });
   }, [data, onExportReady]);
 

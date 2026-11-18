@@ -11,7 +11,7 @@ import {
 import StatComparisonCard from '../../components/analytics/StatComparisonCard';
 import TrendChart from '../../components/analytics/TrendChart';
 import { analyticsApi } from '../analyticsApi';
-import { exportAnalyticsToCsv } from '../analyticsUtils';
+import { exportAnalyticsToExcel } from '../analyticsUtils';
 import { number } from '../../utils/adminUtils';
 
 export default function LearnersAnalyticsTab({ range, compare, onExportReady }) {
@@ -34,19 +34,19 @@ export default function LearnersAnalyticsTab({ range, compare, onExportReady }) 
     };
   }, [range, compare]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!data?.current?.series) return;
-    const columns = [
-      { header: 'Kỳ / Tháng', accessor: 'label' },
-      { header: 'Học viên mới kỳ này', accessor: 'current' },
-      { header: 'Học viên mới kỳ trước', accessor: 'previous' },
-    ];
-    exportAnalyticsToCsv(`Thong_ke_hoc_vien_${range.from}_${range.to}`, columns, data.current.series);
+    const header = ['Kỳ / Tháng', 'Học viên mới kỳ này', 'Học viên mới kỳ trước'];
+    const dataRows = data.current.series.map(row => [row.label, row.current, row.previous]);
+    await exportAnalyticsToExcel(
+      [header, ...dataRows],
+      `Thong_ke_hoc_vien_${range.from}_${range.to}.xlsx`,
+    );
   };
 
   useEffect(() => {
     if (onExportReady) {
-      onExportReady(() => handleExport);
+      onExportReady(async () => handleExport());
     }
   }, [data, range]);
 

@@ -9,7 +9,7 @@ import {
 import StatComparisonCard from '../../components/analytics/StatComparisonCard';
 import TrendChart from '../../components/analytics/TrendChart';
 import { analyticsApi } from '../analyticsApi';
-import { exportAnalyticsToCsv } from '../analyticsUtils';
+import { exportAnalyticsToExcel } from '../analyticsUtils';
 import { number } from '../../utils/adminUtils';
 
 export default function ShopAnalyticsTab({ range, compare, onExportReady }) {
@@ -33,7 +33,7 @@ export default function ShopAnalyticsTab({ range, compare, onExportReady }) {
   // Export handler
   useEffect(() => {
     if (!onExportReady) return;
-    onExportReady(() => {
+    onExportReady(async () => {
       if (!data) return;
       const { current, topItems } = data;
       const rows = [
@@ -51,7 +51,7 @@ export default function ShopAnalyticsTab({ range, compare, onExportReady }) {
           item.gemCost, item.totalGemSpent, item.owners, `${item.equipRate}%`,
         ]),
       ];
-      exportAnalyticsToCsv(rows, 'thong-ke-cua-hang.csv');
+      await exportAnalyticsToExcel(rows, 'thong-ke-cua-hang.xlsx', 'Cửa hàng');
     });
   }, [data, onExportReady]);
 

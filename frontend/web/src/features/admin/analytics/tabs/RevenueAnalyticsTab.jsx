@@ -11,7 +11,7 @@ import {
 import StatComparisonCard from '../../components/analytics/StatComparisonCard';
 import TrendChart from '../../components/analytics/TrendChart';
 import { analyticsApi } from '../analyticsApi';
-import { exportAnalyticsToCsv } from '../analyticsUtils';
+import { exportAnalyticsToExcel } from '../analyticsUtils';
 import { money, number } from '../../utils/adminUtils';
 
 export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
@@ -34,7 +34,7 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
     };
   }, [range, compare]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!data?.transactions) return;
     const columns = [
       { header: 'Mã GD', accessor: 'code' },
@@ -44,12 +44,19 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
       { header: 'Trạng thái', accessor: 'status' },
       { header: 'Thời gian', accessor: 'date' },
     ];
-    exportAnalyticsToCsv(`Thong_ke_doanh_thu_${range.from}_${range.to}`, columns, data.transactions);
+    const header = columns.map(c => c.header);
+    const dataRows = data.transactions.map(row =>
+      columns.map(col => (typeof col.accessor === 'function' ? col.accessor(row) : row[col.accessor])),
+    );
+    await exportAnalyticsToExcel(
+      [header, ...dataRows],
+      `Thong_ke_doanh_thu_${range.from}_${range.to}.xlsx`,
+    );
   };
 
   useEffect(() => {
     if (onExportReady) {
-      onExportReady(() => handleExport);
+      onExportReady(async () => handleExport());
     }
   }, [data, range]);
 

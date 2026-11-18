@@ -12,7 +12,7 @@ import {
 import StatComparisonCard from '../../components/analytics/StatComparisonCard';
 import TrendChart from '../../components/analytics/TrendChart';
 import { analyticsApi } from '../analyticsApi';
-import { exportAnalyticsToCsv } from '../analyticsUtils';
+import { exportAnalyticsToExcel } from '../analyticsUtils';
 import { number } from '../../utils/adminUtils';
 
 export default function ProMembershipTab({ range, compare, onExportReady }) {
@@ -35,22 +35,30 @@ export default function ProMembershipTab({ range, compare, onExportReady }) {
     };
   }, [range, compare]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!data?.activationCodes) return;
-    const columns = [
-      { header: 'Mã Code', accessor: 'code' },
-      { header: 'Người kích hoạt', accessor: 'usedBy' },
-      { header: 'Phân loại', accessor: r => r.type === 'PAID' ? 'Mua trả phí' : r.type === 'CODE' ? 'Mã kích hoạt' : 'Admin cấp' },
-      { header: 'Thời hạn (ngày)', accessor: 'durationDays' },
-      { header: 'Trạng thái', accessor: r => r.status === 'ACTIVE' ? 'Đang hoạt động' : r.status === 'EXPIRED' ? 'Hết hạn' : 'Chưa dùng' },
-      { header: 'Ngày kích hoạt', accessor: 'activatedAt' },
-      { header: 'Hết hạn lúc', accessor: 'expiresAt' },
+    const header = [
+      'Mã Code', 'Người kích hoạt', 'Phân loại',
+      'Thời hạn (ngày)', 'Trạng thái', 'Ngày kích hoạt', 'Hết hạn lúc',
     ];
-    exportAnalyticsToCsv(`Thong_ke_pro_${range.from}_${range.to}`, columns, data.activationCodes);
+    const dataRows = data.activationCodes.map(r => [
+      r.code,
+      r.usedBy,
+      r.type === 'PAID' ? 'Mua trả phí' : r.type === 'CODE' ? 'Mã kích hoạt' : 'Admin cấp',
+      r.durationDays,
+      r.status === 'ACTIVE' ? 'Đang hoạt động' : r.status === 'EXPIRED' ? 'Hết hạn' : 'Chưa dùng',
+      r.activatedAt,
+      r.expiresAt,
+    ]);
+    await exportAnalyticsToExcel(
+      [header, ...dataRows],
+      `Thong_ke_pro_${range.from}_${range.to}.xlsx`,
+      'Thống kê Pro'
+    );
   };
 
   useEffect(() => {
-    if (onExportReady) onExportReady(() => handleExport);
+    if (onExportReady) onExportReady(async () => handleExport());
   }, [data, range]);
 
   if (loading) {

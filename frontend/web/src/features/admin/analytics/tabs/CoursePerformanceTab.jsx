@@ -9,7 +9,7 @@ import {
 import StatComparisonCard from '../../components/analytics/StatComparisonCard';
 import TrendChart from '../../components/analytics/TrendChart';
 import { analyticsApi } from '../analyticsApi';
-import { exportAnalyticsToCsv } from '../analyticsUtils';
+import { exportAnalyticsToExcel } from '../analyticsUtils';
 import { number } from '../../utils/adminUtils';
 
 export default function CoursePerformanceTab({ range, compare, onExportReady }) {
@@ -32,23 +32,27 @@ export default function CoursePerformanceTab({ range, compare, onExportReady }) 
     };
   }, [range, compare]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!data?.coursesTable) return;
-    const columns = [
-      { header: 'ID Khóa học', accessor: 'id' },
-      { header: 'Tên khóa học', accessor: 'title' },
-      { header: 'Danh mục', accessor: 'category' },
-      { header: 'Lượt đăng ký', accessor: 'enrollments' },
-      { header: 'Tỷ lệ hoàn thành (%)', accessor: 'completionRate' },
-      { header: 'Đánh giá (sao)', accessor: 'avgRating' },
-      { header: 'Số lượt đánh giá', accessor: 'reviewsCount' },
+    const header = [
+      'ID Khóa học', 'Tên khóa học', 'Danh mục',
+      'Lượt đăng ký', 'Tỷ lệ hoàn thành (%)',
+      'Đánh giá (sao)', 'Số lượt đánh giá',
     ];
-    exportAnalyticsToCsv(`Hieu_qua_khoa_hoc_${range.from}_${range.to}`, columns, data.coursesTable);
+    const dataRows = data.coursesTable.map(c => [
+      c.id, c.title, c.category, c.enrollments,
+      c.completionRate, c.avgRating, c.reviewsCount,
+    ]);
+    await exportAnalyticsToExcel(
+      [header, ...dataRows],
+      `Hieu_qua_khoa_hoc_${range.from}_${range.to}.xlsx`,
+      'Hiệu quả khóa học'
+    );
   };
 
   useEffect(() => {
     if (onExportReady) {
-      onExportReady(() => handleExport);
+      onExportReady(async () => handleExport());
     }
   }, [data, range]);
 

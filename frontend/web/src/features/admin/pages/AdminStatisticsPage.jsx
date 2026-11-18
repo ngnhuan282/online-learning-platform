@@ -94,7 +94,7 @@ export default function AdminStatisticsPage() {
         compare={compare}
         onCompareChange={setCompare}
         onExport={handleExport}
-        exportLabel="Xuất Excel / CSV"
+        exportLabel="Xuất Excel (.xlsx)"
       />
 
       {/* Tab Panels */}

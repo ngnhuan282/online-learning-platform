@@ -10,6 +10,7 @@ import {
   MenuBookOutlined,
   TaskAlt,
   ArrowForward,
+  WorkspacePremiumOutlined,
 } from '@mui/icons-material';
 import useAuth from '../../auth/hooks/useAuth';
 import { adminApi } from '../api/adminApi';
@@ -17,7 +18,9 @@ import { can, number, money, date } from '../utils/adminUtils';
 import { PageHeading, StatCard, LoadState } from '../components/AdminUi';
 import { getPaymentDisplayStatus } from '../../payment/utils/paymentFlow';
 import PaymentRevenueChart from '../../payment/components/PaymentRevenueChart';
+import TrendChart from '../components/analytics/TrendChart';
 import '../../payment/styles/payment-admin.css';
+import '../analytics/analytics.css';
 
 const sources = [
   ['overview', 'DASHBOARD_VIEW', 'Tài khoản'],
@@ -26,6 +29,62 @@ const sources = [
   ['payments', 'PAYMENT_REPORT_VIEW', 'Thanh toán'],
 ];
 const colors = ['#2563eb', '#38bdf8', '#1646b5', '#a8b8d5', '#86a9f9'];
+
+// --- Mock trend / KPI data (replace with API when available) ---
+const dashboardTrend = {
+  revenueSeries: [
+    { label: 'T2', current: 12500000, previous: 9800000 },
+    { label: 'T3', current: 15200000, previous: 11000000 },
+    { label: 'T4', current: 13800000, previous: 10500000 },
+    { label: 'T5', current: 18900000, previous: 14200000 },
+    { label: 'T6', current: 21500000, previous: 16000000 },
+    { label: 'T7', current: 17300000, previous: 13500000 },
+    { label: 'CN', current: 9800000, previous: 8200000 },
+  ],
+  learnerSeries: [
+    { label: 'T2', current: 42, previous: 35 },
+    { label: 'T3', current: 58, previous: 44 },
+    { label: 'T4', current: 51, previous: 40 },
+    { label: 'T5', current: 73, previous: 55 },
+    { label: 'T6', current: 68, previous: 52 },
+    { label: 'T7', current: 45, previous: 38 },
+    { label: 'CN', current: 29, previous: 24 },
+  ],
+};
+const dashboardKPIs = {
+  proMembers: { current: 142, previous: 118 },
+  lessonsCompleted: { current: 1847, previous: 1523 },
+};
+
+const PERIOD_PRESETS = [
+  { key: '7d', label: '7 ngày' },
+  { key: '30d', label: '30 ngày' },
+  { key: 'thisMonth', label: 'Tháng này' },
+  { key: 'lastMonth', label: 'Tháng trước' },
+];
+
+// Helper: compute % change badge
+function growthBadge(current, previous) {
+  if (previous == null || previous === 0) return null;
+  const pct = ((current - previous) / previous) * 100;
+  const up = pct >= 0;
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 2,
+        fontSize: 12,
+        fontWeight: 600,
+        color: up ? '#16a34a' : '#dc2626',
+        marginTop: 2,
+      }}
+    >
+      {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% so với kỳ trước
+    </span>
+  );
+}
+
 const paymentLabels = {
   PENDING: 'Đang chờ',
   SUCCESS: 'Thành công',
@@ -46,6 +105,7 @@ export default function AdminDashboardPage() {
   const { user } = useAuth();
   const [state, setState] = useState({ loading: true, data: {}, errors: [] });
   const [retry, setRetry] = useState(0);
+  const [activePeriod, setActivePeriod] = useState('7d');
   useEffect(() => {
     let active = true;
     const allowed = sources.filter(([, permission]) => can(user, permission));
@@ -107,6 +167,28 @@ export default function AdminDashboardPage() {
           )}
         </PageHeading>
       </section>
+      {/* Period filter bar */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {PERIOD_PRESETS.map(p => (
+          <button
+            key={p.key}
+            onClick={() => setActivePeriod(p.key)}
+            style={{
+              padding: '5px 14px',
+              borderRadius: 20,
+              border: activePeriod === p.key ? '2px solid #2563eb' : '1.5px solid #cbd5e1',
+              background: activePeriod === p.key ? '#2563eb' : '#fff',
+              color: activePeriod === p.key ? '#fff' : '#374151',
+              fontWeight: activePeriod === p.key ? 600 : 400,
+              fontSize: 13,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
       <LoadState loading={state.loading} />
       {state.errors.length > 0 && (
         <Alert severity="warning">
@@ -119,7 +201,16 @@ export default function AdminDashboardPage() {
           <StatCard
             title={t('TỔNG DOANH THU')}
             value={money(payments?.grossRevenue)}
-            detail="Tổng giá trị đơn đã thanh toán (VND)"
+            detail={
+              <>
+                Tổng giá trị đơn đã thanh toán (VND)
+                <br />
+                {growthBadge(
+                  dashboardTrend.revenueSeries.reduce((s, r) => s + r.current, 0),
+                  dashboardTrend.revenueSeries.reduce((s, r) => s + r.previous, 0),
+                )}
+              </>
+            }
             icon={<AccountBalanceWalletOutlined />}
           />
         )}
@@ -127,7 +218,16 @@ export default function AdminDashboardPage() {
           <StatCard
             title={t('TÀI KHOẢN HỆ THỐNG')}
             value={number(overview?.total)}
-            detail={`${number(overview?.newThisWeek)} tài khoản mới trong 7 ngày`}
+            detail={
+              <>
+                {`${number(overview?.newThisWeek)} tài khoản mới trong 7 ngày`}
+                <br />
+                {growthBadge(
+                  dashboardTrend.learnerSeries.reduce((s, r) => s + r.current, 0),
+                  dashboardTrend.learnerSeries.reduce((s, r) => s + r.previous, 0),
+                )}
+              </>
+            }
             icon={<PeopleOutlined />}
             tone="cyan"
           />
@@ -142,15 +242,69 @@ export default function AdminDashboardPage() {
         )}
         {can(user, 'LEARNING_REPORT_VIEW') && (
           <StatCard
-            title={t('TỶ LỆ HOÀN THÀNH')}
-            value={learning ? `${learning.completionRate.toFixed(1)}%` : '—'}
-            detail={`${number(learning?.completed)} / ${number(learning?.enrollments)} lượt ghi danh hợp lệ`}
+            title={t('BÀI HỌC HOÀN THÀNH')}
+            value={number(dashboardKPIs.lessonsCompleted.current)}
+            detail={
+              <>
+                {`${number(learning?.completed)} / ${number(learning?.enrollments)} lượt ghi danh hợp lệ`}
+                <br />
+                {growthBadge(dashboardKPIs.lessonsCompleted.current, dashboardKPIs.lessonsCompleted.previous)}
+              </>
+            }
             icon={<TaskAlt />}
             tone="green"
           />
         )}
+        <StatCard
+          title={t('THÀNH VIÊN PRO')}
+          value={number(dashboardKPIs.proMembers.current)}
+          detail={
+            <>
+              Thành viên đang hoạt động Pro
+              <br />
+              {growthBadge(dashboardKPIs.proMembers.current, dashboardKPIs.proMembers.previous)}
+            </>
+          }
+          icon={<WorkspacePremiumOutlined />}
+          tone="amber"
+        />
       </div>
       <div className="admin-dashboard-charts">
+        {/* --- Trend charts row --- */}
+        <section className="admin-card">
+          <div className="admin-card-heading">
+            <div>
+              <h2>{t('Xu hướng doanh thu')}</h2>
+              <p>{t('7 ngày · So sánh kỳ trước')}</p>
+            </div>
+          </div>
+          <TrendChart
+            series={dashboardTrend.revenueSeries}
+            compare
+            currentLabel="Kỳ này"
+            previousLabel="Kỳ trước"
+            currentColor="#2563eb"
+            previousColor="#94a3b8"
+            valueFormatter={money}
+          />
+        </section>
+        <section className="admin-card">
+          <div className="admin-card-heading">
+            <div>
+              <h2>{t('Xu hướng học viên mới')}</h2>
+              <p>{t('7 ngày · So sánh kỳ trước')}</p>
+            </div>
+          </div>
+          <TrendChart
+            series={dashboardTrend.learnerSeries}
+            compare
+            currentLabel="Kỳ này"
+            previousLabel="Kỳ trước"
+            currentColor="#0ea5e9"
+            previousColor="#94a3b8"
+            valueFormatter={number}
+          />
+        </section>
         {can(user, 'PAYMENT_REPORT_VIEW') && (
           <section className="admin-card payment-dashboard-revenue">
             <div className="admin-card-heading">
