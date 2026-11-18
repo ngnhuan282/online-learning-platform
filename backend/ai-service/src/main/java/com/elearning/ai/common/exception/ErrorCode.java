@@ -15,6 +15,8 @@ public enum ErrorCode {
     AI_NOT_AVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI provider is not configured"),
     AI_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI provider did not respond in time"),
     AI_QUOTA_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "AI quota or rate limit exceeded"),
+    AI_DAILY_LIMIT_REACHED(HttpStatus.TOO_MANY_REQUESTS, "Your daily AI message limit has been reached"),
+    AI_OFF_TOPIC(HttpStatus.UNPROCESSABLE_ENTITY, "Ask about English learning or using ChitChatGo"),
     AI_PROVIDER_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "AI provider is temporarily unavailable"),
     AI_CONFIGURATION_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "AI provider configuration requires attention"),
     AI_CONTENT_BLOCKED(HttpStatus.UNPROCESSABLE_ENTITY, "AI could not answer this question"),

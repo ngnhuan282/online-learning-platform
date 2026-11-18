@@ -54,6 +54,9 @@ class AiChatIntegrationTests {
     private static final String BASE = "/api/v1/ai/conversations";
     private static final AtomicInteger providerStatus = new AtomicInteger(200);
     private static final AtomicInteger contextStatus = new AtomicInteger(200);
+    private static final AtomicInteger membershipStatus = new AtomicInteger(200);
+    private static final AtomicBoolean proActive = new AtomicBoolean();
+    private static final AtomicLong membershipUserId = new AtomicLong(1);
     private static final AtomicInteger calls = new AtomicInteger();
     private static final AtomicLong delay = new AtomicLong();
     private static final AtomicReference<String> providerRequest = new AtomicReference<>();
@@ -133,7 +136,13 @@ class AiChatIntegrationTests {
                 } else {
                     forwardedAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
                     status = contextStatus.get();
+                    if (path.equals("/api/v1/learning/pro/me")) status = membershipStatus.get();
                     body = switch (path) {
+                        case "/api/v1/learning/pro/me" -> "{\"success\":true,\"data\":{\"userId\":" +
+                            membershipUserId.get() +
+                            ",\"active\":" +
+                            proActive.get() +
+                            "}}";
                         case "/api/v1/learning/courses/42" -> "{\"success\":true,\"data\":{\"courseId\":42}}";
                         case "/api/v1/courses/42" -> "{\"success\":true,\"data\":{\"id\":42,\"status\":\"PUBLISHED\",\"title\":\"English course\",\"description\":\"Grammar\"}}";
                         case "/api/v1/courses/42/sections" -> contextSections.get() != null
@@ -169,6 +178,10 @@ class AiChatIntegrationTests {
         jdbc.update("DELETE FROM ai_conversations");
         jdbc.update("DELETE FROM ai_daily_usage");
         properties.setDailyRequestLimit(100);
+        properties.setFreeDailyRequestLimit(5);
+        membershipStatus.set(200);
+        proActive.set(false);
+        membershipUserId.set(1);
         providerStatus.set(200);
         contextStatus.set(200);
         calls.set(0);
@@ -225,6 +238,106 @@ class AiChatIntegrationTests {
     }
 
     @Test
+    void freeLimitIsSharedAndOnlyVerifiedProUnlocksMoreRequests() throws Exception {
+        long first = create("{}");
+        long second = create("{}");
+        for (int index = 0; index < 5; index++) {
+            assertThat(send(index % 2 == 0 ? first : second, "free-budget-" + index).statusCode()).isEqualTo(
+                200
+            );
+        }
+        assertThat(send(first, "free-budget-0").statusCode()).isEqualTo(200);
+        var exhausted = request(
+            BASE + "/" + second + "/messages",
+            token(1, "ADMIN"),
+            "{\"content\":\"Explain English grammar\",\"requestId\":\"free-budget-next\",\"proActive\":true}"
+        );
+        assertThat(exhausted.statusCode()).isEqualTo(429);
+        assertThat(exhausted.body()).contains("AI_DAILY_LIMIT_REACHED");
+        assertThat(calls.get()).isEqualTo(5);
+        var allowance = request("/api/v1/ai/usage", token(1, "USER"), null);
+        assertThat(allowance.body()).contains(
+            "\"dailyLimit\":5",
+            "\"remaining\":0",
+            "\"proActive\":false",
+            "resetsAt"
+        );
+
+        proActive.set(true);
+        assertThat(request("/api/v1/ai/usage", token(1, "USER"), null).body()).contains(
+            "\"dailyLimit\":100",
+            "\"remaining\":95",
+            "\"proActive\":true"
+        );
+        assertThat(send(second, "free-budget-next").statusCode()).isEqualTo(200);
+        assertThat(calls.get()).isEqualTo(6);
+        jdbc.update("UPDATE ai_daily_usage SET request_count = 100 WHERE user_id = 1");
+        assertThat(send(second, "pro-budget-exhausted").statusCode()).isEqualTo(429);
+        proActive.set(false);
+        assertThat(send(second, "expired-membership").statusCode()).isEqualTo(429);
+        assertThat(calls.get()).isEqualTo(6);
+        assertThat(request(BASE + "/" + first + "/messages", token(1, "USER"), null).statusCode()).isEqualTo(
+            200
+        );
+    }
+
+    @Test
+    void unsupportedQuestionsDoNotCallTheProviderOrConsumeTheDailyAllowance() throws Exception {
+        long id = create("{}");
+        for (String question : List.of(
+            "Game nay la game gi?",
+            "Write Java code for me",
+            "Who won the match?"
+        )) {
+            var response = request(
+                BASE + "/" + id + "/messages",
+                token(1, "USER"),
+                mapper.writeValueAsString(Map.of("content", question))
+            );
+            assertThat(response.statusCode()).isEqualTo(422);
+            assertThat(response.body()).contains("AI_OFF_TOPIC");
+        }
+        assertThat(calls.get()).isZero();
+        assertThat(count("ai_daily_usage")).isZero();
+        assertThat(count("ai_messages")).isZero();
+        assertThat(send(id, "supported-after-refusal").statusCode()).isEqualTo(200);
+        assertThat(
+            request(
+                BASE + "/" + id + "/messages",
+                token(1, "USER"),
+                "{\"content\":\"Cho them vi du nhe\"}"
+            ).statusCode()
+        ).isEqualTo(200);
+        assertThat(
+            request(
+                BASE + "/" + id + "/messages",
+                token(1, "USER"),
+                "{\"content\":\"Tu vung tieng Anh ve game\"}"
+            ).statusCode()
+        ).isEqualTo(200);
+        assertThat(calls.get()).isEqualTo(3);
+        assertThat(
+            mapper.readTree(providerRequest.get()).path("generationConfig").path("maxOutputTokens").asInt()
+        ).isEqualTo(2048);
+    }
+
+    @Test
+    void membershipOutagesAndWrongOwnerNeverGrantProOrConsumeProviderQuota() throws Exception {
+        long id = create("{}");
+        membershipStatus.set(503);
+        assertThat(send(id, "membership-unavailable").statusCode()).isEqualTo(503);
+        assertThat(request("/api/v1/ai/usage", token(1, "USER"), null).statusCode()).isEqualTo(503);
+        membershipStatus.set(200);
+        membershipUserId.set(2);
+        proActive.set(true);
+        assertThat(send(id, "membership-wrong-owner").statusCode()).isEqualTo(503);
+        assertThat(calls.get()).isZero();
+        assertThat(count("ai_daily_usage")).isZero();
+        membershipUserId.set(1);
+        assertThat(send(id, "membership-restored").statusCode()).isEqualTo(200);
+    }
+
+    @Test
     void truncatedAnswerIsMarkedInHistoryAndReplayWithoutGeneratingAgain() throws Exception {
         long id = create("{}");
         providerBody.set(
@@ -265,7 +378,9 @@ class AiChatIntegrationTests {
         assertThat(send(first, "budget-request-1").statusCode()).isEqualTo(200);
         assertThat(send(second, "budget-request-2").statusCode()).isEqualTo(429);
         assertThat(calls.get()).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 1", Integer.class)).isEqualTo(1);
+        assertThat(
+            jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 1", Integer.class)
+        ).isEqualTo(1);
         properties.setDailyRequestLimit(2);
         assertThat(send(second, "budget-request-2").statusCode()).isEqualTo(200);
         assertThat(calls.get()).isEqualTo(2);
@@ -274,12 +389,22 @@ class AiChatIntegrationTests {
     @Test
     void concurrentRequestsCannotExceedTheDailyBudget() {
         properties.setDailyRequestLimit(3);
-        var requests = java.util.stream.IntStream.range(0, 16).mapToObj(index -> CompletableFuture.supplyAsync(() -> {
-            try { usageLimiter.consume(999L); return 1; }
-            catch (AppException limited) { return 0; }
-        }, executor)).toList();
+        var requests = java.util.stream.IntStream.range(0, 16)
+            .mapToObj(index ->
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        usageLimiter.consume(999L, false);
+                        return 1;
+                    } catch (AppException limited) {
+                        return 0;
+                    }
+                }, executor)
+            )
+            .toList();
         assertThat(requests.stream().mapToInt(CompletableFuture::join).sum()).isEqualTo(3);
-        assertThat(jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 999", Integer.class)).isEqualTo(3);
+        assertThat(
+            jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 999", Integer.class)
+        ).isEqualTo(3);
     }
 
     @Test
@@ -410,7 +535,8 @@ class AiChatIntegrationTests {
         assertThat(forwardedAuthorization.get()).startsWith("Bearer ");
         assertThat(providerRequest.get())
             .contains("Past tense", "Use past tense")
-            .contains("understand code", "multiple-choice questions", "learner's language")
+            .contains("NOT a general assistant", "multiple-choice questions", "learner's language")
+            .doesNotContain("understand code")
             .doesNotContain("private-signed-ticket", "private@example.com");
         contextStatus.set(403);
         assertThat(send(id, "request-revoked").statusCode()).isEqualTo(403);

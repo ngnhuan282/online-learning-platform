@@ -1,0 +1,1220 @@
+package com.elearning.learning;
+
+import static org.assertj.core.api.Assertions.*;
+
+import com.elearning.learning.common.exception.AppException;
+import com.elearning.learning.dto.DictationModels.*;
+import com.elearning.learning.service.*;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.Executors;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
+import tools.jackson.databind.json.JsonMapper;
+
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
+        "spring.datasource.url=jdbc:h2:mem:dictation;MODE=MySQL;DB_CLOSE_DELAY=-1",
+        "security.jwt.secret=dictation-test-secret-with-more-than-thirty-two-bytes",
+        "logging.level.root=WARN",
+        "dictation.storage-dir=./target/dictation-test-uploads",
+    }
+)
+@ActiveProfiles("test")
+class DictationIntegrationTests {
+
+    private static final String SECRET = "dictation-test-secret-with-more-than-thirty-two-bytes";
+    private static final String SAMPLE = "ets-2024-company-picnic";
+    private static final String USER = "/api/v1/learning/dictation";
+    private static final String ADMIN = "/api/v1/learning/admin/dictation";
+
+    @Autowired
+    DictationService service;
+
+    @Autowired
+    DictationGrader grader;
+
+    @Autowired
+    DictationWorkbookService workbooks;
+
+    @Autowired
+    DictationAudioService audio;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    JsonMapper json;
+
+    @Autowired
+    org.springframework.transaction.PlatformTransactionManager transactions;
+
+    @LocalServerPort
+    int port;
+
+    final HttpClient http = HttpClient.newHttpClient();
+
+    @Test
+    void sampleMigrationAndCatalogAreAvailableWithoutEnrollment() {
+        var catalog = service.catalog(5001, "picnic", "B1", "Workplace", 0, 12, false);
+        assertThat(catalog.total()).isGreaterThanOrEqualTo(1);
+        var item = catalog
+            .items()
+            .stream()
+            .filter(value -> value.id().equals(SAMPLE))
+            .findFirst()
+            .orElseThrow();
+        assertThat(item.sentenceCount()).isEqualTo(13);
+        assertThat(item.duration()).isBetween(31.0, 32.0);
+        assertThat(
+            service.catalog(5001, "nothing-matches-this-query", "", "", 0, 12, false).items()
+        ).isEmpty();
+        assertThat(service.catalog(5001, "", "C2", "", 0, 12, false).items()).isEmpty();
+    }
+
+    @Test
+    void adminStatusFilterUsesTheSameRulesForRowsAndPaginationTotals() throws Exception {
+        var sentences = List.of(new Sentence("Hello there.", 0.0, 3.0));
+        var draft = create("StatusFilter draft", sentences);
+        var visible = create("StatusFilter visible", sentences);
+        var another = create("StatusFilter another", sentences);
+        var hidden = create("StatusFilter hidden", sentences);
+        for (var lesson : List.of(visible, another, hidden)) service.publish(lesson.id(), lesson.version());
+        service.visibility(hidden.id(), true);
+        service.save(visible.id(), new SaveRequest(visible.definition(), visible.version()));
+
+        var first = service.catalog(0, "StatusFilter", "B1", "Workplace", 0, 1, true, "PUBLISHED");
+        var second = service.catalog(0, "StatusFilter", "B1", "Workplace", 1, 1, true, "PUBLISHED");
+        assertThat(first.total()).isEqualTo(2);
+        assertThat(second.total()).isEqualTo(2);
+        assertThat(first.items())
+            .hasSize(1)
+            .allMatch(item -> item.status().equals("PUBLISHED"));
+        assertThat(second.items())
+            .hasSize(1)
+            .noneMatch(item -> item.id().equals(first.items().getFirst().id()));
+        assertThat(service.catalog(0, "StatusFilter", "", "", 0, 12, true, "DRAFT").items())
+            .extracting(Item::id)
+            .containsExactly(draft.id());
+        assertThat(service.catalog(0, "StatusFilter", "", "", 0, 12, true, "ARCHIVED").items())
+            .extracting(Item::id)
+            .containsExactly(hidden.id());
+        assertThat(service.catalog(0, "StatusFilter", "", "", 0, 12, true).total()).isEqualTo(4);
+        var response = request(5090L, true, "GET", ADMIN + "?keyword=StatusFilter&status=ARCHIVED", null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(json.readTree(response.body()).path("data").path("total").asLong()).isEqualTo(1);
+        assertThat(request(5090L, true, "GET", ADMIN + "?status=unknown", null).statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    void graderAlignsMissingExtraWordsAndNormalizesPunctuationWithoutGuessingWords() {
+        assertThat(grader.grade("There's a video.", "THERE’S   A VIDEO!").accuracy()).isEqualTo(100);
+        var missing = grader.grade("we really enjoyed the company picnic", "we enjoyed the company picnic");
+        assertThat(missing.correct()).isEqualTo(5);
+        assertThat(
+            missing
+                .words()
+                .stream()
+                .filter(word -> word.type().equals("missing"))
+        ).hasSize(1);
+        var extra = grader.grade("we enjoyed it", "we really enjoyed it");
+        assertThat(extra.extra()).isEqualTo(1);
+        assertThat(extra.accuracy()).isLessThan(100);
+        assertThat(grader.grade("I'll", "I will").accuracy()).isLessThan(100);
+    }
+
+    @Test
+    void unansweredTranscriptIsHiddenAndOtherUsersCannotReadOrWriteAttempts() throws Exception {
+        var attempt = start(5002, SAMPLE);
+        assertThat(attempt.responses()).allSatisfy(response -> {
+            assertThat(response.answer()).isNull();
+            assertThat(response.grade()).isNull();
+            assertThat(response.completed()).isFalse();
+            assertThat(response.feedback()).allMatch(
+                word -> word.state().equals("empty") && word.text() == null
+            );
+        });
+        assertThatThrownBy(() -> service.attempt(5003, attempt.id())).isInstanceOf(AppException.class);
+        assertThat(
+            request(5003L, false, "GET", USER + "/attempts/" + attempt.id(), null).statusCode()
+        ).isEqualTo(404);
+        assertThat(
+            request(5003L, false, "GET", USER + "/attempts/" + attempt.id() + "/audio", null).statusCode()
+        ).isEqualTo(404);
+        for (String action : List.of("progress", "check", "hint", "reveal", "skip", "finish"))
+            assertThat(
+                request(
+                    5003L,
+                    false,
+                    action.equals("progress") ? "PUT" : "POST",
+                    USER + "/attempts/" + attempt.id() + "/" + action,
+                    "{\"index\":0,\"wordIndex\":0,\"text\":\"test\"}"
+                ).statusCode()
+            ).isEqualTo(404);
+        assertThat(service.history(5003, "", "", "", "", 0, 20).items()).isEmpty();
+    }
+
+    @Test
+    void revealingEveryWordCompletesTheSentenceAndPersistsWithoutGivingCredit() {
+        var detail = create("All hints", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        String id = start(5030, detail.id()).id();
+        service.progress(5030, id, new AnswerRequest(0, "my draft"));
+        assertThat(service.hint(5030, id, new HintRequest(0, 0)).completed()).isZero();
+        assertThat(service.hint(5030, id, new HintRequest(0, 1)).responses().getFirst().answer()).isNull();
+        var complete = service.hint(5030, id, new HintRequest(0, 2));
+        assertThat(complete.completed()).isEqualTo(1);
+        assertThat(complete.responses().getFirst().revealed()).isTrue();
+        assertThat(complete.responses().getFirst().answer()).isEqualTo("We enjoyed it.");
+        assertThat(complete.responses().getFirst().text()).isEqualTo("my draft");
+        assertThat(complete.responses().getFirst().firstAccuracy()).isZero();
+        assertThat(service.attempt(5030, id).completed()).isEqualTo(1);
+        assertThat(service.hint(5030, id, new HintRequest(0, 2)).responses().getFirst().hints()).hasSize(3);
+        assertThat(complete.responses().getFirst().completed()).isTrue();
+        assertThatThrownBy(() -> service.check(5030, id, new AnswerRequest(0, "We enjoyed it"))).isInstanceOf(
+            AppException.class
+        );
+        assertThat(service.progress(5030, id, new AnswerRequest(0, "my draft")).accuracy()).isZero();
+        assertThat(service.finish(5030, id).completedAt()).isNotNull();
+    }
+
+    @Test
+    void olderFullyHintedResponsesAreRecognizedAndEarnedScoresSurviveLaterHints() {
+        var detail = create("Legacy all hints", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        String id = start(5031, detail.id()).id();
+        service.hint(5031, id, new HintRequest(0, 0));
+        service.hint(5031, id, new HintRequest(0, 1));
+        service.hint(5031, id, new HintRequest(0, 2));
+        jdbc.update("UPDATE dictation_responses SET revealed=FALSE, first_grade=NULL WHERE attempt_id=?", id);
+        assertThat(service.attempt(5031, id).completed()).isEqualTo(1);
+        assertThat(service.attempt(5031, id).responses().getFirst().revealed()).isTrue();
+        assertThat(service.finish(5031, id).accuracy()).isZero();
+
+        String graded = start(5032, detail.id()).id();
+        double first = service
+            .check(5032, graded, new AnswerRequest(0, "We it"))
+            .responses()
+            .getFirst()
+            .firstAccuracy();
+        for (int word = 0; word < 3; word++) service.hint(5032, graded, new HintRequest(0, word));
+        assertThat(service.attempt(5032, graded).responses().getFirst().firstAccuracy()).isEqualTo(first);
+    }
+
+    @Test
+    void wordHintsArePrivatePersistentAndDiscountOnlyWordsNotAlreadyEarned() throws Exception {
+        var detail = create("Word hints", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        var attempt = start(5020, detail.id());
+        String id = attempt.id();
+        assertThat(attempt.sentences().getFirst().wordLengths()).containsExactly(2, 6, 7, 2);
+        assertThatThrownBy(() -> service.hint(5021, id, new HintRequest(0, 1))).isInstanceOf(
+            AppException.class
+        );
+        assertThat(
+            request(
+                5021L,
+                false,
+                "POST",
+                USER + "/attempts/" + id + "/hint",
+                "{\"index\":0,\"wordIndex\":1}"
+            ).statusCode()
+        ).isEqualTo(404);
+        assertThat(
+            request(
+                5020L,
+                false,
+                "POST",
+                USER + "/attempts/" + id + "/hint",
+                "{\"index\":0,\"wordIndex\":-1}"
+            ).statusCode()
+        ).isEqualTo(400);
+        assertThatThrownBy(() -> service.hint(5020, id, new HintRequest(0, 4))).isInstanceOf(
+            AppException.class
+        );
+        var hinted = service.hint(5020, id, new HintRequest(0, 1));
+        assertThat(hinted.completed()).isZero();
+        assertThat(hinted.responses().getFirst().answer()).isNull();
+        assertThat(hinted.responses().getFirst().hints()).containsExactly(new Hint(1, "really"));
+        service.hint(5020, id, new HintRequest(0, 1));
+        service.progress(5020, id, new AnswerRequest(0, "We really enjoyed it"));
+        assertThat(service.attempt(5020, id).responses().getFirst().hints()).hasSize(1);
+        assertThat(service.attempt(5020, id).responses().getFirst().completed()).isTrue();
+        var checked = service.check(5020, id, new AnswerRequest(0, "We really enjoyed it"));
+        assertThat(checked.responses().getFirst().grade().accuracy()).isEqualTo(100);
+        assertThat(checked.responses().getFirst().firstAccuracy()).isEqualTo(75);
+        service.hint(5020, id, new HintRequest(0, 0));
+        service.check(5020, id, new AnswerRequest(0, "We really enjoyed it"));
+        assertThat(service.finish(5020, id).accuracy()).isEqualTo(75);
+        assertThatThrownBy(() -> service.hint(5020, id, new HintRequest(0, 2))).isInstanceOf(
+            AppException.class
+        );
+    }
+
+    @Test
+    void hintsDoNotDoublePenalizeWrongWordsOrShiftAfterMissingAndExtraWords() {
+        var missing = grader.grade("we really enjoyed it", "we enjoyed it");
+        assertThat(grader.withoutHintCredit(missing, List.of(1)).correct()).isEqualTo(3);
+        assertThat(grader.withoutHintCredit(missing, List.of(2)).correct()).isEqualTo(2);
+        var extra = grader.grade("we enjoyed it", "we really enjoyed it");
+        assertThat(grader.withoutHintCredit(extra, List.of(1)).accuracy()).isEqualTo(33.3);
+    }
+
+    @Test
+    void liveProgressReturnsSafeIndexedFeedbackAndPreservesActualTokenOrder() throws Exception {
+        var detail = create("Live feedback", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        String id = start(5050, detail.id()).id();
+        var response = request(
+            5050L,
+            false,
+            "PUT",
+            USER + "/attempts/" + id + "/progress",
+            "{\"index\":0,\"text\":\"Yesterday we re\"}"
+        );
+        assertThat(response.statusCode()).isEqualTo(200);
+        var data = json.readTree(response.body()).path("data");
+        assertThat(data.path("scoringMode").asString()).isEqualTo("LIVE");
+        var sentence = data.path("responses").get(0);
+        assertThat(sentence.path("completed").asBoolean()).isFalse();
+        assertThat(sentence.path("answer").isNull()).isTrue();
+        assertThat(new String(response.body(), StandardCharsets.UTF_8)).doesNotContain(
+            "really",
+            "enjoyed",
+            "\"it\""
+        );
+        var partial = service.attempt(5050, id).responses().getFirst();
+        assertThat(partial.feedback()).containsExactly(
+            new Feedback(0, "correct", "we"),
+            new Feedback(1, "partial", null),
+            new Feedback(2, "empty", null),
+            new Feedback(3, "empty", null)
+        );
+        assertThat(
+            partial.grade().words().stream().map(Edit::actual).filter(Objects::nonNull).toList()
+        ).containsExactly("yesterday", "we", "re");
+        assertThat(partial.grade().words())
+            .filteredOn(edit -> !edit.type().equals("correct"))
+            .allSatisfy(edit -> assertThat(edit.expected()).isNull());
+
+        var wrong = service.progress(5050, id, new AnswerRequest(0, "We wrong"));
+        assertThat(wrong.completed()).isZero();
+        assertThat(wrong.responses().getFirst().feedback().get(1)).isEqualTo(
+            new Feedback(1, "incorrect", null)
+        );
+        assertThat(wrong.responses().getFirst().answer()).isNull();
+        assertThat(
+            service
+                .history(5050, "", "", "", "IN_PROGRESS", 0, 20)
+                .items()
+                .getFirst()
+                .responses()
+                .getFirst()
+                .answer()
+        ).isNull();
+        var blank = service.check(5050, id, new AnswerRequest(0, ""));
+        assertThat(blank.completed()).isZero();
+        assertThat(blank.accuracy()).isEqualTo(25);
+        assertThat(blank.responses().getFirst().feedback()).allMatch(word -> word.state().equals("empty"));
+        assertThatThrownBy(() -> service.finish(5050, id)).isInstanceOf(
+            com.elearning.learning.common.exception.DictationValidationException.class
+        );
+    }
+
+    @Test
+    void hintsBeforeAndAfterEarningWordsRespectThePersistentLedger() {
+        var detail = create("Live ledger", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        String id = start(5051, detail.id()).id();
+        assertThat(service.progress(5051, id, new AnswerRequest(0, "We really")).accuracy()).isEqualTo(50);
+        assertThat(service.hint(5051, id, new HintRequest(0, 1)).accuracy()).isEqualTo(50);
+        service.hint(5051, id, new HintRequest(0, 2));
+        assertThat(
+            service.progress(5051, id, new AnswerRequest(0, "We really enjoyed wrong")).accuracy()
+        ).isEqualTo(50);
+        assertThat(service.progress(5051, id, new AnswerRequest(0, "")).accuracy()).isEqualTo(50);
+        assertThat(service.attempt(5051, id).accuracy()).isEqualTo(50);
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT earned_indices FROM dictation_responses WHERE attempt_id=?",
+                String.class,
+                id
+            )
+        ).isEqualTo("[0,1]");
+        var done = service.progress(5051, id, new AnswerRequest(0, "We really enjoyed it"));
+        assertThat(done.completed()).isEqualTo(1);
+        assertThat(done.accuracy()).isEqualTo(75);
+        assertThat(done.responses().getFirst().completed()).isTrue();
+        assertThat(done.responses().getFirst().answer()).isEqualTo("We really enjoyed it.");
+        assertThat(done.responses().getFirst().hints()).containsExactly(
+            new Hint(1, "really"),
+            new Hint(2, "enjoyed")
+        );
+        assertThat(service.finish(5051, id).accuracy()).isEqualTo(75);
+    }
+
+    @Test
+    void extraWordsPreventCompletionAndDoNotBankNewCreditBeforeReveal() {
+        var detail = create("Extra words", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        String id = start(5052, detail.id()).id();
+        var extra = service.progress(5052, id, new AnswerRequest(0, "We really enjoyed it extra"));
+        assertThat(extra.completed()).isZero();
+        assertThat(extra.responses().getFirst().answer()).isNull();
+        assertThat(extra.responses().getFirst().grade().extra()).isEqualTo(2);
+        assertThat(extra.responses().getFirst().feedback()).containsExactly(
+            new Feedback(0, "correct", "we"),
+            new Feedback(1, "correct", "enjoyed"),
+            new Feedback(2, "correct", "it")
+        );
+        assertThat(extra.accuracy()).isZero();
+        assertThat(service.progress(5052, id, new AnswerRequest(0, "wrong")).accuracy()).isZero();
+        assertThat(service.progress(5052, id, new AnswerRequest(0, "We enjoyed it")).completed()).isEqualTo(
+            1
+        );
+        assertThat(service.finish(5052, id).accuracy()).isEqualTo(100);
+
+        String padded = start(5055, detail.id()).id();
+        service.progress(5055, padded, new AnswerRequest(0, "We really enjoyed it extra"));
+        assertThat(service.revealOrSkip(5055, padded, 0, true).accuracy()).isZero();
+        assertThat(service.finish(5055, padded).accuracy()).isZero();
+
+        String retained = start(5056, detail.id()).id();
+        service.progress(5056, retained, new AnswerRequest(0, "We"));
+        service.progress(5056, retained, new AnswerRequest(0, "We really enjoyed it extra"));
+        assertThat(service.revealOrSkip(5056, retained, 0, true).accuracy()).isEqualTo(33.3);
+    }
+
+    @Test
+    void revealSkipAndAllHintsKeepEarnedWordsAndScoreByWordCount() {
+        var detail = create(
+            "Weighted live score",
+            List.of(new Sentence("We enjoyed it.", 0.0, 3.0), new Sentence("Thanks.", 3.0, 4.0))
+        );
+        service.publish(detail.id(), detail.version());
+        String id = start(5053, detail.id()).id();
+        service.progress(5053, id, new AnswerRequest(0, "We wrong"));
+        assertThat(service.revealOrSkip(5053, id, 0, true).accuracy()).isEqualTo(25);
+        assertThatThrownBy(() ->
+            service.progress(5053, id, new AnswerRequest(0, "We enjoyed it"))
+        ).isInstanceOf(AppException.class);
+        var skipped = service.revealOrSkip(5053, id, 1, false);
+        assertThat(skipped.responses().get(1).completed()).isTrue();
+        assertThat(skipped.responses().get(1).skipped()).isTrue();
+        assertThatThrownBy(() -> service.progress(5053, id, new AnswerRequest(1, "Thanks"))).isInstanceOf(
+            AppException.class
+        );
+        assertThat(service.finish(5053, id).accuracy()).isEqualTo(25);
+
+        String hinted = start(5054, detail.id()).id();
+        service.progress(5054, hinted, new AnswerRequest(0, "We wrong"));
+        for (int word = 0; word < 3; word++) service.hint(5054, hinted, new HintRequest(0, word));
+        var allHints = service.attempt(5054, hinted);
+        assertThat(allHints.completed()).isEqualTo(1);
+        assertThat(allHints.responses().getFirst().completed()).isTrue();
+        assertThat(allHints.responses().getFirst().revealed()).isTrue();
+        assertThat(allHints.accuracy()).isEqualTo(25);
+        assertThatThrownBy(() ->
+            service.progress(5054, hinted, new AnswerRequest(0, "We enjoyed it"))
+        ).isInstanceOf(AppException.class);
+    }
+
+    @Test
+    void wrongAnswersCanEarnFullCreditOnRetryAndRevealedOrSkippedSentencesLock() {
+        var detail = create(
+            "Scoring",
+            List.of(new Sentence("We enjoyed it.", 0.0, 3.0), new Sentence("All right, thanks.", 3.0, 6.0))
+        );
+        service.publish(detail.id(), detail.version());
+        var attempt = start(5004, detail.id());
+        attempt = service.check(5004, attempt.id(), new AnswerRequest(0, "We it"));
+        double first = attempt.responses().getFirst().firstAccuracy();
+        assertThat(first).isEqualTo(66.7);
+        assertThat(attempt.completed()).isZero();
+        assertThat(attempt.responses().getFirst().answer()).isNull();
+        attempt = service.check(5004, attempt.id(), new AnswerRequest(0, "We enjoyed it"));
+        assertThat(attempt.responses().getFirst().grade().accuracy()).isEqualTo(100);
+        assertThat(attempt.responses().getFirst().firstAccuracy()).isEqualTo(100);
+        attempt = service.revealOrSkip(5004, attempt.id(), 1, true);
+        assertThat(attempt.responses().get(1).firstAccuracy()).isZero();
+        assertThat(attempt.responses().get(1).revealed()).isTrue();
+        String id = attempt.id();
+        assertThatThrownBy(() ->
+            service.check(5004, id, new AnswerRequest(1, "All right thanks"))
+        ).isInstanceOf(AppException.class);
+        var finished = service.finish(5004, attempt.id());
+        assertThat(finished.accuracy()).isEqualTo(50);
+        assertThat(service.finish(5004, attempt.id()).completedAt()).isEqualTo(finished.completedAt());
+        assertThat(service.check(5004, id, new AnswerRequest(0, "We enjoyed it")).accuracy()).isEqualTo(50);
+        assertThatThrownBy(() -> service.check(5004, id, new AnswerRequest(0, "changed"))).isInstanceOf(
+            AppException.class
+        );
+        assertThatThrownBy(() -> service.hint(5004, id, new HintRequest(0, 0))).isInstanceOf(
+            AppException.class
+        );
+        assertThatThrownBy(() -> service.revealOrSkip(5004, id, 1, false)).isInstanceOf(AppException.class);
+    }
+
+    @Test
+    void savesResumeCorrectSentenceAndStartIsIdempotentUnderConcurrentRequests() throws Exception {
+        var definition = create("Concurrency", List.of(new Sentence("Hello there.", 0.0, 3.0)));
+        service.publish(definition.id(), definition.version());
+        String requestId = UUID.randomUUID().toString();
+        Set<String> ids = new HashSet<>();
+        try (var pool = Executors.newFixedThreadPool(4)) {
+            var futures = java.util.stream.IntStream.range(0, 8)
+                .mapToObj(i ->
+                    pool.submit(() ->
+                        service.start(5005, definition.id(), new StartRequest(requestId, false))
+                    )
+                )
+                .toList();
+            for (var future : futures) ids.add(future.get().id());
+        }
+        assertThat(ids).hasSize(1);
+        String id = ids.iterator().next();
+        service.progress(5005, id, new AnswerRequest(0, "unsent draft"));
+        assertThat(
+            service
+                .start(5005, definition.id(), new StartRequest(UUID.randomUUID().toString(), false))
+                .responses()
+                .getFirst()
+                .text()
+        ).isEqualTo("unsent draft");
+        assertThat(service.attempt(5005, id).completed()).isZero();
+        assertThatThrownBy(() -> service.finish(5005, id)).isInstanceOf(
+            com.elearning.learning.common.exception.DictationValidationException.class
+        );
+    }
+
+    @Test
+    void startReopensTheLatestCompletedAttemptAndRestartRetainsOldRows() {
+        var detail = create("Latest run", List.of(new Sentence("Hello there.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        String old = start(5060, detail.id()).id();
+        service.progress(5060, old, new AnswerRequest(0, "draft"));
+        String requestId = UUID.randomUUID().toString();
+        String latest = service.start(5060, detail.id(), new StartRequest(requestId, true)).id();
+        assertThat(latest).isNotEqualTo(old);
+        service.progress(5060, latest, new AnswerRequest(0, "Hello there"));
+        assertThat(start(5060, detail.id()).id()).isEqualTo(latest);
+        service.finish(5060, latest);
+        assertThat(start(5060, detail.id()).id()).isEqualTo(latest);
+        assertThat(service.start(5060, detail.id(), new StartRequest(requestId, true)).id()).isEqualTo(
+            latest
+        );
+        assertThat(service.attempt(5060, old).responses().getFirst().text()).isEqualTo("draft");
+        var restarted = service.start(
+            5060,
+            detail.id(),
+            new StartRequest(UUID.randomUUID().toString(), true)
+        );
+        assertThat(restarted.id()).isNotIn(old, latest);
+        assertThat(restarted.scoringMode()).isEqualTo("LIVE");
+        assertThat(restarted.accuracy()).isZero();
+        assertThat(restarted.completed()).isZero();
+        assertThat(restarted.responses().getFirst().text()).isEmpty();
+        assertThat(service.history(5060, "", "", "", "IN_PROGRESS", 0, 20).items())
+            .extracting(Attempt::id)
+            .containsExactly(restarted.id());
+        assertThat(service.history(5060, "", "", "", "COMPLETED", 0, 20).total()).isZero();
+        assertThat(
+            service.catalog(5060, "Latest run", "", "", 0, 12, false).items().getFirst().attemptId()
+        ).isEqualTo(restarted.id());
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dictation_attempts WHERE user_id=?",
+                Integer.class,
+                5060
+            )
+        ).isEqualTo(3);
+    }
+
+    @Test
+    void concurrentProgressAndHintsSerializeWithoutLosingEarnedCreditOrHints() throws Exception {
+        var detail = create("Concurrent mutations", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        String id = start(5061, detail.id()).id();
+        service.progress(5061, id, new AnswerRequest(0, "We"));
+        try (var pool = Executors.newFixedThreadPool(3)) {
+            var gate = new java.util.concurrent.CountDownLatch(1);
+            var progress = pool.submit(() -> {
+                gate.await();
+                return service.progress(5061, id, new AnswerRequest(0, "We really"));
+            });
+            var hint1 = pool.submit(() -> {
+                gate.await();
+                return service.hint(5061, id, new HintRequest(0, 0));
+            });
+            var hint2 = pool.submit(() -> {
+                gate.await();
+                return service.hint(5061, id, new HintRequest(0, 2));
+            });
+            gate.countDown();
+            progress.get();
+            hint1.get();
+            hint2.get();
+        }
+        var saved = service.attempt(5061, id);
+        assertThat(saved.responses().getFirst().hints()).containsExactlyInAnyOrder(
+            new Hint(0, "we"),
+            new Hint(2, "enjoyed")
+        );
+        assertThat(saved.responses().getFirst().text()).isEqualTo("We really");
+        assertThat(saved.accuracy()).isEqualTo(50);
+        assertThat(
+            service.progress(5061, id, new AnswerRequest(0, "We really enjoyed it")).accuracy()
+        ).isEqualTo(75);
+    }
+
+    @Test
+    void latestRevisionIsSelectedBeforeSearchLevelTopicStatusAndTopicChoices() {
+        var original = create("Stale history title", List.of(new Sentence("Hello there.", 0.0, 3.0)));
+        service.publish(original.id(), original.version());
+        String old = start(5062, original.id()).id();
+        service.progress(5062, old, new AnswerRequest(0, "Hello there"));
+        service.finish(5062, old);
+        start(5063, original.id());
+        var edited = service.save(
+            original.id(),
+            new SaveRequest(
+                new Definition(
+                    "Current history title",
+                    "",
+                    "Travel",
+                    "A2",
+                    "sample-ets-2024-test-1",
+                    List.of(new Sentence("New words.", 0.0, 3.0))
+                ),
+                original.version()
+            )
+        );
+        service.publish(edited.id(), edited.version());
+        var latest = service.start(5062, original.id(), new StartRequest(UUID.randomUUID().toString(), true));
+        assertThat(service.history(5062, "Stale", "", "", "", 0, 20).total()).isZero();
+        assertThat(service.history(5062, "", "B1", "", "", 0, 20).total()).isZero();
+        assertThat(service.history(5062, "", "", "Workplace", "", 0, 20).total()).isZero();
+        assertThat(service.history(5062, "", "", "", "COMPLETED", 0, 20).total()).isZero();
+        var history = service.history(5062, "Current", "A2", "Travel", "IN_PROGRESS", 0, 1);
+        assertThat(history.total()).isEqualTo(1);
+        assertThat(history.items()).extracting(Attempt::id).containsExactly(latest.id());
+        assertThat(history.topics()).containsExactly("Travel");
+        assertThat(service.history(5063, "", "", "", "", 0, 20).topics()).containsExactly("Workplace");
+        assertThat(service.attempt(5062, old).title()).isEqualTo("Stale history title");
+    }
+
+    @Test
+    void restartsStayLatestWhenTheClockIsFixedOrMovesBackwards() {
+        var detail = create("Fixed clock", List.of(new Sentence("Hello there.", 0.0, 3.0)));
+        service.publish(detail.id(), detail.version());
+        Instant instant = Instant.parse("2026-01-01T00:00:00.000000499Z");
+        var fixed = new DictationService(
+            jdbc,
+            json,
+            grader,
+            audio,
+            java.time.Clock.fixed(instant, java.time.ZoneOffset.UTC)
+        );
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        var first = tx.execute(status ->
+            fixed.start(5064, detail.id(), new StartRequest(UUID.randomUUID().toString(), true))
+        );
+        var second = tx.execute(status ->
+            fixed.start(5064, detail.id(), new StartRequest(UUID.randomUUID().toString(), true))
+        );
+        var backwards = new DictationService(
+            jdbc,
+            json,
+            grader,
+            audio,
+            java.time.Clock.fixed(instant.minusSeconds(10), java.time.ZoneOffset.UTC)
+        );
+        var third = tx.execute(status ->
+            backwards.start(5064, detail.id(), new StartRequest(UUID.randomUUID().toString(), true))
+        );
+        assertThat(second.startedAt()).isEqualTo(first.startedAt().plusNanos(1000));
+        assertThat(third.startedAt()).isEqualTo(second.startedAt().plusNanos(1000));
+        assertThat(start(5064, detail.id()).id()).isEqualTo(third.id());
+        assertThat(service.history(5064, "", "", "", "", 0, 20).items())
+            .extracting(Attempt::id)
+            .containsExactly(third.id());
+    }
+
+    @Test
+    void contentRevisionsAndArchiveDoNotRewriteOldHistory() {
+        var original = create("Original title", List.of(new Sentence("Original words.", 0.0, 3.0)));
+        service.publish(original.id(), original.version());
+        var old = start(5006, original.id());
+        var edited = service.save(
+            original.id(),
+            new SaveRequest(
+                new Definition(
+                    "New title",
+                    "",
+                    "Workplace",
+                    "B1",
+                    "sample-ets-2024-test-1",
+                    List.of(new Sentence("Different words.", 0.0, 3.0))
+                ),
+                original.version()
+            )
+        );
+        assertThat(
+            service.start(5007, original.id(), new StartRequest(UUID.randomUUID().toString(), false)).title()
+        ).isEqualTo("Original title");
+        service.publish(original.id(), edited.version());
+        assertThat(
+            service.start(5008, original.id(), new StartRequest(UUID.randomUUID().toString(), false)).title()
+        ).isEqualTo("New title");
+        assertThat(
+            service.check(5006, old.id(), new AnswerRequest(0, "Original words")).accuracy()
+        ).isEqualTo(100);
+        assertThat(service.attempt(5006, old.id()).version()).isEqualTo(1);
+        service.visibility(original.id(), true);
+        assertThatThrownBy(() -> start(5009, original.id())).isInstanceOf(AppException.class);
+        assertThat(
+            service.history(5006, "Original", "B1", "Workplace", "", 0, 20).items().getFirst().title()
+        ).isEqualTo("Original title");
+        assertThat(service.history(5006, "New title", "", "", "", 0, 20).total()).isZero();
+        assertThatThrownBy(() ->
+            service.save(original.id(), new SaveRequest(edited.definition(), 1))
+        ).isInstanceOf(AppException.class);
+    }
+
+    @Test
+    void archivedLessonsBlockExistingPracticeButPreserveCompletedResultsAndResumeAfterRestore()
+        throws Exception {
+        var lesson = create("Archived access", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
+        service.publish(lesson.id(), lesson.version());
+        var active = start(5101, lesson.id());
+        var draft = service.progress(5101, active.id(), new AnswerRequest(0, "We"));
+        var finished = start(5102, lesson.id());
+        service.progress(5102, finished.id(), new AnswerRequest(0, "We enjoyed it"));
+        finished = service.finish(5102, finished.id());
+        service.visibility(lesson.id(), true);
+
+        for (String action : List.of("progress", "check", "hint", "reveal", "skip", "finish")) {
+            String body = switch (action) {
+                case "progress", "check" -> "{\"index\":0,\"text\":\"We enjoyed it\"}";
+                case "hint" -> "{\"index\":0,\"wordIndex\":1}";
+                case "finish" -> null;
+                default -> "{\"index\":0}";
+            };
+            var response = request(
+                5101L,
+                false,
+                action.equals("progress") ? "PUT" : "POST",
+                USER + "/attempts/" + active.id() + "/" + action,
+                body
+            );
+            assertThat(response.statusCode()).as(action).isEqualTo(409);
+            assertThat(json.readTree(response.body()).path("code").asString()).isEqualTo(
+                "DICTATION_ARCHIVED"
+            );
+        }
+        for (String suffix : List.of("", "/audio")) {
+            assertThat(
+                request(5101L, false, "GET", USER + "/attempts/" + active.id() + suffix, null).statusCode()
+            ).isEqualTo(409);
+        }
+        assertThat(
+            request(5103L, false, "GET", USER + "/attempts/" + active.id(), null).statusCode()
+        ).isEqualTo(404);
+        var stored = service.history(5101, "Archived access", "", "", "", 0, 20).items().getFirst();
+        assertThat(stored.archived()).isTrue();
+        assertThat(stored.responses()).isEqualTo(draft.responses());
+        assertThat(stored.completedAt()).isNull();
+        var result = service.attempt(5102, finished.id());
+        assertThat(result.archived()).isTrue();
+        assertThat(result.accuracy()).isEqualTo(finished.accuracy());
+        assertThat(result.responses()).isEqualTo(finished.responses());
+        assertThat(result.completedAt()).isEqualTo(finished.completedAt());
+        assertThat(
+            request(5102L, false, "GET", USER + "/attempts/" + finished.id(), null).statusCode()
+        ).isEqualTo(200);
+        assertThat(service.audioKey(5102, finished.id())).isEqualTo(lesson.definition().audioKey());
+        assertThatThrownBy(() ->
+            service.start(5102, lesson.id(), new StartRequest(UUID.randomUUID().toString(), true))
+        ).isInstanceOf(AppException.class);
+
+        service.visibility(lesson.id(), false);
+        assertThat(service.attempt(5101, active.id()).responses()).isEqualTo(draft.responses());
+        var resumed = service.progress(5101, active.id(), new AnswerRequest(0, "We enjoyed it"));
+        assertThat(resumed.archived()).isFalse();
+        assertThat(resumed.completed()).isEqualTo(1);
+    }
+
+    @Test
+    void correctSentencesAreLockedButNavigationAndWrongAnswerRetriesRemainAvailable() throws Exception {
+        var detail = create(
+            "Locked answers",
+            List.of(new Sentence("We enjoyed it.", 0.0, 3.0), new Sentence("All right, thanks.", 3.0, 6.0))
+        );
+        service.publish(detail.id(), detail.version());
+        String id = start(5040, detail.id()).id();
+        var wrong = service.check(5040, id, new AnswerRequest(0, "We it"));
+        assertThat(wrong.responses().getFirst().revealed()).isFalse();
+        service.progress(5040, id, new AnswerRequest(0, "We enjoyed it"));
+        var correct = service.check(5040, id, new AnswerRequest(0, "We enjoyed it"));
+        assertThat(correct.responses().getFirst().grade().accuracy()).isEqualTo(100);
+        double score = correct.responses().getFirst().firstAccuracy();
+        for (String action : List.of("progress", "check")) {
+            assertThat(
+                request(
+                    5040L,
+                    false,
+                    action.equals("progress") ? "PUT" : "POST",
+                    USER + "/attempts/" + id + "/" + action,
+                    "{\"index\":0,\"text\":\"changed after correct\"}"
+                ).statusCode()
+            ).isEqualTo(409);
+        }
+        assertThat(
+            service
+                .check(5040, id, new AnswerRequest(0, "We enjoyed it"))
+                .responses()
+                .getFirst()
+                .firstAccuracy()
+        ).isEqualTo(score);
+        assertThat(service.revealOrSkip(5040, id, 0, true).responses().getFirst().revealed()).isFalse();
+        assertThat(service.hint(5040, id, new HintRequest(0, 0)).responses().getFirst().hints()).isEmpty();
+        service.progress(5040, id, new AnswerRequest(1, "my next draft"));
+        assertThat(service.progress(5040, id, new AnswerRequest(0, "We enjoyed it")).currentIndex()).isZero();
+        assertThat(service.attempt(5040, id).currentIndex()).isZero();
+        assertThat(start(5040, detail.id()).currentIndex()).isZero();
+        assertThat(service.attempt(5040, id).responses().getFirst().text()).isEqualTo("We enjoyed it");
+        assertThat(service.attempt(5040, id).responses().get(1).text()).isEqualTo("my next draft");
+    }
+
+    @Test
+    void historyFiltersAndExactPageTotalsAreScopedToTheOwnerAndStoredRevision() throws Exception {
+        var lesson = create("History filter lesson", List.of(new Sentence("Hello there.", 0.0, 3.0)));
+        service.publish(lesson.id(), lesson.version());
+        String completed = null;
+        for (int index = 0; index < 20; index++) {
+            String id = service
+                .start(5042, lesson.id(), new StartRequest(UUID.randomUUID().toString(), true))
+                .id();
+            if (index == 0) completed = id;
+        }
+        service.check(5042, completed, new AnswerRequest(0, "Hello there"));
+        service.finish(5042, completed);
+        var other = service.save(
+            null,
+            new SaveRequest(
+                new Definition(
+                    "Travel lesson",
+                    "",
+                    "Travel",
+                    "A2",
+                    "sample-ets-2024-test-1",
+                    List.of(new Sentence("Hello there.", 0.0, 3.0))
+                ),
+                0
+            )
+        );
+        service.publish(other.id(), other.version());
+        start(5042, other.id());
+        start(5043, lesson.id());
+        var firstPage = service.history(5042, "", "", "", "", 0, 20);
+        var secondPage = service.history(5042, "", "", "", "", 1, 20);
+        assertThat(firstPage.total()).isEqualTo(2);
+        assertThat(firstPage.items()).hasSize(2);
+        assertThat(secondPage.total()).isEqualTo(2);
+        assertThat(secondPage.items()).isEmpty();
+        assertThat(secondPage.items()).noneMatch(item ->
+            firstPage
+                .items()
+                .stream()
+                .anyMatch(first -> first.id().equals(item.id()))
+        );
+        var exactPage = service.history(5042, "  HISTORY FILTER  ", "B1", "Workplace", "", 0, 20);
+        assertThat(exactPage.total()).isEqualTo(1);
+        assertThat(exactPage.size()).isEqualTo(20);
+        assertThat(exactPage.items()).hasSize(1);
+        assertThat(exactPage.items().getFirst().id()).isNotEqualTo(completed);
+        assertThat(service.history(5042, "", "B1", "Workplace", "IN_PROGRESS", 0, 20).total()).isEqualTo(1);
+        assertThat(service.history(5042, "", "", "", "COMPLETED", 0, 20).items()).isEmpty();
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dictation_attempts WHERE user_id=?",
+                Integer.class,
+                5042
+            )
+        ).isEqualTo(21);
+        var singlePage = service.history(5042, "", "", "", "", 0, 1);
+        var nextPage = service.history(5042, "", "", "", "", 1, 1);
+        assertThat(singlePage.total()).isEqualTo(2);
+        assertThat(nextPage.total()).isEqualTo(2);
+        assertThat(singlePage.items()).hasSize(1);
+        assertThat(nextPage.items()).hasSize(1);
+        assertThat(singlePage.items().getFirst().id()).isNotEqualTo(nextPage.items().getFirst().id());
+        assertThat(service.history(5042, "", "A2", "Travel", "", 0, 20).total()).isEqualTo(1);
+        assertThat(service.history(5044, "", "", "", "", 0, 20).total()).isZero();
+        assertThat(service.history(5044, "", "", "", "", 0, 20).topics()).isEmpty();
+        assertThat(firstPage.topics()).containsExactly("Travel", "Workplace");
+        var response = request(
+            5042L,
+            false,
+            "GET",
+            USER + "/attempts?keyword=History&level=B1&topic=Workplace&status=COMPLETED",
+            null
+        );
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(json.readTree(response.body()).path("data").path("total").asLong()).isZero();
+        assertThat(
+            request(5042L, false, "GET", USER + "/attempts?status=INVALID", null).statusCode()
+        ).isEqualTo(400);
+    }
+
+    @Test
+    void draftCanHaveNoTimingButPublishingRejectsMissingOverlappingOrOutOfBoundsTimes() {
+        for (var rows : List.of(
+            List.of(new Sentence("No timing.", null, null)),
+            List.of(new Sentence("First.", 0.0, 4.0), new Sentence("Second.", 3.0, 5.0))
+        )) {
+            var detail = create("Invalid timeline", rows);
+            assertThatThrownBy(() -> service.publish(detail.id(), detail.version())).isInstanceOf(
+                com.elearning.learning.common.exception.DictationValidationException.class
+            );
+        }
+        assertThatThrownBy(() ->
+            create("Beyond audio", List.of(new Sentence("Hello.", 999.0, 1000.0)))
+        ).isInstanceOf(com.elearning.learning.common.exception.DictationValidationException.class);
+    }
+
+    @Test
+    void overlongEndTimesUseTheExactAudioEndForDraftsAndDirectPublication() {
+        String key = UUID.randomUUID() + ".mp3";
+        jdbc.update(
+            "INSERT INTO dictation_audio (audio_key, original_name, duration_seconds) VALUES (?, ?, ?)",
+            key,
+            "Fractional audio.mp3",
+            35.8
+        );
+        var definition = new Definition(
+            "Fractional audio",
+            "",
+            "Workplace",
+            "B1",
+            key,
+            List.of(new Sentence("The last word.", 32.0, 36.0))
+        );
+        var request = new SaveRequest(definition, 0);
+        var draft = service.save(null, request);
+        assertThat(draft.definition().sentences().getFirst().end()).isEqualTo(35.8);
+        service.publish(draft.id(), draft.version());
+        assertThat(start(5095, draft.id()).sentences().getFirst().end()).isEqualTo(35.8);
+        var direct = service.saveAndPublish(null, request);
+        assertThat(direct.definition().sentences().getFirst().end()).isEqualTo(35.8);
+        assertThat(start(5096, direct.id()).sentences().getFirst().end()).isEqualTo(35.8);
+        var shorter = service.save(
+            null,
+            new SaveRequest(
+                new Definition(
+                    definition.title(),
+                    "",
+                    definition.topic(),
+                    definition.level(),
+                    key,
+                    List.of(new Sentence("Earlier end.", 32.0, 35.0))
+                ),
+                0
+            )
+        );
+        assertThat(shorter.definition().sentences().getFirst().end()).isEqualTo(35.0);
+        assertThatThrownBy(() ->
+            service.saveAndPublish(
+                null,
+                new SaveRequest(
+                    new Definition(
+                        definition.title(),
+                        "",
+                        definition.topic(),
+                        definition.level(),
+                        key,
+                        List.of(new Sentence("Invalid start.", 35.8, 36.0))
+                    ),
+                    0
+                )
+            )
+        ).isInstanceOf(com.elearning.learning.common.exception.DictationValidationException.class);
+    }
+
+    @Test
+    void directPublicationCreatesAndUpdatesWithoutASeparateDraftSave() throws Exception {
+        var definition = new Definition(
+            "Direct publication",
+            "",
+            "Workplace",
+            "B1",
+            "sample-ets-2024-test-1",
+            List.of(new Sentence("Original words.", 0.0, 3.0))
+        );
+        var response = request(
+            5091L,
+            true,
+            "POST",
+            ADMIN + "/publish",
+            json.writeValueAsString(new SaveRequest(definition, 0))
+        );
+        assertThat(response.statusCode()).isEqualTo(201);
+        String id = json.readTree(response.body()).path("data").path("id").asString();
+        var original = service.adminDetail(id);
+        assertThat(original.published()).isTrue();
+        assertThat(original.hasDraft()).isFalse();
+        assertThat(original.version()).isEqualTo(1);
+        var attempt = start(5091, id);
+
+        var updated = new Definition(
+            "Direct update",
+            "New description",
+            "Workplace",
+            "B1",
+            definition.audioKey(),
+            List.of(new Sentence("Updated words.", 0.0, 3.0))
+        );
+        String payload = json.writeValueAsString(new PublishRequest(original.version(), updated));
+        assertThat(
+            request(5091L, true, "POST", ADMIN + "/" + id + "/publish", payload).statusCode()
+        ).isEqualTo(200);
+        var current = service.adminDetail(id);
+        assertThat(current.version()).isEqualTo(2);
+        assertThat(current.definition()).isEqualTo(updated);
+        assertThat(current.hasDraft()).isFalse();
+        assertThat(service.attempt(5091, attempt.id()).title()).isEqualTo(definition.title());
+        assertThat(start(5092, id).title()).isEqualTo(updated.title());
+        assertThat(
+            request(5091L, true, "POST", ADMIN + "/" + id + "/publish", payload).statusCode()
+        ).isEqualTo(409);
+        assertThat(service.adminDetail(id).version()).isEqualTo(2);
+        assertThat(
+            request(5091L, true, "POST", ADMIN + "/" + id + "/publish", "{\"version\":2}").statusCode()
+        ).isEqualTo(200);
+        assertThat(
+            request(
+                5091L,
+                false,
+                "POST",
+                ADMIN + "/publish",
+                json.writeValueAsString(new SaveRequest(definition, 0))
+            ).statusCode()
+        ).isEqualTo(403);
+    }
+
+    @Test
+    void invalidDirectPublicationDoesNotLeaveAPartialLessonOrOverwritePublishedContent() throws Exception {
+        int before = jdbc.queryForObject("SELECT COUNT(*) FROM dictation_exercises", Integer.class);
+        var invalid = new Definition(
+            "Invalid publication",
+            "",
+            "Workplace",
+            "B1",
+            "sample-ets-2024-test-1",
+            List.of(new Sentence("Missing end.", 0.0, null))
+        );
+        assertThat(
+            request(
+                5093L,
+                true,
+                "POST",
+                ADMIN + "/publish",
+                json.writeValueAsString(new SaveRequest(invalid, 0))
+            ).statusCode()
+        ).isEqualTo(400);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dictation_exercises", Integer.class)).isEqualTo(
+            before
+        );
+        var draft = create("Preserved publication", List.of(new Sentence("Keep these words.", 0.0, 3.0)));
+        var published = service.publish(draft.id(), draft.version());
+        assertThat(
+            request(
+                5093L,
+                true,
+                "POST",
+                ADMIN + "/" + draft.id() + "/publish",
+                json.writeValueAsString(new PublishRequest(published.version(), invalid))
+            ).statusCode()
+        ).isEqualTo(400);
+        assertThat(service.adminDetail(draft.id())).isEqualTo(published);
+    }
+
+    @Test
+    void templateHasTwoEditableExamplesAndImportDoesNotReadInstructionSheet() throws Exception {
+        byte[] template = workbooks.template();
+        var samples = workbooks.parse(xlsx(template));
+        assertThat(samples.errors()).isEmpty();
+        assertThat(samples.sentences()).hasSize(2);
+        assertThat(samples.sentences().getFirst().text()).isEqualTo("Thank you for joining us today.");
+        assertThat(samples.sentences().get(1).start()).isEqualTo(4.0);
+        try (
+            var workbook = new XSSFWorkbook(new ByteArrayInputStream(template));
+            var output = new java.io.ByteArrayOutputStream()
+        ) {
+            assertThat(workbook.getSheet("Hướng dẫn")).isNotNull();
+            var row = workbook.getSheet("Transcript").getRow(1);
+            assertThat(row.getCell(2).getCellStyle().getDataFormatString()).isEqualTo("@");
+            row.getCell(0).setCellValue("1");
+            row.getCell(1).setCellValue("Hello there.");
+            row.getCell(2).setCellValue("00:02");
+            row.getCell(3).setCellValue("00:04");
+            workbook.getSheet("Transcript").removeRow(workbook.getSheet("Transcript").getRow(2));
+            workbook.write(output);
+            var imported = workbooks.parse(xlsx(output.toByteArray()));
+            assertThat(imported.errors()).isEmpty();
+            assertThat(imported.sentences()).hasSize(1);
+            assertThat(imported.sentences().getFirst().start()).isEqualTo(2.0);
+        }
+    }
+
+    @Test
+    void importReportsRowsAndRejectsFormulasAndUnknownLayouts() throws Exception {
+        try (
+            var workbook = new XSSFWorkbook(new ByteArrayInputStream(workbooks.template()));
+            var output = new java.io.ByteArrayOutputStream()
+        ) {
+            var row = workbook.getSheet("Transcript").getRow(1);
+            row.getCell(0).setCellValue("3");
+            row.getCell(1).setCellValue("Hello.");
+            row.getCell(2).setCellValue("2 seconds");
+            workbook.write(output);
+            var result = workbooks.parse(xlsx(output.toByteArray()));
+            assertThat(result.errors())
+                .hasSize(2)
+                .allSatisfy(error -> assertThat(error.row()).isEqualTo(2));
+        }
+        try (
+            var workbook = new XSSFWorkbook(new ByteArrayInputStream(workbooks.template()));
+            var output = new java.io.ByteArrayOutputStream()
+        ) {
+            workbook.getSheet("Transcript").getRow(1).getCell(1).setCellFormula("1+1");
+            workbook.write(output);
+            assertThatThrownBy(() -> workbooks.parse(xlsx(output.toByteArray()))).isInstanceOf(
+                com.elearning.learning.common.exception.DictationValidationException.class
+            );
+        }
+    }
+
+    @Test
+    void httpEnforcesAuthenticationAdminRoleValidationAndBinaryAudio() throws Exception {
+        assertThat(request(null, false, "GET", USER, null).statusCode()).isEqualTo(401);
+        for (String path : List.of(ADMIN, ADMIN + "/template", ADMIN + "/audio/sample-ets-2024-test-1"))
+            assertThat(request(5010L, false, "GET", path, null).statusCode()).isEqualTo(403);
+        assertThat(request(5010L, true, "GET", ADMIN + "/template", null).statusCode()).isEqualTo(200);
+        assertThat(
+            request(
+                5010L,
+                false,
+                "POST",
+                ADMIN,
+                json.writeValueAsString(new SaveRequest(service.adminDetail(SAMPLE).definition(), 0))
+            ).statusCode()
+        ).isEqualTo(403);
+        var attempt = start(5010, SAMPLE);
+        assertThat(
+            request(
+                5010L,
+                false,
+                "POST",
+                USER + "/attempts/" + attempt.id() + "/check",
+                "{\"index\":999,\"text\":\"x\"}"
+            ).statusCode()
+        ).isEqualTo(400);
+        var bytes = request(5010L, false, "GET", USER + "/attempts/" + attempt.id() + "/audio", null);
+        assertThat(bytes.statusCode()).isEqualTo(200);
+        assertThat(bytes.body().length).isGreaterThan(1000000);
+        assertThat(bytes.headers().firstValue("content-type")).hasValue("audio/mpeg");
+    }
+
+    @Test
+    void mp3UploadIsValidatedAndStoredOutsideSource() throws Exception {
+        byte[] bytes = Files.readAllBytes(Path.of("../../docs/resources/audio/Audio 1.mp3"));
+        var uploaded = audio.upload(new MockMultipartFile("file", "picnic.mp3", "audio/mpeg", bytes));
+        try {
+            assertThat(uploaded.duration()).isBetween(31.0, 32.0);
+            assertThat(audio.resource(uploaded.key()).contentLength()).isEqualTo(bytes.length);
+        } finally {
+            jdbc.update("DELETE FROM dictation_audio WHERE audio_key=?", uploaded.key());
+            Files.deleteIfExists(Path.of("./target/dictation-test-uploads").resolve(uploaded.key()));
+        }
+        assertThatThrownBy(() ->
+            audio.upload(
+                new MockMultipartFile(
+                    "file",
+                    "fake.mp3",
+                    "audio/mpeg",
+                    "not audio".getBytes(StandardCharsets.UTF_8)
+                )
+            )
+        ).isInstanceOf(com.elearning.learning.common.exception.DictationValidationException.class);
+    }
+
+    private AdminDetail create(String title, List<Sentence> sentences) {
+        return service.save(
+            null,
+            new SaveRequest(
+                new Definition(title, "", "Workplace", "B1", "sample-ets-2024-test-1", sentences),
+                0
+            )
+        );
+    }
+
+    private Attempt start(long user, String exercise) {
+        return service.start(user, exercise, new StartRequest(UUID.randomUUID().toString(), false));
+    }
+
+    private MockMultipartFile xlsx(byte[] bytes) {
+        return new MockMultipartFile(
+            "file",
+            "transcript.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes
+        );
+    }
+
+    private HttpResponse<byte[]> request(Long user, boolean admin, String method, String path, String body)
+        throws Exception {
+        var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        if (user != null) builder.header(
+            "Authorization",
+            "Bearer " +
+                Jwts.builder()
+                    .subject(user.toString())
+                    .issuer("sgedu")
+                    .claim("tokenType", "access")
+                    .claim("role", admin ? "ADMIN" : "USER")
+                    .claim("roles", List.of(admin ? "ADMIN" : "USER"))
+                    .claim("permissions", List.of())
+                    .issuedAt(Date.from(Instant.now()))
+                    .expiration(Date.from(Instant.now().plusSeconds(600)))
+                    .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+                    .compact()
+        );
+        builder.header("Content-Type", "application/json");
+        return http.send(
+            builder
+                .method(
+                    method,
+                    body == null
+                        ? HttpRequest.BodyPublishers.noBody()
+                        : HttpRequest.BodyPublishers.ofString(body)
+                )
+                .build(),
+            HttpResponse.BodyHandlers.ofByteArray()
+        );
+    }
+}

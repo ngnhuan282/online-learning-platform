@@ -6,6 +6,14 @@ Tích hợp Gemini qua backend `ai-service`, lưu hội thoại/tin nhắn và n
 trong `ai_db`, xem lại lịch sử riêng của từng user, chat theo ngữ cảnh khóa học/bài học.
 Không thêm streaming, voice, upload, vector database hoặc tự động đăng ký dịch vụ trả phí.
 
+Trợ lý chỉ phục vụ học tiếng Anh và hướng dẫn sử dụng ChitChatGo. Server lọc cục bộ
+trước khi gọi Gemini; câu chưa nhận diện được mục đích học/hỗ trợ web trả `AI_OFF_TOPIC`
+và không trừ lượt. Có thể hỏi từ vựng tiếng Anh về game, nhưng không dùng trợ lý để
+giới thiệu game hay hỏi kiến thức ngoài phạm vi. Câu nối tiếp ngắn cần có ngữ cảnh phù hợp.
+System instruction tiếp tục ràng buộc câu trả lời trong phạm vi này. Đây là giới hạn
+ứng dụng/prompt, không phải fine-tuning, và bộ lọc từ khóa không bảo đảm phân loại ngữ
+nghĩa hoàn hảo; cần bổ sung tình huống thực tế khi có nhận diện nhầm.
+
 D10 chỉ được nghiệm thu sau khi lead xác nhận Must Have và hồ sơ bắt buộc đã đạt.
 AI vẫn là profile riêng, không làm core phụ thuộc vào API key hoặc Gemini.
 
@@ -18,6 +26,9 @@ Tạo key tại Google AI Studio theo [hướng dẫn chính thức](https://ai.
 AI_API_KEY=<key cua nhom>
 AI_MODEL=<model ID duoc cap quyen trong Google AI Studio>
 AI_REQUEST_TIMEOUT_MS=15000
+AI_FREE_DAILY_REQUEST_LIMIT=5
+AI_DAILY_REQUEST_LIMIT=100
+AI_MAX_OUTPUT_TOKENS=2048
 ```
 
 Model được cấu hình, không hard-code vì danh sách model/quota có thể thay đổi.
@@ -59,14 +70,15 @@ gọi thử provider; chỉ câu trả lời thật mới xác nhận key/model/
 
 Mọi API sau cần Bearer JWT qua Gateway, dùng envelope hiện có:
 
-| Method | `/api/v1/ai` | Kết quả |
-| --- | --- | --- |
-| GET | `/capabilities` | `available`, `historyAvailable`, `maxMessageLength` |
-| GET | `/conversations?page=0&size=20` | PageResponse, chỉ hội thoại của người gọi |
-| POST | `/conversations` | `{title?, courseId?, lessonId?}` → metadata |
-| GET | `/conversations/{id}` | Metadata của hội thoại sở hữu |
-| GET | `/conversations/{id}/messages?page=0&size=50` | PageResponse, mới nhất trước |
-| POST | `/conversations/{id}/messages` | `{content, requestId?}` → cặp USER/AI đã lưu |
+| Method | `/api/v1/ai`                                  | Kết quả                                                                     |
+| ------ | --------------------------------------------- | --------------------------------------------------------------------------- |
+| GET    | `/capabilities`                               | `available`, `historyAvailable`, `maxMessageLength`                         |
+| GET    | `/usage`                                      | `proActive`, `dailyLimit`, `used`, `remaining`, `proDailyLimit`, `resetsAt` |
+| GET    | `/conversations?page=0&size=20`               | PageResponse, chỉ hội thoại của người gọi                                   |
+| POST   | `/conversations`                              | `{title?, courseId?, lessonId?}` → metadata                                 |
+| GET    | `/conversations/{id}`                         | Metadata của hội thoại sở hữu                                               |
+| GET    | `/conversations/{id}/messages?page=0&size=50` | PageResponse, mới nhất trước                                                |
+| POST   | `/conversations/{id}/messages`                | `{content, requestId?}` → cặp USER/AI đã lưu                                |
 
 `content` bắt buộc, không trắng, tối đa 4000 ký tự. `lessonId` cần `courseId` và phải
 thuộc đúng khóa học. `requestId` là ID do frontend tạo, 8–64 ký tự chữ/số/`_`/`-`.
@@ -79,11 +91,13 @@ Nội dung AI được render thành text, không chèn HTML từ provider.
 
 ## Context và retry
 
-- Chat thông thường không cần Course/Learning. Chat theo bài học yêu cầu quyền học;
+- Mỗi lượt gọi AI kiểm tra PRO qua `/api/v1/learning/pro/me` bằng JWT người gọi;
+  Learning không sẵn sàng hoặc trả sai chủ tài khoản thì không gọi Gemini.
+  Chat theo bài học yêu cầu quyền học;
   AI gọi Learning bằng JWT người gọi và kiểm tra lại mỗi lần gửi, sau đó lấy text từ Course.
 - Chỉ gửi mô tả khóa học, tiêu đề và text của bài đã chọn; không gửi email, JWT,
   signed media URL hoặc API key như nội dung prompt. Video không được tự suy diễn thành transcript.
-- Provider nhận tối đa 20 tin nhắn gần nhất, giới hạn 24.000 ký tự lịch sử,
+- Provider nhận tối đa 12 tin nhắn gần nhất, giới hạn 12.000 ký tự lịch sử,
   cùng ngữ cảnh có giới hạn. Toàn bộ lịch sử vẫn đọc được qua phân trang.
 - Lưu cặp USER/AI và usage trong một transaction sau khi provider trả lời thành công.
   Lỗi provider không tạo câu trả lời giả hay cặp tin nhắn dở dang. FE giữ câu hỏi để retry.
@@ -101,6 +115,26 @@ Nội dung AI được render thành text, không chèn HTML từ provider.
   `AI_PROVIDER_ERROR` (503), `AI_CONTEXT_UNAVAILABLE` (503), `AI_CONTENT_BLOCKED` (422)
   có thông báo riêng. Không trả raw lỗi hoặc credentials từ upstream.
 - Usage chỉ lưu model, kết quả, token counts và thời điểm; không ghi prompt vào log.
+
+## Hạn mức miễn phí và PRO
+
+- Mặc định miễn phí 5 lượt/ngày, PRO 100 lượt/ngày. Biến `AI_DAILY_REQUEST_LIMIT`
+  là mức PRO; mức miễn phí không được vượt mức này. Có thể đổi các biến cấu hình trên
+  và recreate riêng ai-service, không cần migration hoặc sửa dữ liệu thành viên.
+- Bộ đếm DB tính chung tất cả hội thoại, dùng UPDATE có điều kiện để chống vượt hạn
+  mức khi gửi đồng thời. JWT role/admin và cờ PRO do client gửi không nâng hạn mức.
+- Ngày tính theo UTC, reset 00:00 UTC (07:00 Việt Nam). API trả `resetsAt` để trình
+  duyệt hiển thị theo giờ người dùng. Nâng cấp có hiệu lực ngay lần kiểm tra tiếp theo;
+  số lượt đã dùng trong ngày vẫn giữ nguyên, không reset khi tạo hội thoại mới.
+- Chỉ trừ lượt sau khi câu hỏi qua bộ lọc và quyền PRO được xác minh, ngay trước
+  request provider. Lỗi/timeout từ provider vẫn tính lượt vì có thể đã phát sinh chi
+  phí. Replay cặp tin nhắn đã lưu không trừ lại; câu bị chặn cục bộ không tốn token.
+- `AI_DAILY_LIMIT_REACHED` là hết hạn mức tài khoản; `AI_QUOTA_EXCEEDED` là quota/rate
+  limit của provider, không thể khắc phục chỉ bằng nâng cấp PRO.
+- Hết lượt vẫn xem được lịch sử. UI giữ bản nháp, hiện giờ reset và liên kết gói PRO
+  hiện có; tự làm mới hạn mức khi quay lại tab, thay đổi thành viên hoặc tới giờ reset.
+- Giới hạn output mặc định 2048 token và hướng dẫn trả lời ngắn giúp kiểm soát chi
+  phí. Đây không phải giới hạn tổng token đầu vào hoặc toàn bộ chi phí của provider.
 
 REST contract theo [Gemini generateContent](https://ai.google.dev/api/generate-content).
 

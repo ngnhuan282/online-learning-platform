@@ -4,6 +4,7 @@ import { ButtonBase, ListItemIcon, ListItemText, Menu, MenuItem } from '@mui/mat
 import {
   AutoAwesomeOutlined,
   ForumOutlined,
+  HeadphonesOutlined,
   KeyboardArrowDownRounded,
   LeaderboardOutlined,
   MenuBookOutlined,
@@ -32,6 +33,7 @@ export default function HeaderUtilities() {
           { to: ROUTES.MY_NOTES, label: 'Ghi chú của tôi', icon: StickyNote2Outlined },
         ]
       : []),
+    { to: ROUTES.DICTATION, label: 'Luyện nghe', icon: HeadphonesOutlined },
     { to: ROUTES.COMMUNITY, label: 'Diễn đàn', icon: ForumOutlined },
     { to: ROUTES.LEADERBOARD, label: 'Bảng xếp hạng', icon: LeaderboardOutlined },
     { to: ROUTES.SHOP, label: 'Cửa hàng', icon: ShoppingBagOutlined },

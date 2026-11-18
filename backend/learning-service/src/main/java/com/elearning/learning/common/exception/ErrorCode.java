@@ -13,6 +13,7 @@ public enum ErrorCode {
     ACTIVATION_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many activation attempts; try again later"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
     CONFLICT(HttpStatus.CONFLICT, "Resource conflict"),
+    DICTATION_ARCHIVED(HttpStatus.CONFLICT, "Bài nghe đã được ẩn. Bạn vẫn có thể xem kết quả đã hoàn thành."),
     INSUFFICIENT_GEMS(HttpStatus.CONFLICT, "Not enough gems for this purchase"),
     INVENTORY_FULL(HttpStatus.CONFLICT, "Streak freeze inventory is full"),
     NOTE_LIMIT_REACHED(

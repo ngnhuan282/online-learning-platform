@@ -11,6 +11,7 @@ import {
   readContext,
   getAiErrorMessage,
   groupConversations,
+  readUsage,
 } from '../src/features/ai-assistant/utils/aiState.js';
 
 process.env.VITE_API_URL = 'http://gateway.test';
@@ -59,6 +60,16 @@ let root;
 beforeEach(() => {
   aiApi.getCapabilities = async () => ({
     data: { available: true, historyAvailable: true, maxMessageLength: 4000 },
+  });
+  aiApi.getUsage = async () => ({
+    data: {
+      proActive: false,
+      dailyLimit: 5,
+      used: 0,
+      remaining: 5,
+      proDailyLimit: 100,
+      resetsAt: new Date(Date.now() + 86400000).toISOString(),
+    },
   });
   aiApi.getConversations = async () => page([metadata]);
   aiApi.getConversation = async () => ({ data: metadata });
@@ -173,6 +184,8 @@ test('AI chat utilities keep chronological, deduplicated text and validate conte
   assert.throws(() => readContext(new URLSearchParams('courseId=-1')));
   assert.match(getAiErrorMessage({ code: 'AI_TIMEOUT' }), /quá lâu/);
   assert.match(getAiErrorMessage({ code: 'AI_QUOTA_EXCEEDED' }), /giới hạn/);
+  assert.match(getAiErrorMessage({ code: 'AI_OFF_TOPIC' }), /chưa bị tính lượt/);
+  assert.throws(() => readUsage({ dailyLimit: 5, used: 0, remaining: 10 }));
 });
 
 test('saved history opens without a provider key and message HTML is rendered as text', async () => {
@@ -211,6 +224,121 @@ test('new conversation sends only context IDs and persists a real response after
   assert.equal(document.querySelectorAll('.ai-assistant-message').length, 2);
   await act(async () => document.querySelector('button[aria-label="Làm mới"]').click());
   assert.equal(document.querySelectorAll('.ai-assistant-message').length, 2);
+});
+
+test('daily allowance blocks new messages but preserves history and links to existing PRO checkout', async () => {
+  let calls = 0;
+  aiApi.getUsage = async () => ({
+    data: {
+      proActive: false,
+      dailyLimit: 5,
+      used: 5,
+      remaining: 0,
+      proDailyLimit: 100,
+      resetsAt: new Date(Date.now() + 3600000).toISOString(),
+    },
+  });
+  aiApi.getMessages = async () => page([message(2, 'AI', 'Saved English answer')]);
+  aiApi.sendMessage = async () => {
+    calls++;
+  };
+  await render('/ai-assistant?conversationId=1');
+  assert.match(document.body.textContent, /0\/5 lượt còn lại/);
+  assert.match(document.body.textContent, /Saved English answer/);
+  assert.ok(document.querySelector('.ai-assistant-quota a[href="/pro"]'));
+  assert.equal(document.querySelector('.ai-assistant-workspace .ai-assistant-quota'), null);
+  await draft('Explain English grammar');
+  await pressEnter();
+  await submit();
+  assert.equal(calls, 0);
+  assert.equal(document.querySelector('button[aria-label="Gửi câu hỏi"]').disabled, true);
+  assert.ok(document.querySelector('.ai-assistant-quota-notice'));
+  assert.ok(document.querySelector('.ai-assistant-chat > .ai-assistant-quota-notice'));
+  assert.match(
+    document.querySelector('.ai-assistant-quota-notice').textContent,
+    /Nâng cấp gói PRO để có tối đa 100 lượt chat mỗi ngày/,
+  );
+  await act(async () =>
+    document.querySelector('.ai-assistant-quota-notice button[aria-label="Đóng thông báo"]').click(),
+  );
+  assert.equal(document.querySelector('.ai-assistant-quota-notice'), null);
+  assert.match(document.querySelector('.ai-assistant-quota').textContent, /0\/5 lượt còn lại/);
+  assert.equal(document.querySelector('button[aria-label="Gửi câu hỏi"]').disabled, true);
+  assert.equal(document.querySelector('textarea:not([aria-hidden])').value, 'Explain English grammar');
+  assert.equal(calls, 0);
+});
+
+test('a dismissed daily warning stays closed when switching conversations', async () => {
+  const resetsAt = new Date(Date.now() + 3600000).toISOString();
+  const other = { ...metadata, id: 2, title: 'Other English lesson' };
+  aiApi.getUsage = async () => ({
+    data: { proActive: false, dailyLimit: 5, used: 5, remaining: 0, proDailyLimit: 100, resetsAt },
+  });
+  aiApi.getConversations = async () => page([metadata, other]);
+  aiApi.getConversation = async id => ({ data: String(id) === '2' ? other : metadata });
+  await render('/ai-assistant?conversationId=1');
+  await act(async () => document.querySelector('.ai-assistant-quota-notice button').click());
+  await act(async () => document.querySelector('button[title="Other English lesson"]').click());
+  assert.equal(document.querySelector('.ai-assistant-quota-notice'), null);
+  assert.match(document.querySelector('.ai-assistant-quota').textContent, /0\/5 lượt còn lại/);
+  assert.equal(document.querySelector('button[aria-label="Gửi câu hỏi"]').disabled, true);
+});
+
+test('off-topic refusal keeps the draft and does not offer a repeated off-topic retry', async () => {
+  let calls = 0;
+  aiApi.sendMessage = async () => {
+    calls++;
+    throw { code: 'AI_OFF_TOPIC', status: 422 };
+  };
+  await render('/ai-assistant?conversationId=1');
+  await draft('What game is this?');
+  await submit();
+  assert.match(document.body.textContent, /chưa bị tính lượt/);
+  assert.equal(document.querySelector('textarea:not([aria-hidden])').value, 'What game is this?');
+  assert.equal(
+    [...document.querySelectorAll('.ai-assistant-composer button')].some(
+      button => button.textContent === 'Thử lại',
+    ),
+    false,
+  );
+  await act(async () => document.querySelector('button[aria-label="Đóng thông báo"]').click());
+  assert.doesNotMatch(document.querySelector('.ai-assistant-composer').textContent, /chưa bị tính lượt/);
+  assert.equal(document.querySelector('textarea:not([aria-hidden])').value, 'What game is this?');
+  assert.equal(calls, 1);
+  await submit();
+  assert.match(document.querySelector('.ai-assistant-composer').textContent, /chưa bị tính lượt/);
+  assert.equal(calls, 2);
+});
+
+test('composer uses a separate associated label without a floating outline label', async () => {
+  await render('/ai-assistant?conversationId=1');
+  const label = document.querySelector('.ai-assistant-input-label');
+  const input = document.querySelector('textarea:not([aria-hidden])');
+  assert.equal(label.textContent, 'Câu hỏi của bạn');
+  assert.equal(label.htmlFor, input.id);
+  assert.equal(document.querySelector('.ai-assistant-input .MuiInputLabel-root'), null);
+});
+
+test('membership upgrade refreshes allowance without losing the draft', async () => {
+  let pro = false;
+  aiApi.getUsage = async () => ({
+    data: {
+      proActive: pro,
+      dailyLimit: pro ? 100 : 5,
+      used: 5,
+      remaining: pro ? 95 : 0,
+      proDailyLimit: 100,
+      resetsAt: new Date(Date.now() + 3600000).toISOString(),
+    },
+  });
+  await render('/ai-assistant?conversationId=1');
+  await draft('Explain English grammar');
+  pro = true;
+  await act(async () => window.dispatchEvent(new dom.window.Event('focus')));
+  assert.match(document.body.textContent, /95\/100 lượt còn lại/);
+  assert.equal(document.querySelector('textarea:not([aria-hidden])').value, 'Explain English grammar');
+  assert.equal(document.querySelector('button[aria-label="Gửi câu hỏi"]').disabled, false);
+  assert.equal(document.querySelector('.ai-assistant-quota a'), null);
 });
 
 test('quota failure preserves draft and retry uses the same request identity', async () => {

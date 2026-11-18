@@ -17,6 +17,7 @@ public class AiChatService {
     private final GeminiGateway provider;
     private final LearningContextClient context;
     private final AiUsageLimiter usage;
+    private final AiScopePolicy scope;
 
     public AiChatService(
         AiConversationStore store,
@@ -24,7 +25,8 @@ public class AiChatService {
         AiProviderProperties properties,
         GeminiGateway provider,
         LearningContextClient context,
-        AiUsageLimiter usage
+        AiUsageLimiter usage,
+        AiScopePolicy scope
     ) {
         this.store = store;
         this.capabilities = capabilities;
@@ -32,6 +34,7 @@ public class AiChatService {
         this.provider = provider;
         this.context = context;
         this.usage = usage;
+        this.scope = scope;
     }
 
     public ConversationResponse create(Long userId, CreateConversationRequest request, String authorization) {
@@ -53,7 +56,8 @@ public class AiChatService {
         var reservation = store.reserve(userId, id, requestId, question);
         if (!reservation.cached().isEmpty()) return reservation.cached();
         try {
-            usage.consume(userId);
+            scope.requireSupported(question, reservation.history());
+            usage.consume(userId, context.proActive(userId, authorization));
             var reply = provider.generate(reservation.history(), question, reference.text());
             return store.finish(
                 userId,

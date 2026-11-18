@@ -12,6 +12,7 @@ import {
   MenuBookOutlined,
   RateReviewOutlined,
   QuizOutlined,
+  HeadphonesOutlined,
   NotificationsOutlined,
   HistoryOutlined,
   Menu,
@@ -102,6 +103,13 @@ const menu = [
     label: 'Quản lý quiz',
     icon: QuizOutlined,
     permission: 'QUIZ_VIEW',
+  },
+  {
+    to: ROUTES.ADMIN_DICTATION,
+    label: 'Quản lý bài nghe',
+    icon: HeadphonesOutlined,
+    permission: 'ADMIN_ACCESS',
+    adminOnly: true,
   },
   {
     to: ROUTES.ADMIN_NOTIFICATIONS,

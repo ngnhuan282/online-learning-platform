@@ -69,6 +69,15 @@ public class LearningContextClient {
         return new Context(title, text);
     }
 
+    public boolean proActive(Long userId, String authorization) {
+        // Membership is verified by learning-service with the caller's JWT, never by a client flag.
+        JsonNode membership = get(learning, "/api/v1/learning/pro/me", authorization);
+        if (membership.path("userId").asLong() != userId || !membership.path("active").isBoolean()) {
+            unavailable();
+        }
+        return membership.path("active").asBoolean();
+    }
+
     private JsonNode get(RestClient client, String path, String authorization) {
         if (
             authorization == null || !authorization.regionMatches(true, 0, "Bearer ", 0, 7)

@@ -5,6 +5,7 @@ import com.elearning.ai.common.exception.ErrorCode;
 import com.elearning.ai.common.response.ApiResponse;
 import com.elearning.ai.common.response.PageResponse;
 import com.elearning.ai.dto.AiCapabilitiesResponse;
+import com.elearning.ai.dto.AiUsageResponse;
 import com.elearning.ai.dto.ConversationResponse;
 import com.elearning.ai.dto.CreateConversationRequest;
 import com.elearning.ai.dto.MessageResponse;
@@ -12,6 +13,8 @@ import com.elearning.ai.dto.SendMessageRequest;
 import com.elearning.ai.service.AiChatService;
 import com.elearning.ai.service.AiConversationStore;
 import com.elearning.ai.service.AiPreparationService;
+import com.elearning.ai.service.AiUsageLimiter;
+import com.elearning.ai.service.LearningContextClient;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -36,16 +39,35 @@ public class AiController {
     private final AiPreparationService ai;
     private final AiConversationStore store;
     private final AiChatService chat;
+    private final AiUsageLimiter usage;
+    private final LearningContextClient context;
 
-    public AiController(AiPreparationService ai, AiConversationStore store, AiChatService chat) {
+    public AiController(
+        AiPreparationService ai,
+        AiConversationStore store,
+        AiChatService chat,
+        AiUsageLimiter usage,
+        LearningContextClient context
+    ) {
         this.ai = ai;
         this.store = store;
         this.chat = chat;
+        this.usage = usage;
+        this.context = context;
     }
 
     @GetMapping("/capabilities")
     ApiResponse<AiCapabilitiesResponse> getCapabilities() {
         return ApiResponse.success(ai.getCapabilities());
+    }
+
+    @GetMapping("/usage")
+    ApiResponse<AiUsageResponse> getUsage(
+        Principal principal,
+        @RequestHeader("Authorization") String authorization
+    ) {
+        Long id = userId(principal);
+        return ApiResponse.success(usage.status(id, context.proActive(id, authorization)));
     }
 
     @GetMapping("/conversations")

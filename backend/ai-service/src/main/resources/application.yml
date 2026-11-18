@@ -40,6 +40,8 @@ integrations:
     model: ${AI_MODEL:}
     request-timeout-ms: ${AI_REQUEST_TIMEOUT_MS:60000}
     daily-request-limit: ${AI_DAILY_REQUEST_LIMIT:100}
+    free-daily-request-limit: ${AI_FREE_DAILY_REQUEST_LIMIT:5}
+    max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:2048}
 
 course:
   service-url: ${COURSE_SERVICE_URL:http://localhost:8082}

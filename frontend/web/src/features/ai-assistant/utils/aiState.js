@@ -15,6 +15,9 @@ export function getAiErrorMessage(error) {
   const messages = {
     AI_TIMEOUT: 'Trợ lý AI phản hồi quá lâu. Bạn có thể thử gửi lại câu hỏi.',
     AI_QUOTA_EXCEEDED: 'Đã đạt giới hạn sử dụng AI. Vui lòng đợi một lúc rồi thử lại.',
+    AI_DAILY_LIMIT_REACHED: 'Bạn đã dùng hết lượt chat AI hôm nay. Lịch sử hội thoại vẫn được giữ nguyên.',
+    AI_OFF_TOPIC:
+      'Mình chỉ hỗ trợ học tiếng Anh và sử dụng ChitChatGo. Bạn hãy nêu rõ phần tiếng Anh hoặc tính năng cần hỗ trợ nhé. Câu hỏi này chưa bị tính lượt.',
     AI_CONFIGURATION_ERROR: 'Kết nối AI chưa được cấu hình đúng. Vui lòng liên hệ quản trị viên.',
     AI_CONTENT_BLOCKED: 'AI chưa thể trả lời câu hỏi này. Bạn hãy thử diễn đạt lại.',
     AI_REQUEST_IN_PROGRESS: 'Một câu hỏi đang được xử lý. Vui lòng đợi rồi thử lại.',
@@ -41,6 +44,23 @@ export function mergeMessages(current, incoming) {
   return [...new Map([...current, ...incoming].map(message => [message.id, message])).values()].sort(
     (a, b) => a.id - b.id,
   );
+}
+
+export function readUsage(data) {
+  if (
+    typeof data?.proActive !== 'boolean' ||
+    !Number.isInteger(data?.dailyLimit) ||
+    data.dailyLimit < 1 ||
+    !Number.isInteger(data?.used) ||
+    data.used < 0 ||
+    !Number.isInteger(data?.remaining) ||
+    data.remaining !== Math.max(0, data.dailyLimit - data.used) ||
+    !Number.isInteger(data?.proDailyLimit) ||
+    data.proDailyLimit < data.dailyLimit ||
+    !Number.isFinite(Date.parse(data?.resetsAt))
+  )
+    throw new Error('Không thể tải hạn mức chat AI. Vui lòng thử lại.');
+  return data;
 }
 
 export function groupConversations(conversations, now = new Date()) {

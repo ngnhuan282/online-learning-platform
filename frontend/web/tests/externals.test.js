@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import { createServer } from 'vite';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -94,6 +95,9 @@ test('header keeps four primary links in home-first order including TOEIC and gr
     '/exams/toeic',
     '/exams/toeic/tests/1',
     '/exams/toeic/attempts/7/result',
+    '/my-notes',
+    '/dictation',
+    '/dictation/lesson-1',
   ];
   for (const user of [null, { id: 1, fullName: 'Nguyễn Văn A', roles: ['USER'] }]) {
     for (const path of paths) {
@@ -130,7 +134,11 @@ test('header keeps four primary links in home-first order including TOEIC and gr
         assert.equal(utilities.textContent, 'Tiện ích khác');
         assert.equal(utilities.getAttribute('aria-haspopup'), 'menu');
         assert.equal(utilities.getAttribute('aria-expanded'), 'false');
-        assert.equal(utilities.classList.contains('active'), Boolean(user) && path === '/ai-assistant');
+        assert.equal(
+          utilities.classList.contains('active'),
+          path.startsWith('/dictation') || (Boolean(user) && ['/ai-assistant', '/my-notes'].includes(path)),
+        );
+        assert.equal(nav.querySelector('a[href="/dictation"]'), null);
         assert.equal(dom.window.document.querySelector('.signup-link'), null);
         const pro = dom.window.document.querySelector('.header-pro-button');
         if (!user) {
@@ -143,6 +151,52 @@ test('header keeps four primary links in home-first order including TOEIC and gr
       }
     }
   }
+});
+
+test('admin navigation keeps TOEIC and quiz permissions while adding admin-only dictation', async () => {
+  const { default: Layout } = await load('layouts/AdminLayout.jsx');
+  const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
+  const { ROUTES } = await load('shared/constants/routes.js');
+  for (const role of ['ADMIN', 'TEACHER']) {
+    const user = {
+      id: 1,
+      fullName: 'Admin test',
+      roles: [role],
+      permissions: ['ADMIN_ACCESS', 'QUIZ_VIEW', 'NOTIFICATION_VIEW'],
+    };
+    const html = renderToStaticMarkup(
+      h(
+        AuthContext.Provider,
+        { value: { user, isAuthenticated: true } },
+        h(MemoryRouter, { initialEntries: ['/admin'] }, h(Layout)),
+      ),
+    );
+    const dom = new JSDOM(html);
+    try {
+      const nav = dom.window.document.querySelector('nav[aria-label="Quản trị"]');
+      assert.ok(nav.querySelector(`a[href="${ROUTES.ADMIN_QUIZZES}"]`));
+      assert.ok(nav.querySelector(`a[href="${ROUTES.ADMIN_NOTIFICATIONS}"]`));
+      for (const route of [ROUTES.ADMIN_TOEIC, ROUTES.ADMIN_DICTATION]) {
+        assert.equal(Boolean(nav.querySelector(`a[href="${route}"]`)), role === 'ADMIN');
+      }
+    } finally {
+      dom.window.close();
+    }
+  }
+});
+
+test('dictation translations do not override existing quiz and catalog labels', async () => {
+  const english = JSON.parse(
+    await readFile(new URL('../src/shared/i18n/en.json', import.meta.url), 'utf8'),
+  );
+  assert.equal(english['Câu'], 'Question');
+  assert.equal(english['câu'], 'questions');
+  assert.equal(english['Câu trước'], 'Previous question');
+  assert.equal(english['Số câu'], 'Question number');
+  assert.equal(english['Đang hiển thị'], 'Visible');
+  assert.equal(english['Câu {index}'], 'Sentence {index}');
+  assert.equal(english['Câu nghe trước'], 'Previous sentence');
+  assert.equal(english['Số câu nghe'], 'Sentences');
 });
 
 test('home and footer AI entry points open the actual assistant route instead of the demo section', async () => {

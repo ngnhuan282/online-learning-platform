@@ -1,6 +1,6 @@
-import { t } from '../../../shared/i18n/locale';
+import { getIntlLocale, t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -22,23 +22,29 @@ import SchoolOutlined from '@mui/icons-material/SchoolOutlined';
 import SendOutlined from '@mui/icons-material/SendOutlined';
 import SpellcheckOutlined from '@mui/icons-material/SpellcheckOutlined';
 import TranslateOutlined from '@mui/icons-material/TranslateOutlined';
+import WorkspacePremiumOutlined from '@mui/icons-material/WorkspacePremiumOutlined';
 import ErrorState from '../../../shared/components/ErrorState';
 import { ROUTES } from '../../../shared/constants/routes';
 import useAuth from '../../auth/hooks/useAuth';
+import usePro from '../../pro/hooks/usePro';
 import { aiApi } from '../api/aiApi';
 import AiMessage from '../components/AiMessage';
 import ConversationSidebar from '../components/ConversationSidebar';
-import { getAiErrorMessage, mergeMessages, readCapabilities, readContext } from '../utils/aiState';
+import { getAiErrorMessage, mergeMessages, readCapabilities, readContext, readUsage } from '../utils/aiState';
 import '../styles/ai-assistant.css';
 import '../../../shared/styles/feature-workspace.css';
 
-function ChatWorkspace() {
+function ChatWorkspace({ closedQuotaNotice, onCloseQuotaNotice }) {
   useLocale();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('conversationId');
   const [capabilities, setCapabilities] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
   const [retry, setRetry] = useState(0);
+  const { membership } = usePro();
+  const [usage, setUsage] = useState(null);
+  const [usageError, setUsageError] = useState(null);
+  const [usageRetry, setUsageRetry] = useState(0);
   const [conversations, setConversations] = useState([]);
   const [historyPage, setHistoryPage] = useState(-1);
   const [historyLast, setHistoryLast] = useState(true);
@@ -60,6 +66,7 @@ function ChatWorkspace() {
   const revision = useRef(0);
   const log = useRef(null);
   const input = useRef(null);
+  const questionInputId = useId();
 
   useEffect(() => {
     alive.current = true;
@@ -83,6 +90,33 @@ function ChatWorkspace() {
       });
     return () => controller.abort();
   }, [retry]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    aiApi
+      .getUsage({ signal: controller.signal })
+      .then(response => {
+        if (controller.signal.aborted) return;
+        setUsage(readUsage(response.data));
+        setUsageError(null);
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) setUsageError(error);
+      });
+    return () => controller.abort();
+  }, [retry, usageRetry, membership?.active, membership?.expiresAt]);
+
+  useEffect(() => {
+    const refresh = () => setUsageRetry(value => value + 1);
+    window.addEventListener('focus', refresh);
+    const timer = usage?.resetsAt
+      ? window.setTimeout(refresh, Math.max(1000, Date.parse(usage.resetsAt) - Date.now() + 1000))
+      : undefined;
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.clearTimeout(timer);
+    };
+  }, [usage?.resetsAt]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -194,6 +228,9 @@ function ChatWorkspace() {
       pending.current ||
       !content ||
       !capabilities?.available ||
+      !usage ||
+      usage.remaining === 0 ||
+      usageError ||
       content.length > capabilities.maxMessageLength
     )
       return;
@@ -234,14 +271,31 @@ function ChatWorkspace() {
       pending.current = false;
       if (alive.current) {
         setSending(false);
+        setUsageRetry(value => value + 1);
         input.current?.focus();
       }
     }
   }
 
   const maxLength = capabilities?.maxMessageLength ?? 4000;
+  const quotaReached = usage?.remaining === 0;
   const blocked =
-    sending || messageBusy || Boolean(messageError) || !capabilities?.available || Boolean(connectionError);
+    sending ||
+    messageBusy ||
+    Boolean(messageError) ||
+    !capabilities?.available ||
+    Boolean(connectionError) ||
+    !usage ||
+    Boolean(usageError) ||
+    quotaReached;
+  const resetTime =
+    usage &&
+    new Intl.DateTimeFormat(getIntlLocale(), {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+    }).format(new Date(usage.resetsAt));
   const contextTitle = conversation?.contextTitle;
   const hasLessonContext = Boolean(conversation?.lessonId || (!selectedId && params.get('lessonId')));
   const latestError = failed?.error;
@@ -249,9 +303,11 @@ function ChatWorkspace() {
     ? 'Mất kết nối'
     : !capabilities
       ? 'Đang kết nối'
-      : capabilities.available
-        ? 'Sẵn sàng'
-        : 'Chưa cấu hình AI';
+      : quotaReached
+        ? 'Hết lượt hôm nay'
+        : capabilities.available
+          ? 'Sẵn sàng'
+          : 'Chưa cấu hình AI';
   const sidebar = (
     <ConversationSidebar
       conversations={conversations}
@@ -288,9 +344,35 @@ function ChatWorkspace() {
               <p>{t('Hỏi, luyện tập và hiểu tiếng Anh theo cách của bạn.')}</p>
             </div>
           </div>
-          <Button component={Link} to={ROUTES.COURSES} variant="outlined" startIcon={<ArrowBack />}>
-            {t('Khóa học')}
-          </Button>
+          <div className="ai-assistant-heading-actions">
+            {usage && !usageError && (
+              <div className="ai-assistant-quota" role="status">
+                <div>
+                  <strong>{usage.proActive ? 'PRO' : t('Miễn phí')}</strong>
+                  <span>
+                    {t('{remaining}/{limit} lượt còn lại hôm nay', {
+                      remaining: usage.remaining,
+                      limit: usage.dailyLimit,
+                    })}
+                  </span>
+                </div>
+                {!usage.proActive && usage.proDailyLimit > usage.dailyLimit && (
+                  <Button
+                    component={Link}
+                    to={ROUTES.PRO}
+                    size="small"
+                    variant="outlined"
+                    startIcon={<WorkspacePremiumOutlined />}
+                  >
+                    {t('Nâng cấp PRO')}
+                  </Button>
+                )}
+              </div>
+            )}
+            <Button component={Link} to={ROUTES.COURSES} variant="outlined" startIcon={<ArrowBack />}>
+              {t('Khóa học')}
+            </Button>
+          </div>
         </div>
         <div className="ai-assistant-workspace">
           {mobile ? (
@@ -330,7 +412,7 @@ function ChatWorkspace() {
                 <Chip
                   label={status}
                   size="small"
-                  color={capabilities?.available && !connectionError ? 'success' : 'default'}
+                  color={capabilities?.available && !connectionError && !quotaReached ? 'success' : 'default'}
                   variant="outlined"
                 />
                 <Tooltip title={t('Làm mới')}>
@@ -346,6 +428,32 @@ function ChatWorkspace() {
                 </Tooltip>
               </div>
             </div>
+            {quotaReached && !usageError && closedQuotaNotice !== usage.resetsAt && (
+              <Alert
+                className="ai-assistant-quota-notice"
+                severity="info"
+                onClose={() => onCloseQuotaNotice(usage.resetsAt)}
+                closeText={t('Đóng thông báo')}
+              >
+                {t('Đã hết lượt hôm nay. Lượt mới được cấp lúc {time}.', { time: resetTime })}
+                {!usage.proActive && usage.proDailyLimit > usage.dailyLimit && (
+                  <span>
+                    {' '}
+                    {t('Nâng cấp gói PRO để có tối đa {limit} lượt chat mỗi ngày.', {
+                      limit: usage.proDailyLimit,
+                    })}
+                  </span>
+                )}
+              </Alert>
+            )}
+            {usageError && (
+              <Alert
+                severity="warning"
+                action={<Button onClick={() => setUsageRetry(value => value + 1)}>{t('Thử lại')}</Button>}
+              >
+                {t('Không thể tải hạn mức chat AI. Vui lòng thử lại.')}
+              </Alert>
+            )}
             {params.get('courseId') && !selectedId && (
               <Alert severity="info">
                 {t('Ngữ cảnh: khóa học #')}
@@ -489,25 +597,32 @@ function ChatWorkspace() {
                 if (!blocked) send();
               }}
             >
-              {latestError && (
+              {latestError && !(quotaReached && latestError.code === 'AI_DAILY_LIMIT_REACHED') && (
                 <Alert
-                  severity="error"
+                  severity={latestError.code === 'AI_OFF_TOPIC' ? 'info' : 'error'}
+                  onClose={latestError.code === 'AI_OFF_TOPIC' ? () => setFailed(null) : undefined}
+                  closeText={t('Đóng thông báo')}
                   action={
-                    <Button disabled={sending || !capabilities?.available} onClick={() => send(failed)}>
-                      {t('Thử lại')}
-                    </Button>
+                    ['AI_OFF_TOPIC', 'AI_DAILY_LIMIT_REACHED'].includes(latestError.code) ? undefined : (
+                      <Button disabled={blocked} onClick={() => send(failed)}>
+                        {t('Thử lại')}
+                      </Button>
+                    )
                   }
                 >
-                  {getAiErrorMessage(latestError)}
+                  {t(getAiErrorMessage(latestError))}
                 </Alert>
               )}
+              <label className="ai-assistant-input-label" htmlFor={questionInputId}>
+                {t('Câu hỏi của bạn')}
+              </label>
               <TextField
+                id={questionInputId}
                 className="ai-assistant-input"
                 fullWidth
                 multiline
                 minRows={2}
                 maxRows={4}
-                label={t('Câu hỏi của bạn')}
                 placeholder={t('Nhập câu hỏi về bài học...')}
                 value={draft}
                 inputRef={input}
@@ -577,5 +692,12 @@ export default function AiAssistantPage() {
   useLocale();
   const { user } = useAuth();
   const [params] = useSearchParams();
-  return <ChatWorkspace key={`${user?.id ?? 'anonymous'}:${params.toString()}`} />;
+  const [dismissedQuota, setDismissedQuota] = useState(null);
+  return (
+    <ChatWorkspace
+      key={`${user?.id ?? 'anonymous'}:${params.toString()}`}
+      closedQuotaNotice={dismissedQuota?.userId === user?.id ? dismissedQuota?.resetsAt : null}
+      onCloseQuotaNotice={resetsAt => setDismissedQuota({ userId: user?.id, resetsAt })}
+    />
+  );
 }
