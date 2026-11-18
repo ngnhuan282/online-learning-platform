@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -303,6 +304,7 @@ class ToeicLearningIntegrationTests {
             ),
             200
         );
+        long timedPracticeId = timedPractice.get("id").asLong();
         assertThat(timedPractice.get("durationMinutes").asInt()).isEqualTo(15);
         assertThat(timedPractice.get("deadlineAt").isNull()).isFalse();
         JsonNode loaded = data(learner("GET", "/attempts/" + attemptId, user, null), 200);
@@ -330,8 +332,23 @@ class ToeicLearningIntegrationTests {
         assertThat(retried.get("submittedAt")).isEqualTo(graded.get("submittedAt"));
         assertThat(retried.get("score")).isEqualTo(graded.get("score"));
         JsonNode progress = data(learner("GET", "/exams/" + examId + "/progress", user, null), 200);
-        assertThat(progress.get("attempts").get(0).get("score").asInt()).isEqualTo(67);
-        assertThat(progress.get("activeAttemptId").isNull()).isTrue();
+        List<JsonNode> history = StreamSupport.stream(progress.get("attempts").spliterator(), false).toList();
+        assertThat(history).hasSize(2);
+        assertThat(history)
+            .filteredOn(item -> item.get("id").asLong() == attemptId)
+            .singleElement()
+            .satisfies(item -> {
+                assertThat(item.get("status").asText()).isEqualTo("GRADED");
+                assertThat(item.get("score").asInt()).isEqualTo(67);
+            });
+        assertThat(history)
+            .filteredOn(item -> item.get("id").asLong() == timedPracticeId)
+            .singleElement()
+            .satisfies(item -> {
+                assertThat(item.get("status").asText()).isEqualTo("IN_PROGRESS");
+                assertThat(item.get("score").isNull()).isTrue();
+            });
+        assertThat(progress.get("activeAttemptId").asLong()).isEqualTo(timedPracticeId);
     }
 
     @Test
