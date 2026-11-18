@@ -107,7 +107,19 @@ const router = createBrowserRouter([
           },
         ],
       },
-      { path: 'analytics', element: <Navigate to="/admin" replace /> },
+      {
+        path: 'statistics',
+        element: <PermissionRoute permission="DASHBOARD_VIEW" />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/admin/pages/AdminStatisticsPage')).default,
+            }),
+          },
+        ],
+      },
+      { path: 'analytics', element: <Navigate to="/admin/statistics" replace /> },
       {
         path: 'payments',
         element: <PermissionRoute permission="PAYMENT_REPORT_VIEW" />,

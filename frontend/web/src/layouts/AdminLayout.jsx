@@ -25,6 +25,7 @@ import {
   EmojiEventsOutlined,
   ForumOutlined,
   CardMembershipOutlined,
+  InsightsOutlined,
 } from '@mui/icons-material';
 import PermissionRoute from '../routes/PermissionRoute';
 import useAuth from '../features/auth/hooks/useAuth';
@@ -38,6 +39,7 @@ import '../features/admin/admin.css';
 
 const menu = [
   { to: '/admin', label: 'Tổng quan', icon: DashboardOutlined, permission: 'DASHBOARD_VIEW', end: true },
+  { to: ROUTES.ADMIN_STATISTICS, label: 'Thống kê', icon: InsightsOutlined, permission: 'DASHBOARD_VIEW' },
   { to: ROUTES.ADMIN_SHOP, label: 'Quản lý cửa hàng', icon: ShoppingBagOutlined, permission: 'SHOP_VIEW' },
   {
     to: ROUTES.ADMIN_ENGAGEMENT,
