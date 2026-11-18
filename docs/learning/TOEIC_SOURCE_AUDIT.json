@@ -1,0 +1,1411 @@
+{
+  "sourceFiles": [
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 1.pdf",
+      "sha256": "0f82880a48415fe71b442130d564f33b315217c4f2eafc7fa2f916f98d59f3ed"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 2.pdf",
+      "sha256": "c47ab798f425f2dd9ebeb46ebbe3a4fd2a5e7e7572316b8a27c0edc9582736e1"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 3.pdf",
+      "sha256": "537ae7da1e007b4c0690b29d4d57719aacfacd7124713b3b0ff3f75693dd4b89"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 4.pdf",
+      "sha256": "1e7bd65691c59c11c3210e6d4f3e0ec2ca3babe3ecd3320d21ce8855c511638a"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 5.pdf",
+      "sha256": "e6064d200e4f2b86276299a6b5f83acfb11d5caf303974071f7ea1ac24ee1eac"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 6.pdf",
+      "sha256": "19dba30e2daf81cdc46e5162bc4123b8217cd6e9abff78bbe1548620d7ce4e34"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 7.pdf",
+      "sha256": "c7cff214fdab85e51f8505ffab6a08c8f03724b263cc77ce20db19b87fc4123a"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 8.pdf",
+      "sha256": "f6258a7e4f1ae4569d05e925488992ae5b6ccde38d73907f84a38cf9b6517b0e"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/[DR. ENGLISH TOEIC] GIẢI CHI TIẾT ETS 2024 - TEST 9.pdf",
+      "sha256": "1dfe5dd3ff54ea9a5cb55394c01d4f257ed75e9f09053d1743c0ee3eea54372a"
+    },
+    {
+      "path": "docs/resources/EBOOK GIẢI CHI TIẾT 10 TEST/GIẢI CHI TIẾT ETS TEST 10.pdf",
+      "sha256": "6d0b0aec70c742301262a6fc9f4bfc0dbced4c85d72163d6ba09f6d02c5317d2"
+    },
+    {
+      "path": "docs/resources/ĐÁP ÁN ETS 2024/ĐÁP ÁN ETS 2024 RC.pdf",
+      "sha256": "b33e751bfb8b1244ac6c70099a454053ad1bce77c1dc966fb146a6a7d2c64920"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 1 RC_.pdf",
+      "sha256": "70cbd8e099d8539e05c92b6ebc3732c7228a717d972b7e24507b071a39956020"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 10 RC_.pdf",
+      "sha256": "18b449101bc70dd65e2a020bfe4236d535904092378248cb3d03ec995ef21998"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 2 RC_.pdf",
+      "sha256": "6edd4f4815b1db10aa14bbff68e9806275d68bae835a02999dc2d98e4483fe15"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 3 RC_.pdf",
+      "sha256": "3e2f065a6b5b675c980039194ccb9c1774537fbd359a65b394c119f04e1f8cea"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 4 RC.pdf",
+      "sha256": "355561b188c22179847eeaa4ee43608d3ca03f1cb814cc8708507e644c7f4477"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 5 RC_.pdf",
+      "sha256": "b54379466f10265a480fa21fb819eddd35983086bec63d82e969d59aa9491383"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 6 RC.pdf",
+      "sha256": "5ac3f5315781242942eb721e11b6536561391a8e06340dd85e3c79e315a68bc2"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 7 RC_.pdf",
+      "sha256": "8f7c8a35b863ab24a7e7b842649d6a065c53ba052186dff22a575a4a9c3578e1"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 8 RC_.pdf",
+      "sha256": "01b0250faaffe68a655eaddec2869de61d5734367ee2d1ab61c75e55c4c0f3e8"
+    },
+    {
+      "path": "docs/resources/ĐỀ RC/TEST 9 RC_.pdf",
+      "sha256": "2502fe0bbdbd02ec7c896e5c435eeaaee916a0567576d8f6b7b78854513b1c38"
+    }
+  ],
+  "answerKeyCount": 1000,
+  "answerKeysCrosschecked": 1000,
+  "manualExplanationCorrections": [
+    {
+      "test": 2,
+      "number": 124,
+      "correctOptionId": "C",
+      "solutionPage": 83,
+      "originalPrompt": "Mr. Moscowitz is — that Dr. Tanaka will agree to present the keynote speech at this year's conference.",
+      "explanation": "Ông Moscowitz_____rằng Tiến sĩ Tanaka sẽ đồng ý trình bày bài phát\nbiểu quan trọng tại hội nghị năm nay.\n(A) động từ chia ở dạng số ít\n\n(B) động từ chia thì quá khứ đơn\n(C) hopeful: tính từ\n(D) trạng từ\nDạng câu hỏi: Từ loại\nĐặc điểm đáp án:\n•\nChỗ trống đứng sau chủ ngữ Mr. Moscowitz và động từ to be “is”. Sau chỗ trống\nlà một mệnh đề.\n→ Đáp án là một tính từ\nTừ vựng cần lưu ý:\n•\nagree (v) đồng ý\n•\npresent (v) trình bày\n•\nkeynote (adj) quan trọng nhất\n•\nspeech (n) bài phát biểu\n•\nconference (n) hội nghị",
+      "note": "Header punctuation/numeric form not matched by original parser"
+    },
+    {
+      "test": 2,
+      "number": 138,
+      "correctOptionId": "A",
+      "solutionPage": 92,
+      "originalPrompt": "",
+      "explanation": "Dạng câu hỏi: Từ loại\nĐặc điểm đáp án:\n•\nTừ cần điền đứng sau dấu phẩy, đóng vai trò là bổ ngữ cho chủ ngữ “fair prices\nand professional work”, được bổ nghĩa bởi cụm giới từ “by our Keep Cool\nguarantee”.\n→ Đáp án là động từ chia theo thì quá khứ phân từ hoặc hiện tại phân từ.\n\nLựa chọn đáp án:\n(A) backed: động từ chia theo thì quá khứ phân từ (được bảo đảm)\n(B) backs: động từ chia theo thì hiện tại đơn ở dạng số ít (bảo đảm)\n(C) backing: động từ chia theo thì hiện tại phân từ (đang bảo đảm)\n(D) back: động từ nguyên mẫu (bảo đảm)\nTạm dịch: Chúng tôi cam kết mang đến cho bạn những mức giá hợp lý và công việc\nchuyên nghiệp, được bảo đảm bởi chương trình bảo hành Keep Cool của chúng tôi.\nTừ vựng cần lưu ý:\ncontractor (n): người thầu, nhà thầu.\nannual (adj): hàng năm, thường niên.\nensure (v): đảm bảo, bảo đảm.\ninspect (v): kiểm tra, thanh tra.\nrepair (v): sửa chữa, khắc phục.\nreplace (v): thay thế, thay mới.\ncost-efficient (adj): tiết kiệm chi phí, hiệu quả về chi phí.\nqualified (adj): có trình độ, có tư cách.\nguarantee (n): bảo hành, bảo đảm.",
+      "note": "Header punctuation/numeric form not matched by original parser"
+    },
+    {
+      "test": 7,
+      "number": 166,
+      "correctOptionId": "A",
+      "solutionPage": 100,
+      "originalPrompt": "What is indicated about registration?",
+      "explanation": "Dạng câu hỏi: Câu hỏi thông tin được đề cập\nCách định vị vùng thông tin chứa đáp án:\n•\nTừ khóa: What, indicate, registration\n•\nĐoạn cuối chứa thông tin về việc đăng ký. “The bookstore requires that attendees\nregister at least one day in advance.” (Hiệu sách yêu cầu người tham dự phải đăng\nký trước ít nhất một ngày.) chứa đáp án.\n•\nSự kiện diễn ra vào ngày 10 tháng 4 “The event will be held on Thursday, April 10,\nfrom 7:00 PM. to 8:30 PM.” Vì vậy, việc đăng ký phải được thực hiện trước ít nhất\nmột ngày là ngày 9 tháng 4.\n→ Phương án (A) là phù hợp nhất.\nLoại các phương án sai:\n•\n(B), (C), (D) chứa thông tin không được đề cập.",
+      "note": "Header punctuation/numeric form not matched by original parser"
+    },
+    {
+      "test": 8,
+      "number": 194,
+      "correctOptionId": "A",
+      "solutionPage": 134,
+      "originalPrompt": "What is indicated about a furniture cart?",
+      "explanation": "Những gì được chỉ ra về một chiếc xe đẩy đồ nội thất?\n(A) Giá thuê là 6,99 USD mỗi ngày.\n(B) Nó không cần phải được trả lại.\n(C) Nó có thể gấp lại để vận chuyển dễ dàng\n(D) Nó là một phần của một bộ\nDạng câu hỏi: Câu hỏi thông tin chi tiết\nCách định vị vùng thông tin chứa đáp án:\n- Từ khoá: What, indicated, a furniture cart\n- Thông tin “Rental: wheeled furniture cart = $6.99” (Giá thuê: xe đẩy đồ nội thất có bánh\nxe = 6,99 USD) cho thấy giá thuê xe đẩy đồ nội thất là 6,99 USD.\n→ Phương án (A) là phù hợp nhất.\nLoại các phương án sai:\n- (B), (C), (D) chứa thông tin không phù hợp.",
+      "note": "Misnumbered PDF header corrected by actual English RC prompt"
+    },
+    {
+      "test": 8,
+      "number": 195,
+      "correctOptionId": "A",
+      "solutionPage": 134,
+      "originalPrompt": "What is true about the new cost estimate?",
+      "explanation": "Điều gì đúng về ước tính chi phí mới?\n(A) Nó cao hơn ước tính ban đầu\n(B) Nó phải được thanh toán đầy đủ ngay lập tức.\n(C) Nó bao gồm chi phí nhiên liệu.\n(D) Nó hết hạn sau ba ngày\nDạng câu hỏi: Câu hỏi thông tin chi tiết\nCách định vị vùng thông tin chứa đáp án:\n- Từ khoá: What, true, new cost estimate\n- Thông tin về chi phí trong đơn đặt chỗ đầu tiên “I reserved a moving van online and was\ngiven an estimated price of $150” (Tôi đã đặt trước một chiếc xe tải chuyển hàng trực tuyến\nvà được đưa ra mức giá ước tính là 150 USD) cho thấy chi phí trước khi cập nhật đặt chỗ\nlà $150, trong khi đó, theo email phản hồi từ công ty thì tổng chi phí sau khi cập nhật đặt\nchỗ là “Total = $171.46” (Tổng cộng = $171,46). Như vậy, ước tính chi phí mới cao hơn do\nvới ban đầu.\n→ Phương án (A) là phù hợp nhất.\n\nLoại các phương án sai:\n- (B), (C), (D) chứa thông tin không được đề cập.\nTừ vựng cần lưu ý:\nreservation (n): đặt chỗ\npickup (n): điểm lấy xe\ndrop-off (n): điểm trả xe\nvehicle (n): phương tiện\ncustomer support (noun phrase): hỗ trợ khách hàng\nestimated price (noun phrase): chi phí ước tính\ncredit card (noun phrase): thẻ tín dụng",
+      "note": "Misnumbered PDF header corrected by actual English RC prompt"
+    }
+  ],
+  "tests": [
+    {
+      "test": 1,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 70,
+      "fallbacks": [
+        {
+          "number": 119,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 126,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 160,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 164,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 166,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 171,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 177,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 97
+    },
+    {
+      "test": 2,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 70,
+      "fallbacks": [
+        {
+          "number": 157,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 166,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 171,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 182,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 98
+    },
+    {
+      "test": 3,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 101,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 104,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 105,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 106,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 107,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 108,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 110,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 113,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 114,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 115,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 117,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 126,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 127,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 130,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 160,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 163,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 167,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 169,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 179,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 183,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 81
+    },
+    {
+      "test": 4,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 104,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 105,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 108,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 110,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 111,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 116,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 120,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 121,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 122,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 126,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 128,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 130,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 160,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 162,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 167,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 175,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 177,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 84
+    },
+    {
+      "test": 5,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 102,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 104,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 105,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 107,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 108,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 110,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 111,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 115,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 116,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 119,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 121,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 122,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 124,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 127,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 130,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 159,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 160,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 161,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 166,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 171,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 179,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 185,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 79
+    },
+    {
+      "test": 6,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 102,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 103,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 104,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 105,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 108,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 109,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 113,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 114,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 116,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 118,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 121,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 123,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 124,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 127,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 128,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 158,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 167,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 177,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 83
+    },
+    {
+      "test": 7,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 104,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 105,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 106,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 109,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 110,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 112,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 115,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 117,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 118,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 122,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 124,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 125,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 128,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 130,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 157,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 159,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 163,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 167,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 170,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 82
+    },
+    {
+      "test": 8,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 107,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 109,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 114,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 118,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 119,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 120,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 121,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 122,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 123,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 125,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 127,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 163,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 170,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 171,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 175,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 179,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 183,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 84
+    },
+    {
+      "test": 9,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 101,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 104,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 105,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 112,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 114,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 116,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 117,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 119,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 126,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 149,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 157,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 159,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 168,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 175,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 87
+    },
+    {
+      "test": 10,
+      "questions": 100,
+      "lessons": 4,
+      "imageBackedQuestions": 100,
+      "fallbacks": [
+        {
+          "number": 101,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 105,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 109,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 112,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 113,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 114,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 117,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 119,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 121,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 127,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 128,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 129,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 130,
+          "reasons": [
+            "blank_not_reliably_ocr_read"
+          ]
+        },
+        {
+          "number": 155,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 160,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 171,
+          "reasons": [
+            "source_position_diagram"
+          ]
+        },
+        {
+          "number": 174,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        },
+        {
+          "number": 177,
+          "reasons": [
+            "question_stem_incomplete_ocr"
+          ]
+        }
+      ],
+      "typedQuestionPrompts": 84
+    }
+  ],
+  "notes": [
+    "AUDIO excluded.",
+    "Question and passage images come only from answer-free original RC scans.",
+    "Uncertain OCR uses source question images; no guessed blank location is published."
+  ],
+  "publishedExamCount": 10,
+  "publishedQuestionCount": 1000,
+  "lessonsPerExam": 4,
+  "sourceQuestionImagePolicy": "Answer-free originalRC question crops are authoritative when OCR omitted content; no guessed blank positions.",
+  "versionedOverrides": [
+    "infra/scripts/toeic/source-overrides/test01-part5.json",
+    "infra/scripts/toeic/source-overrides/test02-part5.json",
+    "infra/scripts/toeic/source-overrides/native-question-corrections.json",
+    "infra/scripts/toeic/source-overrides/explanation-errata.json",
+    "infra/scripts/toeic/source-overrides/question-anchors.json"
+  ],
+  "manualOptionCorrections": [
+    {
+      "test": 4,
+      "number": 103,
+      "prompt": "The annual report will be ready after ------- make the necessary revisions.",
+      "options": [
+        {
+          "id": "A",
+          "text": "I"
+        },
+        {
+          "id": "B",
+          "text": "me"
+        },
+        {
+          "id": "C",
+          "text": "myself"
+        },
+        {
+          "id": "D",
+          "text": "my"
+        }
+      ]
+    },
+    {
+      "test": 5,
+      "number": 101,
+      "prompt": "After upgrading to Pro Data Whiz, our clients began ------- problems with spreadsheets.",
+      "options": [
+        {
+          "id": "A",
+          "text": "has"
+        },
+        {
+          "id": "B",
+          "text": "had"
+        },
+        {
+          "id": "C",
+          "text": "have"
+        },
+        {
+          "id": "D",
+          "text": "having"
+        }
+      ]
+    },
+    {
+      "test": 5,
+      "number": 106,
+      "prompt": "------- of all cosmetics are final, and refunds will not be given under any circumstances.",
+      "options": [
+        {
+          "id": "A",
+          "text": "Sale"
+        },
+        {
+          "id": "B",
+          "text": "Sales"
+        },
+        {
+          "id": "C",
+          "text": "Sells"
+        },
+        {
+          "id": "D",
+          "text": "Selling"
+        }
+      ]
+    },
+    {
+      "test": 5,
+      "number": 140,
+      "options": [
+        {
+          "id": "A",
+          "text": "asked"
+        },
+        {
+          "id": "B",
+          "text": "is asking"
+        },
+        {
+          "id": "C",
+          "text": "has asked"
+        },
+        {
+          "id": "D",
+          "text": "will ask"
+        }
+      ]
+    },
+    {
+      "test": 6,
+      "number": 131,
+      "options": [
+        {
+          "id": "A",
+          "text": "is"
+        },
+        {
+          "id": "B",
+          "text": "or"
+        },
+        {
+          "id": "C",
+          "text": "likely"
+        },
+        {
+          "id": "D",
+          "text": "from"
+        }
+      ]
+    },
+    {
+      "test": 9,
+      "number": 132,
+      "options": [
+        {
+          "id": "A",
+          "text": "at"
+        },
+        {
+          "id": "B",
+          "text": "on"
+        },
+        {
+          "id": "C",
+          "text": "by"
+        },
+        {
+          "id": "D",
+          "text": "to"
+        }
+      ]
+    },
+    {
+      "test": 10,
+      "number": 123,
+      "prompt": "Mr. Nayar ------- the need for enhanced safety protocols long before the government issued a report on the topic.",
+      "options": [
+        {
+          "id": "A",
+          "text": "stresses"
+        },
+        {
+          "id": "B",
+          "text": "stressing"
+        },
+        {
+          "id": "C",
+          "text": "will stress"
+        },
+        {
+          "id": "D",
+          "text": "had stressed"
+        }
+      ]
+    },
+    {
+      "test": 10,
+      "number": 137,
+      "options": [
+        {
+          "id": "A",
+          "text": "issues"
+        },
+        {
+          "id": "B",
+          "text": "clients"
+        },
+        {
+          "id": "C",
+          "text": "articles"
+        },
+        {
+          "id": "D",
+          "text": "proposals"
+        }
+      ]
+    }
+  ]
+}

@@ -48,6 +48,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
+                    .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/learning/toeic/exams")
+                    .permitAll()
                     .requestMatchers("/internal/v1/learning/enrollments")
                     .permitAll()
                     .requestMatchers(

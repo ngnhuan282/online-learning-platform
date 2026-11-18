@@ -62,6 +62,7 @@ public class AuthenticationFilter implements WebFilter, Ordered {
                 Set.of("/api/v1/payments/vnpay/return", "/api/v1/payments/vnpay/ipn").contains(path)) ||
             (method == HttpMethod.GET &&
                 (path.equals("/api/v1/courses") ||
+                    path.equals("/api/v1/learning/toeic/exams") ||
                     path.matches("/api/v1/courses/[^/]+") ||
                     path.matches("/api/v1/courses/[^/]+/sections") ||
                     path.matches("/api/v1/courses/[^/]+/reviews") ||
