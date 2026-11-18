@@ -80,6 +80,18 @@ const router = createBrowserRouter([
     path: '/admin',
     element: <AdminLayout />,
     children: [
+      {
+        path: 'dictation',
+        element: <RoleRoute roles={['ADMIN']} />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/dictation/pages/AdminDictationPage')).default,
+            }),
+          },
+        ],
+      },
       { index: true, element: <AdminDashboardPage /> },
       { path: 'profile', element: <AccountPage /> },
       ...commerceAdminRoutes,
@@ -298,6 +310,18 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
+          {
+            path: 'dictation',
+            lazy: async () => ({
+              Component: (await import('../features/dictation/pages/DictationLibraryPage')).default,
+            }),
+          },
+          {
+            path: 'dictation/:id',
+            lazy: async () => ({
+              Component: (await import('../features/dictation/pages/DictationPracticePage')).default,
+            }),
+          },
           {
             path: 'achievements',
             lazy: async () => ({

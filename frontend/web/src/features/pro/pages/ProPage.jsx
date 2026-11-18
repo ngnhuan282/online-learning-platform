@@ -28,6 +28,7 @@ const freeBenefits = [
   'Lưu tối đa 100 ghi chú từ vựng khi luyện thi TOEIC',
   'Chuỗi ngày học, XP, huy hiệu và cửa hàng',
   'Tham gia diễn đàn và bảng xếp hạng',
+  'Chat AI với hạn mức theo ngày',
 ];
 const proBenefits = [
   'Tất cả tính năng của gói Miễn phí',
@@ -37,6 +38,7 @@ const proBenefits = [
   'Gia hạn cộng dồn vào thời gian Pro còn lại',
   'Giữ nguyên tiến độ khi gia hạn',
   'Kích hoạt bằng thanh toán hoặc mã Pro',
+  'Chat AI với hạn mức cao hơn mỗi ngày',
 ];
 const planLabel = plan =>
   !['PRO_MONTH', 'PRO_QUARTER', 'PRO_YEAR'].includes(plan.code)

@@ -2,6 +2,7 @@ package com.elearning.ai.service;
 
 import com.elearning.ai.common.exception.AppException;
 import com.elearning.ai.common.exception.ErrorCode;
+import com.elearning.ai.dto.AiUsageResponse;
 import com.elearning.ai.provider.AiProviderProperties;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -28,7 +29,33 @@ public class AiUsageLimiter {
         this.properties = properties;
     }
 
-    public void consume(Long userId) {
+    public AiUsageResponse status(Long userId, boolean proActive) {
+        LocalDate day = LocalDate.now(ZoneOffset.UTC);
+        var counts = jdbc.query(
+            "SELECT request_count FROM ai_daily_usage WHERE user_id = ? AND usage_date = ?",
+            (row, index) -> row.getInt(1),
+            userId,
+            day
+        );
+        int used = counts.isEmpty() ? 0 : counts.getFirst();
+        int limit = limit(proActive);
+        return new AiUsageResponse(
+            proActive,
+            limit,
+            used,
+            Math.max(0, limit - used),
+            properties.getDailyRequestLimit(),
+            day.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)
+        );
+    }
+
+    private int limit(boolean proActive) {
+        return proActive
+            ? properties.getDailyRequestLimit()
+            : Math.min(properties.getFreeDailyRequestLimit(), properties.getDailyRequestLimit());
+    }
+
+    public void consume(Long userId, boolean proActive) {
         LocalDate day = LocalDate.now(ZoneOffset.UTC);
         // The conditional UPDATE is atomic across conversations and service replicas.
         // Retry first-request insert collisions only after their transaction rolls back.
@@ -39,7 +66,7 @@ public class AiUsageLimiter {
                         "UPDATE ai_daily_usage SET request_count = request_count + 1 WHERE user_id = ? AND usage_date = ? AND request_count < ?",
                         userId,
                         day,
-                        properties.getDailyRequestLimit()
+                        limit(proActive)
                     );
                     if (changed == 1) return;
                     Long existing = jdbc.queryForObject(
@@ -48,7 +75,9 @@ public class AiUsageLimiter {
                         userId,
                         day
                     );
-                    if (existing != null && existing > 0) throw new AppException(ErrorCode.AI_QUOTA_EXCEEDED);
+                    if (existing != null && existing > 0) throw new AppException(
+                        ErrorCode.AI_DAILY_LIMIT_REACHED
+                    );
                     jdbc.update(
                         "INSERT INTO ai_daily_usage (user_id, usage_date, request_count) VALUES (?, ?, 1)",
                         userId,

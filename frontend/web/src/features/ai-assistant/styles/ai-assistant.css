@@ -3,6 +3,11 @@
   background: linear-gradient(180deg, #f3f8ff 0%, #f6f9fc 100%);
 }
 
+.ai-assistant-page > .container {
+  width: calc(100% - 48px);
+  max-width: 1360px;
+}
+
 .ai-assistant-heading,
 .ai-assistant-heading > div,
 .ai-assistant-history-heading,
@@ -23,6 +28,12 @@
   justify-content: space-between;
   flex-wrap: wrap;
   margin-bottom: 22px;
+}
+
+.ai-assistant-heading-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 16px;
 }
 
 .ai-assistant-heading-icon,
@@ -57,10 +68,10 @@
 
 .ai-assistant-workspace {
   display: grid;
-  grid-template-columns: 296px minmax(0, 1fr);
-  height: 760px;
-  max-height: calc(100dvh - 236px);
-  min-height: 540px;
+  grid-template-columns: 264px minmax(0, 1fr);
+  height: calc(100dvh - 100px);
+  max-height: 1200px;
+  min-height: 720px;
   background: #ffffff;
   border: 1.5px solid #dce5f0;
   border-radius: 22px;
@@ -245,6 +256,34 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+
+.ai-assistant-quota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.ai-assistant-quota > div {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+}
+
+.ai-assistant-quota strong {
+  color: var(--text);
+}
+
+.ai-assistant-quota .MuiButton-root {
+  background: #fff;
+}
+
+.ai-assistant-quota-notice.MuiAlert-root {
+  margin: 12px 20px 0;
+  flex-shrink: 0;
 }
 
 .ai-assistant-toolbar {
@@ -646,6 +685,15 @@
   margin-bottom: 14px;
 }
 
+.ai-assistant-input-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
 .ai-assistant-input .MuiOutlinedInput-root {
   background: #ffffff;
   font-size: 14px;
@@ -788,6 +836,9 @@
 }
 
 @media (max-width: 800px) {
+  .ai-assistant-page > .container {
+    width: calc(100% - 32px);
+  }
   .ai-assistant-page {
     padding: 24px 0 32px;
   }
@@ -797,6 +848,11 @@
     margin-bottom: 18px;
   }
 
+  .ai-assistant-heading-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .ai-assistant-heading h1 {
     font-size: 24px;
     line-height: 32px;
@@ -804,9 +860,9 @@
 
   .ai-assistant-workspace {
     grid-template-columns: minmax(0, 1fr);
-    height: calc(100dvh - 180px);
-    min-height: 520px;
-    max-height: 780px;
+    height: calc(100dvh - 128px);
+    min-height: 640px;
+    max-height: 1040px;
   }
 
   .ai-assistant-toolbar,

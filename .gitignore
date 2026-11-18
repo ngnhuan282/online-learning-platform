@@ -19,3 +19,4 @@ backups/
 *.iml
 .DS_Store
 Thumbs.db
+backend/learning-service/uploads/

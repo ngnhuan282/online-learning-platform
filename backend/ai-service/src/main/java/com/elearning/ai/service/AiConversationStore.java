@@ -102,7 +102,7 @@ public class AiConversationStore {
         conversation.setActiveUntil(now.plusSeconds(120));
         var history = new ArrayList<>(
             messages
-                .findByConversationId(id, PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "id")))
+                .findByConversationId(id, PageRequest.of(0, 12, Sort.by(Sort.Direction.DESC, "id")))
                 .getContent()
         );
         Collections.reverse(history);
@@ -110,7 +110,7 @@ public class AiConversationStore {
             .stream()
             .mapToInt(message -> message.getContent().length())
             .sum();
-        while (characters > 24000 && history.size() >= 2) {
+        while (characters > 12000 && history.size() >= 2) {
             characters -= history.removeFirst().getContent().length();
             characters -= history.removeFirst().getContent().length();
         }

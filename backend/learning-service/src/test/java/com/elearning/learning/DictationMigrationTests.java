@@ -1,0 +1,103 @@
+package com.elearning.learning;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import com.elearning.learning.dto.DictationModels.*;
+import com.elearning.learning.service.*;
+import java.sql.Timestamp;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.*;
+import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import tools.jackson.databind.json.JsonMapper;
+
+class DictationMigrationTests {
+
+    @Test
+    void v14ToV16ExtendMainWithoutChangingItsHistoryOrExistingSettings() {
+        String url = "jdbc:h2:mem:dictation-main-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
+        var source = new DriverManagerDataSource(url, "sa", "");
+        FluentConfiguration config = Flyway.configure().dataSource(source).placeholders(Map.of(
+            "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""));
+        config.target("13").load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        String mainHistory = "SELECT \"version\",\"script\",\"checksum\" FROM \"flyway_schema_history\" "
+            + "WHERE \"version\" IS NOT NULL AND \"installed_rank\"<=13 ORDER BY \"installed_rank\"";
+        var before = jdbc.queryForList(mainHistory);
+        jdbc.update("UPDATE engagement_settings SET lesson_xp=37 WHERE id=1");
+
+        var migrated = config.target("16").load().migrate();
+
+        assertThat(migrated.migrationsExecuted).isEqualTo(3);
+        assertThat(jdbc.queryForList(mainHistory)).isEqualTo(before).hasSize(13);
+        assertThat(jdbc.queryForObject("SELECT lesson_xp FROM engagement_settings WHERE id=1", Integer.class))
+            .isEqualTo(37);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM toeic_notes", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dictation_exercises", Integer.class)).isEqualTo(1);
+        config.load().validate();
+    }
+
+    @Test
+    void v16PreservesCompletedLegacyScoresAndMovesUnfinishedChecksToLiveScoring() {
+        String url = "jdbc:h2:mem:dictation-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
+        var source = new DriverManagerDataSource(url, "sa", "");
+        FluentConfiguration config = Flyway.configure().dataSource(source).placeholders(Map.of(
+            "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""));
+        config.target("15").load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        var grader = new DictationGrader();
+        var json = JsonMapper.builder().build();
+        String exercise = UUID.randomUUID().toString();
+        var definition = new Definition("Migrated", "", "Workplace", "B1", "sample",
+            List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
+        var timestamp = Timestamp.from(Instant.parse("2026-01-01T00:00:00Z"));
+        jdbc.update("INSERT INTO dictation_exercises (id,current_version,published_version,archived,updated_at) VALUES (?,1,1,FALSE,?)",
+            exercise, timestamp);
+        jdbc.update("INSERT INTO dictation_revisions (exercise_id,version,title,topic,level,duration_seconds,definition) VALUES (?,1,'Migrated','Workplace','B1',3,?)",
+            exercise, json.writeValueAsString(definition));
+        String legacy = UUID.randomUUID().toString(), live = UUID.randomUUID().toString();
+        String first = json.writeValueAsString(grader.grade("We enjoyed it.", "We it"));
+        for (String id : List.of(legacy, live)) {
+            jdbc.update("INSERT INTO dictation_attempts (id,user_id,exercise_id,version,request_id,started_at,completed_at) VALUES (?,7001,?,1,?,?,?)",
+                id, exercise, id, timestamp, id.equals(legacy) ? timestamp : null);
+            jdbc.update("INSERT INTO dictation_responses (attempt_id,sentence_index,answer_text,first_grade,latest_grade) VALUES (?,0,?,?,?)",
+                id, id.equals(legacy) ? "We enjoyed it" : "We it", first,
+                id.equals(legacy) ? json.writeValueAsString(grader.grade("We enjoyed it.", "We enjoyed it")) : first);
+        }
+        config.target("16").load().migrate();
+        var audio = mock(DictationAudioService.class);
+        when(audio.metadata("sample")).thenReturn(new Audio("sample", 3, "sample.mp3"));
+        var service = new DictationService(jdbc, json, grader, audio, Clock.systemUTC());
+        var completed = service.attempt(7001, legacy);
+        assertThat(completed.scoringMode()).isEqualTo("LEGACY");
+        assertThat(completed.accuracy()).isEqualTo(66.7);
+        assertThat(completed.completed()).isEqualTo(1);
+        assertThat(completed.responses().getFirst().completed()).isTrue();
+        assertThat(completed.responses().getFirst().answer()).isEqualTo("We enjoyed it.");
+        assertThat(service.finish(7001, legacy).accuracy()).isEqualTo(66.7);
+        assertThat(completed.responses().getFirst().grade().accuracy()).isEqualTo(100);
+        assertThatThrownBy(() -> service.progress(7001, legacy, new AnswerRequest(0, "changed")))
+            .isInstanceOf(com.elearning.learning.common.exception.AppException.class);
+        var unfinished = service.attempt(7001, live);
+        assertThat(unfinished.scoringMode()).isEqualTo("LIVE");
+        assertThat(unfinished.completed()).isZero();
+        assertThat(unfinished.responses().getFirst().answer()).isNull();
+        assertThat(unfinished.responses().getFirst().grade().words()).filteredOn(edit -> !edit.type().equals("correct"))
+            .allSatisfy(edit -> assertThat(edit.expected()).isNull());
+        assertThat(unfinished.accuracy()).isEqualTo(66.7);
+        var corrected = service.progress(7001, live, new AnswerRequest(0, "We enjoyed it"));
+        assertThat(corrected.completed()).isEqualTo(1);
+        assertThat(corrected.accuracy()).isEqualTo(100);
+        assertThat(corrected.responses().getFirst().firstAccuracy()).isEqualTo(100);
+        assertThat(jdbc.queryForObject("SELECT earned_indices FROM dictation_responses WHERE attempt_id=?",
+            String.class, live)).isEqualTo("[0,1,2]");
+        assertThat(service.attempt(7001, legacy).accuracy()).isEqualTo(66.7);
+        assertThat(jdbc.queryForObject("SELECT first_grade FROM dictation_responses WHERE attempt_id=?",
+            String.class, legacy)).isEqualTo(first);
+    }
+}

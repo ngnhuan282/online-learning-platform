@@ -8,6 +8,10 @@ notifications:
   events:
     api-key: ${NOTIFICATION_EVENT_API_KEY:}
 spring:
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
   flyway:
     placeholders:
       notificationCheckKeyword: CHECK
@@ -29,6 +33,9 @@ security:
     access-token-seconds: ${JWT_ACCESS_TOKEN_SECONDS:900}
 course:
   service-url: ${COURSE_SERVICE_URL:http://localhost:8082}
+dictation:
+  storage-dir: ${DICTATION_STORAGE_DIR:./uploads/dictation}
+  sample-dir: ${DICTATION_SAMPLE_DIR:../../docs/resources/audio}
 auth:
   service-url: ${AUTH_SERVICE_URL:http://localhost:8081}
 integrations:

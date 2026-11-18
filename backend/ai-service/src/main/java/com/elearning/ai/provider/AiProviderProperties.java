@@ -26,6 +26,14 @@ public class AiProviderProperties {
     @Max(10000)
     private int dailyRequestLimit = 100;
 
+    @Min(1)
+    @Max(10000)
+    private int freeDailyRequestLimit = 5;
+
+    @Min(256)
+    @Max(4096)
+    private int maxOutputTokens = 2048;
+
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank() && model != null && model.matches("[a-zA-Z0-9._-]{1,100}");
     }

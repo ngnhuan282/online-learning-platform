@@ -25,6 +25,9 @@ class AiProviderPropertiesTests {
             assertThat(properties.getApiKey()).isEmpty();
             assertThat(properties.getModel()).isEmpty();
             assertThat(properties.getRequestTimeoutMs()).isEqualTo(60000);
+            assertThat(properties.getFreeDailyRequestLimit()).isEqualTo(5);
+            assertThat(properties.getDailyRequestLimit()).isEqualTo(100);
+            assertThat(properties.getMaxOutputTokens()).isEqualTo(2048);
         });
     }
 

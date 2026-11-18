@@ -3,6 +3,7 @@ import { ENDPOINTS } from '../../../shared/apis/endpoints';
 
 export const aiApi = {
   getCapabilities: options => axiosClient.get(`${ENDPOINTS.ai}/capabilities`, options),
+  getUsage: options => axiosClient.get(`${ENDPOINTS.ai}/usage`, options),
   getConversations: ({ page = 0, size = 20 } = {}, options = {}) =>
     axiosClient.get(`${ENDPOINTS.ai}/conversations`, { ...options, params: { page, size } }),
   getConversation: (conversationId, options) =>
