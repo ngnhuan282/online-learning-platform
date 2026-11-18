@@ -30,8 +30,16 @@ function SourceImage({ src, alt, className }) {
   );
 }
 
-export default function ToeicQuestion({ question, selected, onSelect, disabled = false, review = false }) {
+export default function ToeicQuestion({
+  question,
+  selected,
+  onSelect,
+  disabled = false,
+  review = false,
+  showAnswer = false,
+}) {
   const images = question.passageImageUrls ?? [];
+  const reveal = review || (showAnswer && Boolean(question.correctOptionId));
   return (
     <article className="toeic-question" id={`question-${question.id}`}>
       {(question.passage || images.length > 0) && (
@@ -74,8 +82,8 @@ export default function ToeicQuestion({ question, selected, onSelect, disabled =
         )}
         <div className="toeic-options">
           {(question.options ?? []).map(option => {
-            const correct = review && option.id === question.correctOptionId;
-            const wrong = review && selected === option.id && !correct;
+            const correct = reveal && option.id === question.correctOptionId;
+            const wrong = reveal && selected === option.id && !correct;
             return (
               <label
                 key={option.id}
@@ -98,14 +106,14 @@ export default function ToeicQuestion({ question, selected, onSelect, disabled =
           })}
         </div>
       </fieldset>
-      {review && (
+      {reveal && (
         <section className="toeic-explanation">
           <h3>
             {selected === question.correctOptionId
               ? t('Bạn đã trả lời đúng')
               : selected
                 ? t('Cùng xem lại câu này')
-                : t('Bạn chưa trả lời câu này')}
+                : t('Đáp án & giải thích chi tiết')}
           </h3>
           <p>
             <strong>

@@ -4,6 +4,8 @@ import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
 import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded';
 import CheckCircleOutlineOutlined from '@mui/icons-material/CheckCircleOutlineOutlined';
 import AccessTimeRounded from '@mui/icons-material/AccessTimeRounded';
+import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined';
 import ErrorState from '../../../shared/components/ErrorState';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
 import { t } from '../../../shared/i18n/locale';
@@ -13,6 +15,7 @@ import { readStorage, writeStorage, removeStorage } from '../../../shared/utils/
 import useAuth from '../../auth/hooks/useAuth';
 import { toeicApi } from '../api/toeicApi';
 import ToeicQuestion from '../components/ToeicQuestion';
+import StudyTextAssistant from '../components/StudyTextAssistant';
 
 const timeLeft = (deadline, offset) =>
   deadline ? Math.max(0, Math.ceil((Date.parse(deadline) - Date.now() - offset) / 1000)) : null;
@@ -267,12 +270,21 @@ function AttemptWorkspace({ attemptId, userId }) {
   const [confirm, setConfirm] = useState(false);
   const [onlyUnanswered, setOnlyUnanswered] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [revealedIds, setRevealedIds] = useState({});
+  const [autoReveal, setAutoReveal] = useState(false);
+
   const questions = session.attempt?.questions ?? [];
   const currentIndex = Math.min(index, Math.max(questions.length - 1, 0));
   const question = questions[currentIndex];
   const answered = questions.filter(item => session.answers[item.id]).length;
   const expired = session.remaining === 0;
   const blocked = session.submitting || expired;
+  const isPractice = session.attempt?.mode === 'PRACTICE';
+  const canRevealAnswer = isPractice && Boolean(question?.correctOptionId);
+  const isRevealed = questionId =>
+    isPractice && Boolean(revealedIds[questionId] || (autoReveal && session.answers[questionId]));
+  const currentRevealed = question ? isRevealed(question.id) : false;
+
   async function leave() {
     setLeaving(true);
     try {
@@ -281,6 +293,16 @@ function AttemptWorkspace({ attemptId, userId }) {
       setLeaving(false);
     }
   }
+
+  function toggleCurrentAnswer() {
+    if (!question || !canRevealAnswer) return;
+    setRevealedIds(previous => {
+      const currentlyShown = Boolean(previous[question.id] || (autoReveal && session.answers[question.id]));
+      if (currentlyShown && autoReveal) setAutoReveal(false);
+      return { ...previous, [question.id]: !currentlyShown };
+    });
+  }
+
   if (session.loading)
     return (
       <p className="toeic-loading" role="status">
@@ -299,8 +321,12 @@ function AttemptWorkspace({ attemptId, userId }) {
     <>
       <header className="toeic-attempt-heading">
         <div>
-          <span className="toeic-eyebrow">
-            {session.attempt.mode === 'EXAM' ? t('THI THỬ READING') : t('LUYỆN TẬP READING')}
+          <span className={`toeic-eyebrow ${session.attempt.mode === 'EXAM' ? 'is-exam-badge' : ''}`}>
+            {session.attempt.mode === 'EXAM'
+              ? t('THI THỰC CHIẾN · READING')
+              : session.attempt.part
+                ? `${t('CHẾ ĐỘ LUYỆN TẬP')} · Part ${session.attempt.part}`
+                : t('CHẾ ĐỘ LUYỆN TẬP · READING')}
           </span>
           <h1>{session.attempt.title}</h1>
           <p>{t('{answered}/{total} câu đã trả lời', { answered, total: questions.length })}</p>
@@ -362,12 +388,46 @@ function AttemptWorkspace({ attemptId, userId }) {
       )}
       <div className="toeic-attempt-layout">
         <div className="toeic-question-stage">
-          <ToeicQuestion
-            question={question}
-            selected={session.answers[question.id]}
-            onSelect={option => session.choose(question.id, option)}
-            disabled={blocked}
-          />
+          <StudyTextAssistant
+            allowNotes
+            examId={session.attempt.examId}
+            attemptId={session.attempt.id}
+            questionNumber={question.number}
+            part={question.part}
+          >
+            <ToeicQuestion
+              question={question}
+              selected={session.answers[question.id]}
+              onSelect={option => session.choose(question.id, option)}
+              disabled={blocked}
+              showAnswer={currentRevealed}
+            />
+          </StudyTextAssistant>
+          {canRevealAnswer && (
+            <div className="toeic-practice-reveal-bar">
+              <button
+                type="button"
+                className={`toeic-button ${currentRevealed ? 'button-primary' : 'toeic-button-outline'}`}
+                aria-expanded={currentRevealed}
+                onClick={toggleCurrentAnswer}
+              >
+                {currentRevealed ? (
+                  <VisibilityOffOutlined fontSize="small" />
+                ) : (
+                  <VisibilityOutlined fontSize="small" />
+                )}
+                {t(currentRevealed ? 'Ẩn đáp án' : 'Xem đáp án & lời giải')}
+              </button>
+              <label className="toeic-auto-reveal-toggle">
+                <input
+                  type="checkbox"
+                  checked={autoReveal}
+                  onChange={event => setAutoReveal(event.target.checked)}
+                />
+                <span>{t('Tự động hiện đáp án sau khi chọn')}</span>
+              </label>
+            </div>
+          )}
           <div className="toeic-question-actions">
             <button
               type="button"
@@ -414,20 +474,31 @@ function AttemptWorkspace({ attemptId, userId }) {
               {t('Chỉ hiện câu chưa trả lời')}
             </label>
             <div className="toeic-question-palette">
-              {questions.map((item, position) =>
-                !onlyUnanswered || !session.answers[item.id] ? (
+              {questions.map((item, position) => {
+                if (onlyUnanswered && session.answers[item.id]) return null;
+                const shown = isRevealed(item.id) && item.correctOptionId;
+                const toneClass = shown
+                  ? session.answers[item.id] === item.correctOptionId
+                    ? 'is-correct'
+                    : session.answers[item.id]
+                      ? 'is-wrong'
+                      : ''
+                  : session.answers[item.id]
+                    ? 'is-answered'
+                    : '';
+                return (
                   <button
                     key={item.id}
                     type="button"
-                    className={`${session.answers[item.id] ? 'is-answered' : ''} ${position === currentIndex ? 'is-current' : ''}`}
+                    className={`${toneClass} ${position === currentIndex ? 'is-current' : ''}`}
                     aria-label={t('Đến câu {number}', { number: item.number })}
                     aria-current={position === currentIndex ? 'step' : undefined}
                     onClick={() => setIndex(position)}
                   >
                     {item.number}
                   </button>
-                ) : null,
-              )}
+                );
+              })}
             </div>
             <p className="toeic-question-legend">
               <i />
@@ -444,7 +515,13 @@ function AttemptWorkspace({ attemptId, userId }) {
             {session.submitting ? t('Đang nộp bài...') : t('Nộp bài')}
           </button>
           <p className="toeic-attempt-note">
-            {t('Bạn có thể quay lại câu trước để đổi đáp án. Lời giải được mở sau khi nộp bài.')}
+            {session.attempt.mode === 'EXAM'
+              ? t(
+                  'Chế độ thi thực chiến: Không xem đáp án giữa chừng. Điểm số và lời giải chi tiết chỉ mở sau khi nộp bài.',
+                )
+              : t(
+                  'Chế độ luyện tập: Bạn có thể xem đáp án và lời giải ngay trên từng câu hoặc sau khi nộp bài.',
+                )}
           </p>
         </aside>
       </div>

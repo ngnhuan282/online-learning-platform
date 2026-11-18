@@ -9,6 +9,7 @@ import {
   MenuBookOutlined,
   PaymentsOutlined,
   ShoppingBagOutlined,
+  StickyNote2Outlined,
 } from '@mui/icons-material';
 import useAuth from '../../features/auth/hooks/useAuth';
 import { ROUTES } from '../constants/routes';
@@ -25,7 +26,12 @@ export default function HeaderUtilities() {
   const id = useId();
   const open = Boolean(anchor);
   const items = [
-    ...(user ? [{ to: '/my-courses', label: 'Khóa của tôi', icon: MenuBookOutlined }] : []),
+    ...(user
+      ? [
+          { to: '/my-courses', label: 'Khóa của tôi', icon: MenuBookOutlined },
+          { to: ROUTES.MY_NOTES, label: 'Ghi chú của tôi', icon: StickyNote2Outlined },
+        ]
+      : []),
     { to: ROUTES.COMMUNITY, label: 'Diễn đàn', icon: ForumOutlined },
     { to: ROUTES.LEADERBOARD, label: 'Bảng xếp hạng', icon: LeaderboardOutlined },
     { to: ROUTES.SHOP, label: 'Cửa hàng', icon: ShoppingBagOutlined },

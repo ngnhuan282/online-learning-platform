@@ -3,12 +3,14 @@ import useLocale from '../../../shared/i18n/useLocale';
 import { NavLink } from 'react-router-dom';
 import DashboardOutlined from '@mui/icons-material/DashboardOutlined';
 import AutoStoriesOutlined from '@mui/icons-material/AutoStoriesOutlined';
+import StickyNote2Outlined from '@mui/icons-material/StickyNote2Outlined';
 import NotificationsNone from '@mui/icons-material/NotificationsNone';
 import '../styles/workspace.css';
 
 const destinations = [
   { to: '/dashboard', label: 'Tổng quan', Icon: DashboardOutlined },
   { to: '/my-courses', label: 'Khóa học của tôi', Icon: AutoStoriesOutlined },
+  { to: '/my-notes', label: 'Ghi chú của tôi', Icon: StickyNote2Outlined },
   { to: '/notifications', label: 'Thông báo', Icon: NotificationsNone },
 ];
 

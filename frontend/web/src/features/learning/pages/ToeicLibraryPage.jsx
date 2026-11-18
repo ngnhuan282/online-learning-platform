@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Pagination from '@mui/material/Pagination';
 import MenuBookOutlined from '@mui/icons-material/MenuBookOutlined';
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
@@ -9,7 +9,11 @@ import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded';
 import SearchRounded from '@mui/icons-material/SearchRounded';
 import AccessTimeRounded from '@mui/icons-material/AccessTimeRounded';
 import CheckCircleOutlineOutlined from '@mui/icons-material/CheckCircleOutlineOutlined';
+import BoltRounded from '@mui/icons-material/BoltRounded';
+import StickyNote2Outlined from '@mui/icons-material/StickyNote2Outlined';
 import ErrorState from '../../../shared/components/ErrorState';
+import { ROUTES } from '../../../shared/constants/routes';
+import useAuth from '../../auth/hooks/useAuth';
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
 import { toeicApi } from '../api/toeicApi';
@@ -27,6 +31,8 @@ const normalize = value =>
 
 export default function ToeicLibraryPage() {
   useLocale();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const { bookmarks, toggle } = useToeicBookmarks();
   const resultsHeading = useRef(null);
@@ -66,6 +72,10 @@ export default function ToeicLibraryPage() {
     setParams(next);
     resultsHeading.current?.scrollIntoView?.({ block: 'start' });
   }
+  function openTest(examId, event) {
+    if (event.target.closest('button, a')) return;
+    navigate(`/exams/toeic/tests/${examId}`);
+  }
   return (
     <>
       <header className="toeic-page-heading">
@@ -73,16 +83,30 @@ export default function ToeicLibraryPage() {
           <h1>{t('Luyện thi TOEIC')}</h1>
           <p>
             {t(
-              'Học kiến thức, luyện từng Part và thi thử Reading ngay trên web. Đáp án và lời giải xuất hiện sau khi nộp bài.',
+              'Chọn chế độ Luyện tập linh hoạt (tùy chỉnh thời gian, xem đáp án thoải mái) hoặc Thi thực chiến chuẩn giờ thật ngay trên web.',
             )}
           </p>
         </div>
-        <span className="toeic-pill">
-          <CheckCircleOutlineOutlined fontSize="small" />
-          TOEIC Reading
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {user && (
+            <Link className="toeic-button toeic-button-outline" to={ROUTES.MY_NOTES}>
+              <StickyNote2Outlined fontSize="small" />
+              {t('Ghi chú của tôi')}
+            </Link>
+          )}
+          <span className="toeic-pill">
+            <CheckCircleOutlineOutlined fontSize="small" />
+            TOEIC Reading
+          </span>
+        </div>
       </header>
-      <section className="toeic-featured" aria-labelledby="toeic-collection-title">
+      <section
+        className={`toeic-featured ${!loading && !error && exams[0] ? 'is-clickable' : ''}`}
+        aria-labelledby="toeic-collection-title"
+        onClick={event => {
+          if (!loading && !error && exams[0]) openTest(exams[0].id, event);
+        }}
+      >
         <div className="toeic-featured-icon">
           <MenuBookOutlined />
         </div>
@@ -90,9 +114,14 @@ export default function ToeicLibraryPage() {
           <div className="toeic-featured-tags">
             <span>ETS 2024</span>
             <span>Reading · Part 5, 6, 7</span>
+            <span>{t('Luyện tập & Thi thực chiến')}</span>
           </div>
-          <h2 id="toeic-collection-title">{t('Học để hiểu. Luyện để tiến bộ.')}</h2>
-          <p>{t('Bài học, bài tập tương tác và kết quả được lưu trong tài khoản của bạn.')}</p>
+          <h2 id="toeic-collection-title">{t('Luyện đề chủ động. Bứt phá điểm Reading.')}</h2>
+          <p>
+            {t(
+              'Hỗ trợ cả 2 chế độ: Luyện tập tự chọn thời gian có giải thích ngay, hoặc Thi thực chiến khóa đáp án như phòng thi thật.',
+            )}
+          </p>
         </div>
         {!loading && !error && exams[0] && (
           <Link className="toeic-button button-primary" to={`/exams/toeic/tests/${exams[0].id}`}>
@@ -104,18 +133,20 @@ export default function ToeicLibraryPage() {
       <div className="toeic-learning-steps">
         <div>
           <span>01</span>
-          <strong>{t('Học theo từng Part')}</strong>
-          <p>{t('Đọc kiến thức và đánh dấu bài học đã hoàn thành.')}</p>
+          <strong>{t('Chọn bộ đề & phần thi')}</strong>
+          <p>{t('Luyện riêng từng Part 5, 6, 7 hoặc làm trọn bộ 100 câu Reading.')}</p>
         </div>
         <div>
           <span>02</span>
-          <strong>{t('Luyện tập hoặc thi thử')}</strong>
-          <p>{t('Chọn đáp án trực tiếp; bài làm được lưu để tiếp tục.')}</p>
+          <strong>{t('Chọn chế độ & thời gian')}</strong>
+          <p>
+            {t('Luyện tập tự chọn thời gian và xem đáp án thoải mái, hoặc Thi thực chiến tính giờ thật.')}
+          </p>
         </div>
         <div>
           <span>03</span>
-          <strong>{t('Xem lại để cải thiện')}</strong>
-          <p>{t('Biết câu đúng, câu sai và đọc lời giải chi tiết.')}</p>
+          <strong>{t('Đối chiếu lời giải chi tiết')}</strong>
+          <p>{t('Lưu tiến độ tự động, thống kê tỷ lệ đúng theo Part và giải thích từng câu.')}</p>
         </div>
       </div>
       <div className="toeic-library-heading" ref={resultsHeading}>
@@ -199,7 +230,11 @@ export default function ToeicLibraryPage() {
           {rows.map((exam, index) => {
             const saved = bookmarks.includes(String(exam.id));
             return (
-              <article className="toeic-test-card" key={exam.id}>
+              <article
+                className="toeic-test-card is-clickable"
+                key={exam.id}
+                onClick={event => openTest(exam.id, event)}
+              >
                 <div className="toeic-test-card-top">
                   <span className="toeic-test-edition">{exam.sourceLabel || 'TOEIC Reading'}</span>
                   <button
@@ -207,7 +242,10 @@ export default function ToeicLibraryPage() {
                     className={`toeic-icon-button toeic-save ${saved ? 'is-saved' : ''}`}
                     aria-label={t(saved ? 'Bỏ lưu {name}' : 'Lưu {name}', { name: exam.title })}
                     aria-pressed={saved}
-                    onClick={() => toggle(String(exam.id))}
+                    onClick={event => {
+                      event.stopPropagation();
+                      toggle(String(exam.id));
+                    }}
                   >
                     {saved ? (
                       <BookmarkRounded fontSize="small" />
@@ -219,7 +257,7 @@ export default function ToeicLibraryPage() {
                 <div className="toeic-test-title">
                   <div>
                     <h2>{exam.title}</h2>
-                    <p>{exam.description || t('Học và luyện TOEIC Reading')}</p>
+                    <p>{exam.description || t('Luyện tập hoặc thi thử TOEIC Reading trực tiếp')}</p>
                   </div>
                   <span className={`toeic-book-symbol tone-${index % 2 ? 'violet' : 'blue'}`}>
                     <MenuBookOutlined />
@@ -229,23 +267,24 @@ export default function ToeicLibraryPage() {
                   <span>Part 5</span>
                   <span>Part 6</span>
                   <span>Part 7</span>
+                  <span className="is-highlight">{t('2 chế độ thi')}</span>
                 </div>
                 <div className="toeic-test-meta">
-                  <span>
-                    <MenuBookOutlined />
-                    {t('{count} bài học', { count: exam.lessonCount })}
-                  </span>
                   <span>
                     <FactCheckOutlined />
                     {t('{count} câu hỏi', { count: exam.questionCount })}
                   </span>
                   <span>
                     <AccessTimeRounded />
-                    {t('{minutes} phút', { minutes: exam.durationMinutes })}
+                    {t('Chuẩn {minutes} phút', { minutes: exam.durationMinutes })}
+                  </span>
+                  <span>
+                    <BoltRounded />
+                    {t('Tùy chọn giờ')}
                   </span>
                 </div>
                 <Link className="toeic-test-action" to={`/exams/toeic/tests/${exam.id}`}>
-                  {t('Vào học và luyện tập')}
+                  {t('Chọn chế độ & làm bài')}
                   <ArrowForwardRounded fontSize="small" />
                 </Link>
               </article>

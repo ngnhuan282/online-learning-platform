@@ -65,12 +65,21 @@ function PostDetail({ id }) {
           <article className="workspace-card post-detail">
             <div className="post-tags">
               <span>{t(topicLabels[post.topicCode] || post.topicCode)}</span>
-              <span>{t(post.kind === 'QUESTION' ? 'Hỏi đáp' : 'Thảo luận')}</span>
+              <span className={post.kind === 'QUESTION' ? 'is-question' : ''}>
+                {t(post.kind === 'QUESTION' ? 'Hỏi đáp' : 'Thảo luận')}
+              </span>
               {post.acceptedCommentId && <span className="answered">✓ {t('Đã giải đáp')}</span>}
+              {post.locked && <span>🔒 {t('Đã khóa')}</span>}
             </div>
             <h1>{post.title}</h1>
-            <div className="post-meta">
-              <strong>{post.authorName}</strong>
+            <div className="post-meta" style={{ borderTop: 0, paddingTop: 4 }}>
+              <span className="post-author-badge">
+                <span className="post-author-initial" aria-hidden="true">
+                  {(post.authorName || 'U').trim().charAt(0).toUpperCase()}
+                </span>
+                <strong>{post.authorName}</strong>
+              </span>
+              <span>·</span>
               <time dateTime={post.createdAt}>{date(post.createdAt)}</time>
             </div>
             <div className="post-body">{post.body}</div>
@@ -105,10 +114,14 @@ function PostDetail({ id }) {
             </div>
           </article>
           <ActionError error={mutation.error} />
-          <h2>{t('{count} bình luận', { count: post.commentCount })}</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 14 }}>
+            {t('{count} bình luận', { count: post.commentCount })}
+          </h2>
           <WorkspaceState loading={comments.loading} error={comments.error} retry={comments.reload} />
           {!comments.loading && !comments.error && comments.data?.content.length === 0 && (
-            <p>{t('Chưa có bình luận.')}</p>
+            <p className="workspace-card" style={{ color: '#55667d' }}>
+              {t('Chưa có bình luận.')}
+            </p>
           )}
           <div className="comment-list">
             {!comments.error &&
@@ -120,8 +133,14 @@ function PostDetail({ id }) {
                   {post.acceptedCommentId === comment.id && (
                     <p className="answered">✓ {t('Lời giải được chọn')}</p>
                   )}
-                  <div className="post-meta">
-                    <strong>{comment.authorName}</strong>
+                  <div className="post-meta" style={{ borderTop: 0, paddingTop: 0 }}>
+                    <span className="post-author-badge">
+                      <span className="post-author-initial" aria-hidden="true">
+                        {(comment.authorName || 'U').trim().charAt(0).toUpperCase()}
+                      </span>
+                      <strong>{comment.authorName}</strong>
+                    </span>
+                    <span>·</span>
                     <time dateTime={comment.createdAt}>{date(comment.createdAt)}</time>
                   </div>
                   {commentEdit?.id === comment.id ? (
@@ -250,7 +269,9 @@ function PostDetail({ id }) {
               </button>
             </form>
           ) : (
-            <p role="status">🔒 {t('Bài viết đã khóa bình luận.')}</p>
+            <p className="workspace-card" role="status">
+              🔒 {t('Bài viết đã khóa bình luận.')}
+            </p>
           )}
           {editing && (
             <PostEditor

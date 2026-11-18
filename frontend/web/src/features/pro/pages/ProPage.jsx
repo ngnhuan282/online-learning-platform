@@ -25,11 +25,13 @@ import '../styles/pro.css';
 const freeBenefits = [
   'Học các khóa miễn phí đã công bố',
   'Làm quiz và theo dõi tiến độ học tập',
+  'Lưu tối đa 100 ghi chú từ vựng khi luyện thi TOEIC',
   'Chuỗi ngày học, XP, huy hiệu và cửa hàng',
   'Tham gia diễn đàn và bảng xếp hạng',
 ];
 const proBenefits = [
   'Tất cả tính năng của gói Miễn phí',
+  'Lưu không giới hạn ghi chú khi luyện thi TOEIC',
   'Học mọi khóa trả phí đang công bố trong thời hạn Pro',
   'Truy cập bài học, quiz và tài liệu của các khóa được mở',
   'Gia hạn cộng dồn vào thời gian Pro còn lại',

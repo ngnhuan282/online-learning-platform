@@ -89,7 +89,7 @@ export default function CommunityPage() {
           <option value="QUESTION">{t('Hỏi đáp')}</option>
           <option value="unanswered">{t('Chưa giải đáp')}</option>
         </select>
-        <button className="button button-outline">{t('Tìm kiếm')}</button>
+        <button className="button button-soft">{t('Tìm kiếm')}</button>
       </form>
       <WorkspaceState
         loading={topics.loading || posts.loading}
@@ -108,7 +108,9 @@ export default function CommunityPage() {
             <article className="workspace-card post-preview" key={post.id}>
               <div className="post-tags">
                 <span>{t(topicLabels[post.topicCode] || post.topicCode)}</span>
-                <span>{t(post.kind === 'QUESTION' ? 'Hỏi đáp' : 'Thảo luận')}</span>
+                <span className={post.kind === 'QUESTION' ? 'is-question' : ''}>
+                  {t(post.kind === 'QUESTION' ? 'Hỏi đáp' : 'Thảo luận')}
+                </span>
                 {post.acceptedCommentId && <span className="answered">✓ {t('Đã giải đáp')}</span>}
                 {post.locked && <span>🔒 {t('Đã khóa')}</span>}
               </div>
@@ -117,10 +119,17 @@ export default function CommunityPage() {
               </h2>
               <p className="post-excerpt">{post.body}</p>
               <div className="post-meta">
-                <span>{post.authorName}</span>
+                <span className="post-author-badge">
+                  <span className="post-author-initial" aria-hidden="true">
+                    {(post.authorName || 'U').trim().charAt(0).toUpperCase()}
+                  </span>
+                  {post.authorName}
+                </span>
+                <span>·</span>
                 <time dateTime={post.createdAt}>
                   {new Date(post.createdAt).toLocaleDateString(getIntlLocale())}
                 </time>
+                <span>·</span>
                 <span>{t('{count} bình luận', { count: post.commentCount })}</span>
               </div>
             </article>

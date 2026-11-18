@@ -186,6 +186,7 @@ public class ToeicService {
                     value.id(),
                     value.mode(),
                     value.part(),
+                    attemptDuration(value),
                     value.status(),
                     value.score(),
                     value.correctCount(),
@@ -243,9 +244,25 @@ public class ToeicService {
         ) {
             throw badRequest();
         }
+        if (
+            request.durationMinutes() != null &&
+            (request.durationMinutes() < 1 || request.durationMinutes() > 180)
+        ) {
+            throw badRequest();
+        }
         Exam current = exam(examId, true, true);
         Definition definition = decode(current.json(), Definition.class);
         validate(definition, true);
+        if (
+            request.mode().equals("EXAM") &&
+            request.durationMinutes() != null &&
+            !request.durationMinutes().equals(definition.durationMinutes())
+        ) {
+            throw badRequest();
+        }
+        Integer chosenDuration = request.mode().equals("EXAM")
+            ? definition.durationMinutes()
+            : request.durationMinutes();
         List<Attempt> active = jdbc.query(
             "SELECT * FROM toeic_attempts WHERE user_id = ? AND exam_id = ? AND status = 'IN_PROGRESS' ORDER BY id DESC",
             (row, i) -> attemptRow(row),
@@ -253,7 +270,11 @@ public class ToeicService {
             examId
         );
         for (Attempt item : active) {
-            if (!item.mode().equals(request.mode()) || !Objects.equals(item.part(), request.part())) continue;
+            if (
+                !item.mode().equals(request.mode()) ||
+                !Objects.equals(item.part(), request.part()) ||
+                !Objects.equals(attemptDuration(item), chosenDuration)
+            ) continue;
             Attempt owned = attempt(item.id(), userId);
             if (expired(owned)) finish(owned, null);
             else return view(owned);
@@ -268,7 +289,7 @@ public class ToeicService {
             definition.slug(),
             definition.title(),
             definition.description(),
-            definition.durationMinutes(),
+            chosenDuration != null ? chosenDuration : definition.durationMinutes(),
             definition.sourceLabel(),
             definition.lessons(),
             selected,
@@ -277,9 +298,7 @@ public class ToeicService {
             null
         );
         Instant started = clock.instant().truncatedTo(ChronoUnit.SECONDS);
-        Instant deadline = request.mode().equals("EXAM")
-            ? started.plusSeconds(definition.durationMinutes() * 60L)
-            : null;
+        Instant deadline = chosenDuration != null ? started.plusSeconds(chosenDuration * 60L) : null;
         var keys = new GeneratedKeyHolder();
         jdbc.update(connection -> {
             var statement = connection.prepareStatement(
@@ -365,12 +384,14 @@ public class ToeicService {
 
     private AttemptView view(Attempt attempt) {
         Definition definition = decode(attempt.snapshot(), Definition.class);
+        boolean revealAnswers = attempt.status().equals("GRADED") || attempt.mode().equals("PRACTICE");
         return new AttemptView(
             attempt.id(),
             attempt.examId(),
             definition.title(),
             attempt.mode(),
             attempt.part(),
+            attemptDuration(attempt),
             attempt.status(),
             attempt.startedAt(),
             attempt.deadlineAt(),
@@ -380,7 +401,7 @@ public class ToeicService {
             attempt.correctCount(),
             attempt.totalQuestions(),
             answers(attempt.answers()),
-            questionViews(definition.questions(), attempt.status().equals("GRADED"))
+            questionViews(definition.questions(), revealAnswers)
         );
     }
 
@@ -477,7 +498,7 @@ public class ToeicService {
             definition.durationMinutes() > 180 ||
             definition.lessons().size() > 100 ||
             definition.questions().size() > 1000 ||
-            (scorable && (definition.lessons().isEmpty() || definition.questions().isEmpty()))
+            (scorable && definition.questions().isEmpty())
         ) throw badRequest();
         Set<String> lessonIds = new HashSet<>();
         for (Lesson lesson : definition.lessons()) {
@@ -639,6 +660,14 @@ public class ToeicService {
             attempt.status().equals("IN_PROGRESS") &&
             attempt.deadlineAt() != null &&
             !clock.instant().isBefore(attempt.deadlineAt())
+        );
+    }
+
+    private static Integer attemptDuration(Attempt attempt) {
+        if (attempt.deadlineAt() == null || attempt.startedAt() == null) return null;
+        return (int) Math.max(
+            1,
+            java.time.Duration.between(attempt.startedAt(), attempt.deadlineAt()).toMinutes()
         );
     }
 

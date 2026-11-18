@@ -15,6 +15,10 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT, "Resource conflict"),
     INSUFFICIENT_GEMS(HttpStatus.CONFLICT, "Not enough gems for this purchase"),
     INVENTORY_FULL(HttpStatus.CONFLICT, "Streak freeze inventory is full"),
+    NOTE_LIMIT_REACHED(
+        HttpStatus.CONFLICT,
+        "Gói miễn phí chỉ lưu tối đa 100 ghi chú. Nâng cấp Pro để lưu không giới hạn."
+    ),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Please wait before posting again"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dependent service is unavailable"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),

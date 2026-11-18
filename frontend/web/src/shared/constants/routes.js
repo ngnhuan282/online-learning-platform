@@ -14,6 +14,7 @@ export const ROUTES = Object.freeze({
   LEADERBOARD: '/leaderboard',
   COMMUNITY: '/community',
   NOTIFICATIONS: '/notifications',
+  MY_NOTES: '/my-notes',
   LOGIN: '/login',
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',

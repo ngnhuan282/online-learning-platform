@@ -22,6 +22,12 @@ export default function LeaderboardPage() {
   const resource = useLearningResource(load, null);
   const data = resource.data;
   const change = values => setFilter(current => ({ ...current, ...values, page: 0 }));
+
+  const podiumEntries =
+    filter.page === 0 && data?.content?.length >= 3
+      ? [data.content[1], data.content[0], data.content[2]]
+      : [];
+
   return (
     <section className="community-workspace container">
       <header className="workspace-heading">
@@ -60,10 +66,30 @@ export default function LeaderboardPage() {
       {data && !resource.error && (
         <>
           <p className="ranking-self">
-            {data.me
-              ? t('Hạng của bạn: {rank}', { rank: data.me.rank })
-              : t('Chưa có điểm trong kỳ này. Hoàn thành bài học để tham gia!')}
+            <span>
+              {data.me
+                ? t('Hạng của bạn: {rank}', { rank: data.me.rank })
+                : t('Chưa có điểm trong kỳ này. Hoàn thành bài học để tham gia!')}
+            </span>
           </p>
+
+          {podiumEntries.length === 3 && (
+            <div className="leaderboard-podium" aria-hidden="true">
+              {podiumEntries.map(entry => (
+                <div key={entry.userId} className={`podium-card rank-${entry.rank}`}>
+                  <span className="podium-medal">{['🥇', '🥈', '🥉'][entry.rank - 1]}</span>
+                  <LearnerAvatar
+                    name={entry.displayName}
+                    frame={entry.activeFrame}
+                    assetKey={entry.activeFrameAssetKey}
+                  />
+                  <span className="podium-name">{entry.displayName}</span>
+                  <span className="podium-xp">{entry.xp.toLocaleString(getIntlLocale())} XP</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="workspace-table-wrap">
             <table className="ranking-table">
               <thead>
@@ -77,18 +103,25 @@ export default function LeaderboardPage() {
               <tbody>
                 {data.content.map(entry => (
                   <tr key={entry.userId} className={entry.userId === data.me?.userId ? 'is-me' : ''}>
-                    <td>{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : entry.rank}</td>
+                    <td>{entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : `#${entry.rank}`}</td>
                     <td>
-                      <LearnerAvatar
-                        name={entry.displayName}
-                        frame={entry.activeFrame}
-                        assetKey={entry.activeFrameAssetKey}
-                        size="small"
-                      />{' '}
-                      {entry.displayName} {entry.userId === data.me?.userId && <small>({t('Bạn')})</small>}
+                      <div className="ranking-learner-cell">
+                        <LearnerAvatar
+                          name={entry.displayName}
+                          frame={entry.activeFrame}
+                          assetKey={entry.activeFrameAssetKey}
+                          size="small"
+                        />
+                        <span>
+                          {entry.displayName}{' '}
+                          {entry.userId === data.me?.userId && <small>({t('Bạn')})</small>}
+                        </span>
+                      </div>
                     </td>
-                    <td>{entry.level}</td>
-                    <td>{entry.xp.toLocaleString(getIntlLocale())}</td>
+                    <td>
+                      <span className="ranking-level-pill">Lv.{entry.level}</span>
+                    </td>
+                    <td>{entry.xp.toLocaleString(getIntlLocale())} XP</td>
                   </tr>
                 ))}
               </tbody>

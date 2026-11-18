@@ -389,7 +389,10 @@ function CourseDetail({ id }) {
           <div>
             <article className="course-hero-card">
               <div className="course-hero-media">
-                <img src={resolveMediaUrl(item.thumbnailUrl || '/images/english-ielts.jpg')} alt={item.title} />
+                <img
+                  src={resolveMediaUrl(item.thumbnailUrl || '/images/english-ielts.jpg')}
+                  alt={item.title}
+                />
               </div>
               <div className="course-hero-header">
                 <span className="eyebrow-pill">{item.categoryName || t('Khóa học')}</span>
@@ -483,7 +486,10 @@ function CourseDetail({ id }) {
                                 >
                                   <div className="curriculum-lesson-main">
                                     <span className="curriculum-lesson-type">
-                                      <Icon name={lesson.lessonType === 'VIDEO' ? 'play' : 'book'} size={16} />
+                                      <Icon
+                                        name={lesson.lessonType === 'VIDEO' ? 'play' : 'book'}
+                                        size={16}
+                                      />
                                     </span>
                                     <span className="curriculum-lesson-title">{t(lesson.title)}</span>
                                     {lesson.preview ? (
@@ -612,7 +618,9 @@ function CourseDetail({ id }) {
                         </span>
                         <button
                           className="button button-outline"
-                          disabled={reviewPagination.page >= reviewPagination.totalPages - 1 || reviewsLoading}
+                          disabled={
+                            reviewPagination.page >= reviewPagination.totalPages - 1 || reviewsLoading
+                          }
                           onClick={() => loadReviews(reviewPagination.page + 1)}
                         >
                           Trang sau

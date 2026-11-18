@@ -74,19 +74,22 @@ export default function AchievementsPage() {
               </article>
             ))}
           </div>
+
           <article className="workspace-card level-card">
             <h2>
               <LearnerAvatar
                 name={data.displayName}
                 frame={data.activeFrame}
                 assetKey={data.activeFrameAssetKey}
-              />{' '}
-              {t('Cấp độ {level}', { level: data.level })}
+              />
+              <span>{t('Cấp độ {level}', { level: data.level })}</span>
             </h2>
-            <progress max={data.xpPerLevel} value={data.xpInLevel} aria-label={t('Cấp độ')} />
-            <span>
-              {data.xpInLevel} / {data.xpPerLevel} XP
-            </span>
+            <div className="level-progress-row">
+              <progress max={data.xpPerLevel} value={data.xpInLevel} aria-label={t('Cấp độ')} />
+              <span className="level-xp-pill">
+                {data.xpInLevel} / {data.xpPerLevel} XP
+              </span>
+            </div>
             <p>
               {t(
                 data.activeToday
@@ -95,6 +98,7 @@ export default function AchievementsPage() {
               )}
             </p>
           </article>
+
           <article className="workspace-card">
             <h2>{t('Hoạt động 90 ngày gần đây')}</h2>
             <div className="activity-calendar">
@@ -128,12 +132,20 @@ export default function AchievementsPage() {
               {t('Được bảo vệ bằng freeze')}
             </p>
           </article>
-          <h2>{t('Huy hiệu & phần thưởng')}</h2>
-          <p>
-            <Link to="/shop">{t('Cửa hàng & kho đồ')}</Link> · ❄ {data.streakFreezes ?? 0} / 7
-          </p>
+
+          <div className="achievements-section-bar">
+            <h2>{t('Huy hiệu & phần thưởng')}</h2>
+            <p className="achievements-shop-pill">
+              <Link to="/shop">{t('Cửa hàng & kho đồ')}</Link> · ❄ {data.streakFreezes ?? 0} / 7
+            </p>
+          </div>
+
           <ActionError error={mutation.error} />
-          {notice && <p role="status">{t(notice)}</p>}
+          {notice && (
+            <p className="account-feedback is-success" role="status" style={{ marginBottom: 16 }}>
+              {t(notice)}
+            </p>
+          )}
           <div className="reward-grid">
             {data.rewards.map(reward => (
               <article
@@ -144,9 +156,9 @@ export default function AchievementsPage() {
                   {rewards[reward.code]?.[0] || '🏅'}
                 </span>
                 <h3>{t(reward.label || rewards[reward.code]?.[1] || reward.code)}</h3>
-                <p>💎 +{reward.gems}</p>
+                <p className="reward-gems-tag">💎 +{reward.gems}</p>
                 <button
-                  className="button button-primary"
+                  className={`button ${reward.claimed ? 'button-success' : 'button-primary'}`}
                   disabled={!reward.eligible || reward.claimed || mutation.busy}
                   onClick={() => claim(reward.code)}
                 >
@@ -171,26 +183,28 @@ export default function AchievementsPage() {
           </div>
           <article className="workspace-card">
             <h2>{t('Quy tắc tính điểm')}</h2>
-            <p>
-              {t(
-                'Hoàn thành bài học lần đầu: +{lessonXp} XP. Nộp quiz có trả lời lần đầu: +{quizXp} XP. Mỗi {xpPerLevel} XP lên một cấp.',
-                {
-                  lessonXp: data.lessonXp ?? 20,
-                  quizXp: data.quizXp ?? 10,
-                  xpPerLevel: data.xpPerLevel ?? 100,
-                },
-              )}
-            </p>
-            <p>
-              {t('Mỗi ngày có hoạt động học hợp lệ nhận {gems} kim cương, tối đa một lần mỗi ngày.', {
-                gems: data.dailyGems ?? 25,
-              })}
-            </p>
-            <p>
-              {t(
-                'Ngày học tính theo giờ Việt Nam. Làm lại quiz có trả lời vẫn duy trì streak, nhưng không cộng lại XP. Kim cương là phần thưởng trong ứng dụng.',
-              )}
-            </p>
+            <div style={{ display: 'grid', gap: 8, color: '#42546d', fontSize: 14 }}>
+              <p>
+                {t(
+                  'Hoàn thành bài học lần đầu: +{lessonXp} XP. Nộp quiz có trả lời lần đầu: +{quizXp} XP. Mỗi {xpPerLevel} XP lên một cấp.',
+                  {
+                    lessonXp: data.lessonXp ?? 20,
+                    quizXp: data.quizXp ?? 10,
+                    xpPerLevel: data.xpPerLevel ?? 100,
+                  },
+                )}
+              </p>
+              <p>
+                {t('Mỗi ngày có hoạt động học hợp lệ nhận {gems} kim cương, tối đa một lần mỗi ngày.', {
+                  gems: data.dailyGems ?? 25,
+                })}
+              </p>
+              <p>
+                {t(
+                  'Ngày học tính theo giờ Việt Nam. Làm lại quiz có trả lời vẫn duy trì streak, nhưng không cộng lại XP. Kim cương là phần thưởng trong ứng dụng.',
+                )}
+              </p>
+            </div>
           </article>
         </>
       )}

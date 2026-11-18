@@ -13,6 +13,7 @@ import {
   LeaderboardOutlined,
   ForumOutlined,
   WorkspacePremiumOutlined,
+  StickyNote2Outlined,
 } from '@mui/icons-material';
 import useAuth from '../../features/auth/hooks/useAuth';
 import { ROUTES } from '../constants/routes';
@@ -92,6 +93,12 @@ export default function AccountMenu({ profileTo = ROUTES.ACCOUNT, showDetails = 
             <ListItemText>{t('Không gian quản trị')}</ListItemText>
           </MenuItem>
         )}
+        <MenuItem component={Link} to={ROUTES.MY_NOTES} onClick={() => setAnchor(null)}>
+          <ListItemIcon>
+            <StickyNote2Outlined fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>{t('Ghi chú của tôi')}</ListItemText>
+        </MenuItem>
         <MenuItem component={Link} to={ROUTES.ACHIEVEMENTS} onClick={() => setAnchor(null)}>
           <ListItemIcon>
             <EmojiEventsOutlined fontSize="small" />

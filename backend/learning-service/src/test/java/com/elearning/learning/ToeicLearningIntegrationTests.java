@@ -292,7 +292,19 @@ class ToeicLearningIntegrationTests {
         Map<String, Object> answers = Map.of("answers", Map.of("q101", "A", "q131", "B", "q147", "A"));
         JsonNode saved = data(learner("PUT", "/attempts/" + attemptId + "/answers", user, answers), 200);
         assertThat(saved.get("answers").get("q101").asText()).isEqualTo("A");
-        assertThat(saved.get("questions").get(0).has("correctOptionId")).isFalse();
+        assertThat(saved.get("questions").get(0).get("correctOptionId").asText()).isEqualTo("A");
+        assertThat(saved.get("questions").get(0).get("explanation").asText()).isNotBlank();
+        JsonNode timedPractice = data(
+            learner(
+                "POST",
+                "/exams/" + examId + "/attempts",
+                user,
+                Map.of("mode", "PRACTICE", "part", 5, "durationMinutes", 15)
+            ),
+            200
+        );
+        assertThat(timedPractice.get("durationMinutes").asInt()).isEqualTo(15);
+        assertThat(timedPractice.get("deadlineAt").isNull()).isFalse();
         JsonNode loaded = data(learner("GET", "/attempts/" + attemptId, user, null), 200);
         assertThat(loaded.get("answers")).isEqualTo(saved.get("answers"));
         assertThat(learner("GET", "/attempts/" + attemptId, user + 1000, null).statusCode()).isEqualTo(404);
@@ -387,6 +399,8 @@ class ToeicLearningIntegrationTests {
             learner("POST", "/exams/" + examId + "/attempts", user, Map.of("mode", "EXAM")),
             200
         );
+        assertThat(exam.get("questions").get(0).has("correctOptionId")).isFalse();
+        assertThat(exam.get("questions").get(0).has("explanation")).isFalse();
         long id = exam.get("id").asLong();
         data(
             learner("PUT", "/attempts/" + id + "/answers", user, Map.of("answers", Map.of("q101", "A"))),
@@ -430,6 +444,25 @@ class ToeicLearningIntegrationTests {
                 Map.of("mode", "EXAM", "part", 5)
             ).statusCode()
         ).isEqualTo(400);
+        assertThat(
+            learner(
+                "POST",
+                "/exams/" + examId + "/attempts",
+                user,
+                Map.of("mode", "EXAM", "durationMinutes", 30)
+            ).statusCode()
+        ).isEqualTo(400);
+        assertThat(
+            learner(
+                "POST",
+                "/exams/" + examId + "/attempts",
+                user,
+                Map.of("mode", "PRACTICE", "durationMinutes", 0)
+            ).statusCode()
+        ).isEqualTo(400);
+        Map<String, Object> lessonless = new java.util.HashMap<>(definition(true));
+        lessonless.put("lessons", List.of());
+        assertThat(send("POST", ADMIN, 1L, "ADMIN", lessonless).statusCode()).isEqualTo(201);
         assertThat(
             learner(
                 "POST",
@@ -555,5 +588,67 @@ class ToeicLearningIntegrationTests {
         assertThat(
             jdbc.queryForObject("SELECT deleted FROM toeic_exams WHERE id = ?", Boolean.class, id)
         ).isTrue();
+    }
+
+    @Test
+    void dictionaryIsPublicAndToeicNotesEnforceFreeHundredNoteLimitUntilProIsActive() throws Exception {
+        JsonNode lookup = data(send("GET", BASE + "/dictionary?term=appointments", null, null, null), 200);
+        assertThat(lookup.get("found").asBoolean()).isTrue();
+        assertThat(lookup.get("headword").asText()).isEqualTo("appointment");
+
+        long user = USERS.incrementAndGet();
+        long examId = create(true).get("id").asLong();
+        for (int i = 1; i <= 100; i++) {
+            data(
+                learner(
+                    "POST",
+                    "/notes",
+                    user,
+                    Map.of(
+                        "examId",
+                        examId,
+                        "questionNumber",
+                        101,
+                        "part",
+                        5,
+                        "selectedText",
+                        "term-" + i,
+                        "noteContent",
+                        "meaning " + i,
+                        "color",
+                        "yellow"
+                    )
+                ),
+                201
+            );
+        }
+        HttpResponse<String> blocked = learner(
+            "POST",
+            "/notes",
+            user,
+            Map.of("examId", examId, "selectedText", "term-101", "noteContent", "overflow")
+        );
+        assertThat(blocked.statusCode()).isEqualTo(409);
+        assertThat(blocked.body()).contains("NOTE_LIMIT_REACHED");
+
+        JsonNode listed = data(learner("GET", "/notes", user, null), 200);
+        assertThat(listed.get("count").asInt()).isEqualTo(100);
+        assertThat(listed.get("limit").asInt()).isEqualTo(100);
+        long firstId = listed.get("items").get(0).get("id").asLong();
+
+        JsonNode updated = data(
+            learner(
+                "PUT",
+                "/notes/" + firstId,
+                user,
+                Map.of("noteContent", "updated meaning", "color", "blue")
+            ),
+            200
+        );
+        assertThat(updated.get("note").get("noteContent").asText()).isEqualTo("updated meaning");
+        assertThat(updated.get("note").get("color").asText()).isEqualTo("blue");
+
+        JsonNode afterDelete = data(learner("DELETE", "/notes/" + firstId, user, null), 200);
+        assertThat(afterDelete.get("count").asInt()).isEqualTo(99);
     }
 }

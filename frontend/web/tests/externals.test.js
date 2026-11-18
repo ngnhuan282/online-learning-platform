@@ -78,16 +78,15 @@ test('AI workspace and updated checkout compile with the existing layout', async
   }
 });
 
-test('header keeps five primary links including TOEIC and groups extra tools by current route', async () => {
+test('header keeps four primary links in home-first order including TOEIC and groups extra tools by current route', async () => {
   const { default: Header } = await load('shared/components/SiteHeader.jsx');
   const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
   const { NotificationsProvider } = await load('features/learning/context/NotificationsContext.jsx');
   const primaryLinks = [
+    ['/', 'Trang chủ'],
     ['/#courses', 'Khóa học'],
     ['/exams/toeic', 'Luyện thi TOEIC'],
     ['/#categories', 'Danh mục'],
-    ['/#benefits', 'Lợi ích'],
-    ['/', 'Trang chủ'],
   ];
   const paths = [
     '/ai-assistant',

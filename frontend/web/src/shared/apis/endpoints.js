@@ -26,6 +26,9 @@ export const ENDPOINTS = Object.freeze({
   categories: `${API_PREFIX}/categories`,
   toeic: {
     exams: `${API_PREFIX}/learning/toeic/exams`,
+    dictionary: `${API_PREFIX}/learning/toeic/dictionary`,
+    notes: `${API_PREFIX}/learning/toeic/notes`,
+    note: id => `${API_PREFIX}/learning/toeic/notes/${id}`,
     exam: id => `${API_PREFIX}/learning/toeic/exams/${id}`,
     progress: id => `${API_PREFIX}/learning/toeic/exams/${id}/progress`,
     completeLesson: (id, lessonId) => `${API_PREFIX}/learning/toeic/exams/${id}/lessons/${lessonId}/complete`,

@@ -26,6 +26,8 @@ const { default: Study } = await load('features/learning/pages/ToeicReaderPage.j
 const { default: Attempt } = await load('features/learning/pages/ToeicAttemptPage.jsx');
 const { default: Result } = await load('features/learning/pages/ToeicResultPage.jsx');
 const { default: Admin } = await load('features/learning/pages/AdminToeicPage.jsx');
+const { default: MyNotes } = await load('features/learning/pages/MyNotesPage.jsx');
+const { default: StudyTextAssistant } = await load('features/learning/components/StudyTextAssistant.jsx');
 const { toeicApi } = await load('features/learning/api/toeicApi.js');
 const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
 const { setLocale } = await load('shared/i18n/locale.js');
@@ -111,6 +113,15 @@ async function render(path = '/exams/toeic', userId = 1) {
               h(Route, { path: '/exams/toeic/attempts/:attemptId', element: h(Attempt) }),
               h(Route, { path: '/exams/toeic/attempts/:attemptId/result', element: h(Result) }),
               h(Route, { path: '/admin/toeic', element: h(Admin) }),
+              h(Route, { path: '/my-notes', element: h(MyNotes) }),
+              h(Route, {
+                path: '/lesson-sample',
+                element: h(
+                  StudyTextAssistant,
+                  { allowNotes: false },
+                  h('p', { className: 'lesson-sample-text' }, 'Please review the attached agenda.'),
+                ),
+              }),
             ),
           ),
         ),
@@ -184,6 +195,24 @@ beforeEach(() => {
     return { data: clone(currentAttempt) };
   };
   toeicApi.adminList = async () => ({ data: [] });
+  toeicApi.notes = async () => ({ data: { items: [], count: 0, limit: 100, isPro: false } });
+  toeicApi.dictionary = async term => ({
+    data: {
+      term,
+      headword: term.toLowerCase(),
+      phonetic: '/ɪkˈspɪriəns/',
+      meanings: [
+        {
+          partOfSpeech: 'Danh từ (n)',
+          meaningVi: 'kinh nghiệm, trải nghiệm',
+          exampleEn: 'Prior retail experience is preferred.',
+          exampleVi: 'Ưu tiên có kinh nghiệm bán lẻ trước đó.',
+        },
+      ],
+      relatedForms: ['experienced'],
+      found: true,
+    },
+  });
 });
 afterEach(async () => {
   await act(async () => root?.unmount());
@@ -212,8 +241,11 @@ test('native catalogue keeps six exams per page, filters and saved lists, withou
   assert.equal(rows().length, 1);
   assert.equal(new URLSearchParams(location.search).has('page'), false);
   await act(async () => document.querySelector('.toeic-save').click());
+  assert.equal(location.pathname, '/exams/toeic');
   await click('Đề đã lưu1');
   assert.equal(rows().length, 1);
+  await act(async () => document.querySelector('.toeic-test-card h2').click());
+  assert.equal(location.pathname, '/exams/toeic/tests/1');
 });
 
 test('catalogue API errors show retry instead of substituting the source PDF collection', async () => {
@@ -230,31 +262,56 @@ test('catalogue API errors show retry instead of substituting the source PDF col
   assert.equal(rows().length, 6);
 });
 
-test('learner studies native lesson text, completes it and starts part practice with server progress', async () => {
-  let completed = false;
-  toeicApi.progress = async () => ({
-    data: { completedLessonIds: completed ? ['part5'] : [], attempts: [] },
+test('learner selects practice timer or real exam mode without pre-practice lessons and can view answers freely in practice mode', async () => {
+  const started = [];
+  currentAttempt = freshAttempt({
+    mode: 'PRACTICE',
+    durationMinutes: 30,
+    deadlineAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    questions: questions.map((question, index) => ({
+      ...question,
+      correctOptionId: index ? 'A' : 'B',
+      explanation: index
+        ? 'The passage states Monday.'
+        : 'His là tính từ sở hữu, đứng trước career experiences.',
+    })),
   });
-  toeicApi.completeLesson = async (id, lessonId) => {
-    assert.equal(String(id), '1');
-    assert.equal(lessonId, 'part5');
-    completed = true;
-    return toeicApi.progress();
-  };
-  let started;
   toeicApi.start = async (...args) => {
-    started = args;
+    started.push(args);
     return { data: clone(currentAttempt) };
   };
   await render('/exams/toeic/tests/1');
-  assert.match(document.querySelector('.toeic-lesson-text').textContent, /Tính từ sở hữu đứng trước danh từ/);
+  assert.equal(
+    document.querySelector('.toeic-lesson-list, .toeic-lesson-content, .toeic-progress-panel'),
+    null,
+  );
   assert.equal(document.querySelector('iframe, a[download]'), null);
-  await click('Đánh dấu đã học xong');
-  assert.match(document.body.textContent, /1\/1 bài học hoàn thành/);
+  await click('30 phút');
   await click('Luyện Part 5');
-  assert.deepEqual(started, ['1', 'PRACTICE', 5]);
+  assert.deepEqual(started[0], ['1', 'PRACTICE', 5, 30]);
   assert.equal(location.pathname, '/exams/toeic/attempts/41');
   assert.match(document.querySelector('.toeic-question-prompt').textContent, /career experiences/);
+  assert.equal(document.querySelector('.toeic-explanation'), null);
+  await click('Xem đáp án & lời giải');
+  assert.match(document.querySelector('.toeic-explanation').textContent, /His là tính từ sở hữu/);
+  assert.equal(document.querySelector('input[value="B"]').disabled, false);
+  await click('Ẩn đáp án');
+  assert.equal(document.querySelector('.toeic-explanation'), null);
+
+  await click('Lưu và về bộ đề');
+  assert.equal(location.pathname, '/exams/toeic/tests/1');
+  currentAttempt = freshAttempt({
+    id: 42,
+    mode: 'EXAM',
+    durationMinutes: 75,
+    deadlineAt: new Date(Date.now() + 75 * 60 * 1000).toISOString(),
+  });
+  await act(async () => document.querySelector('.toeic-mode-card.is-exam').click());
+  await click('Bắt đầu thi thử');
+  assert.deepEqual(started[1], ['1', 'EXAM', null, null]);
+  assert.equal(location.pathname, '/exams/toeic/attempts/42');
+  assert.equal(document.querySelector('.toeic-practice-reveal-bar'), null);
+  assert.equal(document.querySelector('.toeic-explanation'), null);
 });
 
 test('late autosave responses never overwrite a newer native answer and queued saves keep the newest selection', async () => {
@@ -675,4 +732,128 @@ test('Admin imports an actual XLSX workbook into the same editable question form
     writes[0].definition.questions.find(question => question.number === 103)?.correctOptionId,
     'B',
   );
+});
+
+function selectNodeSubstring(element, substring) {
+  const walker = document.createTreeWalker(element, dom.window.NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const start = node.nodeValue.indexOf(substring);
+    if (start >= 0) {
+      const range = document.createRange();
+      range.setStart(node, start);
+      range.setEnd(node, start + substring.length);
+      const selection = dom.window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return node.parentElement;
+    }
+  }
+  throw new Error(`Substring not found: ${substring}`);
+}
+
+test('drag-highlighting in TOEIC opens compact note dialog with 100-note free quota, while double-click opens dictionary without conflict and lessons forbid notes', async () => {
+  const savedNotes = [];
+  toeicApi.notes = async () => ({
+    data: { items: clone(savedNotes), count: savedNotes.length, limit: 100, isPro: false },
+  });
+  toeicApi.createNote = async payload => {
+    const item = {
+      id: savedNotes.length + 1,
+      examTitle: detail.title,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...payload,
+    };
+    savedNotes.unshift(item);
+    return { data: { note: item, count: savedNotes.length, limit: 100, isPro: false } };
+  };
+  toeicApi.updateNote = async (id, payload) => {
+    const target = savedNotes.find(item => item.id === id);
+    Object.assign(target, payload);
+    return { data: { note: clone(target), count: savedNotes.length, limit: 100, isPro: false } };
+  };
+  toeicApi.deleteNote = async id => {
+    const idx = savedNotes.findIndex(item => item.id === id);
+    if (idx >= 0) savedNotes.splice(idx, 1);
+    return { data: { items: clone(savedNotes), count: savedNotes.length, limit: 100, isPro: false } };
+  };
+
+  await render('/exams/toeic/attempts/41');
+  const promptEl = selectNodeSubstring(
+    document.querySelector('.toeic-question-prompt'),
+    'career experiences',
+  );
+
+  // 1) Drag-select ("tô đen", detail === 1) opens Note dialog, NOT Dictionary
+  await act(async () => {
+    promptEl.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true, detail: 1 }));
+  });
+  assert.ok(document.querySelector('[role="dialog"][aria-label="Thêm ghi chú TOEIC"]'));
+  assert.equal(document.querySelector('[role="dialog"][aria-label="Tra từ điển tiếng Anh"]'), null);
+  await change(document.querySelector('textarea[aria-label="Nội dung ghi chú"]'), 'Kinh nghiệm nghề nghiệp');
+  await click('Lưu ghi chú');
+  assert.equal(savedNotes.length, 1);
+  assert.equal(savedNotes[0].selectedText, 'career experiences');
+  assert.equal(savedNotes[0].questionNumber, 101);
+  assert.match(document.querySelector('.study-tool-badge').textContent, /1\/100/);
+
+  // 2) Double-click (detail === 2 + dblclick) opens Dictionary Lookup WITHOUT triggering Note dialog
+  const wordTarget = selectNodeSubstring(document.querySelector('.toeic-question-prompt'), 'experiences');
+  await act(async () => {
+    wordTarget.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true, detail: 2 }));
+    wordTarget.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+  });
+  await pause(30);
+  assert.ok(document.querySelector('[role="dialog"][aria-label="Tra từ điển tiếng Anh"]'));
+  assert.equal(document.querySelector('[role="dialog"][aria-label="Thêm ghi chú TOEIC"]'), null);
+  assert.match(document.body.textContent, /kinh nghiệm, trải nghiệm/);
+  await act(async () => document.querySelector('button[aria-label="Đóng"]').click());
+
+  // 3) Free 100-note limit shows Pro upgrade notice
+  toeicApi.notes = async () => ({
+    data: { items: clone(savedNotes), count: 100, limit: 100, isPro: false },
+  });
+  await act(async () => root.unmount());
+  root = null;
+  await render('/exams/toeic/attempts/41');
+  const limitTarget = selectNodeSubstring(document.querySelector('.toeic-question-prompt'), 'Sendai Company');
+  await act(async () => {
+    limitTarget.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true, detail: 1 }));
+  });
+  assert.match(document.body.textContent, /Đã đạt giới hạn 100\/100 ghi chú/);
+
+  // 4) Non-TOEIC lesson view forbids drag-highlight notes while keeping double-click dictionary
+  await act(async () => root.unmount());
+  root = null;
+  await render('/lesson-sample');
+  const lessonNode = selectNodeSubstring(document.querySelector('.lesson-sample-text'), 'agenda');
+  await act(async () => {
+    lessonNode.dispatchEvent(new dom.window.MouseEvent('mouseup', { bubbles: true, detail: 1 }));
+  });
+  assert.equal(document.querySelector('[role="dialog"][aria-label="Thêm ghi chú TOEIC"]'), null);
+  await act(async () => {
+    lessonNode.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+  });
+  await pause(30);
+  assert.ok(document.querySelector('[role="dialog"][aria-label="Tra từ điển tiếng Anh"]'));
+
+  // 5) My Notes page (/my-notes) displays, edits and deletes saved TOEIC notes
+  toeicApi.notes = async () => ({
+    data: { items: clone(savedNotes), count: savedNotes.length, limit: 100, isPro: false },
+  });
+  await act(async () => root.unmount());
+  root = null;
+  await render('/my-notes');
+  assert.match(document.body.textContent, /career experiences/);
+  assert.match(document.body.textContent, /Kinh nghiệm nghề nghiệp/);
+  await click('Sửa');
+  await change(
+    document.querySelector('textarea[aria-label="Chỉnh sửa nội dung ghi chú"]'),
+    'Cụm danh từ chỉ kinh nghiệm sự nghiệp',
+  );
+  await click('Lưu thay đổi');
+  assert.match(document.body.textContent, /Cụm danh từ chỉ kinh nghiệm sự nghiệp/);
+  await click('Xóa');
+  assert.equal(savedNotes.length, 0);
 });

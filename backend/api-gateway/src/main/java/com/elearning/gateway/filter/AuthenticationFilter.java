@@ -63,6 +63,7 @@ public class AuthenticationFilter implements WebFilter, Ordered {
             (method == HttpMethod.GET &&
                 (path.equals("/api/v1/courses") ||
                     path.equals("/api/v1/learning/toeic/exams") ||
+                    path.equals("/api/v1/learning/toeic/dictionary") ||
                     path.matches("/api/v1/courses/[^/]+") ||
                     path.matches("/api/v1/courses/[^/]+/sections") ||
                     path.matches("/api/v1/courses/[^/]+/reviews") ||

@@ -11,6 +11,7 @@ import useAuth from '../../auth/hooks/useAuth';
 import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import ToeicQuestion from '../components/ToeicQuestion';
+import StudyTextAssistant from '../components/StudyTextAssistant';
 
 export default function ToeicResultPage() {
   useLocale();
@@ -49,7 +50,12 @@ export default function ToeicResultPage() {
     const session = getSessionVersion();
     const isCurrent = () => generation.current === captured && getSessionVersion() === session;
     try {
-      const response = await toeicApi.start(result.examId, result.mode, result.part ?? null);
+      const response = await toeicApi.start(
+        result.examId,
+        result.mode,
+        result.part ?? null,
+        result.mode === 'PRACTICE' ? (result.durationMinutes ?? null) : null,
+      );
       if (isCurrent()) navigate(`/exams/toeic/attempts/${response.data.id}`);
     } catch (failure) {
       if (isCurrent()) setActionError(failure);
@@ -120,7 +126,7 @@ export default function ToeicResultPage() {
           <span>{t('Câu bỏ trống')}</span>
         </div>
         <div>
-          <strong>{result.mode === 'EXAM' ? t('Thi thử') : t('Luyện tập')}</strong>
+          <strong>{result.mode === 'EXAM' ? t('Thi thực chiến') : t('Luyện tập')}</strong>
           <span>TOEIC Reading</span>
         </div>
       </section>
@@ -153,7 +159,7 @@ export default function ToeicResultPage() {
           {busy ? t('Đang chuẩn bị...') : t('Làm lại bộ đề')}
         </button>
         <Link className="toeic-button toeic-button-outline" to={`/exams/toeic/tests/${result.examId}`}>
-          {t('Học lại kiến thức')}
+          {t('Chọn lại chế độ & thời gian')}
         </Link>
       </div>
       <section className="toeic-review-heading">
@@ -183,7 +189,15 @@ export default function ToeicResultPage() {
         <div>
           {question ? (
             <>
-              <ToeicQuestion question={question} selected={answers[question.id]} review />
+              <StudyTextAssistant
+                allowNotes
+                examId={result.examId}
+                attemptId={result.id}
+                questionNumber={question.number}
+                part={question.part}
+              >
+                <ToeicQuestion question={question} selected={answers[question.id]} review />
+              </StudyTextAssistant>
               <nav className="toeic-question-navigation" aria-label={t('Điều hướng lời giải')}>
                 <button
                   className="toeic-button toeic-button-outline"

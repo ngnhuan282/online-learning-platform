@@ -33,14 +33,19 @@ export default function SiteHeader() {
         <Brand />
 
         <nav className="main-nav" id="main-nav" aria-label={t('Điều hướng chính')}>
+          <Link
+            className={pathname === ROUTES.HOME && !hash ? 'active' : ''}
+            aria-current={pathname === ROUTES.HOME && !hash ? 'page' : undefined}
+            to={ROUTES.HOME}
+          >
+            {t('Trang chủ')}
+          </Link>
+
           <Link className={hash === '#courses' ? 'active' : ''} to="/#courses">
             {t('Khóa học')}
           </Link>
 
-          <Link
-            className={pathname.startsWith(ROUTES.TOEIC) ? 'active' : ''}
-            to={ROUTES.TOEIC}
-          >
+          <Link className={pathname.startsWith(ROUTES.TOEIC) ? 'active' : ''} to={ROUTES.TOEIC}>
             {t('Luyện thi TOEIC')}
           </Link>
 
@@ -49,18 +54,6 @@ export default function SiteHeader() {
             to="/#categories"
           >
             {t('Danh mục')}
-          </Link>
-
-          <Link className={hash === '#benefits' ? 'active' : ''} to="/#benefits">
-            {t('Lợi ích')}
-          </Link>
-
-          <Link
-            className={pathname === ROUTES.HOME && !hash ? 'active' : ''}
-            aria-current={pathname === ROUTES.HOME && !hash ? 'page' : undefined}
-            to={ROUTES.HOME}
-          >
-            {t('Trang chủ')}
           </Link>
 
           <HeaderUtilities />

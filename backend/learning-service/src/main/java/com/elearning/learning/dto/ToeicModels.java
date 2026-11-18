@@ -95,7 +95,7 @@ public final class ToeicModels {
         long version
     ) {}
 
-    public record StartRequest(String mode, Integer part) {}
+    public record StartRequest(String mode, Integer part, Integer durationMinutes) {}
 
     public record AnswersRequest(Map<String, String> answers) {}
 
@@ -107,6 +107,7 @@ public final class ToeicModels {
         String title,
         String mode,
         Integer part,
+        Integer durationMinutes,
         String status,
         Instant startedAt,
         Instant deadlineAt,
@@ -123,6 +124,7 @@ public final class ToeicModels {
         Long id,
         String mode,
         Integer part,
+        Integer durationMinutes,
         String status,
         Integer score,
         Integer correctCount,
@@ -136,5 +138,51 @@ public final class ToeicModels {
         List<String> completedLessonIds,
         List<AttemptSummary> attempts,
         Long activeAttemptId
+    ) {}
+
+    public record NoteItem(
+        Long id,
+        Long examId,
+        Long attemptId,
+        Integer questionNumber,
+        Integer part,
+        String examTitle,
+        String selectedText,
+        String noteContent,
+        String color,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
+
+    public record NotesCollection(List<NoteItem> items, int count, Integer limit, boolean isPro) {}
+
+    public record NoteMutationResult(NoteItem note, int count, Integer limit, boolean isPro) {}
+
+    public record CreateNoteRequest(
+        Long examId,
+        Long attemptId,
+        Integer questionNumber,
+        Integer part,
+        String selectedText,
+        String noteContent,
+        String color
+    ) {}
+
+    public record UpdateNoteRequest(String noteContent, String color) {}
+
+    public record DictionaryMeaning(
+        String partOfSpeech,
+        String meaningVi,
+        String exampleEn,
+        String exampleVi
+    ) {}
+
+    public record DictionaryEntry(
+        String term,
+        String headword,
+        String phonetic,
+        List<DictionaryMeaning> meanings,
+        List<String> relatedForms,
+        boolean found
     ) {}
 }

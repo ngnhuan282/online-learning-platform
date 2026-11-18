@@ -343,6 +343,12 @@ const router = createBrowserRouter([
             }),
           },
           {
+            path: 'my-notes',
+            lazy: async () => ({
+              Component: (await import('../features/learning/pages/MyNotesPage')).default,
+            }),
+          },
+          {
             path: 'learning/:courseId',
             lazy: async () => ({
               Component: (await import('../features/learning/pages/LearningPage')).default,
