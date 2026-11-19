@@ -16,6 +16,7 @@ globalThis.document = dom.window.document;
 globalThis.Event = dom.window.Event;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const server = await createServer({
+  cacheDir: 'node_modules/.vite-tests/auth',
   server: { middlewareMode: true, hmr: false, ws: false },
   appType: 'custom',
   optimizeDeps: { noDiscovery: true, include: [] },

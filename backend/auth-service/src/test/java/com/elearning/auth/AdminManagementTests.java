@@ -451,4 +451,138 @@ class AdminManagementTests {
             ).statusCode()
         ).isEqualTo(403);
     }
+
+    @Test
+    void roleValidationConflictsUserLookupAndExceptionHandlers() throws Exception {
+        User administrator = user("ADMIN");
+        String admin = token(administrator, "ADMIN");
+        assertThat(request("GET", "/admin/users/not-a-number", admin, null).statusCode()).isEqualTo(400);
+        assertThat(request("GET", "/admin/users/99999999", admin, null).statusCode()).isEqualTo(404);
+        assertThat(request("DELETE", "/admin/overview", admin, null).statusCode()).isEqualTo(405);
+        assertThat(data(request("GET", "/admin/roles", admin, null)).size()).isGreaterThanOrEqualTo(2);
+
+        var unsupported = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/roles"))
+            .header("Authorization", "Bearer " + admin)
+            .header("Content-Type", "text/plain")
+            .POST(HttpRequest.BodyPublishers.ofString("{}"))
+            .build();
+        assertThat(client.send(unsupported, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(415);
+
+        var malformed = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/admin/roles"))
+            .header("Authorization", "Bearer " + admin)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{bad"))
+            .build();
+        assertThat(client.send(malformed, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(400);
+
+        assertThat(
+            request(
+                "POST",
+                "/admin/roles",
+                admin,
+                Map.of("name", "INVALID_PERM", "label", "Bad", "description", "x", "version", 0, "permissions", List.of("NO_SUCH"))
+            ).statusCode()
+        ).isEqualTo(400);
+        assertThat(
+            request(
+                "POST",
+                "/admin/roles",
+                admin,
+                Map.of("name", "ADMIN_PERM", "label", "Bad", "description", "x", "version", 0, "permissions", List.of("ROLE_MANAGE"))
+            ).statusCode()
+        ).isEqualTo(403);
+
+        String roleName = "SUPPORT_" + System.nanoTime();
+        JsonNode role = data(
+            request(
+                "POST",
+                "/admin/roles",
+                admin,
+                Map.of("name", roleName, "label", "Support", "description", "Ops", "version", 0, "permissions", List.of("USER_VIEW"))
+            )
+        );
+        long roleId = role.get("id").asLong();
+        assertThat(
+            request(
+                "POST",
+                "/admin/roles",
+                admin,
+                Map.of("name", roleName, "label", "Dup", "description", "Ops", "version", 0, "permissions", List.of("USER_VIEW"))
+            ).statusCode()
+        ).isEqualTo(409);
+        assertThat(
+            request(
+                "PUT",
+                "/admin/roles/" + roleId,
+                admin,
+                Map.of("name", "OTHER_" + System.nanoTime(), "label", "Support", "description", "Ops", "version", 0, "permissions", List.of("USER_VIEW"))
+            ).statusCode()
+        ).isEqualTo(400);
+        assertThat(
+            request(
+                "PUT",
+                "/admin/roles/" + roleId,
+                admin,
+                Map.of("name", roleName, "label", "Support", "description", "Ops", "version", 99, "permissions", List.of("USER_VIEW"))
+            ).statusCode()
+        ).isEqualTo(409);
+
+        String email = UUID.randomUUID() + "@test.com";
+        JsonNode created = data(
+            request(
+                "POST",
+                "/admin/users",
+                admin,
+                Map.of("fullName", "Scoped Operator", "email", email, "password", "Password123!", "roles", List.of(roleName))
+            )
+        );
+        long userId = created.get("id").asLong();
+        assertThat(data(request("GET", "/admin/users/" + userId, admin, null)).get("email").asString()).isEqualTo(email);
+        assertThat(
+            request(
+                "POST",
+                "/admin/users",
+                admin,
+                Map.of("fullName", "Dup", "email", email, "password", "Password123!")
+            ).statusCode()
+        ).isEqualTo(409);
+        assertThat(request("DELETE", "/admin/roles/" + roleId, admin, null).statusCode()).isEqualTo(409);
+
+        String operatorRoleName = "OPS_" + System.nanoTime();
+        data(
+            request(
+                "POST",
+                "/admin/roles",
+                admin,
+                Map.of("name", operatorRoleName, "label", "Operator", "description", "Ops", "version", 0, "permissions", List.of("USER_CREATE", "USER_STATUS_UPDATE"))
+            )
+        );
+        var operator = user(operatorRoleName);
+        String operatorToken = token(operator, operatorRoleName);
+        assertThat(
+            request(
+                "POST",
+                "/admin/users",
+                operatorToken,
+                Map.of("fullName", "No Role Grant", "email", UUID.randomUUID() + "@test.com", "password", "Password123!", "roles", List.of(roleName))
+            ).statusCode()
+        ).isEqualTo(403);
+        assertThat(
+            request("PATCH", "/admin/users/" + administrator.getId() + "/status", operatorToken, Map.of("status", "LOCKED"))
+                .statusCode()
+        ).isEqualTo(403);
+
+        JsonNode updated = data(
+            request(
+                "PUT",
+                "/admin/users/" + userId,
+                admin,
+                Map.of("fullName", "Updated Operator", "roles", List.of("USER"))
+            )
+        );
+        assertThat(updated.get("fullName").asString()).isEqualTo("Updated Operator");
+        assertThat(request("DELETE", "/admin/roles/" + roleId, admin, null).statusCode()).isEqualTo(200);
+        assertThat(request("DELETE", "/admin/users/" + userId, admin, null).statusCode()).isEqualTo(200);
+        assertThat(request("GET", "/admin/users/" + userId, admin, null).statusCode()).isEqualTo(404);
+    }
 }

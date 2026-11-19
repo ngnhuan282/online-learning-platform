@@ -5,6 +5,8 @@ export const adminApi = {
   courses: options => axiosClient.get('/api/v1/admin/courses/overview', { signal: options?.signal }),
   learning: options => axiosClient.get('/api/v1/learning/admin/overview', { signal: options?.signal }),
   payments: options => axiosClient.get('/api/v1/payments/admin/analytics', { signal: options?.signal }),
+  paymentOrders: (params, options) =>
+    axiosClient.get('/api/v1/payments/admin/orders', { params, signal: options?.signal }),
   commerceAnalytics: (report, range, options) =>
     axiosClient.get(`/api/v1/learning/admin/analytics/${report}`, {
       params: range ?? undefined,

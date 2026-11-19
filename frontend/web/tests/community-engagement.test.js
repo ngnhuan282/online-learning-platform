@@ -25,6 +25,7 @@ Object.assign(globalThis, {
 });
 const { createRoot } = await import('react-dom/client');
 const server = await createServer({
+  cacheDir: 'node_modules/.vite-tests/community-engagement',
   server: { middlewareMode: true, hmr: false, ws: false },
   appType: 'custom',
   optimizeDeps: { noDiscovery: true, include: [] },

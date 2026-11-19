@@ -10,7 +10,9 @@ import {
   MenuBookOutlined,
   TaskAlt,
   ArrowForward,
+  InsightsOutlined,
 } from '@mui/icons-material';
+import { ROUTES } from '../../../shared/constants/routes';
 import useAuth from '../../auth/hooks/useAuth';
 import { adminApi } from '../api/adminApi';
 import { can, number, money, date } from '../utils/adminUtils';
@@ -102,6 +104,11 @@ export default function AdminDashboardPage() {
           >
             {t('Làm mới dữ liệu')}
           </Button>
+          {can(user, 'DASHBOARD_VIEW') && (
+            <Button component={Link} to={ROUTES.ADMIN_STATISTICS} variant="outlined" startIcon={<InsightsOutlined />}>
+              {t('Thống kê chi tiết')}
+            </Button>
+          )}
           {can(user, 'USER_CREATE') && (
             <Button component={Link} to="/admin/users?create=1" variant="contained">
               {t('+ Thêm tài khoản')}

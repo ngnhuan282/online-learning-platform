@@ -1,20 +1,25 @@
 import { useCallback, useState } from 'react';
+import { Button } from '@mui/material';
 import {
   AttachMoney,
   DiamondOutlined,
+  DownloadOutlined,
   EmojiEventsOutlined,
   MenuBook,
   PeopleAltOutlined,
   StorefrontOutlined,
   WorkspacePremium,
 } from '@mui/icons-material';
-import RevenueAnalyticsTab from '../analytics/tabs/RevenueAnalyticsTab';
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
+import useAuth from '../../auth/hooks/useAuth';
+import { PageHeading } from '../components/AdminUi';
+import { can } from '../utils/adminUtils';
+import { commerceReports } from '../analytics/commerceReports';
+import CommerceAnalyticsTab from '../analytics/tabs/CommerceAnalyticsTab';
 import LearnersAnalyticsTab from '../analytics/tabs/LearnersAnalyticsTab';
 import OverviewAnalyticsTab from '../analytics/tabs/OverviewAnalyticsTab';
-import CommerceAnalyticsTab from '../analytics/tabs/CommerceAnalyticsTab';
-import { commerceReports } from '../analytics/commerceReports';
-import useAuth from '../../auth/hooks/useAuth';
-import { can } from '../utils/adminUtils';
+import RevenueAnalyticsTab from '../analytics/tabs/RevenueAnalyticsTab';
 import '../analytics/analytics.css';
 
 const tabs = [
@@ -28,6 +33,7 @@ const tabs = [
 ];
 
 export default function AdminStatisticsPage() {
+  useLocale();
   const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState('revenue');
   const [exportReport, setExportReport] = useState(null);
@@ -38,7 +44,17 @@ export default function AdminStatisticsPage() {
 
   return (
     <div className="analytics-container">
-      <h1>Thống kê & Báo cáo</h1>
+      <PageHeading
+        title="Thống kê & Báo cáo"
+        description="Theo dõi doanh thu, tăng trưởng học viên, tiến độ học tập, khóa học và kinh tế trong hệ thống."
+      >
+        {exportReport && (
+          <Button variant="contained" startIcon={<DownloadOutlined />} onClick={exportReport}>
+            {t('Xuất Excel')}
+          </Button>
+        )}
+      </PageHeading>
+
       <nav className="analytics-nav-tabs" aria-label="Phân hệ thống kê">
         {visibleTabs.map(([id, label, Icon]) => (
           <button
@@ -46,16 +62,17 @@ export default function AdminStatisticsPage() {
             type="button"
             className={`analytics-tab-btn${activeTab === id ? ' is-active' : ''}`}
             aria-pressed={activeTab === id}
-            onClick={() => setSelectedTab(id)}
+            onClick={() => {
+              setExportReport(null);
+              setSelectedTab(id);
+            }}
           >
             <Icon fontSize="small" />
-            {label}
+            {t(label)}
           </button>
         ))}
       </nav>
-      {exportReport && (
-        <button type="button" className="button button-soft" onClick={exportReport}>Xuất Excel</button>
-      )}
+
       {activeTab === 'revenue' && <RevenueAnalyticsTab onExportReady={onExportReady} />}
       {activeTab === 'learners' && <LearnersAnalyticsTab onExportReady={onExportReady} />}
       {hasSummary && <OverviewAnalyticsTab key={activeTab} report={activeTab} />}

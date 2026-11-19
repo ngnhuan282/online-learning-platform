@@ -16,6 +16,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { createRoot } = await import('react-dom/client');
 const cache = createCache({ key: 'reset' });
 const server = await createServer({
+  cacheDir: 'node_modules/.vite-tests/password-reset',
   server: { middlewareMode: true, hmr: false, ws: false },
   appType: 'custom',
   optimizeDeps: { noDiscovery: true, include: [] },

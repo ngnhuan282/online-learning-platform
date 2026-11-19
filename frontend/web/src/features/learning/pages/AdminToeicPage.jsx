@@ -74,10 +74,8 @@ export default function AdminToeicPage() {
   const [editingId, setEditingId] = useState(null);
   const [saved, setSaved] = useState(() => JSON.stringify(blankDefinition()));
   const [questionId, setQuestionId] = useState(null);
-  const [lessonId, setLessonId] = useState(null);
   const [questionSearch, setQuestionSearch] = useState('');
   const [listSearch, setListSearch] = useState('');
-  const [tab, setTab] = useState('lessons');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
@@ -91,7 +89,6 @@ export default function AdminToeicPage() {
   const { data: exams, loading, error: listError, reload } = useLearningResource(load, EMPTY);
   const dirty = JSON.stringify(form) !== saved;
   const selectedQuestion = form.questions.find(item => item.id === questionId) ?? form.questions[0];
-  const selectedLesson = form.lessons.find(item => item.id === lessonId) ?? form.lessons[0];
 
   useEffect(() => {
     const activeGeneration = ++generation.current;
@@ -116,7 +113,6 @@ export default function AdminToeicPage() {
     setSaved(JSON.stringify(next));
     setEditingId(data.id ?? null);
     setQuestionId(next.questions[0]?.id ?? null);
-    setLessonId(next.lessons[0]?.id ?? null);
     setQuestionSearch('');
     setError(null);
     setImportOpen(false);
@@ -169,16 +165,6 @@ export default function AdminToeicPage() {
     }));
     setMessage('');
   }
-  function editLesson(key, value) {
-    if (!selectedLesson) return;
-    setForm(previous => ({
-      ...previous,
-      lessons: previous.lessons.map(lesson =>
-        lesson.id === selectedLesson.id ? { ...lesson, [key]: value } : lesson,
-      ),
-    }));
-    setMessage('');
-  }
   function addQuestion() {
     const number = Math.max(100, ...form.questions.map(question => Number(question.number) || 100)) + 1;
     const question = {
@@ -197,11 +183,6 @@ export default function AdminToeicPage() {
     updateField('questions', [...form.questions, question]);
     setQuestionId(question.id);
     setQuestionSearch('');
-  }
-  function addLesson() {
-    const lesson = { id: uniqueId('lesson'), title: '', content: '' };
-    updateField('lessons', [...form.lessons, lesson]);
-    setLessonId(lesson.id);
   }
   function importQuestions(questions) {
     if (pending.current) return;
@@ -225,8 +206,6 @@ export default function AdminToeicPage() {
       Number(form.durationMinutes) > 180
     )
       return 'Thời gian thi phải là số nguyên từ 1 đến 180 phút.';
-    if (form.lessons.some(lesson => !lesson.title.trim() || !lesson.content.trim()))
-      return 'Mỗi bài học cần có tên và nội dung.';
     const numbers = new Set();
     for (const question of form.questions) {
       if (
@@ -295,7 +274,7 @@ export default function AdminToeicPage() {
           <h1>{t('Quản lý TOEIC Reading')}</h1>
           <p>
             {t(
-              'Tạo bài học và câu hỏi trực tiếp. Nội dung đã xuất bản sẽ được đưa vào luồng học của học viên.',
+              'Tạo và quản lý ngân hàng câu hỏi TOEIC Reading trực tiếp. Nội dung đã xuất bản sẽ được đưa vào luồng luyện tập của học viên.',
             )}
           </p>
         </div>
@@ -420,93 +399,11 @@ export default function AdminToeicPage() {
             </label>
           </fieldset>
           <div className="toeic-tabs toeic-admin-tabs">
-            <button
-              type="button"
-              className={tab === 'lessons' ? 'is-active' : ''}
-              onClick={() => setTab('lessons')}
-            >
-              {t('Bài học')} ({form.lessons.length})
-            </button>
-            <button
-              type="button"
-              className={tab === 'questions' ? 'is-active' : ''}
-              onClick={() => setTab('questions')}
-            >
+            <button type="button" className="is-active">
               {t('Ngân hàng câu hỏi')} ({form.questions.length})
             </button>
           </div>
-          {tab === 'lessons' ? (
-            <section className="toeic-admin-content">
-              <div className="toeic-editor-toolbar">
-                <select
-                  aria-label={t('Chọn bài học để sửa')}
-                  value={selectedLesson?.id ?? ''}
-                  disabled={!form.lessons.length || busy}
-                  onChange={event => setLessonId(event.target.value)}
-                >
-                  {form.lessons.length ? (
-                    form.lessons.map((lesson, index) => (
-                      <option key={lesson.id} value={lesson.id}>
-                        {index + 1}. {lesson.title || t('Bài học chưa đặt tên')}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">{t('Chưa có bài học')}</option>
-                  )}
-                </select>
-                <button
-                  type="button"
-                  className="toeic-button toeic-button-outline"
-                  disabled={busy}
-                  onClick={addLesson}
-                >
-                  <AddRounded fontSize="small" />
-                  {t('Thêm bài học')}
-                </button>
-              </div>
-              {selectedLesson ? (
-                <fieldset disabled={busy} className="toeic-admin-fields">
-                  <label>
-                    {t('Tên bài học')}
-                    <input
-                      value={selectedLesson.title}
-                      onChange={event => editLesson('title', event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    {t('Nội dung bài học')}
-                    <textarea
-                      rows="14"
-                      value={selectedLesson.content}
-                      onChange={event => editLesson('content', event.target.value)}
-                      placeholder={t(
-                        'Nhập kiến thức, hướng dẫn và ví dụ để học viên học trực tiếp trên web.',
-                      )}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="toeic-button toeic-danger"
-                    onClick={() => {
-                      updateField(
-                        'lessons',
-                        form.lessons.filter(item => item.id !== selectedLesson.id),
-                      );
-                      setLessonId(null);
-                    }}
-                  >
-                    <DeleteOutlineRounded fontSize="small" />
-                    {t('Xóa bài học')}
-                  </button>
-                </fieldset>
-              ) : (
-                <p className="toeic-admin-empty">
-                  {t('Thêm bài học để nhập nội dung kiến thức trước khi luyện tập.')}
-                </p>
-              )}
-            </section>
-          ) : (
-            <section className="toeic-admin-content">
+          <section className="toeic-admin-content">
               <div className="toeic-editor-toolbar">
                 <input
                   type="search"
@@ -693,7 +590,6 @@ export default function AdminToeicPage() {
                 )}
               </div>
             </section>
-          )}
           <div className="toeic-admin-savebar">
             <button type="submit" className="toeic-button button-primary" disabled={busy || !dirty}>
               <SaveOutlined fontSize="small" />

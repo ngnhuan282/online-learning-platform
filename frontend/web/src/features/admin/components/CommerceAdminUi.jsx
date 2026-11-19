@@ -183,7 +183,16 @@ export function AdminRowActions({ actions }) {
   );
 }
 
-export function CommerceTable({ columns, rows, rowKey = 'id', paginate = false, pagination }) {
+export function CommerceTable({
+  columns,
+  rows,
+  rowKey = 'id',
+  paginate = false,
+  pagination,
+  emptyMessage = 'Không có dữ liệu.',
+  ariaLabel,
+  embedded = false,
+}) {
   useLocale();
   const tableRows = Array.isArray(rows) ? rows : [];
   const [localPage, setLocalPage] = useState(0);
@@ -197,20 +206,25 @@ export function CommerceTable({ columns, rows, rowKey = 'id', paginate = false, 
     if (page !== currentPage) setPage(currentPage);
   }, [page, currentPage, setPage]);
   const visible = paginate ? tableRows.slice(currentPage * size, (currentPage + 1) * size) : tableRows;
+  const resolveKey = (row, index) =>
+    typeof rowKey === 'function' ? rowKey(row, index) : (row[rowKey] ?? index);
+  const Wrapper = embedded ? 'div' : 'section';
   return (
-    <section className="admin-card admin-table-card">
+    <Wrapper className={embedded ? 'analytics-embedded-table' : 'admin-card admin-table-card'}>
       <div className="admin-table-scroll">
-        <table className="admin-table">
+        <table className="admin-table" aria-label={ariaLabel}>
           <thead>
             <tr>
               {columns.map(([label]) => (
-                <th key={label}>{t(label)}</th>
+                <th key={label} scope="col">
+                  {t(label)}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {visible.map(row => (
-              <tr key={row[rowKey]}>
+            {visible.map((row, index) => (
+              <tr key={resolveKey(row, index)}>
                 {columns.map(([label, render]) => (
                   <td key={label}>{typeof render === 'function' ? render(row) : (row[render] ?? '—')}</td>
                 ))}
@@ -218,7 +232,7 @@ export function CommerceTable({ columns, rows, rowKey = 'id', paginate = false, 
             ))}
           </tbody>
         </table>
-        {!tableRows.length && <p className="admin-empty">{t('Không có dữ liệu.')}</p>}
+        {!tableRows.length && <p className="admin-empty">{t(emptyMessage)}</p>}
       </div>
       {paginate && (
         <CommercePager
@@ -236,7 +250,7 @@ export function CommerceTable({ columns, rows, rowKey = 'id', paginate = false, 
           }}
         />
       )}
-    </section>
+    </Wrapper>
   );
 }
 export function CommercePager({ data, page, onChange, size = 20, onSizeChange }) {

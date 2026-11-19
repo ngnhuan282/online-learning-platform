@@ -124,6 +124,9 @@ class PasswordResetTests {
     GoogleLoginCodeService googleCodes;
 
     @Autowired
+    com.elearning.auth.service.PasswordResetService resetService;
+
+    @Autowired
     @Qualifier("passwordResetMailExecutor")
     ThreadPoolTaskExecutor executor;
 
@@ -703,5 +706,23 @@ class PasswordResetTests {
             assertThat(value.ready()).isFalse();
             assertThat(value.toString()).isEqualTo("PasswordResetProperties[redacted]");
         }
+    }
+
+    @Test
+    void cleanupExpiredRemovesOldRateLimitsAndExpiredTokens() {
+        String key = "expired-bucket-" + UUID.randomUUID();
+        jdbc.update(
+            "INSERT INTO password_reset_rate_limits (bucket_key, window_start, request_count) VALUES (?, ?, 1)",
+            key,
+            Timestamp.from(Instant.now().minusSeconds(90000))
+        );
+        resetService.cleanupExpired();
+        assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM password_reset_rate_limits WHERE bucket_key = ?",
+                Long.class,
+                key
+            )
+        ).isZero();
     }
 }

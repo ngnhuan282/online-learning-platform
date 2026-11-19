@@ -1,7 +1,7 @@
 import { t } from '../shared/i18n/locale';
 import useLocale from '../shared/i18n/useLocale';
 import { useRef, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { IconButton } from '@mui/material';
 import {
   SchoolOutlined,
@@ -16,7 +16,6 @@ import {
   NotificationsOutlined,
   HistoryOutlined,
   Menu,
-  Search,
   OpenInNew,
   Close,
   WorkspacePremiumOutlined,
@@ -125,9 +124,7 @@ const menu = [
 export default function AdminLayout() {
   useLocale();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const lastInvalidNotice = useRef(0);
   return (
     <PermissionRoute permission="ADMIN_ACCESS">
@@ -192,25 +189,7 @@ export default function AdminLayout() {
             >
               {open ? <Close /> : <Menu />}
             </IconButton>
-            {can(user, 'USER_VIEW') ? (
-              <form
-                className="admin-global-search"
-                onSubmit={event => {
-                  event.preventDefault();
-                  navigate(`/admin/users?q=${encodeURIComponent(search)}`);
-                }}
-              >
-                <Search fontSize="small" />
-                <input
-                  aria-label={t('Tìm tài khoản nhanh')}
-                  placeholder={t('Tìm nhanh tài khoản theo tên, email...')}
-                  value={search}
-                  onChange={event => setSearch(event.target.value)}
-                />
-              </form>
-            ) : (
-              <span>ChitChatGo Admin</span>
-            )}
+            <span>ChitChatGo Admin</span>
             <div className="admin-profile">
               <LanguageSwitcher />
               <AccountMenu profileTo={ROUTES.ADMIN_PROFILE} showDetails />

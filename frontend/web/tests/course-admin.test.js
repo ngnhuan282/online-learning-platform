@@ -4,6 +4,7 @@ import { createServer } from 'vite';
 
 process.env.VITE_API_URL = 'http://gateway.test';
 const server = await createServer({
+  cacheDir: 'node_modules/.vite-tests/course-admin',
   server: { middlewareMode: true, hmr: false },
   appType: 'custom',
   optimizeDeps: { noDiscovery: true, include: [] },

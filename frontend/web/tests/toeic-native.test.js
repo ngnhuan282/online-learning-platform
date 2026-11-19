@@ -519,10 +519,6 @@ test('Admin creates native lessons/questions, edits with a version, publishes an
   await render('/admin/toeic');
   await change(document.querySelector('input[name="title"]'), 'Reading tự luyện');
   await change(document.querySelector('input[name="slug"]'), 'reading-tu-luyen');
-  await click('Thêm bài học');
-  await change(labelled('Tên bài học'), 'Sở hữu trong câu');
-  await change(labelled('Nội dung bài học'), 'Tính từ sở hữu đi trước danh từ.');
-  await clickContaining('Ngân hàng câu hỏi');
   await click('Thêm câu hỏi');
   await change(labelled('Nội dung câu hỏi'), questions[0].prompt);
   for (const option of questions[0].options) await change(labelled(`Lựa chọn ${option.id}`), option.text);
@@ -530,7 +526,7 @@ test('Admin creates native lessons/questions, edits with a version, publishes an
   await change(labelled('Giải thích đáp án'), 'His đứng trước cụm danh từ.');
   await click('Lưu bộ đề');
   assert.equal(calls[0][0], 'create');
-  assert.equal(calls[0][1].lessons[0].content, 'Tính từ sở hữu đi trước danh từ.');
+  assert.deepEqual(calls[0][1].lessons, []);
   assert.equal(calls[0][1].questions[0].correctOptionId, 'B');
   assert.deepEqual(
     calls[0][1].questions[0].options.map(option => option.text),
