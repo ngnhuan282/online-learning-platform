@@ -204,8 +204,8 @@ export default function MockPaymentPage() {
                 <dd>{statusLabel[payment?.status] || payment?.status}</dd>
               </div>
               <div>
-                <dt>{t(state.order?.productType === 'PRO' ? 'Gói Pro' : 'Khóa học')}</dt>
-                <dd>{item?.courseTitle || t('Khóa học')}</dd>
+                <dt>{t(state.order?.productType === 'PRO' ? 'Gói Pro' : state.order?.productType === 'GEM_TOPUP' ? 'Nạp Gem' : 'Khóa học')}</dt>
+                <dd>{item?.courseTitle || (state.order?.productType === 'GEM_TOPUP' ? t('Kim Cương') : t('Khóa học'))}</dd>
               </div>
               <div>
                 <dt>{t('Số tiền')}</dt>

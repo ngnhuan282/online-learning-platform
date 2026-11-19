@@ -31,4 +31,9 @@ public class ShopController {
     public ApiResponse<State> equip(Principal principal, @Valid @RequestBody EquipRequest request) {
         return ApiResponse.success(shop.equip(Long.parseLong(principal.getName()), request));
     }
+
+    @PostMapping("/topup")
+    public ApiResponse<State> topUp(Principal principal, @Valid @RequestBody TopUpRequest request) {
+        return ApiResponse.success(shop.topUp(Long.parseLong(principal.getName()), request));
+    }
 }

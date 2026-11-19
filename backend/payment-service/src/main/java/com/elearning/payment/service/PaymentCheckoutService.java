@@ -2,6 +2,7 @@ package com.elearning.payment.service;
 
 import com.elearning.payment.dto.CheckoutRequest;
 import com.elearning.payment.dto.CheckoutResponse;
+import com.elearning.payment.dto.GemTopUpModels;
 import com.elearning.payment.dto.ProPaymentModels;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,18 @@ public class PaymentCheckoutService {
             return payments.createProCheckout(request, userId, clientIp);
         } catch (DataIntegrityViolationException collision) {
             return payments.findExistingProCheckout(request, userId).orElseThrow(() -> collision);
+        }
+    }
+
+    public CheckoutResponse createGemCheckout(
+        GemTopUpModels.CheckoutRequest request,
+        Long userId,
+        String clientIp
+    ) {
+        try {
+            return payments.createGemCheckout(request, userId, clientIp);
+        } catch (DataIntegrityViolationException collision) {
+            return payments.findExistingGemCheckout(request, userId).orElseThrow(() -> collision);
         }
     }
 }

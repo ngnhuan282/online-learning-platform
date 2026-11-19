@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   CheckRounded,
@@ -13,9 +13,6 @@ import ProMembershipCard from '../components/ProMembershipCard';
 import useLearningResource from '../../learning/hooks/useLearningResource';
 import useWorkspaceMutation from '../../engagement/hooks/useWorkspaceMutation';
 import { WorkspaceState } from '../../engagement/components/WorkspaceUi';
-import { paymentApi } from '../../payment/api/paymentApi';
-import { getCheckoutErrorMessage, readCheckoutRedirect } from '../../payment/utils/paymentFlow';
-import ConfirmDialog from '../../../shared/components/ConfirmDialog';
 import { formatCurrency } from '../../../shared/utils/formatCurrency';
 import { t } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
@@ -58,10 +55,9 @@ export default function ProPage() {
   const navigate = useNavigate();
   const { membership, refresh } = usePro();
   const load = useCallback(async options => {
-    const [plans, methods] = await Promise.all([proApi.plans(options), paymentApi.getMethods()]);
+    const plans = await proApi.plans(options);
     if (
       !Array.isArray(plans.data) ||
-      !Array.isArray(methods.data) ||
       plans.data.some(
         plan =>
           !plan.code ||
@@ -73,46 +69,19 @@ export default function ProPage() {
     ) {
       throw new Error('Không thể tải danh sách gói Pro. Vui lòng thử lại.');
     }
-    return { data: { plans: plans.data, methods: methods.data } };
+    return { data: { plans: plans.data } };
   }, []);
   const resource = useLearningResource(load, null);
   const [selected, setSelected] = useState('PRO_YEAR');
-  const [provider, setProvider] = useState('');
   const [code, setCode] = useState('');
   const [notice, setNotice] = useState('');
-  const [confirm, setConfirm] = useState(false);
-  const checkout = useWorkspaceMutation();
   const activation = useWorkspaceMutation();
-  const intent = useRef(null);
   const plans = resource.data?.plans || [];
   const plan = plans.find(item => item.code === selected) || plans[0];
-  const methods = (resource.data?.methods || []).filter(item => item.available);
-  const selectedProvider = methods.some(item => item.provider === provider)
-    ? provider
-    : methods[0]?.provider || '';
-  const busy = checkout.busy || activation.busy;
+  const busy = activation.busy;
   const discount =
     plan && plan.originalPrice > plan.price ? Math.round((1 - plan.price / plan.originalPrice) * 100) : 0;
 
-  function purchase() {
-    const identity = `${plan.code}:${selectedProvider}`;
-    if (intent.current?.identity !== identity) intent.current = { identity, key: crypto.randomUUID() };
-    checkout.run(
-      () =>
-        paymentApi.createProCheckout({
-          planCode: plan.code,
-          provider: selectedProvider,
-          idempotencyKey: intent.current.key,
-          returnUrl: `${window.location.origin}${ROUTES.PAYMENT_RESULT}`,
-          cancelUrl: `${window.location.origin}${ROUTES.PAYMENT_RESULT}`,
-        }),
-      response => {
-        const url = readCheckoutRedirect(response.data.checkoutUrl, selectedProvider, window.location.origin);
-        if (selectedProvider === 'VNPAY') window.location.assign(url.toString());
-        else navigate(url.pathname + url.search);
-      },
-    );
-  }
   function redeem(event) {
     event.preventDefault();
     setNotice('');
@@ -244,37 +213,10 @@ export default function ProPage() {
                 {t(notice)}
               </p>
             )}
-            {methods.length > 0 ? (
-              <div className="pro-payment-method">
-                <label htmlFor="pro-payment-provider">{t('Phương thức thanh toán')}</label>
-                <select
-                  id="pro-payment-provider"
-                  value={selectedProvider}
-                  disabled={busy}
-                  onChange={event => {
-                    setProvider(event.target.value);
-                    intent.current = null;
-                  }}
-                >
-                  {methods.map(method => (
-                    <option key={method.provider} value={method.provider}>
-                      {t(method.label)}
-                    </option>
-                  ))}
-                </select>
-                <small>
-                  {t(methods.find(method => method.provider === selectedProvider)?.description || '')}
-                </small>
-              </div>
-            ) : (
-              <p className="pro-payment-unavailable">
-                {t('Hiện chưa có phương thức thanh toán khả dụng. Bạn có thể sử dụng mã kích hoạt.')}
-              </p>
-            )}
             <button
               className="pro-primary-action"
-              disabled={busy || !plan || !selectedProvider || membership?.suspended}
-              onClick={() => setConfirm(true)}
+              disabled={busy || !plan || membership?.suspended}
+              onClick={() => navigate(`${ROUTES.PRO_CHECKOUT}?plan=${plan.code}`)}
             >
               {t(membership?.active ? 'Gia hạn Pro' : 'Đăng ký ngay')}
             </button>
@@ -302,28 +244,6 @@ export default function ProPage() {
           </p>
         </details>
       </div>
-      <ConfirmDialog
-        open={confirm}
-        title="Xác nhận đăng ký Pro"
-        description={
-          plan
-            ? t('Bạn chọn gói {period} với giá {price}. Thời gian được cộng vào hạn Pro còn lại nếu có.', {
-                period: planLabel(plan),
-                price: formatCurrency(plan.price),
-              })
-            : ''
-        }
-        confirmLabel={t('Tiếp tục thanh toán')}
-        pending={checkout.busy}
-        onClose={() => setConfirm(false)}
-        onConfirm={purchase}
-      >
-        {checkout.error && (
-          <p className="workspace-error" role="alert">
-            {t(getCheckoutErrorMessage(checkout.error))}
-          </p>
-        )}
-      </ConfirmDialog>
     </section>
   );
 }

@@ -72,6 +72,26 @@ const router = createBrowserRouter([
     children: [{ index: true, element: <MockPaymentPage /> }],
   },
   {
+    path: '/payment/gem-checkout',
+    element: <UserLayout />,
+    children: [
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('../features/payment/pages/GemCheckoutPage')).default }),
+      },
+    ],
+  },
+  {
+    path: '/payment/pro-checkout',
+    element: <UserLayout />,
+    children: [
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('../features/payment/pages/ProCheckoutPage')).default }),
+      },
+    ],
+  },
+  {
     path: '/payment/history',
     element: <UserLayout />,
     children: [{ index: true, element: <PaymentHistoryPage /> }],
@@ -107,7 +127,19 @@ const router = createBrowserRouter([
           },
         ],
       },
-      { path: 'analytics', element: <Navigate to="/admin" replace /> },
+      {
+        path: 'statistics',
+        element: <PermissionRoute permission="DASHBOARD_VIEW" />,
+        children: [
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import('../features/admin/pages/AdminStatisticsPage')).default,
+            }),
+          },
+        ],
+      },
+      { path: 'analytics', element: <Navigate to="/admin/statistics" replace /> },
       {
         path: 'payments',
         element: <PermissionRoute permission="PAYMENT_REPORT_VIEW" />,

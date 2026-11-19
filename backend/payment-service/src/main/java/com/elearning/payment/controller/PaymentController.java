@@ -105,6 +105,17 @@ public class PaymentController {
         return ApiResponse.success(checkout.createProCheckout(request, user.userId(), clientIp));
     }
 
+    @PostMapping("/gem/checkout")
+    ApiResponse<CheckoutResponse> createGemCheckout(
+        @Valid @RequestBody GemTopUpModels.CheckoutRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        String clientIp = httpRequest.getHeader("X-Payment-Client-IP");
+        if (clientIp == null || !clientIp.matches("[0-9a-fA-F:.]{3,45}")) clientIp =
+            httpRequest.getRemoteAddr();
+        return ApiResponse.success(checkout.createGemCheckout(request, user.userId(), clientIp));
+    }
+
     @GetMapping("/orders/{orderCode}")
     ApiResponse<OrderResponse> getOrder(@PathVariable String orderCode) {
         return ApiResponse.success(payments.getOrder(orderCode, user.userId(), user.hasRole("ADMIN")));
