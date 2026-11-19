@@ -607,8 +607,12 @@ npm test
 Tại root project:
 
 ```powershell
-mvn -f backend/pom.xml verify
+mvn -B -fae -f backend/pom.xml clean verify
 ```
+
+JaCoCo kiểm tra line coverage tối thiểu 93% cho từng module backend. Mở
+`backend/<module>/target/site/jacoco/index.html` để xem các dòng đã được kiểm thử.
+Báo cáo XML cùng thư mục có cả số liệu branch coverage.
 
 Riêng Auth Service:
 

@@ -28,15 +28,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         @Param("maxPrice") BigDecimal maxPrice, @Param("minRating") Double minRating,
         @Param("pricing") String pricing, Pageable pageable);
 
-    Page<Course> findByStatus(CourseStatus status, Pageable pageable);
-    Page<Course> findByStatusAndCategoryId(CourseStatus status, Long categoryId, Pageable pageable);
-    Page<Course> findByStatusAndLevel(CourseStatus status, CourseLevel level, Pageable pageable);
-    Page<Course> findByStatusAndCategoryIdAndLevel(
-        CourseStatus status,
-        Long categoryId,
-        CourseLevel level,
-        Pageable pageable
-    );
     boolean existsBySlug(String slug);
     boolean existsByThumbnailUrlAndStatus(String thumbnailUrl, CourseStatus status);
     boolean existsByThumbnailUrlStartingWithAndStatus(String thumbnailUrl, CourseStatus status);

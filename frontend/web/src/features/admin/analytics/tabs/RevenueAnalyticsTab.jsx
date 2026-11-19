@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+import useLearningResource from '../../../learning/hooks/useLearningResource';
 import {
   AttachMoney,
-  School,
-  WorkspacePremium,
   AssignmentReturn,
   CheckCircle,
   HourglassEmpty,
@@ -14,33 +13,16 @@ import { analyticsApi } from '../analyticsApi';
 import { exportAnalyticsToExcel } from '../analyticsUtils';
 import { money, number } from '../../utils/adminUtils';
 
-export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function RevenueAnalyticsTab({ onExportReady }) {
+  const load = useCallback(async options => ({ data: await analyticsApi.getRevenueAnalytics(options) }), []);
+  const { data, loading } = useLearningResource(load, null);
 
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    analyticsApi
-      .getRevenueAnalytics({ from: range.from, to: range.to, compare })
-      .then(res => {
-        if (active) setData(res);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [range, compare]);
-
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     if (!data?.transactions) return;
     const columns = [
       { header: 'Mã GD', accessor: r => r.code || r.orderCode || '—' },
       { header: 'Học viên', accessor: r => r.userName || (r.userId ? `Học viên #${r.userId}` : '—') },
       { header: 'Khóa học / Gói', accessor: r => r.courseTitle || (r.type === 'PRO_SUBSCRIPTION' ? 'Gói Pro VIP' : '—') },
-      { header: 'Loại GD', accessor: r => r.type === 'PRO_SUBSCRIPTION' ? 'Gói Pro VIP' : r.type === 'REFUND' ? 'Hoàn tiền' : 'Khóa học lẻ' },
       { header: 'Số tiền (VNĐ)', accessor: r => money(r.amount) },
       { header: 'Trạng thái', accessor: r => r.status === 'SUCCESS' ? 'Thành công' : r.status === 'PENDING' ? 'Chờ thanh toán' : r.status === 'REFUNDED' ? 'Đã hoàn tiền' : 'Thất bại' },
       { header: 'Thời gian', accessor: r => r.date || '—' },
@@ -51,16 +33,16 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
     );
     await exportAnalyticsToExcel(
       [header, ...dataRows],
-      `Thong_ke_doanh_thu_${range.from}_${range.to}.xlsx`,
+      'Giao_dich_gan_day.xlsx',
       'Doanh thu'
     );
-  };
+  }, [data]);
 
   useEffect(() => {
-    if (onExportReady) {
-      onExportReady(async () => handleExport());
-    }
-  }, [data, range]);
+    if (!onExportReady || !data) return;
+    onExportReady(handleExport);
+    return () => onExportReady(null);
+  }, [data, handleExport, onExportReady]);
 
   if (loading) {
     return <p style={{ textAlign: 'center', color: '#64748b', padding: '40px 0' }}>Đang tải thống kê doanh thu...</p>;
@@ -70,43 +52,23 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
     return <p style={{ textAlign: 'center', color: '#64748b', padding: '40px 0' }}>Không tìm thấy dữ liệu doanh thu.</p>;
   }
 
-  const { current, previous, transactions } = data;
+  const { current, transactions } = data;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* 4 Thẻ KPI Doanh thu */}
+      {data.notice && <p role="status">{data.notice}</p>}
       <div className="analytics-stats-grid">
         <StatComparisonCard
-          title="Doanh thu thuần"
+          title="Giá trị thanh toán thành công"
           icon={<AttachMoney />}
-          value={current.netRevenue}
-          previousValue={previous?.netRevenue}
+          value={current.grossRevenue}
           format="money"
-          compare={compare}
-        />
-        <StatComparisonCard
-          title="Doanh thu Khóa học"
-          icon={<School />}
-          value={current.courseRevenue}
-          previousValue={previous?.courseRevenue}
-          format="money"
-          compare={compare}
-        />
-        <StatComparisonCard
-          title="Doanh thu Gói Pro"
-          icon={<WorkspacePremium />}
-          value={current.proRevenue}
-          previousValue={previous?.proRevenue}
-          format="money"
-          compare={compare}
         />
         <StatComparisonCard
           title="Tiền hoàn lại"
           icon={<AssignmentReturn />}
           value={current.refundRevenue}
-          previousValue={previous?.refundRevenue}
           format="money"
-          compare={compare}
         />
       </div>
 
@@ -117,11 +79,8 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
         </div>
         <TrendChart
           series={current.series}
-          compare={compare}
-          currentLabel="Kỳ này"
-          previousLabel="Kỳ trước"
+          compare={false}
           currentColor="#2563eb"
-          previousColor="#94a3b8"
           valueFormatter={money}
         />
       </div>
@@ -166,14 +125,6 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
       <div className="analytics-section-card">
         <div className="analytics-card-header">
           <h3 className="analytics-card-title">📋 Bảng kê giao dịch trong kỳ</h3>
-          <button
-            type="button"
-            className="button button-soft"
-            style={{ fontSize: 13, padding: '4px 12px' }}
-            onClick={handleExport}
-          >
-            Xuất file CSV / Excel
-          </button>
         </div>
 
         <div className="analytics-table-wrapper">
@@ -182,7 +133,6 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
               <tr>
                 <th>Mã đơn</th>
                 <th>Khách hàng / Học viên</th>
-                <th>Phân loại</th>
                 <th>Số tiền</th>
                 <th>Trạng thái</th>
                 <th>Thời gian</th>
@@ -201,12 +151,7 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
                         ) : null}
                       </div>
                     </td>
-                    <td>
-                      <span className="badge" style={{ fontSize: 11, background: '#eff6ff', color: '#1d4ed8' }}>
-                        {txn.type === 'PRO_SUBSCRIPTION' ? 'Gói Pro VIP' : txn.type === 'REFUND' ? 'Hoàn tiền' : (txn.courseTitle || 'Khóa học lẻ')}
-                      </span>
-                    </td>
-                    <td><strong style={{ color: txn.type === 'REFUND' ? '#dc2626' : '#0f172a' }}>{money(txn.amount)}</strong></td>
+                    <td><strong>{money(txn.amount)}</strong></td>
                     <td>
                       <span
                         className="badge"
@@ -224,8 +169,8 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>
-                    Không có giao dịch nào trong kỳ này.
+                  <td colSpan="5" style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>
+                    Chưa có giao dịch.
                   </td>
                 </tr>
               )}

@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.HashSet;
 import java.util.Set;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,7 +86,7 @@ public class ShopService {
             .findFirst()
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
         if (item.owned()) {
-            recordPurchase(userId, request.requestId(), item.code(), 0);
+            recordPurchase(userId, request.requestId(), item.code(), 0, false);
             return new Purchase(item.code(), 0, true, before);
         }
         if ("FREEZE".equals(item.itemType()) && before.streakFreezes() >= FREEZE_CAPACITY) {
@@ -106,7 +107,7 @@ public class ShopService {
                 Timestamp.from(clock.instant())
             );
         }
-        recordPurchase(userId, request.requestId(), item.code(), item.price());
+        recordPurchase(userId, request.requestId(), item.code(), item.price(), true);
         return new Purchase(item.code(), item.price(), false, state(userId));
     }
 
@@ -136,29 +137,48 @@ public class ShopService {
         return state(userId);
     }
 
-    public State topUp(long userId, TopUpRequest request) {
+    public void grantGems(String orderCode, long userId, int gems) {
+        if (orderCode == null || !orderCode.matches("[A-Za-z0-9_-]{1,64}") || userId <= 0 || gems <= 0) {
+            throw new AppException(ErrorCode.BAD_REQUEST);
+        }
         engagement.lockProfile(userId);
-        if (request.gems() <= 0) throw new AppException(ErrorCode.BAD_REQUEST);
-        jdbc.update("UPDATE learner_profiles SET gems = gems + ? WHERE user_id = ?", request.gems(), userId);
-        return state(userId);
-    }
-
-    public void grantGems(long userId, int gems) {
-        engagement.lockProfile(userId);
-        if (gems <= 0) throw new AppException(ErrorCode.BAD_REQUEST);
+        var receipts = jdbc.queryForList(
+            "SELECT user_id, gems FROM gem_topup_receipts WHERE order_code = ?",
+            orderCode
+        );
+        if (!receipts.isEmpty()) {
+            var receipt = receipts.getFirst();
+            if (((Number) receipt.get("user_id")).longValue() != userId ||
+                ((Number) receipt.get("gems")).intValue() != gems) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
+            return;
+        }
+        try {
+            jdbc.update(
+                "INSERT INTO gem_topup_receipts (order_code, user_id, gems, created_at) VALUES (?, ?, ?, ?)",
+                orderCode, userId, gems, Timestamp.from(clock.instant())
+            );
+        } catch (DuplicateKeyException collision) {
+            throw new AppException(ErrorCode.CONFLICT);
+        }
         jdbc.update("UPDATE learner_profiles SET gems = gems + ? WHERE user_id = ?", gems, userId);
     }
 
     private record Receipt(String code, int spent) {}
 
-    private void recordPurchase(long userId, String requestId, String code, int spent) {
+    private void recordPurchase(long userId, String requestId, String code, int spent, boolean granted) {
         jdbc.update(
-            "INSERT INTO shop_purchases (user_id, request_id, item_code, gems_spent, created_at) VALUES (?, ?, ?, ?, ?)",
+            """
+            INSERT INTO shop_purchases (user_id, request_id, item_code, gems_spent, created_at, item_granted)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
             userId,
             requestId,
             code,
             spent,
-            Timestamp.from(clock.instant())
+            Timestamp.from(clock.instant()),
+            granted
         );
     }
 }

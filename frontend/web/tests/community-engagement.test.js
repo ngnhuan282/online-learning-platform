@@ -292,7 +292,8 @@ test('header renders the live streak, diamond balance, framed level avatar and n
   assert.match(document.querySelector('.header-gems').textContent, /50/);
   assert.equal(document.querySelector('.learner-avatar-level').textContent, 'Lv.5');
   await switchLanguage('en');
-  assert.equal(document.querySelector('.header-gems').getAttribute('aria-label'), 'Shop: 50 diamonds');
+  assert.equal(document.querySelector('.header-gems').getAttribute('aria-label'), 'Top up gems: 50 diamonds');
+  assert.match(document.querySelector('.header-gems').getAttribute('href'), /\/shop\?tab=topup$/);
 });
 
 test('language switch persists the preference and preserves a draft post without translating learner content', async () => {

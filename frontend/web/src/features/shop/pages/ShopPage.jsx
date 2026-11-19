@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AcUnitRounded,
@@ -25,7 +25,6 @@ import useLocale from '../../../shared/i18n/useLocale';
 import '../styles/shop.css';
 
 const TOPUP_PACKAGES = [
-  { code: 'GEM_50',   gems: 50,   price: 0,     label: 'Mien phi',   badge: '\uD83C\uDF81 Demo',      color: '#22c55e' },
   { code: 'GEM_200',  gems: 200,  price: 19000, label: '19.000 \u20AB', badge: null,            color: '#24b8ec' },
   { code: 'GEM_500',  gems: 500,  price: 45000, label: '45.000 \u20AB', badge: '\uD83D\uDD25 Ph\u1ED5 bi\u1EBFn', color: '#a855f7' },
   { code: 'GEM_1200', gems: 1200, price: 99000, label: '99.000 \u20AB', badge: '\uD83D\uDC8E T\u1ED1t nh\u1EA5t', color: '#f59e0b' },
@@ -34,20 +33,21 @@ const TOPUP_PACKAGES = [
 export default function ShopPage() {
   useLocale();
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const load = useCallback(options => shopApi.state(options), []);
   const resource = useLearningResource(load, null);
   const mutation = useWorkspaceMutation();
-  const [tab, setTab] = useState(() => (searchParams.get('tab') === 'topup' ? 'topup' : 'shop'));
+  const tab = ['shop', 'inventory', 'topup'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'shop';
+  const setTab = value => setSearchParams(previous => {
+    const next = new URLSearchParams(previous);
+    next.set('tab', value);
+    return next;
+  });
   const [category, setCategory] = useState('ALL');
   const [pendingPurchase, setPendingPurchase] = useState(null);
   const [notice, setNotice] = useState('');
-  const [topupBusy, setTopupBusy] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get('tab') === 'topup') setTab('topup');
-  }, [searchParams]);
 
   const data = resource.data;
   const freeze = data?.items.find(item => item.itemType === 'FREEZE');
@@ -85,21 +85,7 @@ export default function ShopPage() {
     );
   }
   function handleTopUp(pkg) {
-    if (pkg.price === 0) {
-      // Free package: direct topup (demo)
-      setNotice('');
-      setTopupBusy(true);
-      shopApi.topUp({ gems: pkg.gems, packageCode: pkg.code, amount: 0, paymentMethod: 'MOCK' })
-        .then(() => {
-          setNotice(`Đã nhận ${pkg.gems} kim cương! 💎`);
-          resource.reload();
-        })
-        .catch(() => setNotice('Nhận gem thất bại, vui lòng thử lại.'))
-        .finally(() => setTopupBusy(false));
-    } else {
-      // Paid package: go through payment flow
-      navigate(`/payment/gem-checkout?package=${pkg.code}`);
-    }
+    navigate(`/payment/gem-checkout?package=${pkg.code}`);
   }
 
   return (
@@ -176,20 +162,20 @@ export default function ShopPage() {
                     </div>
                     <div className="topup-gems">{number(pkg.gems)}</div>
                     <div className="topup-unit">{t('Kim c\u01B0\u01A1ng')}</div>
-                    <div className="topup-price">{pkg.price === 0 ? t('Mi\u1EC5n ph\u00ED') : pkg.label}</div>
+                    <div className="topup-price">{pkg.label}</div>
                     <button
                       className="shop-button topup-btn"
-                      disabled={topupBusy}
+                      disabled={mutation.busy}
                       onClick={() => handleTopUp(pkg)}
                     >
-                      {pkg.price === 0 ? t('Nh\u1EADn ngay') : t('N\u1EA1p ngay')}
+                      {t('Nạp ngay')}
                     </button>
                   </article>
                 ))}
               </div>
 
               <p className="topup-note">
-                {t('\u0110\u00E2y l\u00E0 giao d\u1ECBch m\u00F4 ph\u1ECFng (demo). Kim c\u01B0\u01A1ng s\u1EBD \u0111\u01B0\u1EE3c c\u1ED9ng ngay v\u00E0o t\u00E0i kho\u1EA3n.')}
+                {t('Kim cương được cộng sau khi thanh toán được xác nhận thành công.')}
               </p>
             </div>
           )}

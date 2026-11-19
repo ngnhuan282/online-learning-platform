@@ -10,8 +10,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -22,9 +25,19 @@ import org.springframework.web.multipart.MultipartFile;
 public class LocalStorageService implements StorageService {
 
     private final Path rootLocation;
+    private final String signingSecret;
 
-    public LocalStorageService(@Value("${storage.local-dir:./uploads}") String uploadDir) {
+    public LocalStorageService(String uploadDir) {
+        this(uploadDir, UUID.randomUUID().toString());
+    }
+
+    @Autowired
+    public LocalStorageService(
+        @Value("${storage.local-dir:./uploads}") String uploadDir,
+        @Value("${security.jwt.secret}") String signingSecret
+    ) {
         this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
+        this.signingSecret = signingSecret;
         try {
             Files.createDirectories(this.rootLocation);
         } catch (IOException e) {
@@ -51,7 +64,9 @@ public class LocalStorageService implements StorageService {
         try {
             Path targetPath = this.rootLocation.resolve(objectKey).normalize();
             Files.createDirectories(targetPath.getParent());
-            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            try (var input = file.getInputStream()) {
+                Files.copy(input, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             String downloadUrl = "/api/v1/media/download/" + objectKey;
             return new MediaUploadResponse(
@@ -69,7 +84,7 @@ public class LocalStorageService implements StorageService {
     @Override
     public void delete(String objectKey) {
         try {
-            Path filePath = this.rootLocation.resolve(objectKey).normalize();
+            Path filePath = resolveObject(objectKey);
             Files.deleteIfExists(filePath);
         } catch (IOException ignored) {}
     }
@@ -79,13 +94,12 @@ public class LocalStorageService implements StorageService {
         return "/api/v1/media/download/" + objectKey;
     }
 
-    private static final String SIGNING_SECRET = "learnsphere-local-storage-secret-key-2026";
-
     @Override
     public String generatePresignedUrl(String objectKey, Duration duration) {
         long durationMs = (duration != null ? duration.toMillis() : Duration.ofMinutes(30).toMillis());
         long expires = System.currentTimeMillis() + durationMs;
-        String token = computeHmac(objectKey + ":" + expires, SIGNING_SECRET);
+        resolveObject(objectKey);
+        String token = computeHmac(objectKey + ":" + expires, signingSecret);
         return "/api/v1/media/download/" + objectKey + "?expires=" + expires + "&token=" + token;
     }
 
@@ -97,8 +111,8 @@ public class LocalStorageService implements StorageService {
         if (System.currentTimeMillis() > expires) {
             return false;
         }
-        String expected = computeHmac(objectKey + ":" + expires, SIGNING_SECRET);
-        return expected.equals(token);
+        String expected = computeHmac(objectKey + ":" + expires, signingSecret);
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8));
     }
 
     private String computeHmac(String data, String key) {
@@ -108,14 +122,14 @@ public class LocalStorageService implements StorageService {
             byte[] bytes = mac.doFinal(data.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             return java.util.HexFormat.of().formatHex(bytes);
         } catch (Exception e) {
-            return Integer.toHexString((data + key).hashCode());
+            throw new IllegalStateException("Media signing is unavailable", e);
         }
     }
 
     @Override
     public Resource loadAsResource(String objectKey) {
         try {
-            Path filePath = this.rootLocation.resolve(objectKey).normalize();
+            Path filePath = resolveObject(objectKey);
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
@@ -125,5 +139,14 @@ public class LocalStorageService implements StorageService {
         } catch (MalformedURLException e) {
             throw new AppException(ErrorCode.NOT_FOUND, "Đường dẫn file không hợp lệ: " + e.getMessage());
         }
+    }
+
+    private Path resolveObject(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) throw new AppException(ErrorCode.BAD_REQUEST);
+        Path path = rootLocation.resolve(objectKey).normalize();
+        if (!path.startsWith(rootLocation) || path.equals(rootLocation)) {
+            throw new AppException(ErrorCode.BAD_REQUEST);
+        }
+        return path;
     }
 }

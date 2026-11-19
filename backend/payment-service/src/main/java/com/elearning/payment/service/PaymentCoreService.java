@@ -16,6 +16,7 @@ import com.elearning.payment.entity.enums.PaymentEventType;
 import com.elearning.payment.entity.enums.PaymentProvider;
 import com.elearning.payment.entity.enums.PaymentStatus;
 import com.elearning.payment.learning.LearningEnrollmentClient;
+import com.elearning.payment.learning.PaidCourseActivationService;
 import com.elearning.payment.repository.CourseOrderRepository;
 import com.elearning.payment.repository.PaymentRepository;
 import com.elearning.payment.repository.PaymentTransactionRepository;
@@ -47,6 +48,7 @@ public class PaymentCoreService {
     private final PaymentTransactionRepository transactions;
     private final CourseSnapshotProvider courses;
     private final LearningEnrollmentClient learning;
+    private final PaidCourseActivationService activation;
     private final VnpayGateway vnpay;
     private final PaymentProviderPolicy providers;
     private final ProPlanService proPlans;
@@ -57,6 +59,7 @@ public class PaymentCoreService {
         PaymentTransactionRepository transactions,
         CourseSnapshotProvider courses,
         LearningEnrollmentClient learning,
+        PaidCourseActivationService activation,
         VnpayGateway vnpay,
         PaymentProviderPolicy providers,
         ProPlanService proPlans
@@ -66,6 +69,7 @@ public class PaymentCoreService {
         this.transactions = transactions;
         this.courses = courses;
         this.learning = learning;
+        this.activation = activation;
         this.vnpay = vnpay;
         this.providers = providers;
         this.proPlans = proPlans;
@@ -470,7 +474,7 @@ public class PaymentCoreService {
         if (nextStatus == PaymentStatus.SUCCESS) providers.requireAvailable(payment.getProvider());
         if (payment.getStatus() == nextStatus) {
             if (nextStatus == PaymentStatus.SUCCESS) {
-                enrollPaidCourse(order);
+                activation.fulfill(order);
             }
             return;
         }
@@ -479,7 +483,7 @@ public class PaymentCoreService {
         }
 
         if (nextStatus == PaymentStatus.SUCCESS) {
-            enrollPaidCourse(order);
+            activation.fulfill(order);
         }
         if (nextStatus == PaymentStatus.REFUNDED && order.isPro()) {
             learning.revokePro(order.getOrderCode(), order.getUserId());
@@ -505,30 +509,6 @@ public class PaymentCoreService {
                 null
             )
         );
-    }
-
-    private void enrollPaidCourse(CourseOrder order) {
-        if (order.isGemTopUp()) {
-            if (order.getGemAmount() == null || order.getGemAmount() <= 0) {
-                throw new AppException(ErrorCode.CONFLICT);
-            }
-            learning.grantGems(order.getOrderCode(), order.getUserId(), order.getGemAmount());
-            return;
-        }
-        if (order.isPro()) {
-            learning.grantPro(
-                order.getOrderCode(),
-                order.getUserId(),
-                order.getPlanCode(),
-                order.getPlanDurationMonths()
-            );
-            return;
-        }
-        OrderItem item = firstItem(order);
-        if (item == null) {
-            throw new AppException(ErrorCode.CONFLICT);
-        }
-        learning.enroll(order.getOrderCode(), order.getUserId(), item.getCourseId());
     }
 
     private PaymentHistoryItemResponse toHistoryItem(CourseOrder order) {

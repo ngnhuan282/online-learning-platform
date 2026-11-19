@@ -35,7 +35,7 @@ public class InternalShopController {
         @Valid @RequestBody InternalGemGrantRequest request
     ) {
         authenticator.requireValid(token);
-        shop.grantGems(request.userId(), request.gems());
+        shop.grantGems(request.orderCode(), request.userId(), request.gems());
         return ApiResponse.success(Map.of("userId", request.userId()));
     }
 }

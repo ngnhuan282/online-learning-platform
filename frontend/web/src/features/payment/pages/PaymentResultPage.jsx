@@ -102,7 +102,7 @@ export default function PaymentResultPage() {
         setRemoteResult({ orderCode, order: response.data, error: null });
         if (response.data.productType === 'PRO' && response.data.payment?.status === 'SUCCESS')
           notifyProChanged();
-        if (response.data.productType === 'GEM_TOPUP' && response.data.payment?.status === 'SUCCESS')
+        if (response.data.productType === 'GEM_TOPUP' && response.data.payment?.enrollmentReady === true)
           notifyEngagementChanged();
         if (
           response.data.productType !== 'PRO' &&
@@ -239,14 +239,14 @@ export default function PaymentResultPage() {
   const amount = order.payment?.amount ?? order.totalAmount;
   const provider = order.payment?.provider;
   const retryCheckoutUrl = isGem
-    ? `${ROUTES.GEM_CHECKOUT}?package=${order.gemPackageCode || ''}`
+    ? `${ROUTES.SHOP}?tab=topup`
     : isPro
       ? ROUTES.PRO
       : `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = getResumePaymentUrl(order, window.location.origin);
   const enrollmentReady =
     provider === 'VNPAY' || isPro || isGem
-      ? order.payment.enrollmentReady === true || isGem
+      ? order.payment.enrollmentReady === true
       : enrollmentState.orderCode === orderCode && enrollmentState.ready;
   const awaitingActivation = paymentStatus === 'SUCCESS' && !enrollmentReady;
 
@@ -258,10 +258,15 @@ export default function PaymentResultPage() {
       const response = await paymentApi.retryActivation(orderCode);
       setRemoteResult({ orderCode, order: response.data, error: null });
       if (response.data.productType === 'PRO') notifyProChanged();
+      if (response.data.productType === 'GEM_TOPUP' && response.data.payment?.enrollmentReady === true) {
+        notifyEngagementChanged();
+      }
     } catch {
       setActivationError(
         new Error(
-          isPro
+          isGem
+            ? t('Chưa thể cộng kim cương lúc này. Thanh toán đã được ghi nhận, vui lòng thử lại sau.')
+            : isPro
             ? 'Pro chưa thể kích hoạt lúc này. Thanh toán đã được ghi nhận, vui lòng thử lại sau.'
             : 'Khóa học chưa thể kích hoạt lúc này. Thanh toán của bạn đã được ghi nhận, vui lòng thử lại sau.',
         ),
@@ -283,7 +288,9 @@ export default function PaymentResultPage() {
           <p>
             {awaitingActivation
               ? t(
-                  isPro
+                  isGem
+                    ? 'Thanh toán đã thành công. Đang chờ cộng kim cương, bạn không cần thanh toán lại.'
+                    : isPro
                     ? 'Thanh toán đã thành công. Đang chờ kích hoạt Pro, bạn không cần thanh toán lại.'
                     : 'Thanh toán đã thành công. Đang chờ quyền học được đồng bộ, bạn không cần thanh toán lại.',
                 )
@@ -295,7 +302,7 @@ export default function PaymentResultPage() {
           {activationError && (
             <ErrorState
               error={activationError}
-              title={t(isPro ? 'Đang chờ kích hoạt Pro' : 'Đang chờ kích hoạt khóa học')}
+              title={t(isGem ? 'Đang chờ cộng kim cương' : isPro ? 'Đang chờ kích hoạt Pro' : 'Đang chờ kích hoạt khóa học')}
             />
           )}
           {awaitingActivation && enrollmentState.error && (
@@ -331,7 +338,7 @@ export default function PaymentResultPage() {
                 {activating
                   ? t('Đang kích hoạt...')
                   : provider === 'VNPAY'
-                    ? t(isPro ? 'Thử kích hoạt Pro' : 'Thử kích hoạt khóa học')
+                    ? t(isGem ? 'Thử cộng kim cương' : isPro ? 'Thử kích hoạt Pro' : 'Thử kích hoạt khóa học')
                     : t('Kiểm tra lại quyền học')}{' '}
                 <RefreshOutlined sx={{ fontSize: 17 }} />
               </button>

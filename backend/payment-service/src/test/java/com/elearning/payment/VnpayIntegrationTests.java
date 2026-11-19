@@ -140,6 +140,36 @@ class VnpayIntegrationTests {
     }
 
     @Test
+    void gemCheckoutUsesServerPriceAndCreditsWalletOnlyAfterSuccessfulActivation() throws Exception {
+        String key = UUID.randomUUID().toString();
+        String body = mapper.writeValueAsString(Map.of(
+            "packageCode", "GEM_500", "provider", "VNPAY", "idempotencyKey", key
+        ));
+        var checkout = request(BASE + "/gem/checkout", token(ownerId, "USER"), "POST", body);
+        assertThat(checkout.statusCode()).isEqualTo(200);
+        JsonNode data = mapper.readTree(checkout.body()).path("data");
+        String orderCode = data.path("orderCode").asString();
+        assertThat(data.path("order").path("productType").asString()).isEqualTo("GEM_TOPUP");
+        assertThat(data.path("order").path("totalAmount").asInt()).isEqualTo(45000);
+        assertThat(data.path("order").path("items").get(0).path("courseId").isNull()).isTrue();
+        var replay = request(BASE + "/gem/checkout", token(ownerId, "USER"), "POST", body);
+        assertThat(mapper.readTree(replay.body()).path("data").path("orderCode").asString()).isEqualTo(orderCode);
+        assertThat(request(BASE + "/gem/checkout", token(ownerId, "USER"), "POST",
+            body.replace("GEM_500", "GEM_200")).statusCode()).isEqualTo(409);
+        assertThat(request(BASE + "/gem/checkout", token(ownerId, "USER"), "POST",
+            body.replace("GEM_500", "GEM_UNKNOWN").replace(key, UUID.randomUUID().toString())).statusCode()).isEqualTo(400);
+        then(learning).shouldHaveNoInteractions();
+
+        var fields = callback(orderCode, "00", "00");
+        fields.put("vnp_Amount", "4500000");
+        assertThat(ipn(signed(fields))).isEqualTo("00");
+        assertThat(ipn(signed(fields))).isEqualTo("02");
+        assertThat(core.getOrder(orderCode, ownerId, false).payment().enrollmentReady()).isTrue();
+        then(learning).should().grantGems(orderCode, ownerId, 500);
+        then(learning).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
     void signedProIpnUsesPlanAmountAndActivatesMembershipSnapshot() throws Exception {
         var response = request(
             BASE + "/pro/checkout",

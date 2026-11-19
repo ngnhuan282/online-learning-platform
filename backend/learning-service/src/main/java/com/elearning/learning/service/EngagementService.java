@@ -87,6 +87,7 @@ public class EngagementService {
         reconcileFrozenDays(userId, today);
         Profile profile = profile(userId);
         boolean firstActivityToday = !today.equals(profile.lastDate());
+        int dailyGems = firstActivityToday ? rules.settings().dailyGems() : 0;
         int streak = !firstActivityToday
             ? profile.streak()
             : profile.streak() > 0 && today.minusDays(1).equals(profile.through())
@@ -94,11 +95,12 @@ public class EngagementService {
               : 1;
         jdbc.update(
             """
-            INSERT INTO learning_activity_days (user_id, activity_date) VALUES (?, ?)
+            INSERT INTO learning_activity_days (user_id, activity_date, gems_awarded) VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE activity_count = activity_count + 1
             """,
             userId,
-            today
+            today,
+            dailyGems
         );
         jdbc.update(
             """
@@ -109,7 +111,7 @@ public class EngagementService {
             Math.max(streak, profile.longest()),
             today,
             today,
-            firstActivityToday ? rules.settings().dailyGems() : 0,
+            dailyGems,
             userId
         );
         long count = jdbc.queryForObject(

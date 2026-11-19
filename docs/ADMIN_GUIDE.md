@@ -46,7 +46,7 @@ Admin được chuyển đến `http://localhost:5173/admin`. Tài khoản thư�
 | `/admin/notifications` | Xem lịch sử thông báo; gửi thông báo khi có quyền quản lý |
 | `/admin/courses` | Trang quản lý khóa học hiện có, dùng API admin để lấy cả khóa nháp; nút tạo/xóa hiện theo quyền |
 
-Admin có sidebar, topbar và footer riêng, không sử dụng header của giao diện học viên. `/admin/analytics` chuyển về tổng quan mới.
+Admin có sidebar, topbar và footer riêng, không sử dụng header của giao diện học viên. `/admin/analytics` chuyển về trang Thống kê tại `/admin/statistics`.
 
 Nhấn avatar ở góc phải để mở menu **Hồ sơ cá nhân** và **Đăng xuất**. Trong admin, Hồ sơ mở `/admin/profile`; ở giao diện người dùng, Hồ sơ mở `/account`. Menu thay các nút Dashboard/Tài khoản/Đăng xuất trước đây trên header người dùng. Nhấn Escape hoặc bên ngoài để đóng menu; đăng xuất thu hồi phiên qua AuthContext hiện có rồi đưa về trang đăng nhập.
 
@@ -93,8 +93,19 @@ Tất cả request từ frontend đi qua Gateway `/api/v1` và dùng Axios/AuthC
 | `GET /admin/courses`, `GET /admin/courses/overview` | `COURSE_VIEW` |
 | `GET /learning/admin/overview` | `LEARNING_REPORT_VIEW` |
 | `GET /payments/admin/analytics` | `PAYMENT_REPORT_VIEW` |
+| `GET /learning/admin/analytics/pro` | `PRO_MEMBER_VIEW`. Chi tiết mã đã che yêu cầu thêm `PRO_CODE_VIEW` |
+| `GET /learning/admin/analytics/gems` | `ENGAGEMENT_VIEW` |
+| `GET /learning/admin/analytics/shop` | `SHOP_VIEW` |
 
 ADMIN có toàn bộ quyền. API tạo/sửa/xóa khóa học và danh mục cũng chấp nhận quyền `COURSE_*`/`CATEGORY_*` tương ứng. Catalog chỉ chứa quyền có API thực tế. Nhập Excel, đặt lại mật khẩu quản trị, dashboard AI và những chức năng chưa có backend không được tạo thành nút giả.
+
+## Thống kê Pro, Gem và Shop
+
+Mở **Thống kê** bằng quyền `DASHBOARD_VIEW` và chọn báo cáo được cấp quyền theo bảng trên. Mặc định báo cáo lấy 30 ngày gần nhất, kể cả hôm nay theo giờ Việt Nam (UTC+7). Có thể gửi cả `from` và `to` dạng `YYYY-MM-DD` để chọn hai đầu mốc, tối đa 90 ngày. Kỳ trước kết thúc ngay trước kỳ hiện tại và có cùng số ngày. Các chỉ số trong mục **Số liệu hiện tại** phản ánh thời điểm tải. Tệp Excel chứa khoảng ngày, số liệu so sánh và các bảng chi tiết đang hiển thị.
+
+- **Pro** hiển thị trạng thái thành viên, lượt cấp lần đầu và các lượt cấp tiếp theo theo nguồn. Lượt cấp đã thu hồi được ghi riêng theo ngày thu hồi. Phần mã hiển thị lượt phát hành, lượt đổi và tối đa 20 mã gần đây được che.
+- **Gem** hiển thị số dư, Gem nạp đã ghi có, thưởng, điều chỉnh và chi tiêu. Migration Learning `V18` lưu số Gem thưởng theo ngày cho giao dịch mới. Báo cáo đếm số ngày học cũ chưa ghi nhận phần thưởng và để chúng ngoài tổng Gem cộng đã ghi nhận.
+- **Shop** hiển thị lượt mua được xác nhận, người mua, Gem đã chi, tình trạng sở hữu và trang bị, cùng lượt mua và lượt sử dụng Streak Freeze. `V18` lưu kết quả cấp vật phẩm cho biên nhận mới. Biên nhận khung và ảnh nền 0 Gem từ trước migration có kết quả cấp chưa xác định và được đếm riêng. Biên nhận Streak Freeze xác nhận lượt cấp kể cả khi giá bằng 0.
 
 ## Quản trị cửa hàng, học tập và Pro
 

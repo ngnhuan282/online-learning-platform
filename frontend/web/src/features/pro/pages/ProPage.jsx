@@ -145,7 +145,6 @@ export default function ProPage() {
                   disabled={busy}
                   onClick={() => {
                     setSelected(item.code);
-                    intent.current = null;
                   }}
                 >
                   {planLabel(item)}

@@ -1,10 +1,13 @@
 package com.elearning.learning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.elearning.learning.dto.CommunityModels.*;
+import com.elearning.learning.common.exception.AppException;
+import com.elearning.learning.common.exception.ErrorCode;
 import com.elearning.learning.dto.ShopModels.PurchaseRequest;
 import com.elearning.learning.service.CommunityService;
 import com.elearning.learning.service.CurrentProfileClient;
@@ -166,6 +169,31 @@ class EngagementCommunityIntegrationTests {
         assertThat(november.me().rank()).isEqualTo(2);
         assertThat(engagement.leaderboard(103, "month", "2026-10", 0, 20).content()).hasSize(1);
         assertThat(engagement.leaderboard(103, "all", null, 0, 20).totalElements()).isEqualTo(3);
+    }
+
+    @Test
+    void topicSearchAndOwnerEditsPreserveAcceptedAnswers() {
+        var topic = community.topics().getFirst();
+        long post = community.create(101, new PostRequest(topic.id(), "QUESTION", "Prefix study question", "Need help"), null).id();
+        long other = community.create(102, new PostRequest(topic.id(), "DISCUSSION", "Prefix study discussion", "Ideas"), null).id();
+        assertThat(community.posts(topic.id(), "STUDY", "QUESTION", true, 0, 10).content())
+            .extracting(Post::id).containsExactly(post);
+        assertThat(community.posts(topic.id(), "prefix", null, false, 0, 1).totalElements()).isEqualTo(2);
+        var comment = community.addComment(102, false, post, new CommentRequest("Suggested answer"), null);
+        assertThat(community.comments(post, 0, 1).content()).extracting(Comment::id).containsExactly(comment.id());
+        assertThat(community.updateComment(102, false, post, comment.id(), new CommentRequest(" Corrected answer ")).body())
+            .isEqualTo("Corrected answer");
+        community.acceptAnswer(101, false, post, comment.id());
+        assertThat(community.posts(topic.id(), "prefix", "QUESTION", true, 0, 10).content()).isEmpty();
+        assertThatThrownBy(() ->
+            community.update(101, false, post, new PostRequest(topic.id(), "DISCUSSION", "Wrong type", "Body"))
+        ).isInstanceOf(AppException.class).extracting("errorCode").isEqualTo(ErrorCode.CONFLICT);
+        assertThat(community.update(101, false, post, new PostRequest(topic.id(), "QUESTION", " Updated title ", "Body")).title())
+            .isEqualTo("Updated title");
+        assertThat(community.get(post).acceptedCommentId()).isEqualTo(comment.id());
+        community.delete(102, false, other);
+        assertThat(community.posts(topic.id(), null, null, false, 0, 10).content())
+            .extracting(Post::id).containsExactly(post);
     }
 
     @Test

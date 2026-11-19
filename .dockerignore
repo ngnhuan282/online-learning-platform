@@ -3,6 +3,7 @@
 .tmp
 **/target
 **/node_modules
+**/*.log
 **/qa.local
 **/.env
 **/.env.*

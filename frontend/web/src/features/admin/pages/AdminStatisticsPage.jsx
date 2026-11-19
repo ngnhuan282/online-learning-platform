@@ -1,156 +1,66 @@
-import { useState, useRef } from 'react';
+import { useCallback, useState } from 'react';
 import {
   AttachMoney,
-  PeopleAltOutlined,
-  MenuBook,
-  EmojiEventsOutlined,
-  WorkspacePremium,
   DiamondOutlined,
+  EmojiEventsOutlined,
+  MenuBook,
+  PeopleAltOutlined,
   StorefrontOutlined,
+  WorkspacePremium,
 } from '@mui/icons-material';
-import AnalyticsFilterBar from '../components/analytics/AnalyticsFilterBar';
 import RevenueAnalyticsTab from '../analytics/tabs/RevenueAnalyticsTab';
 import LearnersAnalyticsTab from '../analytics/tabs/LearnersAnalyticsTab';
-import LearningProgressTab from '../analytics/tabs/LearningProgressTab';
-import CoursePerformanceTab from '../analytics/tabs/CoursePerformanceTab';
-import ProMembershipTab from '../analytics/tabs/ProMembershipTab';
-import GemAnalyticsTab from '../analytics/tabs/GemAnalyticsTab';
-import ShopAnalyticsTab from '../analytics/tabs/ShopAnalyticsTab';
-import { getPresetRange } from '../analytics/analyticsUtils';
+import OverviewAnalyticsTab from '../analytics/tabs/OverviewAnalyticsTab';
+import CommerceAnalyticsTab from '../analytics/tabs/CommerceAnalyticsTab';
+import { commerceReports } from '../analytics/commerceReports';
+import useAuth from '../../auth/hooks/useAuth';
+import { can } from '../utils/adminUtils';
 import '../analytics/analytics.css';
 
-const TABS = [
-  { id: 'revenue', label: 'Doanh thu & Thanh toán', icon: AttachMoney, phase: 1 },
-  { id: 'learners', label: 'Học viên & Tăng trưởng', icon: PeopleAltOutlined, phase: 1 },
-  { id: 'progress', label: 'Tiến độ & Kết quả học', icon: EmojiEventsOutlined, phase: 2 },
-  { id: 'courses', label: 'Hiệu quả Khóa học', icon: MenuBook, phase: 2 },
-  { id: 'pro', label: 'Gói Pro & Mã kích hoạt', icon: WorkspacePremium, phase: 3 },
-  { id: 'gems', label: 'Kinh tế Gem', icon: DiamondOutlined, phase: 3 },
-  { id: 'shop', label: 'Cửa hàng & Kho đồ', icon: StorefrontOutlined, phase: 3 },
+const tabs = [
+  ['revenue', 'Doanh thu & Thanh toán', AttachMoney, 'PAYMENT_REPORT_VIEW'],
+  ['learners', 'Học viên & Tăng trưởng', PeopleAltOutlined, 'DASHBOARD_VIEW'],
+  ['progress', 'Tiến độ & Kết quả học', EmojiEventsOutlined, 'LEARNING_REPORT_VIEW'],
+  ['courses', 'Hiệu quả Khóa học', MenuBook, 'COURSE_VIEW'],
+  ['pro', 'Gói Pro & Mã kích hoạt', WorkspacePremium, 'PRO_MEMBER_VIEW'],
+  ['gems', 'Kinh tế Gem', DiamondOutlined, 'ENGAGEMENT_VIEW'],
+  ['shop', 'Cửa hàng & Kho đồ', StorefrontOutlined, 'SHOP_VIEW'],
 ];
 
 export default function AdminStatisticsPage() {
-  const [activeTab, setActiveTab] = useState('progress'); // Default to Phase 2 or Revenue
-  const [range, setRange] = useState(() => getPresetRange('30d'));
-  const [compare, setCompare] = useState(true);
-  const exportHandlerRef = useRef(null);
-
-  const handleExport = () => {
-    if (exportHandlerRef.current) {
-      exportHandlerRef.current();
-    }
-  };
+  const { user } = useAuth();
+  const [selectedTab, setSelectedTab] = useState('revenue');
+  const [exportReport, setExportReport] = useState(null);
+  const onExportReady = useCallback(handler => setExportReport(() => handler), []);
+  const visibleTabs = tabs.filter(([, , , permission]) => can(user, permission));
+  const activeTab = visibleTabs.some(([id]) => id === selectedTab) ? selectedTab : visibleTabs[0]?.[0];
+  const hasSummary = activeTab === 'progress' || activeTab === 'courses';
 
   return (
     <div className="analytics-container">
-      {/* Page Header */}
-      <div>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>
-          📊 Thống kê & Báo cáo
-        </h1>
-        <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>
-          Theo dõi tổng quan tài chính, tăng trưởng người dùng, tiến độ học tập và hiệu quả các khóa học
-        </p>
-      </div>
-
-      {/* Tabs Navigation */}
+      <h1>Thống kê & Báo cáo</h1>
       <nav className="analytics-nav-tabs" aria-label="Phân hệ thống kê">
-        {TABS.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              className={`analytics-tab-btn ${isActive ? 'is-active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <Icon style={{ fontSize: 18 }} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+        {visibleTabs.map(([id, label, Icon]) => (
+          <button
+            key={id}
+            type="button"
+            className={`analytics-tab-btn${activeTab === id ? ' is-active' : ''}`}
+            aria-pressed={activeTab === id}
+            onClick={() => setSelectedTab(id)}
+          >
+            <Icon fontSize="small" />
+            {label}
+          </button>
+        ))}
       </nav>
-
-      {/* Filter Bar */}
-      <AnalyticsFilterBar
-        range={range}
-        onRangeChange={setRange}
-        compare={compare}
-        onCompareChange={setCompare}
-        onExport={handleExport}
-        exportLabel="Xuất Excel (.xlsx)"
-      />
-
-      {/* Tab Panels */}
-      {activeTab === 'revenue' && (
-        <RevenueAnalyticsTab
-          range={range}
-          compare={compare}
-          onExportReady={fn => {
-            exportHandlerRef.current = fn;
-          }}
-        />
+      {exportReport && (
+        <button type="button" className="button button-soft" onClick={exportReport}>Xuất Excel</button>
       )}
-
-      {activeTab === 'learners' && (
-        <LearnersAnalyticsTab
-          range={range}
-          compare={compare}
-          onExportReady={fn => {
-            exportHandlerRef.current = fn;
-          }}
-        />
-      )}
-
-      {activeTab === 'progress' && (
-        <LearningProgressTab
-          range={range}
-          compare={compare}
-          onExportReady={fn => {
-            exportHandlerRef.current = fn;
-          }}
-        />
-      )}
-
-      {activeTab === 'courses' && (
-        <CoursePerformanceTab
-          range={range}
-          compare={compare}
-          onExportReady={fn => {
-            exportHandlerRef.current = fn;
-          }}
-        />
-      )}
-
-      {activeTab === 'pro' && (
-        <ProMembershipTab
-          range={range}
-          compare={compare}
-          onExportReady={fn => {
-            exportHandlerRef.current = fn;
-          }}
-        />
-      )}
-
-      {activeTab === 'gems' && (
-        <GemAnalyticsTab
-          range={range}
-          compare={compare}
-          onExportReady={fn => {
-            exportHandlerRef.current = fn;
-          }}
-        />
-      )}
-
-      {activeTab === 'shop' && (
-        <ShopAnalyticsTab
-          range={range}
-          compare={compare}
-          onExportReady={fn => {
-            exportHandlerRef.current = fn;
-          }}
-        />
+      {activeTab === 'revenue' && <RevenueAnalyticsTab onExportReady={onExportReady} />}
+      {activeTab === 'learners' && <LearnersAnalyticsTab onExportReady={onExportReady} />}
+      {hasSummary && <OverviewAnalyticsTab key={activeTab} report={activeTab} />}
+      {commerceReports[activeTab] && (
+        <CommerceAnalyticsTab key={activeTab} report={activeTab} onExportReady={onExportReady} />
       )}
     </div>
   );

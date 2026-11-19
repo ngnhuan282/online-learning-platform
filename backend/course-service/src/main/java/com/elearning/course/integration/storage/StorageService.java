@@ -18,6 +18,6 @@ public interface StorageService {
     Resource loadAsResource(String objectKey);
 
     default boolean verifySignedToken(String objectKey, Long expires, String token) {
-        return true;
+        return false;
     }
 }

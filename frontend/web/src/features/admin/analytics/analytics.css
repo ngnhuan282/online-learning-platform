@@ -254,6 +254,30 @@
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
 }
 
+.commerce-analytics-report {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.commerce-analytics-report .analytics-section-card > h2 {
+  color: #0f172a;
+  font-size: 17px;
+  margin: 0 0 12px;
+}
+
+.commerce-analytics-report .analytics-section-card > p,
+.commerce-analytics-report .analytics-filter-card > span {
+  color: #475569;
+  font-size: 13px;
+}
+
+.commerce-analytics-report .analytics-filter-card > p {
+  color: #991b1b;
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .analytics-card-header {
   display: flex;
   justify-content: space-between;

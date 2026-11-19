@@ -22,7 +22,7 @@ export default function TrendChart({
     return max > 0 ? max : 1;
   }, [series, compare]);
 
-  if (!series || series.length === 0) {
+  if (!series.some(point => Number(point.current ?? point.amount ?? point.count ?? 0) > 0 || (compare && Number(point.previous) > 0))) {
     return <p style={{ textAlign: 'center', color: '#64748b', padding: '40px 0' }}>{emptyMessage}</p>;
   }
 
@@ -48,8 +48,9 @@ export default function TrendChart({
           const curVal = Number(item.current ?? item.amount ?? item.count ?? 0);
           const prevVal = Number(item.previous ?? 0);
 
-          const curHeight = Math.max(4, Math.round((curVal / maxVal) * BAR_MAX_HEIGHT));
-          const prevHeight = compare ? Math.max(4, Math.round((prevVal / maxVal) * BAR_MAX_HEIGHT)) : 0;
+          const height = value => value > 0 ? Math.max(4, Math.round((value / maxVal) * BAR_MAX_HEIGHT)) : 0;
+          const curHeight = height(curVal);
+          const prevHeight = compare ? height(prevVal) : 0;
 
           return (
             <div key={item.label || idx} className="analytics-bar-col" title={`${item.label}: ${valueFormatter(curVal)}`}>

@@ -11,6 +11,4 @@ export const shopApi = {
   state: options => axiosClient.get(base, options),
   purchase: (itemCode, requestId) => update(axiosClient.post(`${base}/purchases`, { itemCode, requestId })),
   equip: (itemType, itemCode) => update(axiosClient.post(`${base}/equip`, { itemType, itemCode })),
-  topUp: ({ gems, packageCode, amount, paymentMethod }) =>
-    update(axiosClient.post(`${base}/topup`, { gems, packageCode, amount, paymentMethod })),
 };

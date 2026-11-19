@@ -83,6 +83,9 @@ class AiChatIntegrationTests {
     AiConversationStore store;
 
     @Autowired
+    com.elearning.ai.service.LearningContextClient learningContext;
+
+    @Autowired
     com.elearning.ai.service.AiUsageLimiter usageLimiter;
 
     private final HttpClient client = HttpClient.newHttpClient();
@@ -144,6 +147,9 @@ class AiChatIntegrationTests {
                             proActive.get() +
                             "}}";
                         case "/api/v1/learning/courses/42" -> "{\"success\":true,\"data\":{\"courseId\":42}}";
+                        case "/api/v1/learning/courses/43" -> "{\"success\":true,\"data\":{\"courseId\":42}}";
+                        case "/api/v1/learning/courses/44" -> "{\"success\":true,\"data\":{\"courseId\":44}}";
+                        case "/api/v1/courses/44" -> "{\"success\":true,\"data\":{\"id\":44,\"status\":\"DRAFT\"}}";
                         case "/api/v1/courses/42" -> "{\"success\":true,\"data\":{\"id\":42,\"status\":\"PUBLISHED\",\"title\":\"English course\",\"description\":\"Grammar\"}}";
                         case "/api/v1/courses/42/sections" -> contextSections.get() != null
                             ? contextSections.get()
@@ -552,6 +558,72 @@ class AiChatIntegrationTests {
         contextStatus.set(503);
         assertThat(send(id, "request-outage").statusCode()).isEqualTo(503);
         assertThat(calls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void contextResponsesFailClosedWhenUpstreamReturnsMalformedOrMismatchedData() throws Exception {
+        String authorization = "Bearer " + token(1, "USER");
+        assertThat(learningContext.resolve(42L, null, authorization).title()).isEqualTo("English course");
+        assertThat(request(BASE, token(1, "USER"), "{\"courseId\":43}").statusCode()).isEqualTo(503);
+        assertThat(request(BASE, token(1, "USER"), "{\"courseId\":44}").statusCode()).isEqualTo(404);
+        assertThatThrownBy(() -> learningContext.resolve(42L, 9L, null))
+            .isInstanceOf(AppException.class).extracting("errorCode").isEqualTo(com.elearning.ai.common.exception.ErrorCode.UNAUTHORIZED);
+        for (String bad : List.of(
+            "{\"success\":true,\"data\":null}",
+            "{\"success\":false}",
+            "{\"success\":true,\"data\":[{\"id\":3,\"courseId\":99,\"lessons\":[]}]}",
+            "{\"success\":true,\"data\":[{\"id\":3,\"courseId\":42,\"lessons\":[{\"id\":9,\"sectionId\":99}]}]}",
+            "not json"
+        )) {
+            contextSections.set(bad);
+            assertThatThrownBy(() -> learningContext.resolve(42L, 9L, authorization))
+                .isInstanceOf(AppException.class).extracting("errorCode").isEqualTo(com.elearning.ai.common.exception.ErrorCode.AI_CONTEXT_UNAVAILABLE);
+        }
+        contextStatus.set(401);
+        assertThat(request(BASE, token(1, "USER"), "{\"courseId\":42}").statusCode()).isEqualTo(401);
+        contextStatus.set(404);
+        assertThat(request(BASE, token(1, "USER"), "{\"courseId\":42}").statusCode()).isEqualTo(404);
+        assertThat(calls.get()).isZero();
+    }
+
+    @Test
+    void conversationEndpointReturnsOwnedDataAndSafeParameterErrors() throws Exception {
+        long id = create("{}");
+        var detail = request(BASE + "/" + id, token(1, "USER"), null);
+        assertThat(detail.statusCode()).isEqualTo(200);
+        assertThat(mapper.readTree(detail.body()).path("data").path("id").asLong()).isEqualTo(id);
+        assertThat(request(BASE + "/" + id, token(2, "USER"), null).statusCode()).isEqualTo(404);
+        var invalid = request(BASE + "?page=invalid-page-value", token(1, "USER"), null);
+        assertThat(invalid.statusCode()).isEqualTo(400);
+        assertThat(invalid.body()).contains("VALIDATION_ERROR", "page").doesNotContain("invalid-page-value");
+        assertThat(request(BASE + "/" + id, token(0, "USER"), null).statusCode()).isEqualTo(401);
+        var unsupportedMethod = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + BASE))
+            .header("Authorization", "Bearer " + token(1, "USER")).DELETE().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(unsupportedMethod.statusCode()).isEqualTo(405);
+        assertThat(unsupportedMethod.body()).contains("METHOD_NOT_ALLOWED");
+        var unsupportedContent = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + BASE))
+            .header("Authorization", "Bearer " + token(1, "USER")).header("Content-Type", "text/plain")
+            .POST(HttpRequest.BodyPublishers.ofString("test body")).build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(unsupportedContent.statusCode()).isEqualTo(415);
+        assertThat(unsupportedContent.body()).contains("UNSUPPORTED_MEDIA_TYPE");
+    }
+
+    @Test
+    void oversizedHistoryDropsTheOldestTurnWhileRetainingItForTheOwner() throws Exception {
+        long id = create("{}");
+        String longAnswer = "previous lesson explanation ".repeat(450);
+        providerBody.set(mapper.writeValueAsString(Map.of("candidates", List.of(Map.of(
+            "content", Map.of("parts", List.of(Map.of("text", longAnswer))), "finishReason", "STOP"
+        )))));
+        assertThat(send(id, "long-history-one").statusCode()).isEqualTo(200);
+        providerBody.set(null);
+        assertThat(send(id, "long-history-two").statusCode()).isEqualTo(200);
+        assertThat(providerRequest.get()).doesNotContain("previous lesson explanation");
+        var history = request(BASE + "/" + id + "/messages", token(1, "USER"), null);
+        assertThat(history.statusCode()).isEqualTo(200);
+        assertThat(history.body()).contains("previous lesson explanation");
+        providerStatus.set(504);
+        assertThat(send(id, "upstream-timeout").body()).contains("AI_TIMEOUT");
     }
 
     @Test

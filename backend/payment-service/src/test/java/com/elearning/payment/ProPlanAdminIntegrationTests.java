@@ -169,6 +169,42 @@ class ProPlanAdminIntegrationTests {
     }
 
     @Test
+    void auditShowsCommittedPlanChangesOnlyToAuthorizedStaff() throws Exception {
+        String admin = token("ADMIN");
+        assertThat(request("PUT", "/pro/plans/PRO_MONTH", admin, update(65000, true, 0)).statusCode()).isEqualTo(200);
+        assertThat(request("GET", "/audit", token("SUPPORT", "ADMIN_ACCESS", "PRO_PLAN_VIEW"), null).statusCode()).isEqualTo(403);
+        var audit = request("GET", "/audit", token("SUPPORT", "ADMIN_ACCESS", "AUDIT_VIEW"), null);
+        assertThat(audit.statusCode()).isEqualTo(200);
+        var entry = json.readTree(audit.body()).path("data").get(0);
+        assertThat(entry.path("actorId").asLong()).isEqualTo(91);
+        assertThat(entry.path("action").asString()).isEqualTo("PRO_PLAN_UPDATE");
+        assertThat(entry.path("target").asString()).isEqualTo("PRO_MONTH");
+        assertThat(entry.path("description").asString()).contains("65000", "new price policy");
+        assertThat(entry.path("createdAt").asString()).isNotBlank();
+        assertThat(request("DELETE", "/pro/plans/PRO_MONTH", admin, Map.of("version", 0, "reason", "stale")).statusCode())
+            .isEqualTo(409);
+        assertThat(request("DELETE", "/pro/plans/PRO_UNKNOWN", admin, Map.of("version", 0, "reason", "missing")).statusCode())
+            .isEqualTo(404);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_admin_audit", Long.class)).isEqualTo(1);
+    }
+
+    @Test
+    void createRejectsUnsupportedDurationFractionalCurrencyAndDuplicateCode() throws Exception {
+        String admin = token("ADMIN");
+        var candidate = new java.util.HashMap<String, Object>(Map.of(
+            "code", "PRO_MONTH", "name", "Monthly", "durationMonths", 2,
+            "price", 50000, "active", true, "reason", "test catalog constraints"
+        ));
+        assertThat(request("POST", "/pro/plans", admin, candidate).statusCode()).isEqualTo(400);
+        candidate.put("durationMonths", 1);
+        candidate.put("price", new java.math.BigDecimal("50000.25"));
+        assertThat(request("POST", "/pro/plans", admin, candidate).statusCode()).isEqualTo(400);
+        candidate.put("price", 50000);
+        assertThat(request("POST", "/pro/plans", admin, candidate).statusCode()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_admin_audit", Long.class)).isZero();
+    }
+
+    @Test
     void readAndUpdatePermissionsAreDistinctAndLearnerCannotUseClaimedPermissions() throws Exception {
         assertThat(
             request("GET", "/pro/plans", token("USER", "ADMIN_ACCESS", "PRO_PLAN_VIEW"), null).statusCode()

@@ -167,6 +167,24 @@ test('a late confirmed payment shows success despite the expired checkout deadli
   assert.doesNotMatch(document.body.textContent, /Đơn đã hết hạn thanh toán/);
 });
 
+test('gem payment waits for wallet activation and retries the paid order without charging again', async () => {
+  const pending = { ...order('SUCCESS', { enrollmentReady: false }), productType: 'GEM_TOPUP', items: [{ courseTitle: '500 Kim Cương' }] };
+  const credited = { ...pending, payment: { ...pending.payment, enrollmentReady: true } };
+  const activations = [];
+  await mount(pending, undefined, async config => {
+    if (config.url.endsWith('/activation')) activations.push(config.url);
+    return { config, status: 200, headers: {}, data: { success: true, data: activations.length ? credited : pending } };
+  });
+  assert.match(document.body.textContent, /Đang chờ cộng kim cương/);
+  assert.equal(document.querySelector('a[href="/shop"]'), null);
+  const retry = [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Thử cộng kim cương');
+  assert.ok(retry);
+  await act(async () => retry.click());
+  assert.deepEqual(activations, ['/api/v1/payments/orders/LS-PAY-TEST-1/activation']);
+  assert.ok(document.querySelector('a[href="/shop"]'));
+  assert.match(document.body.textContent, /Kim cương đã được cộng/);
+});
+
 test('history shows expiry and its filter sends no invented provider status', async () => {
   const seen = [];
   const history = {

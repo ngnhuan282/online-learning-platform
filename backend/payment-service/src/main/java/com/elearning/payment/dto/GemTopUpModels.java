@@ -3,7 +3,6 @@ package com.elearning.payment.dto;
 import com.elearning.payment.entity.enums.PaymentProvider;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Map;
 
 public final class GemTopUpModels {
@@ -20,12 +19,6 @@ public final class GemTopUpModels {
 
     public static Package getPackage(String code) {
         return PACKAGES.get(code);
-    }
-
-    public static List<Package> listPackages() {
-        return PACKAGES.values().stream()
-            .sorted((a, b) -> a.price().compareTo(b.price()))
-            .toList();
     }
 
     public record CheckoutRequest(

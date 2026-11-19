@@ -1,10 +1,15 @@
 import axiosClient from '../../../shared/apis/axiosClient';
 
 export const adminApi = {
-  overview: () => axiosClient.get('/api/v1/admin/overview'),
-  courses: () => axiosClient.get('/api/v1/admin/courses/overview'),
-  learning: () => axiosClient.get('/api/v1/learning/admin/overview'),
-  payments: () => axiosClient.get('/api/v1/payments/admin/analytics'),
+  overview: options => axiosClient.get('/api/v1/admin/overview', { signal: options?.signal }),
+  courses: options => axiosClient.get('/api/v1/admin/courses/overview', { signal: options?.signal }),
+  learning: options => axiosClient.get('/api/v1/learning/admin/overview', { signal: options?.signal }),
+  payments: options => axiosClient.get('/api/v1/payments/admin/analytics', { signal: options?.signal }),
+  commerceAnalytics: (report, range, options) =>
+    axiosClient.get(`/api/v1/learning/admin/analytics/${report}`, {
+      params: range ?? undefined,
+      signal: options?.signal,
+    }),
   roles: () => axiosClient.get('/api/v1/admin/roles'),
   permissions: () => axiosClient.get('/api/v1/admin/permissions'),
   createRole: payload => axiosClient.post('/api/v1/admin/roles', payload),

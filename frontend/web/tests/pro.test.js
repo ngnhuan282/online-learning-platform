@@ -32,6 +32,7 @@ const server = await createServer({
 });
 const load = name => server.ssrLoadModule('/src/' + name);
 const { default: ProPage } = await load('features/pro/pages/ProPage.jsx');
+const { default: ProCheckoutPage } = await load('features/payment/pages/ProCheckoutPage.jsx');
 const { default: AdminProCodesPage } = await load('features/pro/pages/AdminProCodesPage.jsx');
 const { default: ProUpgradeButton } = await load('shared/components/ProUpgradeButton.jsx');
 const { default: LanguageSwitcher } = await load('shared/components/LanguageSwitcher.jsx');
@@ -86,6 +87,7 @@ async function render(path = '/pro', membership = { userId: 1, active: false }) 
                 Routes,
                 null,
                 h(Route, { path: '/pro', element: h(ProPage) }),
+                h(Route, { path: '/payment/pro-checkout', element: h(ProCheckoutPage) }),
                 h(Route, { path: '/admin/pro-codes', element: h(AdminProCodesPage) }),
                 h(Route, { path: '/payment/mock', element: h('p', null, 'Mock checkout') }),
               ),
@@ -150,11 +152,13 @@ test('Pro uses the three server prices, changes duration and translates without 
   assert.match(document.querySelector('.pro-price-block strong').textContent, /50.000/);
   await click('3 tháng');
   assert.match(document.querySelector('.pro-price-block strong').textContent, /120.000/);
-  assert.match(document.querySelector('.pro-payment-method').textContent, /Không phát sinh thanh toán thật/);
   await act(async () => document.querySelector('.language-switcher').click());
   await act(async () => document.querySelector('.language-menu-paper [lang="en"]').click());
   assert.match(document.body.textContent, /Choose the right plan/);
   assert.equal(document.querySelector('.pro-periods [aria-pressed=true]').textContent, '3 months');
+  await click('Subscribe now');
+  assert.match(document.querySelector('.payment-method-list').textContent, /Simulated payment/);
+  assert.match(document.querySelector('.checkout-total').textContent, /120,000/);
 });
 
 test('Pro checkout retries the same identity and sends plan only with no client amount or user ID', async () => {
@@ -170,10 +174,10 @@ test('Pro checkout retries the same identity and sends plan only with no client 
   await render();
   await click('Đăng ký ngay');
   await click('Tiếp tục thanh toán');
-  assert.ok(document.querySelector('[role=dialog] [role=alert]'));
-  await click('Tiếp tục thanh toán');
-  assert.equal(button('Đang xử lý…').disabled, true);
-  await click('Đang xử lý…');
+  assert.ok(document.querySelector('.checkout-error[role=alert]'));
+  await click('Thử lại thanh toán');
+  assert.equal(button('Đang tạo giao dịch...').disabled, true);
+  await click('Đang tạo giao dịch...');
   assert.equal(requests.length, 2);
   assert.equal(requests[0].idempotencyKey, requests[1].idempotencyKey);
   assert.equal(requests[0].planCode, 'PRO_YEAR');
@@ -208,9 +212,10 @@ test('activation reports unavailable codes and refreshes membership after a vali
 test('unavailable payment methods disable checkout while activation remains available', async () => {
   paymentApi.getMethods = async () => ({ data: [] });
   await render();
-  assert.equal(button('Đăng ký ngay').disabled, true);
   await input(document.getElementById('pro-code'), 'CCG-valid-code');
   assert.equal(button('Kích hoạt').disabled, false);
+  await click('Đăng ký ngay');
+  assert.equal(button('Tiếp tục thanh toán').disabled, true);
   assert.match(document.body.textContent, /Hiện chưa có phương thức thanh toán khả dụng/);
 });
 

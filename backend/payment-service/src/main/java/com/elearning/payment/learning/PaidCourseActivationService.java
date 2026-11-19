@@ -2,6 +2,7 @@ package com.elearning.payment.learning;
 
 import com.elearning.payment.common.exception.AppException;
 import com.elearning.payment.common.exception.ErrorCode;
+import com.elearning.payment.entity.CourseOrder;
 import com.elearning.payment.entity.OrderItem;
 import com.elearning.payment.entity.enums.PaymentProvider;
 import com.elearning.payment.entity.enums.PaymentStatus;
@@ -43,7 +44,18 @@ public class PaidCourseActivationService {
             throw new AppException(ErrorCode.CONFLICT);
         }
         if (payment.getEnrollmentActivatedAt() != null) return;
-        if (order.isPro()) {
+        fulfill(order);
+        payment.markEnrollmentActivated();
+    }
+
+    public void fulfill(CourseOrder order) {
+        String orderCode = order.getOrderCode();
+        if (order.isGemTopUp()) {
+            if (order.getGemAmount() == null || order.getGemAmount() <= 0) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
+            learning.grantGems(orderCode, order.getUserId(), order.getGemAmount());
+        } else if (order.isPro()) {
             learning.grantPro(
                 orderCode,
                 order.getUserId(),
@@ -56,8 +68,8 @@ public class PaidCourseActivationService {
                 .stream()
                 .min(Comparator.comparing(OrderItem::getId))
                 .orElseThrow(() -> new AppException(ErrorCode.CONFLICT));
+            if (item.getCourseId() == null) throw new AppException(ErrorCode.CONFLICT);
             learning.enroll(orderCode, order.getUserId(), item.getCourseId());
         }
-        payment.markEnrollmentActivated();
     }
 }

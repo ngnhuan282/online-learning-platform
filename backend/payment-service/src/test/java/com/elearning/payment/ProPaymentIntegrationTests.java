@@ -14,7 +14,10 @@ import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,6 +118,47 @@ class ProPaymentIntegrationTests {
         assertThat(
             jdbc.queryForObject("SELECT total_amount FROM orders WHERE user_id=2", java.math.BigDecimal.class)
         ).isEqualByComparingTo("120000");
+    }
+
+    @Test
+    void concurrentGemCheckoutWithTheSameKeyKeepsOneOrderAndOnePackageSnapshot() throws Exception {
+        String key = UUID.randomUUID().toString();
+        String body = json.writeValueAsString(Map.of("packageCode", "GEM_200", "idempotencyKey", key));
+        var submitted = new CyclicBarrier(6);
+        var codes = new HashSet<String>();
+        try (var pool = Executors.newFixedThreadPool(6)) {
+            var tasks = java.util.stream.IntStream.range(0, 6)
+                .mapToObj(i -> pool.submit(() -> {
+                    submitted.await(10, TimeUnit.SECONDS);
+                    return request(7, false, "POST", "/gem/checkout", body);
+                }))
+                .toList();
+            for (var task : tasks) {
+                var response = task.get(20, TimeUnit.SECONDS);
+                assertThat(response.statusCode()).withFailMessage(response.body()).isEqualTo(200);
+                var data = json.readTree(response.body()).path("data");
+                codes.add(data.path("orderCode").asString());
+                assertThat(data.path("order").path("totalAmount").asInt()).isEqualTo(19000);
+            }
+        }
+        assertThat(codes).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT gem_amount FROM orders WHERE user_id=7", Integer.class))
+            .isEqualTo(200);
+        verifyNoInteractions(learning);
+        String orderCode = codes.iterator().next();
+        var confirmed = request(7, false, "POST", "/mock/orders/" + orderCode + "/complete", "{\"status\":\"SUCCESS\"}");
+        assertThat(confirmed.statusCode()).isEqualTo(200);
+        verify(learning).grantGems(orderCode, 7L, 200);
+    }
+
+    @Test
+    void invalidHistoryParametersAndUnsupportedMethodsUseThePublicErrorEnvelope() throws Exception {
+        var invalid = request(7, false, "GET", "/history?page=unparseable-secret-marker", null);
+        assertThat(invalid.statusCode()).isEqualTo(400);
+        assertThat(invalid.body()).contains("VALIDATION_ERROR", "page").doesNotContain("unparseable-secret-marker");
+        var unsupported = request(7, false, "PUT", "/history", null);
+        assertThat(unsupported.statusCode()).isEqualTo(405);
+        assertThat(unsupported.body()).contains("METHOD_NOT_ALLOWED");
     }
 
     @Test
