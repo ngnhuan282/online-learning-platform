@@ -12,27 +12,39 @@
 .analytics-nav-tabs {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   overflow-x: auto;
   padding: 4px;
   background: #f1f5f9;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
+  scrollbar-width: thin;
+}
+
+.analytics-nav-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.analytics-nav-tabs::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 .analytics-tab-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #475569;
   background: transparent;
   border: none;
   cursor: pointer;
   white-space: nowrap;
+  flex: 1 0 auto;
   transition: all 0.15s ease-in-out;
 }
 
@@ -283,15 +295,16 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 220px;
+  min-height: 200px;
 }
 
 .analytics-bars-wrapper {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 12px;
   height: 180px;
-  padding-top: 20px;
+  padding-top: 14px;
+  padding-bottom: 6px;
   border-bottom: 1px solid #e2e8f0;
   overflow-x: auto;
 }
@@ -302,9 +315,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100%;
   justify-content: flex-end;
+  height: 100%;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .analytics-bar-track {

@@ -131,6 +131,43 @@ public class LearningEnrollmentClient {
 
     private record ProData(Long userId) {}
 
+    public void grantGems(String orderCode, Long userId, int gems) {
+        try {
+            GemEnvelope response = client
+                .post()
+                .uri("/internal/v1/learning/gem-topup")
+                .header(INTERNAL_TOKEN_HEADER, internalToken)
+                .body(new GemGrant(orderCode, userId, gems))
+                .retrieve()
+                .onStatus(
+                    status -> status.value() == 409,
+                    (request, result) -> {
+                        throw new AppException(ErrorCode.CONFLICT);
+                    }
+                )
+                .onStatus(HttpStatusCode::isError, (request, result) -> {
+                    throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+                })
+                .body(GemEnvelope.class);
+            if (
+                response == null ||
+                !response.success() ||
+                response.data() == null ||
+                !userId.equals(response.data().userId())
+            ) {
+                throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+            }
+        } catch (RestClientException exception) {
+            throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+        }
+    }
+
+    private record GemGrant(String orderCode, Long userId, int gems) {}
+
+    private record GemEnvelope(boolean success, GemData data) {}
+
+    private record GemData(Long userId) {}
+
     private record EnrollmentEnvelope(boolean success, EnrollmentData data) {}
 
     private record EnrollmentData(Long courseId) {}

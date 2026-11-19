@@ -26,6 +26,8 @@ export default function TrendChart({
     return <p style={{ textAlign: 'center', color: '#64748b', padding: '40px 0' }}>{emptyMessage}</p>;
   }
 
+  const BAR_MAX_HEIGHT = 120;
+
   return (
     <div className="analytics-trend-chart">
       {compare && (
@@ -46,8 +48,8 @@ export default function TrendChart({
           const curVal = Number(item.current ?? item.amount ?? item.count ?? 0);
           const prevVal = Number(item.previous ?? 0);
 
-          const curHeight = Math.max(4, Math.round((curVal / maxVal) * 150));
-          const prevHeight = compare ? Math.max(4, Math.round((prevVal / maxVal) * 150)) : 0;
+          const curHeight = Math.max(4, Math.round((curVal / maxVal) * BAR_MAX_HEIGHT));
+          const prevHeight = compare ? Math.max(4, Math.round((prevVal / maxVal) * BAR_MAX_HEIGHT)) : 0;
 
           return (
             <div key={item.label || idx} className="analytics-bar-col" title={`${item.label}: ${valueFormatter(curVal)}`}>
@@ -57,8 +59,9 @@ export default function TrendChart({
                   alignItems: 'flex-end',
                   justifyContent: 'center',
                   gap: 4,
-                  height: 150,
+                  height: BAR_MAX_HEIGHT,
                   width: '100%',
+                  flexShrink: 0,
                 }}
               >
                 {compare && (
@@ -88,15 +91,20 @@ export default function TrendChart({
                 />
               </div>
               <span
+                className="analytics-bar-label"
                 style={{
                   display: 'block',
                   textAlign: 'center',
                   fontSize: 11,
+                  fontWeight: 600,
                   color: '#64748b',
-                  marginTop: 8,
+                  lineHeight: '16px',
+                  height: 16,
+                  flexShrink: 0,
                   whiteSpace: 'nowrap',
                   textOverflow: 'ellipsis',
                   overflow: 'hidden',
+                  width: '100%',
                 }}
               >
                 {item.label}

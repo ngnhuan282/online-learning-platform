@@ -42,5 +42,18 @@ public final class ShopModels {
         @Pattern(regexp = "[A-Z][A-Z0-9_]{1,31}") String itemCode
     ) {}
 
+    public record TopUpRequest(
+        int gems,
+        String packageCode,
+        Long amount,
+        String paymentMethod
+    ) {}
+
+    public record InternalGemGrantRequest(
+        String orderCode,
+        @NotNull Long userId,
+        int gems
+    ) {}
+
     public record Purchase(String itemCode, int gemsSpent, boolean alreadyOwned, State state) {}
 }

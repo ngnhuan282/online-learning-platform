@@ -39,6 +39,12 @@ public class CourseOrder {
     @Column(name = "plan_duration_months")
     private Integer planDurationMonths;
 
+    @Column(name = "gem_package_code", length = 32)
+    private String gemPackageCode;
+
+    @Column(name = "gem_amount")
+    private Integer gemAmount;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)
@@ -98,6 +104,16 @@ public class CourseOrder {
         productType = "PRO";
         planCode = code;
         planDurationMonths = months;
+    }
+
+    public void assignGemTopUp(String packageCode, int gems) {
+        productType = "GEM_TOPUP";
+        gemPackageCode = packageCode;
+        gemAmount = gems;
+    }
+
+    public boolean isGemTopUp() {
+        return "GEM_TOPUP".equals(productType);
     }
 
     @PrePersist

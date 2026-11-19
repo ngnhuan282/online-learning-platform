@@ -11,6 +11,7 @@ import { formatCurrency } from '../../../shared/utils/formatCurrency';
 import { paymentApi } from '../api/paymentApi';
 import { learningApi } from '../../learning/api/learningApi';
 import { notifyProChanged } from '../../pro/api/proApi';
+import { notifyEngagementChanged } from '../../engagement/utils/engagementEvents';
 import { getPaymentDisplayStatus, getResumePaymentUrl, needsPaymentRefresh } from '../utils/paymentFlow';
 import '../styles/payment.css';
 
@@ -101,8 +102,11 @@ export default function PaymentResultPage() {
         setRemoteResult({ orderCode, order: response.data, error: null });
         if (response.data.productType === 'PRO' && response.data.payment?.status === 'SUCCESS')
           notifyProChanged();
+        if (response.data.productType === 'GEM_TOPUP' && response.data.payment?.status === 'SUCCESS')
+          notifyEngagementChanged();
         if (
           response.data.productType !== 'PRO' &&
+          response.data.productType !== 'GEM_TOPUP' &&
           response.data.payment?.status === 'SUCCESS' &&
           response.data.payment.provider === 'MOCK'
         ) {
@@ -221,21 +225,28 @@ export default function PaymentResultPage() {
 
   const paymentStatus = getPaymentDisplayStatus(order);
   const isPro = order.productType === 'PRO';
+  const isGem = order.productType === 'GEM_TOPUP';
   const copy = { ...paymentTone(paymentStatus, order.payment.provider) };
   if (isPro && paymentStatus === 'SUCCESS')
     copy.description = t('Thanh toán Pro đã được xác nhận. Bạn có thể xem hạn thành viên tại trang Pro.');
   if (isPro && paymentStatus === 'FAILED')
     copy.description = t('Giao dịch Pro chưa thành công. Bạn có thể chọn lại gói khi sẵn sàng.');
+  if (isGem && paymentStatus === 'SUCCESS')
+    copy.description = t('Nạp kim cương thành công! Kim cương đã được cộng vào tài khoản của bạn.');
+  if (isGem && paymentStatus === 'FAILED')
+    copy.description = t('Giao dịch nạp kim cương chưa thành công. Bạn có thể thử lại khi sẵn sàng.');
   const courseTitle = order.items?.[0]?.courseTitle || 'Khóa học';
   const amount = order.payment?.amount ?? order.totalAmount;
   const provider = order.payment?.provider;
-  const retryCheckoutUrl = isPro
-    ? ROUTES.PRO
-    : `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
+  const retryCheckoutUrl = isGem
+    ? `${ROUTES.GEM_CHECKOUT}?package=${order.gemPackageCode || ''}`
+    : isPro
+      ? ROUTES.PRO
+      : `${ROUTES.CHECKOUT}?course=${encodeURIComponent(paymentCourseId)}`;
   const resumePaymentUrl = getResumePaymentUrl(order, window.location.origin);
   const enrollmentReady =
-    provider === 'VNPAY' || isPro
-      ? order.payment.enrollmentReady === true
+    provider === 'VNPAY' || isPro || isGem
+      ? order.payment.enrollmentReady === true || isGem
       : enrollmentState.orderCode === orderCode && enrollmentState.ready;
   const awaitingActivation = paymentStatus === 'SUCCESS' && !enrollmentReady;
 
@@ -297,8 +308,8 @@ export default function PaymentResultPage() {
               <dd>{order.orderCode}</dd>
             </div>
             <div>
-              <dt>{t(isPro ? 'Gói Pro' : 'Khóa học')}</dt>
-              <dd>{isPro ? t(courseTitle) : courseTitle}</dd>
+              <dt>{t(isGem ? 'Nạp Kim Cương' : isPro ? 'Gói Pro' : 'Khóa học')}</dt>
+              <dd>{isGem ? t(courseTitle) : isPro ? t(courseTitle) : courseTitle}</dd>
             </div>
             <div>
               <dt>{t('Số tiền')}</dt>
@@ -325,8 +336,8 @@ export default function PaymentResultPage() {
                 <RefreshOutlined sx={{ fontSize: 17 }} />
               </button>
             ) : paymentStatus === 'SUCCESS' ? (
-              <Link className="button button-primary" to={isPro ? ROUTES.PRO : '/my-courses'}>
-                {t(isPro ? 'Xem Pro của bạn' : 'Vào khu học tập')} <Icon name="arrow" size={17} />
+              <Link className="button button-primary" to={isGem ? ROUTES.SHOP : isPro ? ROUTES.PRO : '/my-courses'}>
+                {t(isGem ? 'Vào cửa hàng' : isPro ? 'Xem Pro của bạn' : 'Vào khu học tập')} <Icon name="arrow" size={17} />
               </Link>
             ) : paymentStatus === 'EXPIRED' ? (
               <>

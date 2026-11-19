@@ -192,6 +192,60 @@ public class PaymentCoreService {
         );
     }
 
+    @Transactional
+    public CheckoutResponse createGemCheckout(
+        GemTopUpModels.CheckoutRequest request,
+        Long userId,
+        String clientIp
+    ) {
+        PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        if (provider == PaymentProvider.VNPAY) vnpay.requireAvailable();
+        else providers.requireAvailable(provider);
+        CourseOrder existing = orders
+            .findByUserIdAndIdempotencyKey(userId, request.idempotencyKey().strip())
+            .orElse(null);
+        if (existing != null) return existingGemCheckout(existing, request.packageCode(), provider);
+        // Validate package
+        GemTopUpModels.Package pkg = GemTopUpModels.getPackage(request.packageCode());
+        if (pkg == null) throw new AppException(ErrorCode.BAD_REQUEST);
+        CourseOrder order = new CourseOrder(
+            generateOrderCode(),
+            userId,
+            request.idempotencyKey().strip(),
+            pkg.price(),
+            "VND",
+            Instant.now().plusSeconds((provider == PaymentProvider.VNPAY ? vnpay.expireMinutes() : 15) * 60L)
+        );
+        order.assignGemTopUp(pkg.code(), pkg.gems());
+        order.addItem(
+            new OrderItem(
+                null,
+                pkg.gems() + " Kim Cương",
+                pkg.price(),
+                BigDecimal.ZERO,
+                pkg.price()
+            )
+        );
+        return persistCheckout(order, provider, pkg.price(), "VND", request.returnUrl(), request.cancelUrl(), clientIp);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CheckoutResponse> findExistingGemCheckout(GemTopUpModels.CheckoutRequest request, Long userId) {
+        PaymentProvider provider = request.provider() == null ? PaymentProvider.MOCK : request.provider();
+        return orders
+            .findByUserIdAndIdempotencyKey(userId, request.idempotencyKey().strip())
+            .map(order -> existingGemCheckout(order, request.packageCode(), provider));
+    }
+
+    private CheckoutResponse existingGemCheckout(CourseOrder order, String packageCode, PaymentProvider provider) {
+        Payment payment = latestPayment(order);
+        if (!order.isGemTopUp() || !packageCode.equals(order.getGemPackageCode()) || payment == null || payment.getProvider() != provider) {
+            throw new AppException(ErrorCode.CONFLICT);
+        }
+        requireUnexpiredCheckout(order, payment);
+        return new CheckoutResponse(order.getOrderCode(), toOrderResponse(order, payment), toPaymentSummary(payment), payment.getCheckoutUrl());
+    }
+
     private CheckoutResponse persistCheckout(
         CourseOrder order,
         PaymentProvider provider,
@@ -454,6 +508,13 @@ public class PaymentCoreService {
     }
 
     private void enrollPaidCourse(CourseOrder order) {
+        if (order.isGemTopUp()) {
+            if (order.getGemAmount() == null || order.getGemAmount() <= 0) {
+                throw new AppException(ErrorCode.CONFLICT);
+            }
+            learning.grantGems(order.getOrderCode(), order.getUserId(), order.getGemAmount());
+            return;
+        }
         if (order.isPro()) {
             learning.grantPro(
                 order.getOrderCode(),

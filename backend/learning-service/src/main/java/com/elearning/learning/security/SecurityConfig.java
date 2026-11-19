@@ -56,6 +56,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/internal/v1/learning/enrollments")
                     .permitAll()
+                    .requestMatchers("/internal/v1/learning/gem-topup")
+                    .permitAll()
                     .requestMatchers(
                         "/internal/v1/learning/pro/grants",
                         "/internal/v1/learning/pro/revocations"

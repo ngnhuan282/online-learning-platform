@@ -46,7 +46,7 @@ export default function AdminStatisticsPage() {
       {/* Page Header */}
       <div>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>
-          📊 Thống kê & Báo cáo nâng cao
+          📊 Thống kê & Báo cáo
         </h1>
         <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>
           Theo dõi tổng quan tài chính, tăng trưởng người dùng, tiến độ học tập và hiệu quả các khóa học
@@ -65,23 +65,8 @@ export default function AdminStatisticsPage() {
               className={`analytics-tab-btn ${isActive ? 'is-active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
-              <Icon fontSize="small" />
+              <Icon style={{ fontSize: 18 }} />
               <span>{tab.label}</span>
-              {tab.phase === 2 && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    background: '#ecfdf5',
-                    color: '#059669',
-                    border: '1px solid #a7f3d0',
-                  }}
-                >
-                  GĐ 2
-                </span>
-              )}
             </button>
           );
         })}

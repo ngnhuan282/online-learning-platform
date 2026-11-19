@@ -19,13 +19,44 @@ export const analyticsApi = {
         { label: 'T7', amount: 28500000 },
         { label: 'CN', amount: 26000000 },
       ];
-      const recentTransactions = raw.recentTransactions || [
-        { id: 'TXN-101', code: 'PRO-SUB-89', userName: 'Nguyen Van A', type: 'PRO_SUBSCRIPTION', amount: 499000, status: 'SUCCESS', date: '2026-11-18 14:20' },
-        { id: 'TXN-102', code: 'CRS-BUY-42', userName: 'Tran Thi B', type: 'COURSE_PURCHASE', amount: 1290000, status: 'SUCCESS', date: '2026-11-18 11:05' },
-        { id: 'TXN-103', code: 'CRS-BUY-77', userName: 'Le Hoang C', type: 'COURSE_PURCHASE', amount: 890000, status: 'PENDING', date: '2026-11-18 09:30' },
-        { id: 'TXN-104', code: 'PRO-SUB-91', userName: 'Pham Minh D', type: 'PRO_SUBSCRIPTION', amount: 499000, status: 'FAILED', date: '2026-11-17 19:40' },
-        { id: 'TXN-105', code: 'REFUND-08', userName: 'Vu Thi E', type: 'REFUND', amount: 890000, status: 'REFUNDED', date: '2026-11-17 16:15' },
-      ];
+      const rawList = Array.isArray(raw.recentTransactions) && raw.recentTransactions.length > 0
+        ? raw.recentTransactions
+        : [
+            { id: 'TXN-101', code: 'PRO-SUB-89', userName: 'Nguyễn Văn A', type: 'PRO_SUBSCRIPTION', amount: 499000, status: 'SUCCESS', date: '2026-11-18 14:20' },
+            { id: 'TXN-102', code: 'CRS-BUY-42', userName: 'Trần Thị B', type: 'COURSE_PURCHASE', amount: 1290000, status: 'SUCCESS', date: '2026-11-18 11:05' },
+            { id: 'TXN-103', code: 'CRS-BUY-77', userName: 'Lê Hoàng C', type: 'COURSE_PURCHASE', amount: 890000, status: 'PENDING', date: '2026-11-18 09:30' },
+            { id: 'TXN-104', code: 'PRO-SUB-91', userName: 'Phạm Minh D', type: 'PRO_SUBSCRIPTION', amount: 499000, status: 'FAILED', date: '2026-11-17 19:40' },
+            { id: 'TXN-105', code: 'REFUND-08', userName: 'Vũ Thị E', type: 'REFUND', amount: 890000, status: 'REFUNDED', date: '2026-11-17 16:15' },
+          ];
+
+      const recentTransactions = rawList.map((t, idx) => {
+        const code = t.orderCode || t.code || `ORD-${String(idx + 1).padStart(4, '0')}`;
+        let dateStr = t.date;
+        if (!dateStr && t.createdAt) {
+          try {
+            const d = new Date(t.createdAt);
+            dateStr = d.toLocaleDateString('vi-VN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          } catch {
+            dateStr = String(t.createdAt);
+          }
+        }
+        return {
+          id: t.id || code || `txn-${idx}`,
+          code,
+          userName: t.userName || (t.userId ? `Học viên #${t.userId}` : 'Khách vãng lai'),
+          courseTitle: t.courseTitle || '',
+          type: t.type || (t.courseTitle ? 'COURSE_PURCHASE' : 'PRO_SUBSCRIPTION'),
+          amount: Number(t.amount || 0),
+          status: t.status || t.orderStatus || 'SUCCESS',
+          date: dateStr || '—',
+        };
+      });
 
       // Tổng hợp dữ liệu kỳ hiện tại
       const totalAmount = revenueSeries.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 138500000;

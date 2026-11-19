@@ -37,12 +37,13 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
   const handleExport = async () => {
     if (!data?.transactions) return;
     const columns = [
-      { header: 'Mã GD', accessor: 'code' },
-      { header: 'Học viên', accessor: 'userName' },
-      { header: 'Loại GD', accessor: 'type' },
+      { header: 'Mã GD', accessor: r => r.code || r.orderCode || '—' },
+      { header: 'Học viên', accessor: r => r.userName || (r.userId ? `Học viên #${r.userId}` : '—') },
+      { header: 'Khóa học / Gói', accessor: r => r.courseTitle || (r.type === 'PRO_SUBSCRIPTION' ? 'Gói Pro VIP' : '—') },
+      { header: 'Loại GD', accessor: r => r.type === 'PRO_SUBSCRIPTION' ? 'Gói Pro VIP' : r.type === 'REFUND' ? 'Hoàn tiền' : 'Khóa học lẻ' },
       { header: 'Số tiền (VNĐ)', accessor: r => money(r.amount) },
-      { header: 'Trạng thái', accessor: 'status' },
-      { header: 'Thời gian', accessor: 'date' },
+      { header: 'Trạng thái', accessor: r => r.status === 'SUCCESS' ? 'Thành công' : r.status === 'PENDING' ? 'Chờ thanh toán' : r.status === 'REFUNDED' ? 'Đã hoàn tiền' : 'Thất bại' },
+      { header: 'Thời gian', accessor: r => r.date || '—' },
     ];
     const header = columns.map(c => c.header);
     const dataRows = data.transactions.map(row =>
@@ -51,6 +52,7 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
     await exportAnalyticsToExcel(
       [header, ...dataRows],
       `Thong_ke_doanh_thu_${range.from}_${range.to}.xlsx`,
+      'Doanh thu'
     );
   };
 
@@ -188,13 +190,20 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
             </thead>
             <tbody>
               {transactions && transactions.length > 0 ? (
-                transactions.map(txn => (
-                  <tr key={txn.id || txn.code}>
-                    <td><strong>{txn.code}</strong></td>
-                    <td>{txn.userName}</td>
+                transactions.map((txn, idx) => (
+                  <tr key={txn.id || txn.code || txn.orderCode || `txn-${idx}`}>
+                    <td><strong>{txn.code || txn.orderCode || '—'}</strong></td>
+                    <td>
+                      <div>
+                        <strong>{txn.userName || (txn.userId ? `Học viên #${txn.userId}` : 'Khách vãng lai')}</strong>
+                        {txn.courseTitle ? (
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{txn.courseTitle}</div>
+                        ) : null}
+                      </div>
+                    </td>
                     <td>
                       <span className="badge" style={{ fontSize: 11, background: '#eff6ff', color: '#1d4ed8' }}>
-                        {txn.type === 'PRO_SUBSCRIPTION' ? 'Gói Pro VIP' : txn.type === 'REFUND' ? 'Hoàn tiền' : 'Khóa học lẻ'}
+                        {txn.type === 'PRO_SUBSCRIPTION' ? 'Gói Pro VIP' : txn.type === 'REFUND' ? 'Hoàn tiền' : (txn.courseTitle || 'Khóa học lẻ')}
                       </span>
                     </td>
                     <td><strong style={{ color: txn.type === 'REFUND' ? '#dc2626' : '#0f172a' }}>{money(txn.amount)}</strong></td>
@@ -210,7 +219,7 @@ export default function RevenueAnalyticsTab({ range, compare, onExportReady }) {
                         {txn.status === 'SUCCESS' ? 'Thành công' : txn.status === 'PENDING' ? 'Chờ thanh toán' : txn.status === 'REFUNDED' ? 'Đã hoàn tiền' : 'Thất bại'}
                       </span>
                     </td>
-                    <td style={{ color: '#64748b', fontSize: 12 }}>{txn.date}</td>
+                    <td style={{ color: '#64748b', fontSize: 12 }}>{txn.date || '—'}</td>
                   </tr>
                 ))
               ) : (

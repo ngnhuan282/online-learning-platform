@@ -13,9 +13,9 @@ export default function HeaderProgress() {
     <div className="header-progress">
       <Link
         className="header-gems"
-        to={ROUTES.SHOP}
-        aria-label={summary ? t('Cửa hàng: {gems} kim cương', { gems: summary.gems }) : t('Cửa hàng')}
-        title={t('Cửa hàng')}
+        to={`${ROUTES.SHOP}?tab=topup`}
+        aria-label={summary ? t('Nạp Gem: {gems} kim cương', { gems: summary.gems }) : t('Nạp Gem')}
+        title={t('Nạp Gem')}
       >
         <DiamondRounded />
         <span>{summary ? summary.gems.toLocaleString(getIntlLocale()) : '—'}</span>

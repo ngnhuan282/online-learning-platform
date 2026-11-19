@@ -136,6 +136,19 @@ public class ShopService {
         return state(userId);
     }
 
+    public State topUp(long userId, TopUpRequest request) {
+        engagement.lockProfile(userId);
+        if (request.gems() <= 0) throw new AppException(ErrorCode.BAD_REQUEST);
+        jdbc.update("UPDATE learner_profiles SET gems = gems + ? WHERE user_id = ?", request.gems(), userId);
+        return state(userId);
+    }
+
+    public void grantGems(long userId, int gems) {
+        engagement.lockProfile(userId);
+        if (gems <= 0) throw new AppException(ErrorCode.BAD_REQUEST);
+        jdbc.update("UPDATE learner_profiles SET gems = gems + ? WHERE user_id = ?", gems, userId);
+    }
+
     private record Receipt(String code, int spent) {}
 
     private void recordPurchase(long userId, String requestId, String code, int spent) {

@@ -30,6 +30,8 @@ export const ROUTES = Object.freeze({
   PAYMENT_MOCK: '/payment/mock',
   PAYMENT_RESULT: '/payment/result',
   PAYMENT_HISTORY: '/payment/history',
+  GEM_CHECKOUT: '/payment/gem-checkout',
+  PRO_CHECKOUT: '/payment/pro-checkout',
   ADMIN_PAYMENTS: '/admin/payments',
   ADMIN_STATISTICS: '/admin/statistics',
   ADMIN_ANALYTICS: '/admin/statistics',

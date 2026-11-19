@@ -72,6 +72,26 @@ const router = createBrowserRouter([
     children: [{ index: true, element: <MockPaymentPage /> }],
   },
   {
+    path: '/payment/gem-checkout',
+    element: <UserLayout />,
+    children: [
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('../features/payment/pages/GemCheckoutPage')).default }),
+      },
+    ],
+  },
+  {
+    path: '/payment/pro-checkout',
+    element: <UserLayout />,
+    children: [
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('../features/payment/pages/ProCheckoutPage')).default }),
+      },
+    ],
+  },
+  {
     path: '/payment/history',
     element: <UserLayout />,
     children: [{ index: true, element: <PaymentHistoryPage /> }],
