@@ -70,6 +70,16 @@ jobs:
           else
             printf '\nRELEASE_TAG=%s\n' "$NEW_TAG" >> "$ENV_FILE"
           fi
+
+          PAYMENT_URL="$(sed -n 's/^VNPAY_PAYMENT_URL=//p' "$ENV_FILE" | tail -n 1)"
+          if printf '%s' "$PAYMENT_URL" | grep -Fq 'sandbox.vnpayment.vn'; then
+            echo "Sandbox VNPay configuration detected; disabling VNPay for this production deployment."
+            sed -i \
+              -e 's|^VNPAY_TMN_CODE=.*|VNPAY_TMN_CODE=|' \
+              -e 's|^VNPAY_HASH_SECRET=.*|VNPAY_HASH_SECRET=|' \
+              -e 's|^VNPAY_PAYMENT_URL=.*|VNPAY_PAYMENT_URL=|' \
+              "$ENV_FILE"
+          fi
           chmod 600 "$ENV_FILE"
 
           node infra/scripts/production.mjs check --env-file "$ENV_FILE" --project "$PROJECT_NAME"
