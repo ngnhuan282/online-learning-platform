@@ -22,20 +22,23 @@ public class ToeicSeedConfig {
 
     @Bean
     @ConditionalOnProperty(name = "toeic.seed.enabled", havingValue = "true", matchIfMissing = true)
-    ApplicationRunner seedToeicReading(ToeicService toeic, JsonMapper mapper) {
+    ApplicationRunner seedToeicCollections(ToeicService toeic, JsonMapper mapper) {
         return arguments -> {
-            var resource = new ClassPathResource("toeic/ets2024-reading.json");
-            if (!resource.exists()) {
-                log.info("TOEIC content seed is not packaged; administrators can create content manually");
-                return;
-            }
-            try (var input = resource.getInputStream()) {
-                List<Definition> definitions = mapper.readValue(
-                    input,
-                    new TypeReference<List<Definition>>() {}
-                );
-                for (Definition definition : definitions) toeic.seed(definition);
-                log.info("TOEIC source collection reconciled definitions={}", definitions.size());
+            for (String collection : List.of("ets2024-reading", "ets2024-listening")) {
+                var resource = new ClassPathResource("toeic/" + collection + ".json");
+                if (!resource.exists()) continue;
+                try (var input = resource.getInputStream()) {
+                    List<Definition> definitions = mapper.readValue(
+                        input,
+                        new TypeReference<List<Definition>>() {}
+                    );
+                    for (Definition definition : definitions) toeic.seed(definition);
+                    log.info(
+                        "TOEIC source collection {} reconciled definitions={}",
+                        collection,
+                        definitions.size()
+                    );
+                }
             }
         };
     }

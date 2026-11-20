@@ -69,6 +69,28 @@ const detail = {
   ],
   questions,
 };
+const listeningClip = (first, last = first) => ({
+  audioUrl: `/toeic-assets/test/audio-${first}${last === first ? '' : '-' + last}.mp3`,
+  transcript: `Transcript for the clip starting at question ${first}.`,
+});
+const listeningQuestions = [
+  [1, 1, listeningClip(1)],
+  [7, 2, listeningClip(7)],
+  [32, 3, listeningClip(32, 34)],
+  [33, 3, listeningClip(32, 34)],
+  [34, 3, listeningClip(32, 34)],
+  [35, 3, listeningClip(35, 37)],
+  [71, 4, listeningClip(71, 73)],
+].map(([number, part, listening]) => ({
+  id: 'q' + number,
+  number,
+  part,
+  listening,
+  imageUrl: part === 1 ? '/toeic-assets/test/question-001.webp' : undefined,
+  prompt: part <= 2 ? '' : 'What are the speakers discussing?',
+  options: Array.from(part === 2 ? 'ABC' : 'ABCD', id => ({ id, text: part <= 2 ? '' : id + ' answer' })),
+  correctOptionId: 'B',
+}));
 let root, location, currentAttempt;
 const freshAttempt = (overrides = {}) => ({
   id: 41,
@@ -260,6 +282,134 @@ test('catalogue API errors show retry instead of substituting the source PDF col
   assert.match(document.body.textContent, /Không thể tải dữ liệu/);
   await click('Thử lại');
   assert.equal(rows().length, 6);
+});
+
+test('Listening catalogue pages separately and starts practice in the chosen part', async () => {
+  const reading = toeicApi.list;
+  const listening = { ...detail, id: 11, section: 'LISTENING', title: 'ETS 2024 — Test 01 · Listening' };
+  toeicApi.list = async () => ({
+    data: [
+      ...(await reading()).data,
+      ...Array.from({ length: 9 }, (_, index) => ({
+        ...listening,
+        id: listening.id + index,
+        title: `ETS 2024 — Test ${index + 1} · Listening`,
+      })),
+    ],
+  });
+  toeicApi.detail = async () => ({
+    data: { ...listening, durationMinutes: 45, questions: listeningQuestions, companionExamId: 1 },
+  });
+  const started = [];
+  currentAttempt = freshAttempt({ examId: 11, part: 2, questions: [listeningQuestions[1]] });
+  toeicApi.start = async (...args) => {
+    started.push(args);
+    return { data: clone(currentAttempt) };
+  };
+  await render();
+  assert.ok(rows().every(title => !title.includes('Listening')));
+  await click('Listening');
+  assert.equal(rows().length, 6);
+  assert.ok(rows().every(title => title.includes('Listening')));
+  await act(async () => document.querySelector('button[aria-label="Trang 2"]').click());
+  assert.equal(rows().length, 3);
+  await click('Reading');
+  assert.equal(new URLSearchParams(location.search).has('page'), false);
+  await click('Listening');
+  await act(async () => document.querySelector('.toeic-test-card h2').click());
+  assert.equal(
+    document.querySelector('a[href="/exams/toeic/tests/1"]').textContent.trim(),
+    'Mở phần Reading',
+  );
+  for (const part of [1, 2, 3, 4]) {
+    assert.ok(
+      [...document.querySelectorAll('button')].some(
+        button => button.textContent.trim() === `Luyện Part ${part}`,
+      ),
+    );
+  }
+  await click('Luyện Part 2');
+  assert.deepEqual(started[0], ['11', 'PRACTICE', 2, null]);
+  assert.equal(document.querySelectorAll('.toeic-option').length, 3);
+});
+
+test('Listening player keeps playback within a group and reveals the answer and transcript independently', async () => {
+  currentAttempt = freshAttempt({ questions: listeningQuestions, examId: 11 });
+  await render('/exams/toeic/attempts/41');
+  assert.ok(document.querySelector('.toeic-question img[src$="question-001.webp"]'));
+  assert.equal(document.querySelectorAll('.toeic-option').length, 4);
+  await act(async () => document.querySelector('button[aria-label="Đến câu 32"]').click());
+  const audio = document.querySelector('audio');
+  assert.match(audio.getAttribute('aria-label'), /32–34/);
+  assert.equal(document.querySelector('.toeic-transcript p'), null);
+  await choose('A');
+  await click('Hiện transcript');
+  assert.match(document.querySelector('.toeic-transcript p').textContent, /starting at question 32/);
+  assert.equal(document.querySelector('.toeic-explanation'), null);
+  const toggle = document.querySelector('.toeic-question .toeic-answer-toggle button');
+  assert.ok(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(document.querySelector('.toeic-practice-reveal-bar'), null);
+  assert.ok(
+    document.querySelector('.toeic-options').compareDocumentPosition(toggle) &
+      dom.window.Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+  await click('Hiện đáp án');
+  const explanation = document.querySelector('.toeic-explanation');
+  assert.match(explanation.textContent, /Đáp án đúng: B/);
+  assert.ok(toggle.compareDocumentPosition(explanation) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  await click('Ẩn transcript');
+  assert.equal(document.querySelector('.toeic-transcript p'), null);
+  assert.ok(document.querySelector('.toeic-explanation'));
+  await click('Ẩn đáp án');
+  assert.equal(document.querySelector('.toeic-answer-toggle button'), toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(document.querySelector('.toeic-explanation'), null);
+  await act(async () => audio.dispatchEvent(new Event('error')));
+  assert.match(document.querySelector('.toeic-listening-error').textContent, /Không tải được đoạn nghe/);
+  let retries = 0;
+  audio.load = () => retries++;
+  await click('Thử lại');
+  assert.equal(retries, 1);
+  assert.equal(document.querySelector('.toeic-listening-error'), null);
+  await click('Hiện transcript');
+  audio.currentTime = 4;
+  await click('Câu tiếp');
+  assert.equal(document.querySelector('audio'), audio);
+  assert.equal(audio.currentTime, 4);
+  assert.ok(document.querySelector('.toeic-transcript p'));
+  await act(async () => document.querySelector('button[aria-label="Đến câu 35"]').click());
+  assert.notEqual(document.querySelector('audio'), audio);
+  assert.equal(document.querySelector('.toeic-transcript p'), null);
+  await pause(550);
+  assert.equal(currentAttempt.answers.q32, 'A');
+});
+
+test('Listening exam hides review controls until submission and then offers audio review', async () => {
+  currentAttempt = freshAttempt({
+    mode: 'EXAM',
+    durationMinutes: 45,
+    deadlineAt: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+    totalQuestions: listeningQuestions.length,
+    questions: listeningQuestions,
+  });
+  await render('/exams/toeic/attempts/41');
+  assert.ok(document.querySelector('audio'));
+  assert.equal(
+    document.querySelector('.toeic-transcript, .toeic-explanation, .toeic-practice-reveal-bar'),
+    null,
+  );
+  await choose('B');
+  await click('Nộp bài');
+  await click('Xác nhận nộp bài');
+  assert.equal(location.pathname, '/exams/toeic/attempts/41/result');
+  assert.match(document.querySelector('h1').textContent, /Kết quả Listening/);
+  assert.equal(document.querySelectorAll('.toeic-result-parts > div').length, 4);
+  assert.ok(document.querySelector('.toeic-option.is-correct'));
+  assert.equal(document.querySelector('.toeic-transcript p'), null);
+  await click('Hiện transcript');
+  assert.match(document.querySelector('.toeic-transcript p').textContent, /starting at question 1/);
 });
 
 test('learner selects practice timer or real exam mode without pre-practice lessons and can view answers freely in practice mode', async () => {
@@ -486,6 +636,45 @@ async function clickContaining(text) {
   assert.ok(button, `Missing button: ${text}`);
   await act(async () => button.click());
 }
+
+test('Admin creates and publishes Part 2 with an audio transcript and the three spoken choices', async () => {
+  let stored;
+  toeicApi.create = async definition => {
+    stored = { ...clone(definition), id: 89, version: 1, published: false };
+    return { data: clone(stored) };
+  };
+  toeicApi.publish = async (id, published) => {
+    assert.equal(id, 89);
+    assert.equal(published, true);
+    stored = { ...stored, published };
+    return { data: clone(stored) };
+  };
+  await render('/admin/toeic');
+  await change(document.querySelector('input[name="title"]'), 'Listening thử nghiệm');
+  await change(document.querySelector('input[name="slug"]'), 'listening-thu-nghiem');
+  await click('Thêm câu Listening');
+  assert.equal(document.querySelector('input[name="durationMinutes"]').value, '45');
+  await change(labelled('Part'), '2');
+  await change(labelled('Số câu hỏi'), '7');
+  assert.deepEqual(
+    [...labelled('Đáp án đúng').options].map(option => option.value),
+    ['A', 'B', 'C'],
+  );
+  assert.equal(labelled('Lựa chọn D'), undefined);
+  await change(labelled('Đường dẫn đoạn nghe'), listeningClip(7).audioUrl);
+  await change(labelled('Transcript'), listeningClip(7).transcript);
+  await change(labelled('Đáp án đúng'), 'C');
+  await click('Lưu bộ đề');
+  assert.equal(stored.questions[0].part, 2);
+  assert.deepEqual(stored.questions[0].listening, listeningClip(7));
+  assert.deepEqual(
+    stored.questions[0].options.map(option => option.text),
+    ['', '', ''],
+  );
+  assert.equal(stored.questions[0].correctOptionId, 'C');
+  await click('Xuất bản');
+  assert.equal(stored.published, true);
+});
 
 test('Admin creates native lessons/questions, edits with a version, publishes and confirms deletion', async () => {
   let stored;

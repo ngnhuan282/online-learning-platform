@@ -11,6 +11,7 @@ import AccessTimeRounded from '@mui/icons-material/AccessTimeRounded';
 import CheckCircleOutlineOutlined from '@mui/icons-material/CheckCircleOutlineOutlined';
 import BoltRounded from '@mui/icons-material/BoltRounded';
 import StickyNote2Outlined from '@mui/icons-material/StickyNote2Outlined';
+import HeadphonesOutlined from '@mui/icons-material/HeadphonesOutlined';
 import ErrorState from '../../../shared/components/ErrorState';
 import { ROUTES } from '../../../shared/constants/routes';
 import useAuth from '../../auth/hooks/useAuth';
@@ -19,6 +20,7 @@ import useLocale from '../../../shared/i18n/useLocale';
 import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import useToeicBookmarks from '../hooks/useToeicBookmarks';
+import { LISTENING_PARTS, READING_PARTS } from '../utils/toeicSections';
 
 const EMPTY = [];
 const PAGE_SIZE = 6;
@@ -40,9 +42,13 @@ export default function ToeicLibraryPage() {
   const { data: exams, error, loading, reload } = useLearningResource(load, EMPTY);
   const query = params.get('q') ?? '';
   const savedOnly = params.get('view') === 'saved';
+  const listening = params.get('section') === 'listening';
+  const sectionExams = exams.filter(exam => (exam.section === 'LISTENING') === listening);
+  const featured = sectionExams[0];
+  const SectionIcon = listening ? HeadphonesOutlined : MenuBookOutlined;
   const search = normalize(query.trim());
   const exactNumber = search.match(/^(?:test\s*)?0*(\d+)$/)?.[1];
-  const filtered = exams.filter(exam => {
+  const filtered = sectionExams.filter(exam => {
     const title = normalize(exam.title);
     const matches =
       !search ||
@@ -96,35 +102,39 @@ export default function ToeicLibraryPage() {
           )}
           <span className="toeic-pill">
             <CheckCircleOutlineOutlined fontSize="small" />
-            TOEIC Reading
+            {listening ? 'TOEIC Listening' : 'TOEIC Reading'}
           </span>
         </div>
       </header>
       <section
-        className={`toeic-featured ${!loading && !error && exams[0] ? 'is-clickable' : ''}`}
+        className={`toeic-featured ${!loading && !error && featured ? 'is-clickable' : ''}`}
         aria-labelledby="toeic-collection-title"
         onClick={event => {
-          if (!loading && !error && exams[0]) openTest(exams[0].id, event);
+          if (!loading && !error && featured) openTest(featured.id, event);
         }}
       >
         <div className="toeic-featured-icon">
-          <MenuBookOutlined />
+          <SectionIcon />
         </div>
         <div className="toeic-featured-copy">
           <div className="toeic-featured-tags">
             <span>ETS 2024</span>
-            <span>Reading · Part 5, 6, 7</span>
+            <span>{listening ? 'Listening · Part 1–4' : 'Reading · Part 5, 6, 7'}</span>
             <span>{t('Luyện tập & Thi thực chiến')}</span>
           </div>
-          <h2 id="toeic-collection-title">{t('Luyện đề chủ động. Bứt phá điểm Reading.')}</h2>
+          <h2 id="toeic-collection-title">
+            {t(listening ? 'Luyện nghe TOEIC theo từng Part' : 'Luyện đề chủ động. Bứt phá điểm Reading.')}
+          </h2>
           <p>
             {t(
-              'Hỗ trợ cả 2 chế độ: Luyện tập tự chọn thời gian có giải thích ngay, hoặc Thi thực chiến khóa đáp án như phòng thi thật.',
+              listening
+                ? 'Nghe theo từng câu hoặc nhóm câu, chọn đáp án và đối chiếu transcript khi luyện tập.'
+                : 'Hỗ trợ cả 2 chế độ: Luyện tập tự chọn thời gian có giải thích ngay, hoặc Thi thực chiến khóa đáp án như phòng thi thật.',
             )}
           </p>
         </div>
-        {!loading && !error && exams[0] && (
-          <Link className="toeic-button button-primary" to={`/exams/toeic/tests/${exams[0].id}`}>
+        {!loading && !error && featured && (
+          <Link className="toeic-button button-primary" to={`/exams/toeic/tests/${featured.id}`}>
             {t('Bắt đầu luyện tập')}
             <ArrowForwardRounded fontSize="small" />
           </Link>
@@ -134,7 +144,13 @@ export default function ToeicLibraryPage() {
         <div>
           <span>01</span>
           <strong>{t('Chọn bộ đề & phần thi')}</strong>
-          <p>{t('Luyện riêng từng Part 5, 6, 7 hoặc làm trọn bộ 100 câu Reading.')}</p>
+          <p>
+            {t(
+              listening
+                ? 'Luyện riêng Part 1, 2, 3, 4 hoặc làm trọn bộ Listening.'
+                : 'Luyện riêng từng Part 5, 6, 7 hoặc làm trọn bộ 100 câu Reading.',
+            )}
+          </p>
         </div>
         <div>
           <span>02</span>
@@ -145,8 +161,14 @@ export default function ToeicLibraryPage() {
         </div>
         <div>
           <span>03</span>
-          <strong>{t('Đối chiếu lời giải chi tiết')}</strong>
-          <p>{t('Lưu tiến độ tự động, thống kê tỷ lệ đúng theo Part và giải thích từng câu.')}</p>
+          <strong>{t(listening ? 'Đối chiếu đáp án và transcript' : 'Đối chiếu lời giải chi tiết')}</strong>
+          <p>
+            {t(
+              listening
+                ? 'Nghe lại đoạn audio và kiểm tra số câu đúng theo từng Part.'
+                : 'Lưu tiến độ tự động, thống kê tỷ lệ đúng theo Part và giải thích từng câu.',
+            )}
+          </p>
         </div>
       </div>
       <div className="toeic-library-heading" ref={resultsHeading}>
@@ -166,12 +188,30 @@ export default function ToeicLibraryPage() {
             onClick={() => filter('view', 'saved')}
           >
             {t('Đề đã lưu')}
-            <small>{exams.filter(exam => bookmarks.includes(String(exam.id))).length}</small>
+            <small>{sectionExams.filter(exam => bookmarks.includes(String(exam.id))).length}</small>
           </button>
         </div>
         <span className="toeic-results-count">{t('{count} kết quả', { count: filtered.length })}</span>
       </div>
       <div className="toeic-filter-bar">
+        <div className="toeic-tabs toeic-section-tabs" role="group" aria-label={t('Chọn kỹ năng TOEIC')}>
+          <button
+            type="button"
+            className={!listening ? 'is-active' : ''}
+            aria-pressed={!listening}
+            onClick={() => filter('section', '')}
+          >
+            <MenuBookOutlined fontSize="small" /> Reading
+          </button>
+          <button
+            type="button"
+            className={listening ? 'is-active' : ''}
+            aria-pressed={listening}
+            onClick={() => filter('section', 'listening')}
+          >
+            <HeadphonesOutlined fontSize="small" /> Listening
+          </button>
+        </div>
         <label className="toeic-library-search">
           <SearchRounded fontSize="small" />
           <input
@@ -207,20 +247,24 @@ export default function ToeicLibraryPage() {
             {t(
               savedOnly
                 ? 'Bạn chưa lưu bộ đề phù hợp'
-                : exams.length
+                : sectionExams.length
                   ? 'Không tìm thấy bộ đề phù hợp'
                   : 'Chưa có bộ đề được xuất bản',
             )}
           </h2>
           <p>
             {t(
-              exams.length
+              sectionExams.length
                 ? 'Thử từ khóa khác hoặc bỏ bộ lọc để xem lại.'
                 : 'Nội dung học tập sẽ xuất hiện sau khi Admin xuất bản bộ đề.',
             )}
           </p>
-          {exams.length > 0 && (
-            <button type="button" className="toeic-button toeic-button-outline" onClick={() => setParams({})}>
+          {sectionExams.length > 0 && (
+            <button
+              type="button"
+              className="toeic-button toeic-button-outline"
+              onClick={() => setParams(listening ? { section: 'listening' } : {})}
+            >
               {t('Xem tất cả bộ đề')}
             </button>
           )}
@@ -236,7 +280,9 @@ export default function ToeicLibraryPage() {
                 onClick={event => openTest(exam.id, event)}
               >
                 <div className="toeic-test-card-top">
-                  <span className="toeic-test-edition">{exam.sourceLabel || 'TOEIC Reading'}</span>
+                  <span className="toeic-test-edition">
+                    {exam.sourceLabel || (listening ? 'TOEIC Listening' : 'TOEIC Reading')}
+                  </span>
                   <button
                     type="button"
                     className={`toeic-icon-button toeic-save ${saved ? 'is-saved' : ''}`}
@@ -257,16 +303,23 @@ export default function ToeicLibraryPage() {
                 <div className="toeic-test-title">
                   <div>
                     <h2>{exam.title}</h2>
-                    <p>{exam.description || t('Luyện tập hoặc thi thử TOEIC Reading trực tiếp')}</p>
+                    <p>
+                      {exam.description ||
+                        t(
+                          listening
+                            ? 'Luyện nghe TOEIC trực tiếp'
+                            : 'Luyện tập hoặc thi thử TOEIC Reading trực tiếp',
+                        )}
+                    </p>
                   </div>
                   <span className={`toeic-book-symbol tone-${index % 2 ? 'violet' : 'blue'}`}>
-                    <MenuBookOutlined />
+                    <SectionIcon />
                   </span>
                 </div>
                 <div className="toeic-test-tags">
-                  <span>Part 5</span>
-                  <span>Part 6</span>
-                  <span>Part 7</span>
+                  {(listening ? LISTENING_PARTS : READING_PARTS).map(part => (
+                    <span key={part}>Part {part}</span>
+                  ))}
                   <span className="is-highlight">{t('2 chế độ thi')}</span>
                 </div>
                 <div className="toeic-test-meta">

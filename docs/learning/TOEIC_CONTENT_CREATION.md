@@ -160,3 +160,39 @@ câu trùng, giới hạn số câu và việc chỉ thêm câu sau khi xác nh�
 
 Backend có `ToeicLearningIntegrationTests`; Gateway có `ToeicGatewayAccessTests`.
 Chỉ chạy các kiểm thử liên quan này cho thay đổi TOEIC.
+
+## 7. Soạn bộ đề Listening
+
+Trong **Luyện thi TOEIC → Listening**, học viên chọn luyện từng Part hoặc thi thử
+45 phút. Một bộ đầy đủ có 6 câu Part 1, 25 câu Part 2, 39 câu Part 3 và 30 câu Part 4.
+Bộ đề ETS 2024 hiện có audio cho Test 01–03 và 05–10.
+
+1. Đối chiếu số Test trong `docs/resources/AUDIO` với đề Listening trong
+   `docs/resources/ĐỀ LC` và bảng đáp án Listening trong `docs/resources/ĐÁP ÁN ETS 2024`.
+2. Cắt theo lời đọc số câu và khoảng nghỉ ở hai đầu. Cắt từng câu cho Part 1–2.
+   Với Part 3–4, một đoạn gồm hội thoại hoặc bài nói và ba câu hỏi đi kèm. Nghe lại
+   câu đầu và câu cuối sau khi cắt để xác nhận đúng nhóm.
+3. Trích ảnh Part 1 và biểu đồ Part 3–4. Từ scan có ghi chú tay, nhập lại câu hỏi và
+   lựa chọn từ chữ in. Dùng đáp án trong bảng đáp án gốc.
+4. Chép transcript từ audio đã cắt. Với Part 1–2, ghi các phương án đã nghe theo
+   thứ tự A–D hoặc A–C. Với Part 3–4, dùng một transcript cho cả nhóm ba câu.
+
+Ví dụ xuất đoạn từ giây 2276.0812 đến giây 2344.1359 của Test 01.
+
+```powershell
+ffmpeg -ss 2276.0812 -i "docs/resources/AUDIO/Test_01.mp3" -t 68.0547 -map 0:a:0 -map_metadata -1 -ac 1 -ar 24000 -c:a libmp3lame -b:a 40k "audio-083-085.mp3"
+```
+
+Trong **Admin → Quản lý TOEIC**, chọn **Thêm câu Listening** khi tạo đề, chọn
+Part, rồi nhập đường dẫn MP3 đã được frontend phục vụ dưới `/toeic-assets/`. Nhập
+transcript, đáp án đúng và ảnh Part 1 hoặc hình nhóm câu nếu có. Part 3–4 có trường
+câu hỏi và bốn lựa chọn. Dùng cùng đường dẫn MP3 cho ba câu liên tiếp trong một
+nhóm. **Xem trước câu hỏi** để kiểm tra bản cắt trước khi lưu và xuất bản.
+
+Dữ liệu phát hành nằm trong `ets2024-listening.json` của Learning Service và chín
+gói media trong `frontend/web/resources/toeic-listening`. Lệnh `npm run prepare:toeic`
+giải nén ảnh và audio khi chạy frontend. Learning Service tự chạy migration V22 và
+thêm các đề Listening khi khởi động với chức năng seed bật.
+
+Ảnh và câu hỏi Test 01 dùng file `docs/resources/ĐỀ LC/TEST 1 LC.pdf` được khôi
+phục từ commit `c3a9b37`. File PDF đọc được đủ 13 trang.

@@ -28,6 +28,9 @@ import tools.jackson.databind.json.JsonMapper;
 public class ToeicService {
 
     private static final Set<String> OPTION_IDS = Set.of("A", "B", "C", "D");
+    private static final Set<String> PART_TWO_OPTION_IDS = Set.of("A", "B", "C");
+    private static final String SUMMARY_COLUMNS =
+        "id, slug, title, description, duration_minutes, question_count, lesson_count, source_label, version, published, section";
     private final JdbcTemplate jdbc;
     private final JsonMapper mapper;
     private final Clock clock;
@@ -41,15 +44,18 @@ public class ToeicService {
     @Transactional(readOnly = true)
     public List<Summary> catalog() {
         return jdbc.query(
-            "SELECT * FROM toeic_exams WHERE deleted = FALSE AND published = TRUE ORDER BY id",
+            "SELECT " +
+                SUMMARY_COLUMNS +
+                " FROM toeic_exams WHERE deleted = FALSE AND published = TRUE ORDER BY id",
             (row, i) -> summary(row)
         );
     }
 
     @Transactional(readOnly = true)
     public List<Summary> listAdmin() {
-        return jdbc.query("SELECT * FROM toeic_exams WHERE deleted = FALSE ORDER BY id DESC", (row, i) ->
-            summary(row)
+        return jdbc.query(
+            "SELECT " + SUMMARY_COLUMNS + " FROM toeic_exams WHERE deleted = FALSE ORDER BY id DESC",
+            (row, i) -> summary(row)
         );
     }
 
@@ -66,7 +72,8 @@ public class ToeicService {
             definition.sourceLabel(),
             definition.lessons(),
             questionViews(definition.questions(), false),
-            exam.version()
+            exam.version(),
+            companionExamId(definition)
         );
     }
 
@@ -93,7 +100,7 @@ public class ToeicService {
         jdbc.update(
             """
             UPDATE toeic_exams SET slug = ?, title = ?, description = ?, duration_minutes = ?,
-            source_label = ?, question_count = ?, lesson_count = ?, definition_json = ?,
+            source_label = ?, question_count = ?, lesson_count = ?, definition_json = ?, section = ?,
             version = version + 1, updated_at = ? WHERE id = ?
             """,
             definition.slug(),
@@ -104,6 +111,7 @@ public class ToeicService {
             definition.questions().size(),
             definition.lessons().size(),
             encode(definition),
+            section(definition),
             timestamp(clock.instant()),
             examId
         );
@@ -240,7 +248,7 @@ public class ToeicService {
         }
         if (
             request.part() != null &&
-            (!Set.of(5, 6, 7).contains(request.part()) || request.mode().equals("EXAM"))
+            (request.part() < 1 || request.part() > 7 || request.mode().equals("EXAM"))
         ) {
             throw badRequest();
         }
@@ -371,12 +379,12 @@ public class ToeicService {
     private Map<String, String> validAnswers(Attempt attempt, AnswersRequest request) {
         if (request == null || request.answers() == null) throw badRequest();
         Definition definition = decode(attempt.snapshot(), Definition.class);
-        Set<String> questions = new HashSet<>(definition.questions().stream().map(Question::id).toList());
+        Map<String, Integer> partsByQuestion = new LinkedHashMap<>();
+        definition.questions().forEach(question -> partsByQuestion.put(question.id(), question.part()));
         Map<String, String> validated = new LinkedHashMap<>();
         request.answers().forEach((key, value) -> {
-            if (
-                key == null || !questions.contains(key) || !OPTION_IDS.contains(value == null ? "" : value)
-            ) throw badRequest();
+            Integer part = partsByQuestion.get(key);
+            if (part == null || value == null || !allowedOptions(part).contains(value)) throw badRequest();
             validated.put(key, value);
         });
         return validated;
@@ -417,10 +425,22 @@ public class ToeicService {
                     item.prompt(),
                     item.imageUrl(),
                     item.passageImageUrls(),
-                    item.options(),
+                    item.part() <= 2
+                        ? item
+                              .options()
+                              .stream()
+                              .map(option -> new Option(option.id(), ""))
+                              .toList()
+                        : item.options(),
                     review ? item.correctOptionId() : null,
                     review ? item.explanation() : null,
-                    item.source()
+                    item.source(),
+                    item.listening() == null
+                        ? null
+                        : new Listening(
+                              item.listening().audioUrl(),
+                              review ? item.listening().transcript() : null
+                          )
                 )
             )
             .toList();
@@ -448,8 +468,8 @@ public class ToeicService {
             var statement = connection.prepareStatement(
                 """
                 INSERT INTO toeic_exams(slug, seed_key, title, description, duration_minutes,
-                    source_label, question_count, lesson_count, definition_json, published, deleted,
-                    version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, 1, ?, ?)
+                    source_label, question_count, lesson_count, definition_json, section, published, deleted,
+                    version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, 1, ?, ?)
                 """,
                 java.sql.Statement.RETURN_GENERATED_KEYS
             );
@@ -462,9 +482,10 @@ public class ToeicService {
             statement.setInt(7, definition.questions().size());
             statement.setInt(8, definition.lessons().size());
             statement.setString(9, encode(definition));
-            statement.setBoolean(10, published);
-            statement.setTimestamp(11, timestamp(clock.instant()));
+            statement.setString(10, section(definition));
+            statement.setBoolean(11, published);
             statement.setTimestamp(12, timestamp(clock.instant()));
+            statement.setTimestamp(13, timestamp(clock.instant()));
             return statement;
         }, keys);
         return Objects.requireNonNull(keys.getKey()).longValue();
@@ -513,6 +534,8 @@ public class ToeicService {
         }
         Set<String> questionIds = new HashSet<>();
         Set<Integer> numbers = new HashSet<>();
+        Boolean listeningSection = null;
+        Map<String, String> transcriptsByClip = new LinkedHashMap<>();
         for (Question question : definition.questions()) {
             if (
                 question == null ||
@@ -523,18 +546,28 @@ public class ToeicService {
                 question.number() > 10000 ||
                 !numbers.add(question.number()) ||
                 question.part() == null ||
-                !Set.of(5, 6, 7).contains(question.part()) ||
+                question.part() < 1 ||
+                question.part() > 7 ||
                 length(question.prompt()) > 20000 ||
                 length(question.passage()) > 100000 ||
                 length(question.explanation()) > 50000 ||
                 length(question.source()) > 2000 ||
                 !validImage(question.imageUrl()) ||
                 question.options() == null ||
-                question.options().size() > 4 ||
-                (scorable &&
-                    (question.options().size() != 4 ||
-                        (blank(question.prompt()) && blank(question.imageUrl())) ||
-                        blank(question.explanation())))
+                question.options().size() > 4
+            ) throw badRequest();
+            boolean listening = question.part() <= 4;
+            if (listeningSection != null && listeningSection != listening) throw badRequest();
+            listeningSection = listening;
+            validateListening(question, scorable, transcriptsByClip);
+            Set<String> allowedOptions = allowedOptions(question.part());
+            boolean audioOnly = question.part() <= 2;
+            boolean optionsInImage = listening && blank(question.prompt()) && !blank(question.imageUrl());
+            if (
+                scorable &&
+                (question.options().size() != allowedOptions.size() ||
+                    (!audioOnly && blank(question.prompt()) && blank(question.imageUrl())) ||
+                    (!listening && blank(question.explanation())))
             ) throw badRequest();
             if (
                 question.passageImageUrls() != null &&
@@ -548,10 +581,10 @@ public class ToeicService {
             for (Option option : question.options()) {
                 if (
                     option == null ||
-                    !OPTION_IDS.contains(option.id() == null ? "" : option.id()) ||
+                    !allowedOptions.contains(option.id() == null ? "" : option.id()) ||
                     !optionIds.add(option.id()) ||
                     length(option.text()) > 4000 ||
-                    (scorable && blank(option.text()))
+                    (scorable && !audioOnly && !optionsInImage && blank(option.text()))
                 ) throw badRequest();
             }
             if (
@@ -559,6 +592,63 @@ public class ToeicService {
             ) throw badRequest();
             if (scorable && question.correctOptionId() == null) throw badRequest();
         }
+    }
+
+    private Set<String> allowedOptions(int part) {
+        return part == 2 ? PART_TWO_OPTION_IDS : OPTION_IDS;
+    }
+
+    private void validateListening(
+        Question question,
+        boolean scorable,
+        Map<String, String> transcriptsByClip
+    ) {
+        Listening listening = question.listening();
+        if (question.part() > 4) {
+            if (listening != null) throw badRequest();
+            return;
+        }
+        if (scorable && (listening == null || blank(listening.audioUrl()) || blank(listening.transcript()))) {
+            throw badRequest();
+        }
+        if (scorable && question.part() == 1 && blank(question.imageUrl())) throw badRequest();
+        if (listening == null) return;
+        if (
+            length(listening.audioUrl()) > 2048 ||
+            length(listening.transcript()) > 20000 ||
+            (!blank(listening.audioUrl()) &&
+                !listening.audioUrl().matches("/toeic-assets/[a-zA-Z0-9_/-]+\\.mp3"))
+        ) throw badRequest();
+        if (scorable) {
+            String previous = transcriptsByClip.putIfAbsent(listening.audioUrl(), listening.transcript());
+            if (previous != null && !previous.equals(listening.transcript())) throw badRequest();
+        }
+    }
+
+    private String section(Definition definition) {
+        return !definition.questions().isEmpty() && definition.questions().getFirst().part() <= 4
+            ? "LISTENING"
+            : "READING";
+    }
+
+    private Long companionExamId(Definition definition) {
+        String slug = definition.slug();
+        if (!slug.matches("ets-2024-test-\\d{2}(-listening)?")) return null;
+        String suffix = "-listening";
+        String companion = slug.endsWith(suffix)
+            ? slug.substring(0, slug.length() - suffix.length())
+            : slug + suffix;
+        String companionSection = section(definition).equals("LISTENING") ? "READING" : "LISTENING";
+        return jdbc
+            .query(
+                "SELECT id FROM toeic_exams WHERE slug = ? AND section = ? AND published = TRUE AND deleted = FALSE",
+                (row, index) -> row.getLong("id"),
+                companion,
+                companionSection
+            )
+            .stream()
+            .findFirst()
+            .orElse(null);
     }
 
     private boolean validImage(String value) {
@@ -608,7 +698,8 @@ public class ToeicService {
             row.getInt("lesson_count"),
             row.getString("source_label"),
             row.getLong("version"),
-            row.getBoolean("published")
+            row.getBoolean("published"),
+            row.getString("section")
         );
     }
 

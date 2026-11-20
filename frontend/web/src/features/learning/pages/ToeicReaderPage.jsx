@@ -17,6 +17,7 @@ import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import useAuth from '../../auth/hooks/useAuth';
 import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
+import { isListeningPart, PART_TITLES } from '../utils/toeicSections';
 
 const TIME_PRESETS = [
   { value: 'unlimited', minutes: null, label: 'Không giới hạn' },
@@ -29,8 +30,12 @@ const TIME_PRESETS = [
 ];
 
 export default function ToeicReaderPage() {
-  useLocale();
   const { testId } = useParams();
+  return <ToeicReaderWorkspace key={testId} testId={testId} />;
+}
+
+function ToeicReaderWorkspace({ testId }) {
+  useLocale();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [selectedMode, setSelectedMode] = useState('PRACTICE');
@@ -138,11 +143,13 @@ export default function ToeicReaderPage() {
     selectedMode === 'EXAM' || selectedPart == null
       ? exam.questions.length
       : exam.questions.filter(question => question.part === selectedPart).length;
+  const parts = [...new Set(exam.questions.map(question => question.part))].sort((a, b) => a - b);
+  const listening = isListeningPart(parts[0]);
 
   return (
     <>
       <div className="toeic-reader-back">
-        <Link to="/exams/toeic">
+        <Link to={listening ? '/exams/toeic?section=listening' : '/exams/toeic'}>
           <ArrowBackRounded fontSize="small" />
           {t('Tất cả bộ đề')}
         </Link>
@@ -157,6 +164,14 @@ export default function ToeicReaderPage() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {exam.companionExamId && (
+            <Link
+              className="toeic-button toeic-button-outline"
+              to={`/exams/toeic/tests/${exam.companionExamId}`}
+            >
+              {t(listening ? 'Mở phần Reading' : 'Mở phần Listening')}
+            </Link>
+          )}
           {user && (
             <Link className="toeic-button toeic-button-outline" to={ROUTES.MY_NOTES}>
               <StickyNote2Outlined fontSize="small" />
@@ -233,9 +248,15 @@ export default function ToeicReaderPage() {
             </div>
             <h3>{t('Luyện tập linh hoạt & xem đáp án ngay')}</h3>
             <ul className="toeic-mode-points">
-              <li>{t('Tùy chọn làm riêng từng Part (5, 6, 7) hoặc trọn bộ đề')}</li>
+              <li>{t('Luyện từng Part hoặc trọn bộ đề')}</li>
               <li>{t('Tự chọn thời gian làm bài hoặc không giới hạn thời gian')}</li>
-              <li>{t('Xem lại đáp án đúng và lời giải chi tiết thoải mái ngay khi đang làm')}</li>
+              <li>
+                {t(
+                  listening
+                    ? 'Hiện đáp án và transcript khi cần đối chiếu'
+                    : 'Xem lại đáp án đúng và lời giải chi tiết thoải mái ngay khi đang làm',
+                )}
+              </li>
             </ul>
           </article>
 
@@ -265,19 +286,34 @@ export default function ToeicReaderPage() {
               </span>
               <span className="toeic-mode-radio" aria-hidden="true" />
             </div>
-            <h3>{t('Thi thực chiến chuẩn phòng thi thật')}</h3>
+            <h3>
+              {t(
+                listening ? 'Thi thử Listening có giới hạn thời gian' : 'Thi thực chiến chuẩn phòng thi thật',
+              )}
+            </h3>
             <ul className="toeic-mode-points">
               <li>
-                {t('Làm trọn bộ {count} câu hỏi Reading (Part 5, 6, 7)', {
-                  count: exam.questions.length,
-                })}
+                {t(
+                  listening
+                    ? 'Làm trọn bộ {count} câu hỏi Listening'
+                    : 'Làm trọn bộ {count} câu hỏi Reading (Part 5, 6, 7)',
+                  {
+                    count: exam.questions.length,
+                  },
+                )}
               </li>
               <li>
                 {t('Thời gian thực tế cố định {minutes} phút, tự động nộp khi hết giờ', {
                   minutes: exam.durationMinutes,
                 })}
               </li>
-              <li>{t('Không xem đáp án giữa chừng — chỉ mở điểm số và lời giải sau khi nộp bài')}</li>
+              <li>
+                {t(
+                  listening
+                    ? 'Đáp án và transcript mở sau khi nộp bài.'
+                    : 'Không xem đáp án giữa chừng — chỉ mở điểm số và lời giải sau khi nộp bài',
+                )}
+              </li>
             </ul>
           </article>
         </div>
@@ -343,7 +379,7 @@ export default function ToeicReaderPage() {
             <h2>{t('3. Chọn phần thi muốn luyện')}</h2>
           </div>
 
-          <div className="toeic-practice-grid is-four">
+          <div className={`toeic-practice-grid ${listening ? 'is-listening' : 'is-four'}`}>
             <article
               className={`toeic-scope-card ${selectedPart === null ? 'is-selected' : ''}`}
               onClick={event => {
@@ -352,7 +388,7 @@ export default function ToeicReaderPage() {
               }}
             >
               <span className="toeic-test-edition">{t('Trọn bộ')}</span>
-              <h3>{t('Toàn bộ Reading')}</h3>
+              <h3>{t(listening ? 'Toàn bộ Listening' : 'Toàn bộ Reading')}</h3>
               <p>
                 {t('{count} câu hỏi · {time}', {
                   count: exam.questions.length,
@@ -369,7 +405,7 @@ export default function ToeicReaderPage() {
               </button>
             </article>
 
-            {[5, 6, 7].map(part => {
+            {parts.map(part => {
               const count = exam.questions.filter(question => question.part === part).length;
               const isChosen = selectedPart === part;
               return (
@@ -382,9 +418,7 @@ export default function ToeicReaderPage() {
                   }}
                 >
                   <span className="toeic-test-edition">Part {part}</span>
-                  <h3>
-                    {t(part === 5 ? 'Hoàn thành câu' : part === 6 ? 'Hoàn thành đoạn văn' : 'Đọc hiểu')}
-                  </h3>
+                  <h3>{t(PART_TITLES[part])}</h3>
                   <p>{t('{count} câu hỏi · {time}', { count, time: practiceTimeSummary })}</p>
                   <button
                     type="button"
@@ -404,13 +438,18 @@ export default function ToeicReaderPage() {
               <h3>
                 {selectedPart
                   ? t('Sẵn sàng luyện Part {part}', { part: selectedPart })
-                  : t('Sẵn sàng luyện trọn bộ Reading')}
+                  : t(listening ? 'Sẵn sàng luyện trọn bộ Listening' : 'Sẵn sàng luyện trọn bộ Reading')}
               </h3>
               <p>
-                {t('{count} câu hỏi · {time} · Xem đáp án & lời giải thoải mái khi đang làm', {
-                  count: selectedQuestionsCount,
-                  time: practiceTimeSummary,
-                })}
+                {t(
+                  listening
+                    ? '{count} câu hỏi · {time} · Có đáp án và transcript'
+                    : '{count} câu hỏi · {time} · Xem đáp án & lời giải thoải mái khi đang làm',
+                  {
+                    count: selectedQuestionsCount,
+                    time: practiceTimeSummary,
+                  },
+                )}
               </p>
             </div>
             <button
@@ -438,10 +477,12 @@ export default function ToeicReaderPage() {
                   {t('Khóa đáp án giữa chừng')}
                 </span>
               </div>
-              <h3>{t('Thi thực chiến TOEIC Reading đầy đủ')}</h3>
+              <h3>{t(listening ? 'Thi thử TOEIC Listening' : 'Thi thực chiến TOEIC Reading đầy đủ')}</h3>
               <p>
                 {t(
-                  '{count} câu hỏi (Part 5, 6, 7) · Đồng hồ đếm ngược {minutes} phút chuẩn đề thật · Điểm số và lời giải chỉ mở sau khi nộp bài.',
+                  listening
+                    ? '{count} câu hỏi · {minutes} phút · Phát audio theo từng nhóm câu. Đáp án và transcript mở sau khi nộp.'
+                    : '{count} câu hỏi (Part 5, 6, 7) · Đồng hồ đếm ngược {minutes} phút chuẩn đề thật · Điểm số và lời giải chỉ mở sau khi nộp bài.',
                   {
                     count: exam.questions.length,
                     minutes: exam.durationMinutes,
@@ -480,10 +521,10 @@ export default function ToeicReaderPage() {
                   <div>
                     <strong>
                       {attempt.mode === 'EXAM'
-                        ? t('Thi thực chiến Reading')
+                        ? t(listening ? 'Thi thử Listening' : 'Thi thực chiến Reading')
                         : attempt.part
-                          ? `${t('Luyện tập Reading')} · Part ${attempt.part}`
-                          : t('Luyện tập Reading')}
+                          ? `${t(listening ? 'Luyện tập Listening' : 'Luyện tập Reading')} · Part ${attempt.part}`
+                          : t(listening ? 'Luyện tập Listening' : 'Luyện tập Reading')}
                     </strong>
                     <small>
                       {attempt.startedAt
