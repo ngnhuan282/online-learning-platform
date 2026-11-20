@@ -2372,7 +2372,27 @@
   "Mình chỉ hỗ trợ học tiếng Anh và sử dụng ChitChatGo. Bạn hãy nêu rõ phần tiếng Anh hoặc tính năng cần hỗ trợ nhé. Câu hỏi này chưa bị tính lượt.": "I can help with learning English and using ChitChatGo. Please specify the English skill or website feature you need help with. This question did not use your allowance.",
   "Chat AI với hạn mức theo ngày": "AI chat with a daily allowance",
   "Chat AI với hạn mức cao hơn mỗi ngày": "A higher daily AI chat allowance",
-  "Hết lượt hôm nay": "Daily limit reached"
+  "Hết lượt hôm nay": "Daily limit reached",
+  "Xem tất cả bài nghe của {name}": "View all listening exercises for {name}",
+  "Nhóm trình độ": "Level group",
+  "Người mới": "Beginner",
+  "Đi đến chủ đề": "Jump to a topic",
+  "Liên kết video": "Video URL",
+  "Dán URL HTTPS phát trực tiếp tệp MP4 trên cloud.": "Paste the direct HTTPS URL of an MP4 hosted in the cloud.",
+  "Vui lòng nhập liên kết video.": "Enter a video URL.",
+  "Vui lòng nhập URL HTTPS trực tiếp của video.": "Enter the direct HTTPS URL for the video.",
+  "Chờ tải thời lượng video trước khi xuất bản.": "Wait for the video's duration to load before publishing.",
+  "Thời lượng video không hợp lệ.": "The video's duration is invalid.",
+  "Không phát được video.": "Could not play the video.",
+  "Không phát được video. Kiểm tra liên kết cloud.": "Could not play the video. Check its cloud URL.",
+  "Lấy vị trí phát hiện tại làm mốc bắt đầu": "Use the current playback position as the start time",
+  "Lấy vị trí phát hiện tại làm mốc kết thúc": "Use the current playback position as the end time",
+  "Liên kết YouTube": "YouTube URL",
+  "Vui lòng nhập liên kết YouTube hợp lệ.": "Enter a valid YouTube URL.",
+  "Dán link YouTube gốc. Bấm phát video nếu thời lượng chưa hiện.": "Paste the original YouTube link. Play the video if the duration has not loaded.",
+  "Không phát được video nhúng YouTube.": "Could not play the embedded YouTube video.",
+  "Bấm nút phát trên video YouTube để tiếp tục.": "Click Play on the YouTube video to continue.",
+  "Thời lượng video: {duration}": "Video duration: {duration}"
 }
 
 

@@ -12,6 +12,7 @@ const multipart = file => {
 export const dictationApi = {
   query: (path, params, signal) => axiosClient.get(path, { params, signal }),
   catalogPath: base,
+  topicGroupsPath: `${base}/topic-groups`,
   adminPath: admin,
   historyPath: `${base}/attempts`,
   attemptPath: id => `${base}/attempts/${part(id)}`,

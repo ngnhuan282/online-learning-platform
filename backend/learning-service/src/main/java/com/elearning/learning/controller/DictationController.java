@@ -27,11 +27,34 @@ public class DictationController {
         @RequestParam(defaultValue = "") String keyword,
         @RequestParam(defaultValue = "") String level,
         @RequestParam(defaultValue = "") String topic,
+        @RequestParam(defaultValue = "") String status,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "12") int size
     ) {
         return ApiResponse.success(
-            dictation.catalog(Long.parseLong(user.getName()), keyword, level, topic, page, size, false)
+            dictation.catalog(
+                Long.parseLong(user.getName()),
+                keyword,
+                level,
+                topic,
+                page,
+                size,
+                false,
+                status
+            )
+        );
+    }
+
+    @GetMapping("/topic-groups")
+    public ApiResponse<GroupedCatalog> topicGroups(
+        Principal user,
+        @RequestParam(defaultValue = "") String keyword,
+        @RequestParam(defaultValue = "") String level,
+        @RequestParam(defaultValue = "") String topic,
+        @RequestParam(defaultValue = "") String status
+    ) {
+        return ApiResponse.success(
+            dictation.topicGroups(Long.parseLong(user.getName()), keyword, level, topic, status)
         );
     }
 

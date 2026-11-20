@@ -2,18 +2,32 @@ package com.elearning.learning.service;
 
 import com.elearning.learning.common.exception.*;
 import com.elearning.learning.dto.DictationModels.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
+import java.util.regex.Pattern;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @Transactional
 public class DictationService {
+
+    private static final Pattern TOEIC_TEST_TOPIC = Pattern.compile("(?i)test\\s+0*([1-9][0-9]{0,8})");
+    private static final Pattern YOUTUBE_VIDEO_ID = Pattern.compile("[A-Za-z0-9_-]{11}");
+    private static final Pattern YOUTUBE_VIDEO_PATH = Pattern.compile("^/(?:embed|shorts)/");
+    private static final Set<String> YOUTUBE_HOSTS = Set.of(
+        "youtube.com", "www.youtube.com", "m.youtube.com", "www.youtube-nocookie.com"
+    );
 
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
@@ -85,77 +99,194 @@ public class DictationService {
     ) {
         page = Math.max(0, Math.min(page, 100000));
         size = Math.max(1, Math.min(size, 50));
-        String join =
-            " FROM dictation_exercises e JOIN dictation_revisions r ON r.exercise_id=e.id AND r.version=" +
-            (admin ? "e.current_version" : "e.published_version");
-        String where =
-            " WHERE " +
-            (admin ? "1=1" : "e.archived=FALSE") +
-            " AND LOWER(r.title) LIKE ? AND (?='' OR r.level=?) AND (?='' OR r.topic=?)";
-        if (admin) {
-            where += switch (Objects.requireNonNullElse(status, "").strip().toUpperCase(Locale.ROOT)) {
-                case "" -> "";
-                case "PUBLISHED" -> " AND e.archived=FALSE AND e.published_version IS NOT NULL";
-                case "DRAFT" -> " AND e.archived=FALSE AND e.published_version IS NULL";
-                case "ARCHIVED" -> " AND e.archived=TRUE";
-                default -> throw new AppException(ErrorCode.BAD_REQUEST);
-            };
-        }
-        String search =
-            "%" +
-            Objects.requireNonNullElse(keyword, "")
-                .toLowerCase(Locale.ROOT)
-                .replace("%", "")
-                .replace("_", "") +
-            "%";
-        Object[] params = { search, level, level, topic, topic };
-        long total = jdbc.queryForObject("SELECT COUNT(*)" + join + where, Long.class, params);
-        var args = new ArrayList<>(Arrays.asList(params));
+        CatalogFilter filter = catalogFilter(user, keyword, level, topic, admin, status);
+        long total = jdbc.queryForObject(
+            "SELECT COUNT(*)" + filter.sql(),
+            Long.class,
+            filter.args().toArray()
+        );
+        var args = new ArrayList<>(filter.args());
         args.add(size);
         args.add((long) page * size);
         List<Item> items = jdbc.query(
-            "SELECT e.*, r.definition, r.duration_seconds" +
-                join +
-                where +
+            "SELECT " +
+                itemColumns(admin) +
+                filter.sql() +
                 " ORDER BY e.updated_at DESC, e.id LIMIT ? OFFSET ?",
-            (rs, row) -> {
-                var definition = json.readValue(rs.getString("definition"), Definition.class);
-                String id = rs.getString("id");
-                List<Run> runs = admin
-                    ? List.of()
-                    : jdbc.query(
-                          "SELECT * FROM dictation_attempts WHERE user_id=? AND exercise_id=? ORDER BY started_at DESC, id DESC LIMIT 1",
-                          this::mapRun,
-                          user,
-                          id
-                      );
-                Attempt progress = runs.isEmpty() ? null : view(runs.getFirst());
-                Integer published = rs.getObject("published_version", Integer.class);
-                return new Item(
-                    id,
-                    definition.title(),
-                    definition.description(),
-                    definition.topic(),
-                    definition.level(),
-                    rs.getDouble("duration_seconds"),
-                    definition.sentences().size(),
-                    rs.getBoolean("archived") ? "ARCHIVED" : published == null ? "DRAFT" : "PUBLISHED",
-                    published == null || published != rs.getInt("current_version"),
-                    rs.getInt("current_version"),
-                    progress == null ? null : progress.id(),
-                    progress == null ? 0 : progress.completed(),
-                    progress == null ? definition.sentences().size() : progress.sentences().size(),
-                    progress != null && progress.completedAt() != null,
-                    progress == null ? null : progress.accuracy()
-                );
-            },
+            (rs, row) -> catalogItem(rs, user),
             args.toArray()
         );
-        List<String> topics = jdbc.queryForList(
-            "SELECT DISTINCT r.topic" + join + (admin ? "" : " WHERE e.archived=FALSE") + " ORDER BY r.topic",
-            String.class
+        return new Catalog(items, total, page, size, catalogTopics(admin));
+    }
+
+    @Transactional(readOnly = true)
+    public GroupedCatalog topicGroups(long user, String keyword, String level, String topic, String status) {
+        CatalogFilter filter = catalogFilter(user, keyword, level, topic, false, status);
+        var groups = new LinkedHashMap<String, TopicGroup>();
+        jdbc.query(
+            "SELECT ranked.* FROM (SELECT " +
+                itemColumns(false) +
+                ", " +
+                "MIN(e.id) OVER (PARTITION BY LOWER(r.topic)) AS group_key, " +
+                "COUNT(*) OVER (PARTITION BY LOWER(r.topic)) AS group_total, " +
+                "ROW_NUMBER() OVER (PARTITION BY LOWER(r.topic) ORDER BY e.updated_at DESC, e.id) AS group_position" +
+                filter.sql() +
+                ") ranked WHERE group_position <= 4 " +
+                "ORDER BY group_key, group_position",
+            rs -> {
+                String topicKey = rs.getString("group_key");
+                long count = rs.getLong("group_total");
+                Item item = catalogItem(rs, user);
+                groups
+                    .computeIfAbsent(topicKey, key -> new TopicGroup(item.topic(), count, new ArrayList<>()))
+                    .items()
+                    .add(item);
+            },
+            filter.args().toArray()
         );
-        return new Catalog(items, total, page, size, topics);
+        var ordered = groups
+            .values()
+            .stream()
+            .sorted(
+                Comparator.comparingInt((TopicGroup group) -> {
+                    var test = TOEIC_TEST_TOPIC.matcher(group.topic());
+                    return test.matches() ? Integer.parseInt(test.group(1)) : Integer.MAX_VALUE;
+                }).thenComparing(TopicGroup::topic, String.CASE_INSENSITIVE_ORDER)
+            )
+            .toList();
+        return new GroupedCatalog(ordered);
+    }
+
+    private record CatalogFilter(String sql, List<Object> args) {}
+
+    private CatalogFilter catalogFilter(
+        long user,
+        String keyword,
+        String level,
+        String topic,
+        boolean admin,
+        String status
+    ) {
+        String from = catalogFrom(admin);
+        var args = new ArrayList<>();
+        if (!admin) {
+            from +=
+                " LEFT JOIN dictation_attempts a ON a.id = (SELECT latest.id FROM dictation_attempts latest" +
+                " WHERE latest.user_id=? AND latest.exercise_id=e.id ORDER BY latest.started_at DESC, latest.id DESC LIMIT 1)";
+            args.add(user);
+        }
+        String where =
+            " WHERE " +
+            (admin ? "1=1" : "e.archived=FALSE") +
+            " AND LOWER(r.title) LIKE ? AND (?='' OR LOWER(r.topic)=LOWER(?))";
+        String normalizedStatus = Objects.requireNonNullElse(status, "").strip().toUpperCase(Locale.ROOT);
+        where += admin
+            ? switch (normalizedStatus) {
+                  case "" -> "";
+                  case "PUBLISHED" -> " AND e.archived=FALSE AND e.published_version IS NOT NULL";
+                  case "DRAFT" -> " AND e.archived=FALSE AND e.published_version IS NULL";
+                  case "ARCHIVED" -> " AND e.archived=TRUE";
+                  default -> throw new AppException(ErrorCode.BAD_REQUEST);
+              }
+            : switch (normalizedStatus) {
+                  case "" -> "";
+                  case "NOT_STARTED" -> " AND a.id IS NULL";
+                  case "IN_PROGRESS" -> " AND a.id IS NOT NULL AND a.completed_at IS NULL";
+                  case "COMPLETED" -> " AND a.completed_at IS NOT NULL";
+                  default -> throw new AppException(ErrorCode.BAD_REQUEST);
+              };
+        args.add(
+            "%" +
+                Objects.requireNonNullElse(keyword, "")
+                    .toLowerCase(Locale.ROOT)
+                    .replace("%", "")
+                    .replace("_", "") +
+                "%"
+        );
+        args.addAll(List.of(topic, topic));
+        where += switch (Objects.requireNonNullElse(level, "")) {
+            case "" -> "";
+            case "BEGINNER" -> " AND r.level IN ('A1', 'A2')";
+            case "ADVANCED" -> " AND r.level IN ('B1', 'B2', 'C1', 'C2')";
+            default -> {
+                args.add(level);
+                yield " AND r.level=?";
+            }
+        };
+        return new CatalogFilter(from + where, args);
+    }
+
+    private String catalogFrom(boolean admin) {
+        return (
+            " FROM dictation_exercises e JOIN dictation_revisions r ON r.exercise_id=e.id AND r.version=" +
+            (admin ? "e.current_version" : "e.published_version")
+        );
+    }
+
+    private String itemColumns(boolean admin) {
+        return (
+            "e.*, r.definition, r.duration_seconds, r.topic, " + (admin ? "NULL" : "a.id") + " AS attempt_id"
+        );
+    }
+
+    private List<String> catalogTopics(boolean admin) {
+        String sql =
+            "SELECT DISTINCT r.topic" + catalogFrom(admin) + " WHERE " + (admin ? "1=1" : "e.archived=FALSE");
+        return jdbc.queryForList(sql + " ORDER BY r.topic", String.class);
+    }
+
+    private Item catalogItem(ResultSet rs, long user) throws SQLException {
+        var definition = json.readValue(rs.getString("definition"), Definition.class);
+        String attemptId = rs.getString("attempt_id");
+        Attempt progress = attemptId == null ? null : view(run(user, attemptId, false));
+        Integer published = rs.getObject("published_version", Integer.class);
+        int current = rs.getInt("current_version");
+        return new Item(
+            rs.getString("id"),
+            definition.title(),
+            definition.description(),
+            rs.getString("topic"),
+            definition.level(),
+            rs.getDouble("duration_seconds"),
+            definition.sentences().size(),
+            rs.getBoolean("archived") ? "ARCHIVED" : published == null ? "DRAFT" : "PUBLISHED",
+            published == null || published != current,
+            current,
+            attemptId,
+            progress == null ? 0 : progress.completed(),
+            progress == null ? definition.sentences().size() : progress.sentences().size(),
+            progress != null && progress.completedAt() != null,
+            progress == null ? null : progress.accuracy(),
+            definition.video() != null,
+            youtubeThumbnail(definition.video())
+        );
+    }
+
+    private String youtubeThumbnail(Video video) {
+        if (video == null || video.url() == null) return null;
+        try {
+            URI url = URI.create(video.url());
+            String host = Objects.requireNonNullElse(url.getHost(), "").toLowerCase(Locale.ROOT);
+            if (!"https".equalsIgnoreCase(url.getScheme()) || url.getUserInfo() != null) return null;
+
+            String path = url.getPath();
+            String id;
+            if ("youtu.be".equals(host)) {
+                id = path.startsWith("/") ? path.substring(1) : "";
+            } else if (YOUTUBE_HOSTS.contains(host)) {
+                if ("/watch".equals(path)) {
+                    String value = UriComponentsBuilder.fromUri(url).build().getQueryParams().getFirst("v");
+                    id = value == null ? "" : UriUtils.decode(value, StandardCharsets.UTF_8);
+                } else {
+                    id = YOUTUBE_VIDEO_PATH.matcher(path).replaceFirst("");
+                }
+            } else {
+                return null;
+            }
+            return YOUTUBE_VIDEO_ID.matcher(id).matches() ? "https://i.ytimg.com/vi/" + id + "/mqdefault.jpg" : null;
+        } catch (IllegalArgumentException invalidUrl) {
+            return null;
+        }
     }
 
     public AdminDetail save(String id, SaveRequest request) {
@@ -172,7 +303,6 @@ public class DictationService {
         Exercise exercise = exercise(id, true);
         if (exercise.version() != request.version()) throw new AppException(ErrorCode.CONFLICT);
         int next = exercise.version() + 1;
-        Audio info = audio.metadata(definition.audioKey());
         jdbc.update(
             "INSERT INTO dictation_revisions (exercise_id, version, title, topic, level, duration_seconds, definition) VALUES (?, ?, ?, ?, ?, ?, ?)",
             id,
@@ -180,7 +310,7 @@ public class DictationService {
             definition.title().strip(),
             definition.topic().strip(),
             definition.level(),
-            info == null ? 0 : info.duration(),
+            mediaDuration(definition),
             json.writeValueAsString(definition)
         );
         jdbc.update(
@@ -209,7 +339,7 @@ public class DictationService {
             exercise.published() != null,
             exercise.published() == null || exercise.published() != exercise.version(),
             definition,
-            audio.metadata(definition.audioKey())
+            definition.video() == null ? audio.metadata(definition.audioKey()) : null
         );
     }
 
@@ -577,6 +707,7 @@ public class DictationService {
                 )
             );
         }
+        boolean archived = exercise(run.exercise(), false).archived();
         return new Attempt(
             run.id(),
             run.exercise(),
@@ -584,7 +715,7 @@ public class DictationService {
             definition.title(),
             definition.topic(),
             definition.level(),
-            audio.metadata(definition.audioKey()).duration(),
+            mediaDuration(definition),
             run.index(),
             segments,
             responses,
@@ -593,13 +724,46 @@ public class DictationService {
             run.started(),
             run.finished(),
             run.scoringMode(),
-            exercise(run.exercise(), false).archived()
+            archived,
+            archived && run.finished() == null ? null : definition.video()
         );
     }
 
-    private Definition validate(Definition definition, boolean publish) {
+    private double mediaDuration(Definition definition) {
+        if (definition.video() != null) return Objects.requireNonNullElse(definition.video().duration(), 0.0);
         Audio info = audio.metadata(definition.audioKey());
-        if (publish && info == null) throw new DictationValidationException(
+        return info == null ? 0.0 : info.duration();
+    }
+
+    private Video validateVideo(Video video, boolean publish) {
+        if (video == null) return null;
+        URI url;
+        try {
+            url = URI.create(Objects.requireNonNullElse(video.url(), "").strip());
+            if (
+                !"https".equalsIgnoreCase(url.getScheme()) ||
+                url.getHost() == null ||
+                url.getUserInfo() != null
+            ) throw new IllegalArgumentException();
+        } catch (IllegalArgumentException ex) {
+            throw new DictationValidationException("Vui lòng nhập URL HTTPS trực tiếp của video.");
+        }
+        Double duration = video.duration();
+        if (
+            duration != null && (!Double.isFinite(duration) || duration <= 0)
+        ) throw new DictationValidationException("Thời lượng video không hợp lệ.");
+        if (publish && duration == null) throw new DictationValidationException(
+            "Chờ tải thời lượng video trước khi xuất bản."
+        );
+        return new Video(url.toString(), duration);
+    }
+
+    private Definition validate(Definition definition, boolean publish) {
+        Video video = validateVideo(definition.video(), publish);
+        Audio info = video == null ? audio.metadata(definition.audioKey()) : null;
+        Double duration =
+            video != null ? video.duration() : info == null ? null : Double.valueOf(info.duration());
+        if (publish && video == null && info == null) throw new DictationValidationException(
             "Vui lòng thêm audio trước khi xuất bản."
         );
         double priorEnd = 0;
@@ -620,11 +784,12 @@ public class DictationService {
                 (end != null && (!Double.isFinite(end) || end <= 0)) ||
                 (start != null && end != null && start >= end)
             ) throw new DictationValidationException(prefix + "mốc thời gian không hợp lệ.");
-            if (info != null) {
-                if (start != null && start >= info.duration()) throw new DictationValidationException(
-                    prefix + "mốc thời gian vượt quá audio."
+            if (duration != null) {
+                if (start != null && start >= duration) throw new DictationValidationException(
+                    prefix +
+                        (video == null ? "mốc thời gian vượt quá audio." : "mốc thời gian vượt quá video.")
                 );
-                if (end != null) end = Math.min(end, info.duration());
+                if (end != null) end = Math.min(end, duration);
             }
             if (publish && start < priorEnd) throw new DictationValidationException(
                 prefix + "thời gian đang chồng lên câu trước."
@@ -632,13 +797,16 @@ public class DictationService {
             if (end != null) priorEnd = end;
             sentences.add(new Sentence(sentence.text(), start, end));
         }
+        String topic = definition.topic().strip();
+        var test = TOEIC_TEST_TOPIC.matcher(topic);
         return new Definition(
             definition.title(),
             definition.description(),
-            definition.topic(),
+            test.matches() ? "Test " + test.group(1) : topic,
             definition.level(),
-            definition.audioKey(),
-            List.copyOf(sentences)
+            video == null ? definition.audioKey() : null,
+            List.copyOf(sentences),
+            video
         );
     }
 
@@ -661,13 +829,23 @@ public class DictationService {
     }
 
     private Definition definition(String id, int version) {
-        String value = jdbc.queryForObject(
-            "SELECT definition FROM dictation_revisions WHERE exercise_id=? AND version=?",
-            String.class,
+        return jdbc.queryForObject(
+            "SELECT definition, topic FROM dictation_revisions WHERE exercise_id=? AND version=?",
+            (rs, row) -> {
+                Definition value = json.readValue(rs.getString("definition"), Definition.class);
+                return new Definition(
+                    value.title(),
+                    value.description(),
+                    rs.getString("topic"),
+                    value.level(),
+                    value.audioKey(),
+                    value.sentences(),
+                    value.video()
+                );
+            },
             id,
             version
         );
-        return json.readValue(value, Definition.class);
     }
 
     private Run run(long user, String id, boolean lock) {

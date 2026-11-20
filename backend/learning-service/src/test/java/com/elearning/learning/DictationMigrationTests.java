@@ -15,8 +15,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class DictationMigrationTests {
+
+    private static final String LEGACY_STARTER = "ets-2024-company-picnic";
+    private static final String YOUTUBE_STARTER = "what-day-is-it-today";
+    private static final String YOUTUBE_TITLE = "What day is it today?";
+    private static final String YOUTUBE_URL = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
 
     @Test
     void v14ToV16ExtendMainWithoutChangingItsHistoryOrExistingSettings() {
@@ -69,10 +75,21 @@ class DictationMigrationTests {
                 id, id.equals(legacy) ? "We enjoyed it" : "We it", first,
                 id.equals(legacy) ? json.writeValueAsString(grader.grade("We enjoyed it.", "We enjoyed it")) : first);
         }
-        config.target("16").load().migrate();
+        config.target("19").load().migrate();
+        var oldDefinition = (ObjectNode) json.valueToTree(definition);
+        oldDefinition.put("toeicTest", 8);
+        String oldSnapshot = json.writeValueAsString(oldDefinition);
+        jdbc.update("UPDATE dictation_revisions SET toeic_test=8, definition=? WHERE exercise_id=?",
+            oldSnapshot, exercise);
+        assertThat(config.target("20").load().migrate().migrationsExecuted).isEqualTo(1);
         var audio = mock(DictationAudioService.class);
         when(audio.metadata("sample")).thenReturn(new Audio("sample", 3, "sample.mp3"));
         var service = new DictationService(jdbc, json, grader, audio, Clock.systemUTC());
+        assertThat(service.adminDetail(exercise).definition().topic()).isEqualTo("Test 8");
+        assertThat(service.catalog(7001, "Migrated", "", "Test 8", 0, 12, false).items())
+            .extracting(Item::id).containsExactly(exercise);
+        assertThat(jdbc.queryForObject("SELECT definition FROM dictation_revisions WHERE exercise_id=?",
+            String.class, exercise)).isEqualTo(oldSnapshot);
         var completed = service.attempt(7001, legacy);
         assertThat(completed.scoringMode()).isEqualTo("LEGACY");
         assertThat(completed.accuracy()).isEqualTo(66.7);
@@ -99,5 +116,79 @@ class DictationMigrationTests {
         assertThat(service.attempt(7001, legacy).accuracy()).isEqualTo(66.7);
         assertThat(jdbc.queryForObject("SELECT first_grade FROM dictation_responses WHERE attempt_id=?",
             String.class, legacy)).isEqualTo(first);
+    }
+
+    @Test
+    void v21PublishesTheYouTubeStarterInANewDatabase() {
+        var source = new DriverManagerDataSource(
+            "jdbc:h2:mem:dictation-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
+        );
+        Flyway.configure().dataSource(source).placeholders(Map.of(
+            "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""
+        )).load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        var audio = mock(DictationAudioService.class);
+        var service = new DictationService(
+            jdbc, JsonMapper.builder().build(), new DictationGrader(), audio, Clock.systemUTC()
+        );
+
+        assertThat(service.catalog(7021, "", "", "", 0, 12, false).items()).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo(YOUTUBE_STARTER);
+            assertThat(item.title()).isEqualTo(YOUTUBE_TITLE);
+            assertThat(item.topic()).isEqualTo("Daily English Conversation");
+            assertThat(item.level()).isEqualTo("A1");
+            assertThat(item.sentenceCount()).isEqualTo(7);
+            assertThat(item.duration()).isEqualTo(92.0);
+            assertThat(item.thumbnailUrl()).isEqualTo("https://i.ytimg.com/vi/_R7nrvhNmrI/mqdefault.jpg");
+        });
+        var definition = service.adminDetail(YOUTUBE_STARTER).definition();
+        assertThat(definition.audioKey()).isNull();
+        assertThat(definition.video()).isEqualTo(new Video(YOUTUBE_URL, 92.0));
+        assertThat(definition.sentences()).contains(
+            new Sentence("It's Wednesday.", 15.0, 18.0),
+            new Sentence("Let's play on Friday.", 27.0, 30.0)
+        );
+        var attempt = service.start(7021, YOUTUBE_STARTER, new StartRequest("youtube-starter-attempt", false));
+        assertThat(attempt.video()).isEqualTo(definition.video());
+        assertThat(attempt.sentences()).hasSize(7);
+        assertThat(attempt.sentences().getLast().end()).isEqualTo(34.0);
+        assertThat(jdbc.queryForObject(
+            "SELECT archived FROM dictation_exercises WHERE id=?", Boolean.class, LEGACY_STARTER
+        )).isTrue();
+        verifyNoInteractions(audio);
+    }
+
+    @Test
+    void v21KeepsAnAlreadyPublishedYouTubeLessonAndTheLegacyAudioProgress() {
+        var source = new DriverManagerDataSource(
+            "jdbc:h2:mem:dictation-existing-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
+        );
+        var config = Flyway.configure().dataSource(source).placeholders(Map.of(
+            "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""
+        ));
+        config.target("20").load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        var audio = mock(DictationAudioService.class);
+        when(audio.metadata("sample-ets-2024-test-1")).thenReturn(
+            new Audio("sample-ets-2024-test-1", 31.479, "Audio 1.mp3")
+        );
+        var service = new DictationService(
+            jdbc, JsonMapper.builder().build(), new DictationGrader(), audio, Clock.systemUTC()
+        );
+        var imported = new Definition(
+            YOUTUBE_TITLE, "Bài của nhóm", "Daily English Conversation", "A2", null,
+            List.of(new Sentence("It's Wednesday.", 15.0, 18.0)), new Video(YOUTUBE_URL, 92.0)
+        );
+        var lesson = service.saveAndPublish(null, new SaveRequest(imported, 0));
+        var attempt = service.start(7022, LEGACY_STARTER, new StartRequest("legacy-starter-attempt", false));
+        service.progress(7022, attempt.id(), new AnswerRequest(0, "Thank you so much"));
+
+        assertThat(config.target("21").load().migrate().migrationsExecuted).isEqualTo(1);
+
+        assertThat(service.catalog(7022, "", "", "", 0, 12, false).items())
+            .extracting(Item::id).containsExactlyInAnyOrder(LEGACY_STARTER, lesson.id());
+        assertThat(service.adminDetail(lesson.id()).definition()).isEqualTo(imported);
+        assertThat(service.attempt(7022, attempt.id()).responses().getFirst().text()).isEqualTo("Thank you so much");
+        config.load().validate();
     }
 }

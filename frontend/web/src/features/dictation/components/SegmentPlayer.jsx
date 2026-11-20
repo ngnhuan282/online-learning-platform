@@ -4,7 +4,18 @@ import { PauseRounded, PlayArrowRounded, ReplayRounded, VolumeUpOutlined } from 
 import { t } from '../../../shared/i18n/locale';
 import { formatTime } from '../utils/dictation';
 
-export default function SegmentAudio({ src, start, end, duration, disabled, busy, seekRequest, onNext }) {
+export default function SegmentPlayer({
+  src,
+  video,
+  start,
+  end,
+  duration,
+  disabled,
+  busy,
+  seekRequest,
+  onNext,
+}) {
+  const Media = video ? 'video' : 'audio';
   const audio = useRef(null);
   const stopAt = useRef(end);
   const playback = useRef({ id: 0, wanted: false, pending: null });
@@ -123,10 +134,12 @@ export default function SegmentAudio({ src, start, end, duration, disabled, busy
   }
   return (
     <div className="dictation-audio">
-      <audio
+      <Media
+        className={video ? 'dictation-video-player' : undefined}
         ref={audio}
         src={src || undefined}
-        preload="auto"
+        preload={video ? 'metadata' : 'auto'}
+        playsInline={video || undefined}
         onPlay={() => setPlaying(!audio.current.paused)}
         onPause={() => setPlaying(!audio.current.paused)}
         onEnded={() => {
@@ -224,7 +237,11 @@ export default function SegmentAudio({ src, start, end, duration, disabled, busy
           {formatTime(start)} - {formatTime(end)}
         </strong>
       </div>
-      {failed && <Alert severity="error">{t('Không phát được audio. Vui lòng tải lại audio.')}</Alert>}
+      {failed && (
+        <Alert severity="error">
+          {t(video ? 'Không phát được video.' : 'Không phát được audio. Vui lòng tải lại audio.')}
+        </Alert>
+      )}
     </div>
   );
 }
