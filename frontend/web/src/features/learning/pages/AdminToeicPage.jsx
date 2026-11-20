@@ -14,10 +14,12 @@ import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import ToeicQuestion from '../components/ToeicQuestion';
 import ToeicQuestionImportDialog from '../components/ToeicQuestionImportDialog';
+import { isListeningPart, LISTENING_PARTS, READING_PARTS } from '../utils/toeicSections';
 import '../styles/toeic.css';
 
 const EMPTY = [];
 const LETTERS = ['A', 'B', 'C', 'D'];
+const optionIds = part => (part === 2 ? LETTERS.slice(0, 3) : LETTERS);
 let sequence = 0;
 const uniqueId = prefix => `${prefix}-${Date.now().toString(36)}-${++sequence}`;
 const blankDefinition = () => ({
@@ -37,6 +39,7 @@ const asForm = data => ({
   lessons: data.lessons ?? [],
   questions: (data.questions ?? []).map(question => ({
     ...question,
+    prompt: question.prompt ?? '',
     passage: question.passage ?? '',
     imageUrl: question.imageUrl ?? '',
     passageImageUrls: question.passageImageUrls ?? [],
@@ -60,6 +63,12 @@ const payload = form => ({
     prompt: question.prompt.trim(),
     passage: question.passage.trim(),
     imageUrl: question.imageUrl?.trim() || null,
+    listening: isListeningPart(question.part)
+      ? {
+          audioUrl: question.listening?.audioUrl?.trim() ?? '',
+          transcript: question.listening?.transcript?.trim() ?? '',
+        }
+      : null,
     passageImageUrls: question.passageImageUrls ?? [],
     correctOptionId: question.correctOptionId || 'A',
     explanation: question.explanation.trim(),
@@ -89,6 +98,8 @@ export default function AdminToeicPage() {
   const { data: exams, loading, error: listError, reload } = useLearningResource(load, EMPTY);
   const dirty = JSON.stringify(form) !== saved;
   const selectedQuestion = form.questions.find(item => item.id === questionId) ?? form.questions[0];
+  const listening = isListeningPart(form.questions[0]?.part);
+  const spokenOptions = listening && selectedQuestion.part <= 2;
 
   useEffect(() => {
     const activeGeneration = ++generation.current;
@@ -155,32 +166,84 @@ export default function AdminToeicPage() {
     setForm(previous => ({ ...previous, [key]: value }));
     setMessage('');
   }
-  function editQuestion(key, value) {
-    if (!selectedQuestion) return;
+  function updateQuestion(changes) {
     setForm(previous => ({
       ...previous,
       questions: previous.questions.map(question =>
-        question.id === selectedQuestion.id ? { ...question, [key]: value } : question,
+        question.id === selectedQuestion.id ? { ...question, ...changes } : question,
       ),
     }));
     setMessage('');
   }
-  function addQuestion() {
-    const number = Math.max(100, ...form.questions.map(question => Number(question.number) || 100)) + 1;
+  function editQuestion(key, value) {
+    updateQuestion({ [key]: value });
+  }
+  function editPart(part) {
+    const letters = optionIds(part);
+    updateQuestion({
+      part,
+      options: letters.map(id => ({
+        id,
+        text: selectedQuestion.options.find(option => option.id === id)?.text ?? '',
+      })),
+      correctOptionId: letters.includes(selectedQuestion.correctOptionId)
+        ? selectedQuestion.correctOptionId
+        : 'A',
+    });
+  }
+  function editAudioUrl(audioUrl) {
+    const shared = form.questions.find(
+      item =>
+        item.id !== selectedQuestion.id &&
+        audioUrl.trim() &&
+        item.listening?.audioUrl?.trim() === audioUrl.trim(),
+    );
+    editQuestion('listening', {
+      audioUrl,
+      transcript: shared?.listening.transcript ?? selectedQuestion.listening?.transcript ?? '',
+    });
+  }
+  function editTranscript(transcript) {
+    const audioUrl = selectedQuestion.listening?.audioUrl ?? '';
+    setForm(previous => ({
+      ...previous,
+      questions: previous.questions.map(item =>
+        item.id === selectedQuestion.id ||
+        (audioUrl.trim() && item.listening?.audioUrl?.trim() === audioUrl.trim())
+          ? { ...item, listening: { audioUrl: item.listening?.audioUrl ?? '', transcript } }
+          : item,
+      ),
+    }));
+    setMessage('');
+  }
+  function addQuestion(addListening) {
+    const firstNumber = addListening ? 1 : 101;
+    const number =
+      Math.max(firstNumber - 1, ...form.questions.map(question => Number(question.number) || 0)) + 1;
+    const ranges = addListening ? [6, 31, 70, Infinity] : [130, 146, Infinity];
+    const part = (addListening ? LISTENING_PARTS : READING_PARTS)[ranges.findIndex(end => number <= end)];
     const question = {
       id: uniqueId('q'),
       number,
-      part: number <= 130 ? 5 : number <= 146 ? 6 : 7,
+      part,
       passage: '',
       prompt: '',
-      options: LETTERS.map(id => ({ id, text: '' })),
+      options: optionIds(part).map(id => ({ id, text: '' })),
       correctOptionId: 'A',
       explanation: '',
       source: '',
       imageUrl: '',
       passageImageUrls: [],
     };
-    updateField('questions', [...form.questions, question]);
+    setForm(previous => ({
+      ...previous,
+      durationMinutes:
+        addListening && !previous.questions.length && previous.durationMinutes === 75
+          ? 45
+          : previous.durationMinutes,
+      questions: [...previous.questions, question],
+    }));
+    setMessage('');
     setQuestionId(question.id);
     setQuestionSearch('');
   }
@@ -196,7 +259,7 @@ export default function AdminToeicPage() {
       t('Đã thêm {count} câu hỏi vào biểu mẫu. Bấm Lưu bộ đề để lưu thay đổi.', { count: imported.length }),
     );
   }
-  function validate() {
+  function validate(publishing = false) {
     if (!form.title.trim() || !form.slug.trim()) return 'Vui lòng nhập tên và mã bộ đề.';
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug.trim()))
       return 'Mã bộ đề dùng chữ thường, số và dấu gạch ngang.';
@@ -215,11 +278,24 @@ export default function AdminToeicPage() {
       )
         return 'Số câu hỏi phải là số nguyên dương và không trùng nhau.';
       numbers.add(Number(question.number));
+      const spoken = isListeningPart(question.part) && question.part <= 2;
       if (
-        (!question.prompt.trim() && !question.imageUrl?.trim()) ||
-        question.options.some(option => !option.text.trim())
+        !spoken &&
+        ((!question.prompt.trim() && !question.imageUrl?.trim()) ||
+          question.options.some(option => !option.text.trim()))
       )
         return t('Câu {number} cần nội dung câu hỏi và đủ bốn lựa chọn A–D.', { number: question.number });
+      if (isListeningPart(question.part)) {
+        const audioUrl = question.listening?.audioUrl?.trim() ?? '';
+        if (audioUrl && !/^\/toeic-assets\/[\w/-]+\.mp3$/.test(audioUrl))
+          return t('Câu {number} cần đường dẫn MP3 dưới /toeic-assets/.', { number: question.number });
+        if (form.published || publishing) {
+          if (!audioUrl || !question.listening?.transcript?.trim())
+            return t('Câu {number} cần audio và transcript để xuất bản.', { number: question.number });
+          if (question.part === 1 && !question.imageUrl?.trim())
+            return t('Câu {number} Part 1 cần hình ảnh.', { number: question.number });
+        }
+      }
       if (question.imageUrl && !question.imageUrl.startsWith('/toeic-assets/'))
         return 'Hình câu hỏi phải dùng đường dẫn nội bộ /toeic-assets/.';
       if (question.passageImageUrls.some(url => !url.startsWith('/toeic-assets/')))
@@ -247,6 +323,13 @@ export default function AdminToeicPage() {
     });
   }
   function togglePublished() {
+    if (listening && !form.published) {
+      const validation = validate(true);
+      if (validation) {
+        setError({ message: t(validation) });
+        return;
+      }
+    }
     return run(async isCurrent => {
       const response = await toeicApi.publish(editingId, !form.published);
       if (isCurrent()) {
@@ -271,12 +354,8 @@ export default function AdminToeicPage() {
     <div className="toeic-app toeic-admin-app">
       <header className="toeic-page-heading">
         <div>
-          <h1>{t('Quản lý TOEIC Reading')}</h1>
-          <p>
-            {t(
-              'Tạo và quản lý ngân hàng câu hỏi TOEIC Reading trực tiếp. Nội dung đã xuất bản sẽ được đưa vào luồng luyện tập của học viên.',
-            )}
-          </p>
+          <h1>{t('Quản lý bộ đề TOEIC')}</h1>
+          <p>{t('Tạo và xuất bản bộ đề Reading hoặc Listening cho học viên.')}</p>
         </div>
         <button
           type="button"
@@ -404,14 +483,15 @@ export default function AdminToeicPage() {
             </button>
           </div>
           <section className="toeic-admin-content">
-              <div className="toeic-editor-toolbar">
-                <input
-                  type="search"
-                  aria-label={t('Tìm câu hỏi trong bộ đề')}
-                  placeholder={t('Tìm số câu hoặc nội dung...')}
-                  value={questionSearch}
-                  onChange={event => setQuestionSearch(event.target.value)}
-                />
+            <div className="toeic-editor-toolbar">
+              <input
+                type="search"
+                aria-label={t('Tìm câu hỏi trong bộ đề')}
+                placeholder={t('Tìm số câu hoặc nội dung...')}
+                value={questionSearch}
+                onChange={event => setQuestionSearch(event.target.value)}
+              />
+              {!listening && (
                 <button
                   type="button"
                   className="toeic-button toeic-button-outline"
@@ -421,62 +501,96 @@ export default function AdminToeicPage() {
                   <FileUploadOutlined fontSize="small" />
                   {t('Import Excel/CSV')}
                 </button>
+              )}
+              {form.questions.length === 0 && (
                 <button
                   type="button"
                   className="toeic-button toeic-button-outline"
                   disabled={busy}
-                  onClick={addQuestion}
+                  onClick={() => addQuestion(true)}
                 >
                   <AddRounded fontSize="small" />
-                  {t('Thêm câu hỏi')}
+                  {t('Thêm câu Listening')}
                 </button>
-              </div>
-              <div className="toeic-question-editor-layout">
-                <nav className="toeic-admin-question-list" aria-label={t('Chọn câu hỏi để sửa')}>
-                  {form.questions
-                    .filter(question =>
-                      `${question.number} ${question.prompt}`
-                        .toLocaleLowerCase()
-                        .includes(questionSearch.trim().toLocaleLowerCase()),
-                    )
-                    .map(question => (
-                      <button
-                        type="button"
-                        key={question.id}
-                        className={selectedQuestion?.id === question.id ? 'is-active' : ''}
-                        onClick={() => setQuestionId(question.id)}
+              )}
+              <button
+                type="button"
+                className="toeic-button toeic-button-outline"
+                disabled={busy}
+                onClick={() => addQuestion(listening)}
+              >
+                <AddRounded fontSize="small" />
+                {t('Thêm câu hỏi')}
+              </button>
+            </div>
+            <div className="toeic-question-editor-layout">
+              <nav className="toeic-admin-question-list" aria-label={t('Chọn câu hỏi để sửa')}>
+                {form.questions
+                  .filter(question =>
+                    `${question.number} ${question.prompt}`
+                      .toLocaleLowerCase()
+                      .includes(questionSearch.trim().toLocaleLowerCase()),
+                  )
+                  .map(question => (
+                    <button
+                      type="button"
+                      key={question.id}
+                      className={selectedQuestion?.id === question.id ? 'is-active' : ''}
+                      onClick={() => setQuestionId(question.id)}
+                    >
+                      <strong>{t('Câu {number}', { number: question.number })}</strong>
+                      <span>Part {question.part}</span>
+                    </button>
+                  ))}
+              </nav>
+              {selectedQuestion ? (
+                <fieldset disabled={busy} className="toeic-admin-fields">
+                  <div className="toeic-field-pair">
+                    <label>
+                      {t('Số câu hỏi')}
+                      <input
+                        type="number"
+                        min="1"
+                        value={selectedQuestion.number}
+                        onChange={event => editQuestion('number', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Part
+                      <select
+                        value={selectedQuestion.part}
+                        onChange={event => editPart(Number(event.target.value))}
                       >
-                        <strong>{t('Câu {number}', { number: question.number })}</strong>
-                        <span>Part {question.part}</span>
-                      </button>
-                    ))}
-                </nav>
-                {selectedQuestion ? (
-                  <fieldset disabled={busy} className="toeic-admin-fields">
-                    <div className="toeic-field-pair">
+                        {(listening ? LISTENING_PARTS : READING_PARTS).map(part => (
+                          <option value={part} key={part}>
+                            Part {part}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {listening && (
+                    <>
                       <label>
-                        {t('Số câu hỏi')}
+                        {t('Đường dẫn đoạn nghe')}
                         <input
-                          type="number"
-                          min="1"
-                          value={selectedQuestion.number}
-                          onChange={event => editQuestion('number', event.target.value)}
+                          value={selectedQuestion.listening?.audioUrl ?? ''}
+                          placeholder="/toeic-assets/.../audio-001.mp3"
+                          onChange={event => editAudioUrl(event.target.value)}
                         />
                       </label>
                       <label>
-                        Part
-                        <select
-                          value={selectedQuestion.part}
-                          onChange={event => editQuestion('part', Number(event.target.value))}
-                        >
-                          {[5, 6, 7].map(part => (
-                            <option value={part} key={part}>
-                              Part {part}
-                            </option>
-                          ))}
-                        </select>
+                        Transcript
+                        <textarea
+                          rows="7"
+                          value={selectedQuestion.listening?.transcript ?? ''}
+                          onChange={event => editTranscript(event.target.value)}
+                        />
                       </label>
-                    </div>
+                      <small>{t('Các câu dùng chung đường dẫn audio dùng cùng một transcript.')}</small>
+                    </>
+                  )}
+                  {!listening && (
                     <label>
                       {t('Đoạn đọc')}
                       <textarea
@@ -485,6 +599,8 @@ export default function AdminToeicPage() {
                         onChange={event => editQuestion('passage', event.target.value)}
                       />
                     </label>
+                  )}
+                  {!spokenOptions && (
                     <label>
                       {t('Nội dung câu hỏi')}
                       <textarea
@@ -493,7 +609,9 @@ export default function AdminToeicPage() {
                         onChange={event => editQuestion('prompt', event.target.value)}
                       />
                     </label>
-                    {selectedQuestion.options.map(option => (
+                  )}
+                  {!spokenOptions &&
+                    selectedQuestion.options.map(option => (
                       <label key={option.id}>
                         {t('Lựa chọn {letter}', { letter: option.id })}
                         <input
@@ -509,19 +627,20 @@ export default function AdminToeicPage() {
                         />
                       </label>
                     ))}
-                    <label>
-                      {t('Đáp án đúng')}
-                      <select
-                        value={selectedQuestion.correctOptionId}
-                        onChange={event => editQuestion('correctOptionId', event.target.value)}
-                      >
-                        {LETTERS.map(letter => (
-                          <option key={letter} value={letter}>
-                            {letter}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                  <label>
+                    {t('Đáp án đúng')}
+                    <select
+                      value={selectedQuestion.correctOptionId}
+                      onChange={event => editQuestion('correctOptionId', event.target.value)}
+                    >
+                      {optionIds(selectedQuestion.part).map(letter => (
+                        <option key={letter} value={letter}>
+                          {letter}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {!listening && (
                     <label>
                       {t('Giải thích đáp án')}
                       <textarea
@@ -530,66 +649,74 @@ export default function AdminToeicPage() {
                         onChange={event => editQuestion('explanation', event.target.value)}
                       />
                     </label>
-                    <details className="toeic-admin-source-fields">
-                      <summary>{t('Nguồn và hình minh họa')}</summary>
-                      <label>
-                        {t('Tham chiếu nguồn câu hỏi')}
-                        <input
-                          value={selectedQuestion.source ?? ''}
-                          onChange={event => editQuestion('source', event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        {t('Đường dẫn hình câu hỏi')}
-                        <input
-                          value={selectedQuestion.imageUrl ?? ''}
-                          placeholder="/toeic-assets/..."
-                          onChange={event => editQuestion('imageUrl', event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        {t('Hình đoạn đọc (mỗi đường dẫn một dòng)')}
-                        <textarea
-                          rows="3"
-                          value={(selectedQuestion.passageImageUrls ?? []).join('\n')}
-                          onChange={event =>
-                            editQuestion(
-                              'passageImageUrls',
-                              event.target.value
-                                .split('\n')
-                                .map(value => value.trim())
-                                .filter(Boolean),
-                            )
-                          }
-                        />
-                      </label>
-                    </details>
-                    <details className="toeic-admin-preview">
-                      <summary>{t('Xem trước câu hỏi')}</summary>
-                      <ToeicQuestion question={selectedQuestion} disabled />
-                    </details>
-                    <button
-                      type="button"
-                      className="toeic-button toeic-danger"
-                      onClick={() => {
-                        updateField(
-                          'questions',
-                          form.questions.filter(item => item.id !== selectedQuestion.id),
-                        );
-                        setQuestionId(null);
-                      }}
-                    >
-                      <DeleteOutlineRounded fontSize="small" />
-                      {t('Xóa câu hỏi')}
-                    </button>
-                  </fieldset>
-                ) : (
-                  <p className="toeic-admin-empty">
-                    {t('Thêm câu hỏi để tạo phần luyện tập tương tác A–D.')}
-                  </p>
-                )}
-              </div>
-            </section>
+                  )}
+                  <details className="toeic-admin-source-fields">
+                    <summary>{t('Nguồn và hình minh họa')}</summary>
+                    <label>
+                      {t('Tham chiếu nguồn câu hỏi')}
+                      <input
+                        value={selectedQuestion.source ?? ''}
+                        onChange={event => editQuestion('source', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {t('Đường dẫn hình câu hỏi')}
+                      <input
+                        value={selectedQuestion.imageUrl ?? ''}
+                        placeholder="/toeic-assets/..."
+                        onChange={event => editQuestion('imageUrl', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {t(
+                        listening
+                          ? 'Hình nhóm câu (mỗi đường dẫn một dòng)'
+                          : 'Hình đoạn đọc (mỗi đường dẫn một dòng)',
+                      )}
+                      <textarea
+                        rows="3"
+                        value={(selectedQuestion.passageImageUrls ?? []).join('\n')}
+                        onChange={event =>
+                          editQuestion(
+                            'passageImageUrls',
+                            event.target.value
+                              .split('\n')
+                              .map(value => value.trim())
+                              .filter(Boolean),
+                          )
+                        }
+                      />
+                    </label>
+                  </details>
+                  <details className="toeic-admin-preview">
+                    <summary>{t('Xem trước câu hỏi')}</summary>
+                    <ToeicQuestion
+                      question={selectedQuestion}
+                      groupQuestions={form.questions}
+                      showTranscript
+                      disabled
+                    />
+                  </details>
+                  <button
+                    type="button"
+                    className="toeic-button toeic-danger"
+                    onClick={() => {
+                      updateField(
+                        'questions',
+                        form.questions.filter(item => item.id !== selectedQuestion.id),
+                      );
+                      setQuestionId(null);
+                    }}
+                  >
+                    <DeleteOutlineRounded fontSize="small" />
+                    {t('Xóa câu hỏi')}
+                  </button>
+                </fieldset>
+              ) : (
+                <p className="toeic-admin-empty">{t('Thêm câu hỏi Reading hoặc Listening để bắt đầu.')}</p>
+              )}
+            </div>
+          </section>
           <div className="toeic-admin-savebar">
             <button type="submit" className="toeic-button button-primary" disabled={busy || !dirty}>
               <SaveOutlined fontSize="small" />

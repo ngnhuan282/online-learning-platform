@@ -4,27 +4,43 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, lstatS
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const defaults = {
-  archiveDirectory: fileURLToPath(new URL('../resources/toeic/', import.meta.url)),
-  outputDirectory: fileURLToPath(new URL('../public/toeic-assets/ets2024-reading/', import.meta.url)),
-};
 const tar = args =>
   execFileSync('tar', args, { encoding: 'utf8', windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
 
 export function prepareToeicAssets({
-  archiveDirectory = defaults.archiveDirectory,
-  outputDirectory = defaults.outputDirectory,
+  archiveDirectory = fileURLToPath(new URL('../resources/toeic/', import.meta.url)),
+  outputDirectory = fileURLToPath(new URL('../public/toeic-assets/ets2024-reading/', import.meta.url)),
 } = {}) {
+  const { files, archives, extracted } = prepareCollection(
+    archiveDirectory,
+    outputDirectory,
+    '(?:question-\\d+|passage-\\d+-\\d+-p\\d+)\\.webp',
+  );
+  return { archives, images: files, extracted };
+}
+
+export function prepareToeicListeningAssets({
+  archiveDirectory = fileURLToPath(new URL('../resources/toeic-listening/', import.meta.url)),
+  outputDirectory = fileURLToPath(new URL('../public/toeic-assets/ets2024-listening/', import.meta.url)),
+} = {}) {
+  return prepareCollection(
+    archiveDirectory,
+    outputDirectory,
+    '(?:(?:question|graphic)-\\d{3}\\.webp|audio-\\d{3}(?:-\\d{3})?\\.mp3)',
+  );
+}
+
+function prepareCollection(archiveDirectory, outputDirectory, pathPattern) {
   const names = readdirSync(archiveDirectory)
     .filter(name => /^test\d{2}\.tar\.gz$/.test(name))
     .sort();
-  if (!names.length) throw new Error('Missing TOEIC image archives in frontend/web/resources/toeic.');
+  if (!names.length) throw new Error(`Missing TOEIC archives in ${archiveDirectory}.`);
   mkdirSync(outputDirectory, { recursive: true });
   if (lstatSync(outputDirectory).isSymbolicLink())
-    throw new Error('TOEIC generated image folder must not be a symbolic link.');
+    throw new Error('TOEIC generated media folder must not be a symbolic link.');
   const manifestFile = join(outputDirectory, '.archive-manifest.json');
   if (existsSync(manifestFile) && lstatSync(manifestFile).isSymbolicLink())
-    throw new Error('TOEIC image cache must not be a symbolic link.');
+    throw new Error('TOEIC media cache must not be a symbolic link.');
   let previous = {};
   try {
     previous = JSON.parse(readFileSync(manifestFile, 'utf8'));
@@ -32,16 +48,16 @@ export function prepareToeicAssets({
     /* A missing cache is regenerated. */
   }
   const manifest = {};
-  let images = 0;
+  let count = 0;
   let extracted = 0;
   for (const name of names) {
     const archive = join(archiveDirectory, name);
     const sha256 = createHash('sha256').update(readFileSync(archive)).digest('hex');
     const test = name.slice(0, -'.tar.gz'.length);
-    const allowed = new RegExp(`^${test}/(?:question-\\d+|passage-\\d+-\\d+-p\\d+)\\.webp$`);
+    const allowed = new RegExp(`^${test}/${pathPattern}$`);
     const folder = join(outputDirectory, test);
     if (existsSync(folder) && lstatSync(folder).isSymbolicLink())
-      throw new Error('TOEIC test image folder must not be a symbolic link.');
+      throw new Error('TOEIC test media folder must not be a symbolic link.');
     const cached = previous[name];
     if (
       cached?.sha256 === sha256 &&
@@ -56,7 +72,7 @@ export function prepareToeicAssets({
       )
     ) {
       manifest[name] = cached;
-      images += cached.files.length;
+      count += cached.files.length;
       continue;
     }
     const files = tar(['-tzf', archive]).split(/\r?\n/).filter(Boolean);
@@ -68,25 +84,27 @@ export function prepareToeicAssets({
       entries.length !== files.length ||
       entries.some(line => !line.startsWith('-') || /\s(?:link to|->)\s/.test(line))
     ) {
-      throw new Error(`Only regular image files are allowed in ${name}.`);
+      throw new Error(`Only regular media files are allowed in ${name}.`);
     }
     for (const file of files) {
       const target = join(outputDirectory, file);
-      if (existsSync(target) && lstatSync(target).isSymbolicLink())
-        throw new Error('TOEIC image must not be a symbolic link.');
+      if (existsSync(target) && !lstatSync(target).isFile())
+        throw new Error('TOEIC media target must be a regular file.');
     }
     tar(['-xzf', archive, '-C', outputDirectory]);
     manifest[name] = { sha256, files };
-    images += files.length;
+    count += files.length;
     extracted += files.length;
   }
   writeFileSync(manifestFile, JSON.stringify(manifest));
-  return { archives: names.length, images, extracted };
+  return { archives: names.length, files: count, extracted };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const result = prepareToeicAssets();
+  const reading = prepareToeicAssets();
+  const listening = prepareToeicListeningAssets();
   console.log(
-    `TOEIC: ${result.images} images available from ${result.archives} archives (${result.extracted} extracted).`,
+    `TOEIC: ${reading.images} Reading images and ${listening.files} Listening media files available ` +
+      `(${reading.extracted + listening.extracted} extracted).`,
   );
 }

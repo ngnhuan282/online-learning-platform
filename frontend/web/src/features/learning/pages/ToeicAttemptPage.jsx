@@ -15,6 +15,7 @@ import { readStorage, writeStorage, removeStorage } from '../../../shared/utils/
 import useAuth from '../../auth/hooks/useAuth';
 import { toeicApi } from '../api/toeicApi';
 import ToeicQuestion from '../components/ToeicQuestion';
+import { isListeningPart } from '../utils/toeicSections';
 import StudyTextAssistant from '../components/StudyTextAssistant';
 
 const timeLeft = (deadline, offset) =>
@@ -317,16 +318,40 @@ function AttemptWorkspace({ attemptId, userId }) {
         <Link to="/exams/toeic">{t('Về thư viện TOEIC')}</Link>
       </div>
     );
+  const listening = isListeningPart(question.part);
+  const answerToggle = canRevealAnswer && (
+    <button
+      type="button"
+      className={`toeic-button ${listening || !currentRevealed ? 'toeic-button-outline' : 'button-primary'}`}
+      aria-expanded={currentRevealed}
+      onClick={toggleCurrentAnswer}
+    >
+      {currentRevealed ? <VisibilityOffOutlined fontSize="small" /> : <VisibilityOutlined fontSize="small" />}
+      {t(currentRevealed ? 'Ẩn đáp án' : listening ? 'Hiện đáp án' : 'Xem đáp án & lời giải')}
+    </button>
+  );
+  const questionCard = (
+    <ToeicQuestion
+      question={question}
+      selected={session.answers[question.id]}
+      onSelect={option => session.choose(question.id, option)}
+      disabled={blocked}
+      showAnswer={currentRevealed}
+      answerToggle={listening ? answerToggle : null}
+      showTranscript={isPractice}
+      groupQuestions={questions}
+    />
+  );
   return (
     <>
       <header className="toeic-attempt-heading">
         <div>
           <span className={`toeic-eyebrow ${session.attempt.mode === 'EXAM' ? 'is-exam-badge' : ''}`}>
             {session.attempt.mode === 'EXAM'
-              ? t('THI THỰC CHIẾN · READING')
+              ? t(listening ? 'THI THỬ · LISTENING' : 'THI THỰC CHIẾN · READING')
               : session.attempt.part
                 ? `${t('CHẾ ĐỘ LUYỆN TẬP')} · Part ${session.attempt.part}`
-                : t('CHẾ ĐỘ LUYỆN TẬP · READING')}
+                : t(listening ? 'CHẾ ĐỘ LUYỆN TẬP · LISTENING' : 'CHẾ ĐỘ LUYỆN TẬP · READING')}
           </span>
           <h1>{session.attempt.title}</h1>
           <p>{t('{answered}/{total} câu đã trả lời', { answered, total: questions.length })}</p>
@@ -388,36 +413,22 @@ function AttemptWorkspace({ attemptId, userId }) {
       )}
       <div className="toeic-attempt-layout">
         <div className="toeic-question-stage">
-          <StudyTextAssistant
-            allowNotes
-            examId={session.attempt.examId}
-            attemptId={session.attempt.id}
-            questionNumber={question.number}
-            part={question.part}
-          >
-            <ToeicQuestion
-              question={question}
-              selected={session.answers[question.id]}
-              onSelect={option => session.choose(question.id, option)}
-              disabled={blocked}
-              showAnswer={currentRevealed}
-            />
-          </StudyTextAssistant>
-          {canRevealAnswer && (
+          {listening ? (
+            questionCard
+          ) : (
+            <StudyTextAssistant
+              allowNotes
+              examId={session.attempt.examId}
+              attemptId={session.attempt.id}
+              questionNumber={question.number}
+              part={question.part}
+            >
+              {questionCard}
+            </StudyTextAssistant>
+          )}
+          {!listening && answerToggle && (
             <div className="toeic-practice-reveal-bar">
-              <button
-                type="button"
-                className={`toeic-button ${currentRevealed ? 'button-primary' : 'toeic-button-outline'}`}
-                aria-expanded={currentRevealed}
-                onClick={toggleCurrentAnswer}
-              >
-                {currentRevealed ? (
-                  <VisibilityOffOutlined fontSize="small" />
-                ) : (
-                  <VisibilityOutlined fontSize="small" />
-                )}
-                {t(currentRevealed ? 'Ẩn đáp án' : 'Xem đáp án & lời giải')}
-              </button>
+              {answerToggle}
               <label className="toeic-auto-reveal-toggle">
                 <input
                   type="checkbox"
@@ -515,25 +526,35 @@ function AttemptWorkspace({ attemptId, userId }) {
             {session.submitting ? t('Đang nộp bài...') : t('Nộp bài')}
           </button>
           <p className="toeic-attempt-note">
-            {session.attempt.mode === 'EXAM'
+            {listening
               ? t(
-                  'Chế độ thi thực chiến: Không xem đáp án giữa chừng. Điểm số và lời giải chi tiết chỉ mở sau khi nộp bài.',
+                  isPractice
+                    ? 'Đáp án và transcript mở riêng theo từng đoạn nghe.'
+                    : 'Đáp án và transcript mở sau khi nộp bài.',
                 )
-              : t(
-                  'Chế độ luyện tập: Bạn có thể xem đáp án và lời giải ngay trên từng câu hoặc sau khi nộp bài.',
-                )}
+              : session.attempt.mode === 'EXAM'
+                ? t(
+                    'Chế độ thi thực chiến: Không xem đáp án giữa chừng. Điểm số và lời giải chi tiết chỉ mở sau khi nộp bài.',
+                  )
+                : t(
+                    'Chế độ luyện tập: Bạn có thể xem đáp án và lời giải ngay trên từng câu hoặc sau khi nộp bài.',
+                  )}
           </p>
         </aside>
       </div>
       <ConfirmDialog
         open={confirm}
-        title="Nộp bài Reading?"
+        title={listening ? 'Nộp bài Listening?' : 'Nộp bài Reading?'}
         description={
           answered < questions.length
             ? t('Bạn còn {count} câu chưa trả lời. Các câu bỏ trống không được tính điểm.', {
                 count: questions.length - answered,
               })
-            : t('Sau khi nộp bài, bạn có thể xem điểm và lời giải cho từng câu.')
+            : t(
+                listening
+                  ? 'Sau khi nộp bài, bạn có thể nghe lại và đối chiếu đáp án.'
+                  : 'Sau khi nộp bài, bạn có thể xem điểm và lời giải cho từng câu.',
+              )
         }
         confirmLabel={t('Xác nhận nộp bài')}
         onClose={() => setConfirm(false)}

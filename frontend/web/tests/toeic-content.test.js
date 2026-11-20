@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { test } from 'node:test';
-import { prepareToeicAssets } from '../scripts/prepare-toeic-assets.mjs';
+import { prepareToeicAssets, prepareToeicListeningAssets } from '../scripts/prepare-toeic-assets.mjs';
 
 prepareToeicAssets();
 
@@ -77,4 +77,62 @@ test('known source questions retain the official keys, including the corrected T
   assert.match(key(1, 101).prompt, /Sendai|Nakata/i);
   assert.notEqual(key(8, 194).explanation, key(8, 195).explanation);
   assert.notEqual(key(8, 195).explanation, key(8, 196).explanation);
+});
+
+test('nine Listening packs provide all 900 questions, matched recordings, transcripts and illustrations', () => {
+  const media = prepareToeicListeningAssets();
+  assert.equal(media.archives, 9);
+  assert.equal(media.files, 585);
+  const exams = JSON.parse(readFileSync(new URL('ets2024-listening.json', seedUrl), 'utf8'));
+  assert.equal(exams.length, 9);
+  assert.equal(new Set(exams.map(exam => exam.seedKey)).size, 9);
+  const groups = new Map();
+  const assetFiles = new Set();
+  for (const exam of exams) {
+    assert.match(exam.slug, /^ets-2024-test-(?:0[1235-9]|10)-listening$/);
+    assert.equal(exam.published, true);
+    assert.equal(exam.durationMinutes, 45);
+    assert.equal(exam.questions.length, 100);
+    const counts = [0, 0, 0, 0];
+    for (const [index, question] of exam.questions.entries()) {
+      const number = index + 1;
+      const part = number <= 6 ? 1 : number <= 31 ? 2 : number <= 70 ? 3 : 4;
+      const choiceIds = part === 2 ? ['A', 'B', 'C'] : ['A', 'B', 'C', 'D'];
+      const label = `${exam.slug}: ${number}`;
+      assert.equal(question.number, number, label);
+      assert.equal(question.part, part, label);
+      counts[part - 1]++;
+      assert.deepEqual(
+        question.options.map(option => option.id),
+        choiceIds,
+        label,
+      );
+      assert.ok(choiceIds.includes(question.correctOptionId), label);
+      if (part === 1) assert.match(question.imageUrl, /question-00[1-6]\.webp$/);
+      if (part >= 3) {
+        assert.ok(question.prompt.endsWith('?'), label);
+        assert.ok(
+          question.options.every(option => option.text.trim()),
+          label,
+        );
+      }
+      const { audioUrl, transcript } = question.listening;
+      const first = number < 32 ? number : number - ((number - 32) % 3);
+      const fileNumber = n => String(n).padStart(3, '0');
+      const range = part <= 2 ? fileNumber(first) : `${fileNumber(first)}-${fileNumber(first + 2)}`;
+      assert.ok(audioUrl.endsWith(`/test${exam.slug.slice(14, 16)}/audio-${range}.mp3`), label);
+      assert.ok(transcript.trim().length > 40, label);
+      assert.equal(groups.get(audioUrl) ?? transcript, transcript, label);
+      groups.set(audioUrl, transcript);
+      for (const file of [audioUrl, question.imageUrl, ...(question.passageImageUrls ?? [])].filter(
+        Boolean,
+      )) {
+        assert.equal(existsSync(new URL(`../public${file}`, import.meta.url)), true, file);
+        assetFiles.add(file);
+      }
+    }
+    assert.deepEqual(counts, [6, 25, 39, 30]);
+  }
+  assert.equal(groups.size, 486);
+  assert.equal(assetFiles.size, media.files);
 });
