@@ -1,5 +1,6 @@
 package com.elearning.learning.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.Instant;
@@ -11,14 +12,29 @@ public final class DictationModels {
 
     public record Sentence(@NotBlank @Size(max = 1500) String text, Double start, Double end) {}
 
+    public record Video(@NotBlank @Size(max = 2048) String url, Double duration) {}
+
+    @JsonIgnoreProperties("toeicTest")
     public record Definition(
         @NotBlank @Size(max = 180) String title,
         @Size(max = 1500) String description,
         @NotBlank @Size(max = 60) String topic,
         @Pattern(regexp = "A1|A2|B1|B2|C1|C2") @NotNull String level,
         @Size(max = 80) String audioKey,
-        @NotNull @Size(min = 1, max = 200) List<@NotNull @Valid Sentence> sentences
-    ) {}
+        @NotNull @Size(min = 1, max = 200) List<@NotNull @Valid Sentence> sentences,
+        @Valid Video video
+    ) {
+        public Definition(
+            String title,
+            String description,
+            String topic,
+            String level,
+            String audioKey,
+            List<Sentence> sentences
+        ) {
+            this(title, description, topic, level, audioKey, sentences, null);
+        }
+    }
 
     public record SaveRequest(@NotNull @Valid Definition definition, @Min(0) int version) {}
 
@@ -81,7 +97,8 @@ public final class DictationModels {
         Instant startedAt,
         Instant completedAt,
         String scoringMode,
-        boolean archived
+        boolean archived,
+        Video video
     ) {}
 
     public record Item(
@@ -99,10 +116,16 @@ public final class DictationModels {
         int completed,
         int progressTotal,
         boolean attemptCompleted,
-        Double accuracy
+        Double accuracy,
+        boolean video,
+        String thumbnailUrl
     ) {}
 
     public record Catalog(List<Item> items, long total, int page, int size, List<String> topics) {}
+
+    public record TopicGroup(String topic, long total, List<Item> items) {}
+
+    public record GroupedCatalog(List<TopicGroup> groups) {}
 
     public record History(List<Attempt> items, long total, int page, int size, List<String> topics) {}
 

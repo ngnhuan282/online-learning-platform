@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Chip,
@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import {
   AccessTimeOutlined,
+  ArrowBackRounded,
   ArrowForwardRounded,
   FilterListRounded,
   HeadphonesOutlined,
@@ -25,8 +26,9 @@ import {
   AssignmentTurnedInOutlined,
   CheckCircleOutlineRounded,
   PlayCircleOutlineRounded,
+  RocketLaunchOutlined,
   SearchOutlined,
-  SubjectOutlined,
+  SpaOutlined,
 } from '@mui/icons-material';
 import { t, getIntlLocale } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
@@ -34,11 +36,41 @@ import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
 import { dictationApi } from '../api/dictationApi';
 import { useDictationQuery } from '../hooks/useDictationQuery';
-import { formatTime, LEVELS, scoreFeedback } from '../utils/dictation';
+import { formatTopicName, LEVELS, isToeicTopic, scoreFeedback } from '../utils/dictation';
+import DictationLessonGrid from '../components/DictationLessonGrid';
 import DictationScore from '../components/DictationScore';
 import '../styles/dictation.css';
 
+const tiers = ['BEGINNER', 'ADVANCED'];
+
+function catalogLink(topic, tier) {
+  const params = new URLSearchParams();
+  if (topic !== null) params.set('topic', topic);
+  if (tier) params.set('tier', tier.toLowerCase());
+  return params.size ? `/dictation?${params}` : '/dictation';
+}
+
 export default function DictationLibraryPage() {
+  const [params, setParams] = useSearchParams();
+  const legacyTest = params.get('test');
+  const groupTopic =
+    params.get('topic')?.trim() || (/^[1-9][0-9]?$/.test(legacyTest) ? `Test ${legacyTest}` : null);
+  const requestedTier = params.get('tier')?.toUpperCase();
+  const tier = tiers.includes(requestedTier) ? requestedTier : '';
+
+  function changeTier(value) {
+    const next = new URLSearchParams(params);
+    if (value) next.set('tier', value.toLowerCase());
+    else next.delete('tier');
+    setParams(next, { replace: true, preventScrollReset: true });
+  }
+
+  return (
+    <DictationLibrary key={groupTopic ?? ''} groupTopic={groupTopic} tier={tier} onTierChange={changeTier} />
+  );
+}
+
+function DictationLibrary({ groupTopic, tier, onTierChange }) {
   useLocale();
   const [tab, setTab] = useState(0);
   const [keyword, setKeyword] = useState('');
@@ -48,19 +80,35 @@ export default function DictationLibraryPage() {
   const [status, setStatus] = useState('ALL');
   const [page, setPage] = useState(0);
   const pageSize = tab ? 20 : 12;
-  const { data, loading, error, reload } = useDictationQuery(
-    tab ? dictationApi.historyPath : dictationApi.catalogPath,
+  const grouped = !tab && groupTopic === null;
+  const selectedGroup = !tab && groupTopic !== null;
+  const overview = useDictationQuery(grouped ? dictationApi.topicGroupsPath : null, {
+    keyword: '',
+    level: '',
+    status: '',
+  });
+  const results = useDictationQuery(
+    tab
+      ? dictationApi.historyPath
+      : selectedGroup
+        ? dictationApi.catalogPath
+        : tier
+          ? dictationApi.topicGroupsPath
+          : null,
     {
       keyword: query,
-      level,
-      topic,
-      page,
-      size: pageSize,
-      ...(tab ? { status: status === 'ALL' ? '' : status } : {}),
+      level: grouped ? tier : level,
+      ...(tab ? { topic } : {}),
+      status: status === 'ALL' ? '' : status,
+      ...(!grouped ? { page, size: pageSize } : {}),
+      ...(selectedGroup ? { topic: groupTopic } : {}),
     },
   );
+  const { data, loading, error, reload } = grouped && (!tier || !overview.data) ? overview : results;
+  const topicGroups = overview.data?.groups ?? [];
   const items = data?.items ?? [];
-  const filtered = Boolean(keyword || query || level || topic || (tab && status !== 'ALL'));
+  const groups = data?.groups ?? [];
+  const filtered = Boolean(keyword || query || level || topic || status !== 'ALL' || (grouped && tier));
   function resetFilters() {
     setKeyword('');
     setQuery('');
@@ -69,140 +117,214 @@ export default function DictationLibraryPage() {
     setStatus('ALL');
     setPage(0);
   }
+  function clearFilters() {
+    resetFilters();
+    if (grouped && tier) onTierChange('');
+  }
   return (
     <section className="dictation-page">
       <div className="container dictation-shell">
-        <header className="dictation-heading">
+        {selectedGroup && (
+          <Link className="dictation-library-back" to={catalogLink(null, tier)}>
+            <ArrowBackRounded fontSize="small" /> {t('Thư viện bài nghe')}
+          </Link>
+        )}
+        <header className={`dictation-heading${selectedGroup ? ' is-test' : ''}`}>
           <div>
-            <span className="dictation-eyebrow">{t('GÓC LUYỆN TẬP')}</span>
-            <h1>{t('Luyện nghe chép chính tả')}</h1>
-          </div>
-          <span className="dictation-heading-icon">
-            <HeadphonesOutlined />
-          </span>
-        </header>
-        <Tabs
-          value={tab}
-          onChange={(_e, value) => {
-            setTab(value);
-            resetFilters();
-          }}
-          aria-label={t('Bài nghe và tiến độ')}
-        >
-          <Tab label={t('Thư viện bài nghe')} icon={<HeadphonesOutlined />} iconPosition="start" />
-          <Tab label={t('Tiến độ bài học')} icon={<AssignmentTurnedInOutlined />} iconPosition="start" />
-        </Tabs>
-        <form
-          className={`dictation-filters ${tab ? 'is-history' : ''}`}
-          onSubmit={event => {
-            event.preventDefault();
-            setQuery(keyword);
-            setPage(0);
-            reload();
-          }}
-        >
-          <div className="dictation-filter-heading">
-            <span>
-              <FilterListRounded fontSize="small" />
-              {t('Bộ lọc')}
+            <span className="dictation-eyebrow">
+              {!tab && selectedGroup && isToeicTopic(groupTopic) ? 'TOEIC LISTENING' : t('GÓC LUYỆN TẬP')}
             </span>
-            {Boolean(tab) && (
-              <ToggleButtonGroup
-                className="dictation-progress-tabs"
-                value={status}
-                exclusive
+            <h1>{selectedGroup ? formatTopicName(groupTopic) : t('Luyện nghe chép chính tả')}</h1>
+          </div>
+          {selectedGroup ? (
+            data && (
+              <span className="dictation-group-count" role="status">
+                {data.total} {t('bài nghe')}
+              </span>
+            )
+          ) : (
+            <span className="dictation-heading-icon">
+              <HeadphonesOutlined />
+            </span>
+          )}
+        </header>
+        {!selectedGroup && (
+          <Tabs
+            value={tab}
+            onChange={(_e, value) => {
+              setTab(value);
+              resetFilters();
+            }}
+            aria-label={t('Bài nghe và tiến độ')}
+          >
+            <Tab label={t('Thư viện bài nghe')} icon={<HeadphonesOutlined />} iconPosition="start" />
+            <Tab label={t('Tiến độ bài học')} icon={<AssignmentTurnedInOutlined />} iconPosition="start" />
+          </Tabs>
+        )}
+        {grouped && (
+          <div className="dictation-catalog-pills">
+            <ToggleButtonGroup
+              className="dictation-tier-pills"
+              value={tier}
+              exclusive
+              size="small"
+              aria-label={t('Nhóm trình độ')}
+              onChange={(_event, value) => {
+                if (value !== null) onTierChange(value);
+              }}
+            >
+              <ToggleButton value="">{t('Tất cả')}</ToggleButton>
+              <ToggleButton value="BEGINNER" title="A1–A2">
+                <SpaOutlined fontSize="small" /> {t('Người mới')}
+              </ToggleButton>
+              <ToggleButton value="ADVANCED" title="B1–C2">
+                <RocketLaunchOutlined fontSize="small" /> {t('Nâng cao')}
+              </ToggleButton>
+            </ToggleButtonGroup>
+            {topicGroups.length > 0 && (
+              <nav className="dictation-topic-pills" aria-label={t('Đi đến chủ đề')}>
+                {topicGroups.map(group => (
+                  <Link key={group.topic} to={catalogLink(group.topic, tier)}>
+                    {formatTopicName(group.topic)}
+                  </Link>
+                ))}
+              </nav>
+            )}
+          </div>
+        )}
+        {!grouped && (
+          <form
+            className={`dictation-filters ${tab ? 'is-history' : 'is-catalog'}`}
+            onSubmit={event => {
+              event.preventDefault();
+              setQuery(keyword);
+              setPage(0);
+              reload();
+            }}
+          >
+            <div className="dictation-filter-heading">
+              <span>
+                <FilterListRounded fontSize="small" />
+                {t('Bộ lọc')}
+              </span>
+              {Boolean(tab) && (
+                <ToggleButtonGroup
+                  className="dictation-progress-tabs"
+                  value={status}
+                  exclusive
+                  size="small"
+                  aria-label={t('Trạng thái bài nghe')}
+                  onChange={(_event, value) => {
+                    if (!value) return;
+                    setStatus(value);
+                    setPage(0);
+                  }}
+                >
+                  <ToggleButton value="ALL">
+                    <ListAltOutlined fontSize="small" />
+                    {t('Tất cả')}
+                  </ToggleButton>
+                  <ToggleButton value="IN_PROGRESS">
+                    <PlayCircleOutlineRounded fontSize="small" />
+                    {t('Đang luyện')}
+                  </ToggleButton>
+                  <ToggleButton value="COMPLETED">
+                    <CheckCircleOutlineRounded fontSize="small" />
+                    {t('Đã hoàn thành')}
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              )}
+              {filtered && (
+                <Button size="small" onClick={clearFilters}>
+                  {t('Xóa bộ lọc')}
+                </Button>
+              )}
+            </div>
+            <TextField
+              className="dictation-search"
+              size="small"
+              placeholder={t('Tìm bài nghe')}
+              value={keyword}
+              onChange={event => setKeyword(event.target.value)}
+              slotProps={{
+                htmlInput: { 'aria-label': t('Tìm bài nghe') },
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchOutlined fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+            <TextField
+              select
+              size="small"
+              slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': t('Trình độ') } } }}
+              value={level}
+              onChange={event => {
+                setLevel(event.target.value);
+                setPage(0);
+              }}
+            >
+              <MenuItem value="">{t('Tất cả trình độ')}</MenuItem>
+              {LEVELS.map(value => (
+                <MenuItem key={value} value={value}>
+                  {value}
+                </MenuItem>
+              ))}
+            </TextField>
+            {tab ? (
+              <TextField
+                select
                 size="small"
-                aria-label={t('Trạng thái bài nghe')}
-                onChange={(_event, value) => {
-                  if (!value) return;
-                  setStatus(value);
+                slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': t('Chủ đề') } } }}
+                value={topic}
+                onChange={event => {
+                  setTopic(event.target.value);
                   setPage(0);
                 }}
               >
-                <ToggleButton value="ALL">
-                  <ListAltOutlined fontSize="small" />
-                  {t('Tất cả')}
-                </ToggleButton>
-                <ToggleButton value="IN_PROGRESS">
-                  <PlayCircleOutlineRounded fontSize="small" />
-                  {t('Đang luyện')}
-                </ToggleButton>
-                <ToggleButton value="COMPLETED">
-                  <CheckCircleOutlineRounded fontSize="small" />
-                  {t('Đã hoàn thành')}
-                </ToggleButton>
-              </ToggleButtonGroup>
+                <MenuItem value="">{t('Tất cả chủ đề')}</MenuItem>
+                {[...new Set([...(data?.topics ?? []), ...(topic ? [topic] : [])])].map(value => (
+                  <MenuItem key={value} value={value}>
+                    {value}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : (
+              <TextField
+                select
+                size="small"
+                slotProps={{
+                  select: { displayEmpty: true, inputProps: { 'aria-label': t('Trạng thái bài nghe') } },
+                }}
+                value={status}
+                onChange={event => {
+                  setStatus(event.target.value);
+                  setPage(0);
+                }}
+              >
+                <MenuItem value="ALL">{t('Tất cả trạng thái')}</MenuItem>
+                <MenuItem value="NOT_STARTED">{t('Chưa luyện')}</MenuItem>
+                <MenuItem value="IN_PROGRESS">{t('Đang luyện')}</MenuItem>
+                <MenuItem value="COMPLETED">{t('Đã hoàn thành')}</MenuItem>
+              </TextField>
             )}
-            {filtered && (
-              <Button size="small" onClick={resetFilters}>
-                {t('Xóa bộ lọc')}
-              </Button>
-            )}
-          </div>
-          <TextField
-            className="dictation-search"
-            size="small"
-            placeholder={t('Tìm bài nghe')}
-            value={keyword}
-            onChange={event => setKeyword(event.target.value)}
-            slotProps={{
-              htmlInput: { 'aria-label': t('Tìm bài nghe') },
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchOutlined fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-          <TextField
-            select
-            size="small"
-            slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': t('Trình độ') } } }}
-            value={level}
-            onChange={event => {
-              setLevel(event.target.value);
-              setPage(0);
-            }}
-          >
-            <MenuItem value="">{t('Tất cả trình độ')}</MenuItem>
-            {LEVELS.map(value => (
-              <MenuItem key={value} value={value}>
-                {value}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            size="small"
-            slotProps={{ select: { displayEmpty: true, inputProps: { 'aria-label': t('Chủ đề') } } }}
-            value={topic}
-            onChange={event => {
-              setTopic(event.target.value);
-              setPage(0);
-            }}
-          >
-            <MenuItem value="">{t('Tất cả chủ đề')}</MenuItem>
-            {[...new Set([...(data?.topics ?? []), ...(topic ? [topic] : [])])].map(value => (
-              <MenuItem key={value} value={value}>
-                {value}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button type="submit" variant={tab ? 'contained' : 'outlined'} startIcon={<SearchOutlined />}>
-            {t('Tìm kiếm')}
-          </Button>
-        </form>
+            <Button type="submit" variant={tab ? 'contained' : 'outlined'} startIcon={<SearchOutlined />}>
+              {t('Tìm kiếm')}
+            </Button>
+          </form>
+        )}
         {error ? (
           <ErrorState error={error} onRetry={reload} />
         ) : loading ? (
           <div className={tab ? 'dictation-history' : 'dictation-library-grid'}>
-            {[1, 2, 3].map(value => (
+            {(tab ? [1, 2, 3] : [1, 2, 3, 4]).map(value => (
               <Skeleton key={value} variant="rounded" height={tab ? 108 : 250} />
             ))}
           </div>
-        ) : !items.length ? (
+        ) : !(grouped ? groups.length : items.length) ? (
           <EmptyState
             title={
               tab
@@ -213,7 +335,9 @@ export default function DictationLibraryPage() {
                     : 'Chưa có bài nghe đang luyện'
                 : 'Chưa có bài nghe phù hợp'
             }
-            action={filtered && <Button onClick={resetFilters}>{t('Xóa bộ lọc')}</Button>}
+            action={
+              filtered && <Button onClick={clearFilters}>{t(grouped ? 'Xem tất cả' : 'Xóa bộ lọc')}</Button>
+            }
           />
         ) : tab ? (
           <>
@@ -309,63 +433,33 @@ export default function DictationLibraryPage() {
               })}
             </div>
           </>
+        ) : grouped ? (
+          <div className="dictation-topic-groups">
+            {groups.map((group, index) => (
+              <section key={group.topic} aria-labelledby={`dictation-topic-${index}`}>
+                <div className="dictation-topic-heading">
+                  <div>
+                    <h2 id={`dictation-topic-${index}`}>{formatTopicName(group.topic)}</h2>
+                    <span className="dictation-group-count">
+                      {group.total} {t('bài nghe')}
+                    </span>
+                  </div>
+                  <Button
+                    component={Link}
+                    to={catalogLink(group.topic, tier)}
+                    variant="outlined"
+                    endIcon={<ArrowForwardRounded />}
+                    aria-label={t('Xem tất cả bài nghe của {name}', { name: formatTopicName(group.topic) })}
+                  >
+                    {t('Xem tất cả')}
+                  </Button>
+                </div>
+                <DictationLessonGrid items={group.items} heading="h3" />
+              </section>
+            ))}
+          </div>
         ) : (
-          <>
-            <p className="dictation-count">
-              {data.total} {t('bài nghe')}
-            </p>
-            <div className="dictation-library-grid">
-              {items.map(item => (
-                <article key={item.id} className="dictation-lesson-card">
-                  <div className="dictation-lesson-art">
-                    <span className="dictation-cover-icon">
-                      <HeadphonesOutlined />
-                    </span>
-                    <span>
-                      <small>Audio</small>
-                      {item.topic}
-                    </span>
-                    <Chip label={item.level} size="small" />
-                  </div>
-                  <div className="dictation-lesson-body">
-                    <h2>{item.title}</h2>
-                    <p title={item.description || undefined}>{item.description}</p>
-                    <div className="dictation-lesson-footer">
-                      <div className="dictation-lesson-meta">
-                        <span>
-                          <AccessTimeOutlined />
-                          {formatTime(item.duration)}
-                        </span>
-                        <span>
-                          <SubjectOutlined />
-                          {t('{count} câu', { count: item.sentenceCount })}
-                        </span>
-                      </div>
-                      <div className="dictation-progress-note">
-                        {item.attemptId && (
-                          <>
-                            <span>
-                              {item.completed}/{item.progressTotal} {t('câu đã luyện')}
-                            </span>
-                            <strong>{t(item.attemptCompleted ? 'Đã hoàn thành' : 'Đang luyện')}</strong>
-                          </>
-                        )}
-                      </div>
-                      <Button
-                        fullWidth
-                        component={Link}
-                        to={`/dictation/${item.id}${item.attemptId ? `?attempt=${item.attemptId}` : ''}`}
-                        variant="contained"
-                        endIcon={<ArrowForwardRounded />}
-                      >
-                        {t(item.attemptCompleted ? 'Xem kết quả' : item.attemptId ? 'Tiếp tục' : 'Bắt đầu')}
-                      </Button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </>
+          <DictationLessonGrid items={items} />
         )}
         {!loading && !error && data?.total > 0 && (tab || data.total > pageSize) && (
           <div className={`dictation-pagination ${tab ? 'is-history' : ''}`}>

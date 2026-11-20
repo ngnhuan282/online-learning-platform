@@ -7,6 +7,7 @@ export function useDictationQuery(path, params = {}) {
   const [retry, setRetry] = useState(0);
   const queryKey = JSON.stringify([path, key, retry]);
   useEffect(() => {
+    if (!path) return;
     const controller = new AbortController();
     let active = true;
     Promise.resolve()
@@ -25,7 +26,7 @@ export function useDictationQuery(path, params = {}) {
       controller.abort();
     };
   }, [path, key, retry, queryKey]);
-  const current = state.queryKey === queryKey ? state : { loading: true, data: null, error: null };
+  const current = state.queryKey === queryKey ? state : { loading: Boolean(path), data: null, error: null };
   return { ...current, reload: () => setRetry(value => value + 1) };
 }
 
