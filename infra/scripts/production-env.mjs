@@ -132,7 +132,11 @@ export function validateProductionEnv(env) {
     errors.push('Configure both VNPay merchant credentials or leave both empty to disable payments');
   if (env.VNPAY_TMN_CODE && !/^[A-Za-z0-9]{8}$/.test(env.VNPAY_TMN_CODE))
     errors.push('VNPAY_TMN_CODE must have 8 alphanumeric characters');
-  if (env.VNPAY_TMN_CODE && env.VNPAY_PAYMENT_URL !== 'https://pay.vnpay.vn/vpcpay.html')
+  const allowedVnpayUrls =
+    env.VNPAY_SANDBOX_ALLOWED === 'true'
+      ? ['https://pay.vnpay.vn/vpcpay.html', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html']
+      : ['https://pay.vnpay.vn/vpcpay.html'];
+  if (env.VNPAY_TMN_CODE && !allowedVnpayUrls.includes(env.VNPAY_PAYMENT_URL))
     errors.push(
       'Production VNPay credentials require the approved production payment URL; sandbox payments cannot be deployed as live payments',
     );
