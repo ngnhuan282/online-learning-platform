@@ -12,6 +12,7 @@ infra/scripts/toeic/__pycache__/
 **/target/
 **/*.local/
 .tmp/
+outputs/
 backups/
 .idea/
 .vscode/
@@ -19,4 +20,4 @@ backups/
 *.iml
 .DS_Store
 Thumbs.db
-backend/learning-service/uploads/
+backend/*/uploads/

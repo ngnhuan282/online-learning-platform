@@ -1,10 +1,11 @@
 .git
 .idea
 .tmp
+outputs
 **/target
 **/node_modules
 **/*.log
-**/qa.local
+**/*.local
 **/.env
 **/.env.*
 frontend/web/dist
