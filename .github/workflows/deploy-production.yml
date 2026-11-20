@@ -1,0 +1,113 @@
+name: Deploy to AWS Production
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to AWS EC2
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Configure SSH key and known hosts
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
+        run: |
+          if [ -z "$PROD_SSH_HOST" ] || [ -z "$PROD_SSH_KEY" ]; then
+            echo "::error::Missing PROD_SSH_HOST or PROD_SSH_KEY in GitHub Actions secrets."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${PROD_SSH_PORT:-22}" -H "$PROD_SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync code, backup database, and deploy containers on AWS EC2
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
+        run: |
+          SSH_USER="${PROD_SSH_USER:-ubuntu}"
+          SSH_PORT="${PROD_SSH_PORT:-22}"
+
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o StrictHostKeyChecking=yes "${SSH_USER}@${PROD_SSH_HOST}" 'bash -se' << 'EOF'
+          set -euo pipefail
+
+          APP_DIR="$HOME/online-learning-platform"
+          PROJECT_NAME="sgsphere-production"
+          ENV_FILE=".env.production"
+
+          cd "$APP_DIR"
+
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "ERROR: $APP_DIR/$ENV_FILE not found on server. Please create it first."
+            exit 1
+          fi
+
+          echo "==> [1/5] Fetching latest code from origin/production..."
+          git fetch origin production
+          git checkout -B production origin/production
+          NEW_TAG="$(git rev-parse --short=12 HEAD)"
+          echo "Target release tag: $NEW_TAG"
+
+          echo "==> [2/5] Updating RELEASE_TAG in $ENV_FILE and running preflight check..."
+          if grep -q '^RELEASE_TAG=' "$ENV_FILE"; then
+            sed -i "s|^RELEASE_TAG=.*|RELEASE_TAG=${NEW_TAG}|" "$ENV_FILE"
+          else
+            printf '\nRELEASE_TAG=%s\n' "$NEW_TAG" >> "$ENV_FILE"
+          fi
+
+          PAYMENT_URL="$(sed -n 's/^VNPAY_PAYMENT_URL=//p' "$ENV_FILE" | tail -n 1)"
+          if printf '%s' "$PAYMENT_URL" | grep -Fq 'sandbox.vnpayment.vn'; then
+            echo "Sandbox VNPay configuration detected; disabling VNPay for this production deployment."
+            sed -i \
+              -e 's|^VNPAY_TMN_CODE=.*|VNPAY_TMN_CODE=|' \
+              -e 's|^VNPAY_HASH_SECRET=.*|VNPAY_HASH_SECRET=|' \
+              -e 's|^VNPAY_PAYMENT_URL=.*|VNPAY_PAYMENT_URL=|' \
+              "$ENV_FILE"
+          fi
+          chmod 600 "$ENV_FILE"
+
+          node infra/scripts/production.mjs check --env-file "$ENV_FILE" --project "$PROJECT_NAME"
+
+          echo "==> [3/5] Backing up MySQL databases before deployment..."
+          mkdir -p backups
+          chmod 700 backups
+          if docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" ps --status running 2>/dev/null | grep -q mysql; then
+            BACKUP_FILE="backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ)-${NEW_TAG}.sql.gz"
+            node infra/scripts/production.mjs backup --env-file "$ENV_FILE" --project "$PROJECT_NAME" --file "$BACKUP_FILE"
+            ls -1t backups/pre-deploy-*.sql.gz 2>/dev/null | tail -n +6 | while read -r old_backup; do
+              rm -f "$old_backup" "${old_backup}.json"
+            done
+          else
+            echo "MySQL container is not running yet; skipping pre-deploy backup."
+          fi
+
+          echo "==> [4/5] Building and starting production services..."
+          node infra/scripts/production.mjs up --env-file "$ENV_FILE" --project "$PROJECT_NAME"
+
+          echo "==> [5/5] Verifying status and cleaning up unused Docker build cache..."
+          node infra/scripts/production.mjs status --env-file "$ENV_FILE" --project "$PROJECT_NAME"
+          docker image prune -f >/dev/null 2>&1 || true
+          docker builder prune -f --keep-storage 3GB >/dev/null 2>&1 || true
+
+          echo "==> Deployment of release $NEW_TAG completed successfully!"
+          EOF
+
+      - name: Clean up temporary SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
