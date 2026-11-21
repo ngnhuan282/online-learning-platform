@@ -43,7 +43,8 @@ class CourseCatalogServiceTest {
     private CourseService courseService;
 
     @Test
-    void shouldFilterPublishedCoursesByKeywordCategoryLevelAndSort() {
+    void getCourses_whenFiltersAndSortAreProvided_shouldReturnMatchingPublishedCourses() {
+        // Arrange
         Category category = new Category();
         category.setId(7L);
         category.setName("IELTS");
@@ -78,7 +79,11 @@ class CourseCatalogServiceTest {
             "newest"
         );
 
-        assertThat(result.getTotalElements()).isEqualTo(1);
+        // Act
+        var totalElements = result.getTotalElements();
+
+        // Assert
+        assertThat(totalElements).isEqualTo(1);
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).categoryId()).isEqualTo(7L);
         assertThat(result.getContent().get(0).level()).isEqualTo(CourseLevel.BEGINNER);

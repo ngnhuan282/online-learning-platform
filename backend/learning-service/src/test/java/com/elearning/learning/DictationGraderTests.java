@@ -13,71 +13,115 @@ class DictationGraderTests {
     private final DictationGrader grader = new DictationGrader();
 
     @Test
-    void aShortMistypedAnswerIsAlignedWithTheFirstWordNotTheLast() {
-        var grade = grader.grade("I agree.", "aaaa");
+    void grade_whenShortAnswerIsMistyped_shouldAlignWithFirstWord() {
+        // Arrange
+        String shortTranscript = "I agree.";
+        String longTranscript = "The food was great, by the way.";
+
+        // Act
+        var grade = grader.grade(shortTranscript, "aaaa");
+        var longAnswer = grader.grade(longTranscript, "a");
+
+        // Assert
         assertThat(grade.words()).containsExactly(
             new Edit("wrong", "i", "aaaa"),
             new Edit("missing", "agree", null)
         );
-        var longAnswer = grader.grade("The food was great, by the way.", "a");
         assertThat(longAnswer.words().getFirst()).isEqualTo(new Edit("wrong", "the", "a"));
         assertThat(longAnswer.words().subList(1, 7)).allMatch(word -> word.type().equals("missing"));
     }
 
     @Test
-    void theFirstWordTypoDoesNotShiftCorrectFollowingWords() {
-        var grade = grader.grade("Everybody seemed to enjoy it.", "Everbody seemed to enjoy it");
+    void grade_whenFirstWordHasTypo_shouldKeepFollowingWordsAligned() {
+        // Arrange
+        String transcript = "Everybody seemed to enjoy it.";
+        String answer = "Everbody seemed to enjoy it";
+
+        // Act
+        var grade = grader.grade(transcript, answer);
+
+        // Assert
         assertThat(grade.words().getFirst()).isEqualTo(new Edit("wrong", "everybody", "everbody"));
         assertThat(grade.correct()).isEqualTo(4);
         assertThat(grade.accuracy()).isEqualTo(80);
     }
 
     @Test
-    void missingAndExtraLeadingWordsRetainTheirActualPositions() {
-        var missing = grader.grade("We really enjoyed it", "really enjoyed it");
+    void grade_whenLeadingWordIsMissingOrExtra_shouldPreserveEditPositions() {
+        // Arrange
+        String missingFirstWord = "really enjoyed it";
+        String extraFirstWord = "Yesterday we enjoyed it";
+
+        // Act
+        var missing = grader.grade("We really enjoyed it", missingFirstWord);
+        var extra = grader.grade("We enjoyed it", extraFirstWord);
+
+        // Assert
         assertThat(missing.words().getFirst()).isEqualTo(new Edit("missing", "we", null));
         assertThat(missing.correct()).isEqualTo(3);
-        var extra = grader.grade("We enjoyed it", "Yesterday we enjoyed it");
         assertThat(extra.words().getFirst()).isEqualTo(new Edit("extra", null, "yesterday"));
         assertThat(extra.extra()).isEqualTo(1);
         assertThat(extra.correct()).isEqualTo(3);
     }
 
     @Test
-    void repeatedWordsHaveStableHintIndicesAndNormalizationIsUnchanged() {
+    void withoutHintCredit_whenWordsRepeat_shouldKeepStableHintIndices() {
+        // Arrange
         var grade = grader.grade("We really really enjoyed it.", "we really enjoyed it");
+
+        // Act
+        var hintOnCorrectWord = grader.withoutHintCredit(grade, List.of(1));
+        var hintOnMissingWord = grader.withoutHintCredit(grade, List.of(2));
+        var normalizedGrade = grader.grade("I'll watch it.", "I’LL WATCH IT!");
+
+        // Assert
         assertThat(grade.words().get(1)).isEqualTo(new Edit("correct", "really", "really"));
         assertThat(grade.words().get(2)).isEqualTo(new Edit("missing", "really", null));
-        assertThat(grader.withoutHintCredit(grade, List.of(1)).correct()).isEqualTo(3);
-        assertThat(grader.withoutHintCredit(grade, List.of(2)).correct()).isEqualTo(4);
-        assertThat(grader.grade("I'll watch it.", "I’LL WATCH IT!").accuracy()).isEqualTo(100);
+        assertThat(hintOnCorrectWord.correct()).isEqualTo(3);
+        assertThat(hintOnMissingWord.correct()).isEqualTo(4);
+        assertThat(normalizedGrade.accuracy()).isEqualTo(100);
     }
 
     @Test
-    void finalPrefixIsPartialOnlyWhileTheTokenIsStillBeingTyped() {
-        assertThat(grader.feedback(grader.grade("We really enjoyed it.", "We re"), "We re"))
-            .containsExactly(new Feedback(0, "correct", "we"), new Feedback(1, "partial", null),
-                new Feedback(2, "empty", null), new Feedback(3, "empty", null));
-        for (String actual : List.of("We re ", "We re.", "We re wrong")) {
-            assertThat(grader.feedback(grader.grade("We really enjoyed it.", actual), actual).get(1))
-                .isEqualTo(new Feedback(1, "incorrect", null));
-        }
-        assertThat(grader.feedback(grader.grade("Hello.", ""), ""))
-            .containsExactly(new Feedback(0, "empty", null));
+    void feedback_whenFinalPrefixIsUnfinished_shouldMarkItPartial() {
+        // Arrange
+        String transcript = "We really enjoyed it.";
+        String partialAnswer = "We re";
+        var completedInputs = List.of("We re ", "We re.", "We re wrong");
+
+        // Act
+        var partial = grader.feedback(grader.grade(transcript, partialAnswer), partialAnswer);
+        var completed = completedInputs.stream().map(answer -> grader.feedback(grader.grade(transcript, answer), answer).get(1)).toList();
+        var empty = grader.feedback(grader.grade("Hello.", ""), "");
+
+        // Assert
+        assertThat(partial).containsExactly(new Feedback(0, "correct", "we"), new Feedback(1, "partial", null),
+            new Feedback(2, "empty", null), new Feedback(3, "empty", null));
+        assertThat(completed).hasSize(3).containsOnly(new Feedback(1, "incorrect", null));
+        assertThat(empty).containsExactly(new Feedback(0, "empty", null));
     }
 
     @Test
-    void feedbackIndicesIgnoreExtraEditsAndRedactionRetainsActualWords() {
-        var grade = grader.grade("We really enjoyed it.", "Yesterday we re");
-        assertThat(grader.feedback(grade, "Yesterday we re"))
-            .containsExactly(new Feedback(0, "correct", "we"), new Feedback(1, "partial", null),
-                new Feedback(2, "empty", null), new Feedback(3, "empty", null));
+    void feedback_whenAnswerHasExtraEdits_shouldKeepExpectedWordIndices() {
+        // Arrange
+        String extraAnswer = "Yesterday we re";
+        String missingAnswer = "We really enjoyed it";
+        var grade = grader.grade("We really enjoyed it.", extraAnswer);
+        var missing = grader.grade("We really really enjoyed it.", missingAnswer);
+
+        // Act
+        var extraFeedback = grader.feedback(grade, extraAnswer);
+        var missingFeedback = grader.feedback(missing, missingAnswer);
         var safe = grader.redact(grade);
+
+        // Assert
+        assertThat(extraFeedback)
+            .containsExactly(new Feedback(0, "correct", "we"), new Feedback(1, "partial", null),
+                new Feedback(2, "empty", null), new Feedback(3, "empty", null));
         assertThat(safe.words()).extracting(Edit::actual).containsExactly("yesterday", "we", "re", null, null);
         assertThat(safe.words()).extracting(Edit::expected).containsExactly(null, "we", null, null, null);
         assertThat(safe.extra()).isEqualTo(1);
-        var missing = grader.grade("We really really enjoyed it.", "We really enjoyed it");
-        assertThat(grader.feedback(missing, "We really enjoyed it")).containsExactly(
+        assertThat(missingFeedback).containsExactly(
             new Feedback(0, "correct", "we"), new Feedback(1, "correct", "really"),
             new Feedback(2, "empty", null), new Feedback(3, "correct", "enjoyed"), new Feedback(4, "correct", "it"));
     }

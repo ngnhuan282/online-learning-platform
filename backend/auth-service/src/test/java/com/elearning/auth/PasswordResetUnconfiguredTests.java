@@ -70,7 +70,9 @@ class PasswordResetUnconfiguredTests {
     }
 
     @Test
-    void enabledWithoutCredentialsStillStartsKeepsLoginWorkingAndIssuesNoTokens() throws Exception {
+    void forgotPassword_whenMailCredentialsAreMissing_shouldLeaveLoginAvailableAndIssueNoResetTokens() throws Exception {
+        // Arrange
+        // Act
         assertThat(properties.ready()).isFalse();
         assertThat(sender).isInstanceOf(JavaMailSenderImpl.class);
         var smtp = ((JavaMailSenderImpl) sender).getJavaMailProperties();
@@ -107,6 +109,7 @@ class PasswordResetUnconfiguredTests {
                 "PASSWORD_RESET_UNAVAILABLE"
             );
         }
+        // Assert
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM password_reset_tokens", Long.class)).isZero();
         assertThat(
             jdbc.queryForObject("SELECT COUNT(*) FROM password_reset_rate_limits", Long.class)

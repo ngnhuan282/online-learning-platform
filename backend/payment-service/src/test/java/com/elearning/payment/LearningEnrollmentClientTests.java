@@ -15,7 +15,8 @@ import org.slf4j.MDC;
 
 class LearningEnrollmentClientTests {
     @Test
-    void verifiesLearningReceiptsAndPreservesConflictAndAvailabilityErrors() throws Exception {
+    void enroll_whenLearningReceiptConflictsOrServiceFails_shouldPreserveUpstreamErrors() throws Exception {
+        // Arrange
         String token = "learning-test-internal-token-at-least-32-bytes";
         var received = new AtomicReference<String>();
         var response = new AtomicReference<>("{\"success\":true,\"data\":{\"courseId\":42,\"userId\":7}}");
@@ -34,11 +35,14 @@ class LearningEnrollmentClientTests {
             }
         });
         server.start();
+
         try (var requestId = MDC.putCloseable("requestId", "request-pay-42")) {
             String endpoint = "http://127.0.0.1:" + server.getAddress().getPort();
             var client = new LearningEnrollmentClient(endpoint, token);
+            // Act
             assertThatThrownBy(() -> new LearningEnrollmentClient(endpoint, "weak")).isInstanceOf(IllegalArgumentException.class);
             client.grantPro("ORDER-PRO", 7L, "PRO_MONTH", 1);
+            // Assert
             assertThat(received.get()).startsWith("/internal/v1/learning/pro/grants " + token + " request-pay-42 ")
                 .contains("\"orderCode\":\"ORDER-PRO\"", "\"planCode\":\"PRO_MONTH\"", "\"durationMonths\":1");
             client.revokePro("ORDER-PRO", 7L);
@@ -75,7 +79,8 @@ class LearningEnrollmentClientTests {
 
 
     @Test
-    void sendsAuthenticatedPaymentEnrollmentContract() throws Exception {
+    void enroll_whenPaymentEnrollmentIsRequested_shouldAuthenticateAndSendRequiredFields() throws Exception {
+        // Arrange
         String internalToken = "test-internal-service-token-1234567890";
         AtomicReference<String> receivedToken = new AtomicReference<>();
         AtomicReference<String> receivedBody = new AtomicReference<>();
@@ -93,14 +98,17 @@ class LearningEnrollmentClientTests {
             }
         });
         server.start();
+
         try {
             LearningEnrollmentClient client = new LearningEnrollmentClient(
                 "http://127.0.0.1:" + server.getAddress().getPort(),
                 internalToken
             );
 
+            // Act
             client.enroll("LS-PAY-CONTRACT-001", 7L, 42L);
 
+            // Assert
             assertThat(receivedToken.get()).isEqualTo(internalToken);
             assertThat(receivedBody.get())
                 .contains("\"orderCode\":\"LS-PAY-CONTRACT-001\"")

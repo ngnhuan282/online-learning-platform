@@ -244,9 +244,11 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void freeLimitIsSharedAndOnlyVerifiedProUnlocksMoreRequests() throws Exception {
+    void sendMessage_whenFreeLimitIsReached_shouldRequireVerifiedProForHigherQuota() throws Exception {
+        // Arrange
         long first = create("{}");
         long second = create("{}");
+        // Act
         for (int index = 0; index < 5; index++) {
             assertThat(send(index % 2 == 0 ? first : second, "free-budget-" + index).statusCode()).isEqualTo(
                 200
@@ -280,6 +282,7 @@ class AiChatIntegrationTests {
         jdbc.update("UPDATE ai_daily_usage SET request_count = 100 WHERE user_id = 1");
         assertThat(send(second, "pro-budget-exhausted").statusCode()).isEqualTo(429);
         proActive.set(false);
+        // Assert
         assertThat(send(second, "expired-membership").statusCode()).isEqualTo(429);
         assertThat(calls.get()).isEqualTo(6);
         assertThat(request(BASE + "/" + first + "/messages", token(1, "USER"), null).statusCode()).isEqualTo(
@@ -288,8 +291,10 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void unsupportedQuestionsDoNotCallTheProviderOrConsumeTheDailyAllowance() throws Exception {
+    void sendMessage_whenQuestionIsUnsupported_shouldRefuseWithoutConsumingQuota() throws Exception {
+        // Arrange
         long id = create("{}");
+        // Act
         for (String question : List.of(
             "Game nay la game gi?",
             "Write Java code for me",
@@ -303,6 +308,7 @@ class AiChatIntegrationTests {
             assertThat(response.statusCode()).isEqualTo(422);
             assertThat(response.body()).contains("AI_OFF_TOPIC");
         }
+        // Assert
         assertThat(calls.get()).isZero();
         assertThat(count("ai_daily_usage")).isZero();
         assertThat(count("ai_messages")).isZero();
@@ -328,9 +334,11 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void membershipOutagesAndWrongOwnerNeverGrantProOrConsumeProviderQuota() throws Exception {
+    void sendMessage_whenMembershipCannotBeVerified_shouldRejectWithoutConsumingQuota() throws Exception {
+        // Arrange
         long id = create("{}");
         membershipStatus.set(503);
+        // Act
         assertThat(send(id, "membership-unavailable").statusCode()).isEqualTo(503);
         assertThat(request("/api/v1/ai/usage", token(1, "USER"), null).statusCode()).isEqualTo(503);
         membershipStatus.set(200);
@@ -340,11 +348,13 @@ class AiChatIntegrationTests {
         assertThat(calls.get()).isZero();
         assertThat(count("ai_daily_usage")).isZero();
         membershipUserId.set(1);
+        // Assert
         assertThat(send(id, "membership-restored").statusCode()).isEqualTo(200);
     }
 
     @Test
-    void truncatedAnswerIsMarkedInHistoryAndReplayWithoutGeneratingAgain() throws Exception {
+    void sendMessage_whenProviderTruncatesAnswer_shouldPreserveTruncationOnReplay() throws Exception {
+        // Arrange
         long id = create("{}");
         providerBody.set(
             """
@@ -352,6 +362,7 @@ class AiChatIntegrationTests {
              "usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":4096}}
             """
         );
+        // Act
         var response = send(id, "truncated-0001");
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode reply = mapper.readTree(response.body()).path("data");
@@ -364,6 +375,7 @@ class AiChatIntegrationTests {
             mapper.readTree(history.body()).path("data").path("content").get(0).path("truncated").asBoolean()
         ).isTrue();
         JsonNode replay = mapper.readTree(send(id, "truncated-0001").body()).path("data");
+        // Assert
         assertThat(replay.size()).isEqualTo(2);
         assertThat(replay.get(1).path("id")).isEqualTo(reply.get(1).path("id"));
         assertThat(replay.get(1).path("content")).isEqualTo(reply.get(1).path("content"));
@@ -376,10 +388,12 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void dailyBudgetIsSharedAcrossConversationsAndReplayDoesNotConsumeAgain() throws Exception {
+    void sendMessage_whenMessagesSpanConversations_shouldShareQuotaAndAllowReplay() throws Exception {
+        // Arrange
         properties.setDailyRequestLimit(1);
         long first = create("{}");
         long second = create("{}");
+        // Act
         assertThat(send(first, "budget-request-1").statusCode()).isEqualTo(200);
         assertThat(send(first, "budget-request-1").statusCode()).isEqualTo(200);
         assertThat(send(second, "budget-request-2").statusCode()).isEqualTo(429);
@@ -388,13 +402,16 @@ class AiChatIntegrationTests {
             jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 1", Integer.class)
         ).isEqualTo(1);
         properties.setDailyRequestLimit(2);
+        // Assert
         assertThat(send(second, "budget-request-2").statusCode()).isEqualTo(200);
         assertThat(calls.get()).isEqualTo(2);
     }
 
     @Test
-    void concurrentRequestsCannotExceedTheDailyBudget() {
+    void sendMessage_whenRequestsAreConcurrent_shouldEnforceDailyQuota() {
+        // Arrange
         properties.setDailyRequestLimit(3);
+        // Act
         var requests = java.util.stream.IntStream.range(0, 16)
             .mapToObj(index ->
                 CompletableFuture.supplyAsync(() -> {
@@ -407,6 +424,8 @@ class AiChatIntegrationTests {
                 }, executor)
             )
             .toList();
+
+        // Assert
         assertThat(requests.stream().mapToInt(CompletableFuture::join).sum()).isEqualTo(3);
         assertThat(
             jdbc.queryForObject("SELECT request_count FROM ai_daily_usage WHERE user_id = 999", Integer.class)
@@ -414,9 +433,11 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void realHttpProviderPersistsBothMessagesAndReplaysWithoutAnotherCall() throws Exception {
+    void sendMessage_whenRequestIsReplayed_shouldReturnPersistedMessagesWithoutCallingProvider() throws Exception {
+        // Arrange
         long id = create("{\"userId\":999,\"apiKey\":\"untrusted\"}");
         var response = send(id, "request-0001");
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body())
             .contains("A clear explanation.")
@@ -430,6 +451,7 @@ class AiChatIntegrationTests {
         assertThat(payload.path("contents").size()).isEqualTo(1);
         assertThat(payload.toString()).doesNotContain("userId", "apiKey", "email");
         var history = request(BASE + "/" + id + "/messages", token(1, "USER"), null);
+        // Assert
         assertThat(mapper.readTree(history.body()).path("data").path("totalElements").asInt()).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT input_tokens FROM ai_usage_logs", Integer.class)).isEqualTo(
             12
@@ -442,8 +464,10 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void ownersAreEnforcedEvenForAdminAndFrontendIdentityIsIgnored() throws Exception {
+    void getConversation_whenAnotherUserRequestsPrivateHistory_shouldRejectAccessRegardlessOfRole() throws Exception {
+        // Arrange
         long id = create("{\"userId\":2,\"title\":\"Private title\"}");
+        // Act
         assertThat(request(BASE, null, null).statusCode()).isEqualTo(401);
         for (String role : List.of("USER", "ADMIN")) {
             assertThat(request(BASE, token(2, role), null).body()).doesNotContain("Private title");
@@ -459,15 +483,19 @@ class AiChatIntegrationTests {
                 ).statusCode()
             ).isEqualTo(404);
         }
+        // Assert
         assertThat(calls.get()).isZero();
     }
 
     @Test
-    void missingConfigDisablesGenerationButNeverHidesSavedHistory() throws Exception {
+    void sendMessage_whenProviderConfigurationIsMissing_shouldRejectGenerationAndKeepHistoryAvailable() throws Exception {
+        // Arrange
         long id = create("{}");
+        // Act
         assertThat(send(id, "request-0001").statusCode()).isEqualTo(200);
         properties.setApiKey("");
         var capabilities = request("/api/v1/ai/capabilities", token(1, "USER"), null);
+        // Assert
         assertThat(capabilities.body()).contains("\"available\":false", "\"historyAvailable\":true");
         assertThat(request(BASE + "/" + id + "/messages", token(1, "USER"), null).body()).contains(
             "A clear explanation."
@@ -477,8 +505,10 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void quotaAndConfigurationErrorsAreSafeAndRetryDoesNotDuplicateMessages() throws Exception {
+    void sendMessage_whenProviderTemporarilyFails_shouldAllowRetryWithoutDuplicateMessages() throws Exception {
+        // Arrange
         long id = create("{}");
+        // Act
         for (int status : new int[] { 429, 403, 503 }) {
             providerStatus.set(status);
             var response = send(id, "request-retry");
@@ -495,6 +525,7 @@ class AiChatIntegrationTests {
             assertThat(count("ai_messages")).isZero();
         }
         providerStatus.set(200);
+        // Assert
         assertThat(send(id, "request-retry").statusCode()).isEqualTo(200);
         assertThat(count("ai_messages")).isEqualTo(2);
         assertThat(count("ai_usage_logs")).isEqualTo(4);
@@ -502,22 +533,27 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void actualNetworkTimeoutClearsLeaseAndRetainsRetryableTurn() throws Exception {
+    void sendMessage_whenProviderTimesOut_shouldReleaseLeaseAndAllowRetry() throws Exception {
+        // Arrange
         long id = create("{}");
         delay.set(1500);
+        // Act
         var response = send(id, "request-timeout");
         assertThat(response.statusCode()).isEqualTo(504);
         assertThat(response.body()).contains("AI_TIMEOUT");
         assertThat(count("ai_messages")).isZero();
         delay.set(0);
+        // Assert
         assertThat(send(id, "request-timeout").statusCode()).isEqualTo(200);
         assertThat(count("ai_messages")).isEqualTo(2);
     }
 
     @Test
-    void concurrentQuestionsAreSerializedWithoutHoldingAnHttpTransaction() throws Exception {
+    void sendMessage_whenQuestionsOverlap_shouldSerializeGenerationWithoutHoldingTransaction() throws Exception {
+        // Arrange
         long id = create("{}");
         delay.set(600);
+        // Act
         var first = CompletableFuture.supplyAsync(() -> {
             try {
                 return send(id, "request-concurrent");
@@ -527,6 +563,7 @@ class AiChatIntegrationTests {
         });
         long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (calls.get() == 0 && System.nanoTime() < until) Thread.sleep(10);
+        // Assert
         assertThat(send(id, "request-concurrent").statusCode()).isEqualTo(409);
         assertThat(first.get(5, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
         assertThat(send(id, "request-concurrent").statusCode()).isEqualTo(200);
@@ -535,8 +572,10 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void authorizedContextIsRevalidatedAndNeverForwardsMediaOrIdentity() throws Exception {
+    void resolve_whenLessonContextAccessChanges_shouldRecheckAccessAndOmitPrivateMedia() throws Exception {
+        // Arrange
         long id = create("{\"courseId\":42,\"lessonId\":9}");
+        // Act
         assertThat(send(id, "request-context").statusCode()).isEqualTo(200);
         assertThat(forwardedAuthorization.get()).startsWith("Bearer ");
         assertThat(providerRequest.get())
@@ -556,13 +595,16 @@ class AiChatIntegrationTests {
         ).isEqualTo(404);
         assertThat(request(BASE, token(1, "USER"), "{\"lessonId\":9}").statusCode()).isEqualTo(400);
         contextStatus.set(503);
+        // Assert
         assertThat(send(id, "request-outage").statusCode()).isEqualTo(503);
         assertThat(calls.get()).isEqualTo(1);
     }
 
     @Test
-    void contextResponsesFailClosedWhenUpstreamReturnsMalformedOrMismatchedData() throws Exception {
+    void resolve_whenUpstreamContextIsInvalid_shouldRejectInvalidOrMismatchedCourseData() throws Exception {
+        // Arrange
         String authorization = "Bearer " + token(1, "USER");
+        // Act
         assertThat(learningContext.resolve(42L, null, authorization).title()).isEqualTo("English course");
         assertThat(request(BASE, token(1, "USER"), "{\"courseId\":43}").statusCode()).isEqualTo(503);
         assertThat(request(BASE, token(1, "USER"), "{\"courseId\":44}").statusCode()).isEqualTo(404);
@@ -582,14 +624,17 @@ class AiChatIntegrationTests {
         contextStatus.set(401);
         assertThat(request(BASE, token(1, "USER"), "{\"courseId\":42}").statusCode()).isEqualTo(401);
         contextStatus.set(404);
+        // Assert
         assertThat(request(BASE, token(1, "USER"), "{\"courseId\":42}").statusCode()).isEqualTo(404);
         assertThat(calls.get()).isZero();
     }
 
     @Test
-    void conversationEndpointReturnsOwnedDataAndSafeParameterErrors() throws Exception {
+    void getConversation_whenOwnerRequestsConversation_shouldReturnOwnedDataAndValidatePagination() throws Exception {
+        // Arrange
         long id = create("{}");
         var detail = request(BASE + "/" + id, token(1, "USER"), null);
+        // Act
         assertThat(detail.statusCode()).isEqualTo(200);
         assertThat(mapper.readTree(detail.body()).path("data").path("id").asLong()).isEqualTo(id);
         assertThat(request(BASE + "/" + id, token(2, "USER"), null).statusCode()).isEqualTo(404);
@@ -604,13 +649,16 @@ class AiChatIntegrationTests {
         var unsupportedContent = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + BASE))
             .header("Authorization", "Bearer " + token(1, "USER")).header("Content-Type", "text/plain")
             .POST(HttpRequest.BodyPublishers.ofString("test body")).build(), HttpResponse.BodyHandlers.ofString());
+        // Assert
         assertThat(unsupportedContent.statusCode()).isEqualTo(415);
         assertThat(unsupportedContent.body()).contains("UNSUPPORTED_MEDIA_TYPE");
     }
 
     @Test
-    void oversizedHistoryDropsTheOldestTurnWhileRetainingItForTheOwner() throws Exception {
+    void sendMessage_whenProviderHistoryExceedsBudget_shouldDropOldestTurnFromPromptAndRetainSavedHistory() throws Exception {
+        // Arrange
         long id = create("{}");
+        // Act
         String longAnswer = "previous lesson explanation ".repeat(450);
         providerBody.set(mapper.writeValueAsString(Map.of("candidates", List.of(Map.of(
             "content", Map.of("parts", List.of(Map.of("text", longAnswer))), "finishReason", "STOP"
@@ -623,11 +671,14 @@ class AiChatIntegrationTests {
         assertThat(history.statusCode()).isEqualTo(200);
         assertThat(history.body()).contains("previous lesson explanation");
         providerStatus.set(504);
+        // Assert
         assertThat(send(id, "upstream-timeout").body()).contains("AI_TIMEOUT");
     }
 
     @Test
-    void missingOrTruncatedLessonTextIsExplicitWithoutFetchingMedia() throws Exception {
+    void resolve_whenLessonTextIsEmptyOrLong_shouldFlagMissingOrTruncatedTextWithoutFetchingMedia() throws Exception {
+        // Arrange
+        // Act
         for (String content : List.of("   ", "A".repeat(10001))) {
             contextSections.set(
                 mapper.writeValueAsString(
@@ -681,12 +732,15 @@ class AiChatIntegrationTests {
                     .contains("[Lesson text truncated; the remainder is not provided.]");
             }
         }
+        // Assert
         assertThat(calls.get()).isEqualTo(2);
     }
 
     @Test
-    void requestIdCannotBeReusedForADifferentQuestionAndInputsAreValidated() throws Exception {
+    void sendMessage_whenRequestIdIsReusedWithDifferentInput_shouldRejectConflictAndValidateInput() throws Exception {
+        // Arrange
         long id = create("{}");
+        // Act
         assertThat(send(id, "request-validate").statusCode()).isEqualTo(200);
         var conflict = request(
             BASE + "/" + id + "/messages",
@@ -703,6 +757,7 @@ class AiChatIntegrationTests {
                 ).statusCode()
             ).isEqualTo(400);
         }
+        // Assert
         assertThat(
             request(
                 BASE + "/" + id + "/messages",
@@ -714,8 +769,10 @@ class AiChatIntegrationTests {
     }
 
     @Test
-    void blockedOrMalformedProviderResponsesNeverBecomeFakeAnswers() throws Exception {
+    void sendMessage_whenProviderResponseIsBlockedOrMalformed_shouldRejectWithoutPersistingAnswer() throws Exception {
+        // Arrange
         long id = create("{}");
+        // Act
         for (String body : List.of(
             "{\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}",
             "{\"candidates\":[{\"finishReason\":\"SAFETY\",\"content\":{\"parts\":[{\"text\":\"blocked text\"}]}}]}"
@@ -733,12 +790,15 @@ class AiChatIntegrationTests {
             providerBody.set(body);
             assertThat(send(id, "request-blocked").statusCode()).isEqualTo(503);
         }
+        // Assert
         assertThat(count("ai_messages")).isZero();
     }
 
     @Test
-    void expiredLeaseCannotUnlockOrCommitOverANewerAttempt() throws Exception {
+    void reserve_whenPreviousLeaseHasExpired_shouldProtectNewLeaseFromStaleCompletion() throws Exception {
+        // Arrange
         long id = create("{}");
+        // Act
         var old = store.reserve(1L, id, "request-lease", "Question");
         jdbc.update("UPDATE ai_conversations SET active_until = ? WHERE id = ?", statement -> {
             statement.setTimestamp(
@@ -778,6 +838,7 @@ class AiChatIntegrationTests {
             new GeminiGateway.Reply("New answer", 1, 1),
             "test-model"
         );
+        // Assert
         assertThat(count("ai_messages")).isEqualTo(2);
         assertThat(calls.get()).isZero();
     }

@@ -34,7 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
 class ProPlanAdminIntegrationTests {
 
     @Test
-    void customPlanCrudKeepsOrderSnapshotsAndRequiresCreateAndDeletePermissions() throws Exception {
+    void savePlan_whenPlanIsCreatedEditedOrArchived_shouldEnforcePermissionsAndPreserveOrderSnapshots() throws Exception {
+        // Arrange
         var payload = Map.of(
             "code",
             "PRO_CRUD_TEST",
@@ -50,7 +51,9 @@ class ProPlanAdminIntegrationTests {
             "new plan"
         );
         String viewer = token("SUPPORT", "ADMIN_ACCESS", "PRO_PLAN_VIEW");
+        // Act
         assertThat(request("POST", "/pro/plans", viewer, payload).statusCode()).isEqualTo(403);
+        // Assert
         assertThat(request("POST", "/pro/plans", token("ADMIN"), payload).statusCode()).isEqualTo(200);
         var order = checkout.createProCheckout(
             new ProPaymentModels.CheckoutRequest(
@@ -169,13 +172,16 @@ class ProPlanAdminIntegrationTests {
     }
 
     @Test
-    void auditShowsCommittedPlanChangesOnlyToAuthorizedStaff() throws Exception {
+    void audit_whenStaffRequestsPlanHistory_shouldShowOnlyCommittedChangesToAuthorizedStaff() throws Exception {
+        // Arrange
         String admin = token("ADMIN");
+        // Act
         assertThat(request("PUT", "/pro/plans/PRO_MONTH", admin, update(65000, true, 0)).statusCode()).isEqualTo(200);
         assertThat(request("GET", "/audit", token("SUPPORT", "ADMIN_ACCESS", "PRO_PLAN_VIEW"), null).statusCode()).isEqualTo(403);
         var audit = request("GET", "/audit", token("SUPPORT", "ADMIN_ACCESS", "AUDIT_VIEW"), null);
         assertThat(audit.statusCode()).isEqualTo(200);
         var entry = json.readTree(audit.body()).path("data").get(0);
+        // Assert
         assertThat(entry.path("actorId").asLong()).isEqualTo(91);
         assertThat(entry.path("action").asString()).isEqualTo("PRO_PLAN_UPDATE");
         assertThat(entry.path("target").asString()).isEqualTo("PRO_MONTH");
@@ -189,27 +195,33 @@ class ProPlanAdminIntegrationTests {
     }
 
     @Test
-    void createRejectsUnsupportedDurationFractionalCurrencyAndDuplicateCode() throws Exception {
+    void createPlan_whenDurationCurrencyOrCodeIsInvalid_shouldRejectPlan() throws Exception {
+        // Arrange
         String admin = token("ADMIN");
         var candidate = new java.util.HashMap<String, Object>(Map.of(
             "code", "PRO_MONTH", "name", "Monthly", "durationMonths", 2,
             "price", 50000, "active", true, "reason", "test catalog constraints"
         ));
+        // Act
         assertThat(request("POST", "/pro/plans", admin, candidate).statusCode()).isEqualTo(400);
         candidate.put("durationMonths", 1);
         candidate.put("price", new java.math.BigDecimal("50000.25"));
         assertThat(request("POST", "/pro/plans", admin, candidate).statusCode()).isEqualTo(400);
         candidate.put("price", 50000);
+        // Assert
         assertThat(request("POST", "/pro/plans", admin, candidate).statusCode()).isEqualTo(409);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_admin_audit", Long.class)).isZero();
     }
 
     @Test
-    void readAndUpdatePermissionsAreDistinctAndLearnerCannotUseClaimedPermissions() throws Exception {
+    void updatePlan_whenCallerHasReadOnlyOrForgedPermission_shouldRejectWrite() throws Exception {
+        // Arrange
+        // Act
         assertThat(
             request("GET", "/pro/plans", token("USER", "ADMIN_ACCESS", "PRO_PLAN_VIEW"), null).statusCode()
         ).isEqualTo(403);
         String viewer = token("SUPPORT", "ADMIN_ACCESS", "PRO_PLAN_VIEW");
+        // Assert
         assertThat(request("GET", "/pro/plans", viewer, null).statusCode()).isEqualTo(200);
         assertThat(
             request("PUT", "/pro/plans/PRO_MONTH", viewer, update(60000, true, 0)).statusCode()
@@ -226,13 +238,17 @@ class ProPlanAdminIntegrationTests {
     }
 
     @Test
-    void oldOrderKeepsPriceAndInactivePlanCannotBePurchased() throws Exception {
+    void checkout_whenPlanBecomesInactive_shouldRejectPurchaseAndRetainPreviousPrice() throws Exception {
+        // Arrange
         String key = UUID.randomUUID().toString();
+        // Act
         var order = checkout.createProCheckout(
             new ProPaymentModels.CheckoutRequest("PRO_MONTH", PaymentProvider.MOCK, key, null, null),
             91L,
             "127.0.0.1"
         );
+
+        // Assert
         assertThat(
             request("PUT", "/pro/plans/PRO_MONTH", token("ADMIN"), update(65000, false, 0)).statusCode()
         ).isEqualTo(200);
@@ -271,9 +287,15 @@ class ProPlanAdminIntegrationTests {
     }
 
     @Test
-    void invalidPriceAndMissingReasonAreRejected() throws Exception {
+    void savePlan_whenPriceOrReasonIsInvalid_shouldRejectUpdate() throws Exception {
+        // Arrange
+        // Act
+
+        var actualStatusCode = request("PUT", "/pro/plans/PRO_MONTH", token("ADMIN"), update(0, true, 0)).statusCode();
+
+        // Assert
         assertThat(
-            request("PUT", "/pro/plans/PRO_MONTH", token("ADMIN"), update(0, true, 0)).statusCode()
+            actualStatusCode
         ).isEqualTo(400);
         assertThat(
             request(

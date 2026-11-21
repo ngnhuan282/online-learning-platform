@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 public class CourseFoundationTest {
 
     @Test
-    void shouldCreateCourseAndCategoryModels() {
+    void createCourse_whenCourseAndCategoryFixturesAreValid_shouldPopulateEntityModels() {
+        // Arrange
         Category category = new Category();
         category.setName("Java");
         category.setSlug("java");
@@ -24,8 +25,10 @@ public class CourseFoundationTest {
         course.setCategory(category);
         course.setPrice(BigDecimal.valueOf(199000));
         course.setLevel(CourseLevel.BEGINNER);
+        // Act
         course.setStatus(CourseStatus.PUBLISHED);
 
+        // Assert
         assertNotNull(category.getName());
         assertNotNull(course.getTitle());
         assertNotNull(course.getCategory());

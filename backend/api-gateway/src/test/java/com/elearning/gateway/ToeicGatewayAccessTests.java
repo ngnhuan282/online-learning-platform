@@ -19,7 +19,8 @@ class ToeicGatewayAccessTests {
     private final AuthenticationFilter filter = new AuthenticationFilter(mock(JwtTokenProvider.class));
 
     @Test
-    void onlyThePublishedExamCatalogueCanBeReadWithoutSigningIn() {
+    void filter_whenGuestRequestsPublishedExamCatalog_shouldAllowCatalogRead() {
+        // Arrange
         for (String path : new String[] {
             "/api/v1/learning/toeic/exams",
             "/api/v1/learning/toeic/dictionary",
@@ -32,6 +33,7 @@ class ToeicGatewayAccessTests {
             "/api/v1/payments/pro/plans"
         }) {
             AtomicBoolean forwarded = new AtomicBoolean();
+            // Act
             filter.filter(
                 MockServerWebExchange.from(MockServerHttpRequest.get(path)),
                 exchange -> {
@@ -39,12 +41,15 @@ class ToeicGatewayAccessTests {
                     return Mono.empty();
                 }
             ).block();
+            // Assert
             assertThat(forwarded).as("Expected public GET for %s", path).isTrue();
         }
     }
 
     @Test
-    void learningAttemptsResultsAndAdministrationStillRequireAuthentication() {
+    void filter_whenGuestRequestsExamAttemptResultOrAdministration_shouldRequireAuthentication() {
+        // Arrange
+        // Act
         for (String path : new String[] {
             "/api/v1/learning/toeic/exams/1",
             "/api/v1/learning/toeic/exams/1/progress",
@@ -63,6 +68,7 @@ class ToeicGatewayAccessTests {
         }) {
             assertUnauthenticated(MockServerHttpRequest.get(path).build());
         }
+        // Assert
         assertUnauthenticated(MockServerHttpRequest.post("/api/v1/learning/toeic/exams").build());
         assertUnauthenticated(MockServerHttpRequest.post("/api/v1/learning/toeic/attempts/1/submit").build());
         assertUnauthenticated(

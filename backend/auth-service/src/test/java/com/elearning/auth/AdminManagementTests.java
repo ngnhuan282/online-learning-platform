@@ -24,8 +24,10 @@ import tools.jackson.databind.json.JsonMapper;
 class AdminManagementTests {
 
     @Test
-    void commercePermissionsAreCataloguedAndAddViewDependenciesToCustomRoles() throws Exception {
+    void updateRole_whenRoleGrantsCommercePermissions_shouldIncludeRequiredViewPermissions() throws Exception {
+        // Arrange
         String admin = token(user("ADMIN"), "ADMIN");
+        // Act
         var catalog = data(request("GET", "/admin/permissions", admin, null));
         Set<String> codes = new HashSet<>();
         catalog.forEach(row -> codes.add(row.get("code").asString()));
@@ -60,6 +62,7 @@ class AdminManagementTests {
         );
         Set<String> assigned = new HashSet<>();
         saved.get("permissions").forEach(value -> assigned.add(value.asString()));
+        // Assert
         assertThat(assigned).contains(
             "ADMIN_ACCESS",
             "ENGAGEMENT_VIEW",
@@ -143,7 +146,8 @@ class AdminManagementTests {
     }
 
     @Test
-    void accountLifecycleKeepsLearningIdentityAndBlocksDeletedAccount() throws Exception {
+    void updateAccount_whenAccountIsDeleted_shouldKeepLearningIdentityAndDenyAuthentication() throws Exception {
+        // Arrange
         User administrator = user("ADMIN");
         String admin = token(administrator, "ADMIN");
         String email = UUID.randomUUID() + "@test.com";
@@ -164,6 +168,7 @@ class AdminManagementTests {
                 "ACTIVE"
             )
         );
+        // Act
         assertThat(creation.statusCode()).isEqualTo(201);
         JsonNode created = data(creation);
         long id = created.get("id").asLong();
@@ -194,6 +199,7 @@ class AdminManagementTests {
             request("DELETE", "/admin/users/" + administrator.getId(), admin, null).statusCode()
         ).isEqualTo(400);
         data(request("DELETE", "/admin/users/" + id, admin, null));
+        // Assert
         assertThat(users.findById(id).orElseThrow().getDeletedAt()).isNotNull();
         assertThat(users.findById(id).orElseThrow().getStatus().name()).isEqualTo("DISABLED");
         assertThat(
@@ -208,8 +214,10 @@ class AdminManagementTests {
     }
 
     @Test
-    void softDeleteReleasesCustomRoleWithoutDeletingUserRecord() throws Exception {
+    void deleteUser_whenUserHasCustomRole_shouldReleaseRoleWithoutRemovingUserRecord() throws Exception {
+        // Arrange
         String admin = token(user("ADMIN"), "ADMIN");
+        // Act
         String roleName = "ARCHIVE_" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
         long roleId = data(
             request(
@@ -252,13 +260,15 @@ class AdminManagementTests {
             .get("id")
             .asLong();
         data(request("DELETE", "/admin/users/" + userId, admin, null));
+        // Assert
         assertThat(users.findById(userId).orElseThrow().getRoles()).isEmpty();
         assertThat(request("DELETE", "/admin/roles/" + roleId, admin, null).statusCode()).isEqualTo(200);
         assertThat(users.findById(userId)).isPresent();
     }
 
     @Test
-    void customRoleLifecycleEnforcesDependenciesReservedPermissionsAndStaleVersion() throws Exception {
+    void updateRole_whenCustomRoleIsModified_shouldEnforcePermissionDependenciesAndVersion() throws Exception {
+        // Arrange
         String admin = token(user("ADMIN"), "ADMIN");
         String name = "SUPPORT_" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
         var payload = new HashMap<String, Object>(
@@ -276,6 +286,7 @@ class AdminManagementTests {
             )
         );
         var creation = request("POST", "/admin/roles", admin, payload);
+        // Act
         assertThat(creation.statusCode()).isEqualTo(201);
         JsonNode role = data(creation);
         long id = role.get("id").asLong();
@@ -306,11 +317,13 @@ class AdminManagementTests {
                 Map.of("roles", List.of("USER"))
             )
         );
+        // Assert
         assertThat(request("DELETE", "/admin/roles/" + id, admin, null).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void defaultUserCannotInheritLegacyAdminPermissionsAndBuiltInRolesAreImmutable() throws Exception {
+    void updateRole_whenRoleIsBuiltIn_shouldRejectChangesAndKeepLegacyAdminPermissionsOutOfDefaultUser() throws Exception {
+        // Arrange
         String admin = token(user("ADMIN"), "ADMIN");
         User existing = user("USER");
         String existingToken = token(existing, "USER");
@@ -331,6 +344,7 @@ class AdminManagementTests {
         );
         payload.put("description", userRole.getDescription());
         try {
+            // Act
             assertThat(request("PUT", path, existingToken, payload).statusCode()).isEqualTo(403);
             assertThat(request("PUT", path, admin, payload).statusCode()).isEqualTo(403);
             userRole.update(
@@ -373,6 +387,7 @@ class AdminManagementTests {
             var adminRole = roles.findByName("ADMIN").orElseThrow();
             payload.put("name", "ADMIN");
             payload.put("version", adminRole.getVersion());
+            // Assert
             assertThat(
                 request("PUT", "/admin/roles/" + adminRole.getId(), admin, payload).statusCode()
             ).isEqualTo(403);
@@ -384,10 +399,12 @@ class AdminManagementTests {
     }
 
     @Test
-    void usersFiltersAuditAndProtectedSystemRoles() throws Exception {
+    void listUsers_whenAdminFiltersAccounts_shouldReturnMatchingAccountsAndAudit() throws Exception {
+        // Arrange
         User administrator = user("ADMIN");
         String admin = token(administrator, "ADMIN");
         String learner = token(user("USER"), "USER");
+        // Act
         assertThat(request("GET", "/admin/overview", learner, null).statusCode()).isEqualTo(403);
         String email = UUID.randomUUID() + "@test.com";
         JsonNode created = data(
@@ -442,6 +459,7 @@ class AdminManagementTests {
                 .size()
         ).isEqualTo(6);
         data(request("PATCH", "/admin/users/" + id + "/status", admin, Map.of("status", "LOCKED")));
+        // Assert
         assertThat(
             request(
                 "GET",
@@ -453,9 +471,11 @@ class AdminManagementTests {
     }
 
     @Test
-    void roleValidationConflictsUserLookupAndExceptionHandlers() throws Exception {
+    void updateRole_whenRoleOrUserInputIsInvalid_shouldReturnSafeValidationOrConflictErrors() throws Exception {
+        // Arrange
         User administrator = user("ADMIN");
         String admin = token(administrator, "ADMIN");
+        // Act
         assertThat(request("GET", "/admin/users/not-a-number", admin, null).statusCode()).isEqualTo(400);
         assertThat(request("GET", "/admin/users/99999999", admin, null).statusCode()).isEqualTo(404);
         assertThat(request("DELETE", "/admin/overview", admin, null).statusCode()).isEqualTo(405);
@@ -580,6 +600,7 @@ class AdminManagementTests {
                 Map.of("fullName", "Updated Operator", "roles", List.of("USER"))
             )
         );
+        // Assert
         assertThat(updated.get("fullName").asString()).isEqualTo("Updated Operator");
         assertThat(request("DELETE", "/admin/roles/" + roleId, admin, null).statusCode()).isEqualTo(200);
         assertThat(request("DELETE", "/admin/users/" + userId, admin, null).statusCode()).isEqualTo(200);

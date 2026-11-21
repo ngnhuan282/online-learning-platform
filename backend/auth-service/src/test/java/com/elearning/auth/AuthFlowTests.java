@@ -95,7 +95,9 @@ class AuthFlowTests {
     }
 
     @Test
-    void disabledMailReturnsSameUnavailableErrorWithoutIssuingAnyResetTokens() throws Exception {
+    void forgotPassword_whenMailIsDisabled_shouldReturnUnavailableAndIssueNoResetToken() throws Exception {
+        // Arrange
+        // Act
         String local = registerUser();
         for (String email : List.of(local, email())) {
             error(
@@ -104,6 +106,7 @@ class AuthFlowTests {
                 "PASSWORD_RESET_UNAVAILABLE"
             );
         }
+        // Assert
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM password_reset_tokens", Long.class)).isZero();
         assertThat(login(local, PASSWORD).statusCode()).isEqualTo(200);
     }
@@ -119,10 +122,13 @@ class AuthFlowTests {
     }
 
     @Test
-    void openApiDocumentsAuthContractWithoutCredentialExamples() throws Exception {
+    void openApi_whenAuthContractIsRequested_shouldDocumentEndpointsWithoutCredentialExamples() throws Exception {
+        // Arrange
         var response = request("/v3/api-docs", null, null);
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode spec = mapper.readTree(response.body());
+        // Assert
         assertThat(spec.get("paths").get("/api/v1/auth/login")).isNotNull();
         assertThat(spec.get("paths").get("/api/v1/admin/users")).isNotNull();
         assertThat(spec.get("paths").get("/api/v1/users/me")).isNotNull();
@@ -133,7 +139,9 @@ class AuthFlowTests {
     }
 
     @Test
-    void registersNormalizesHashesAndIgnoresCallerRoles() throws Exception {
+    void register_whenInputIsValidWithExtraRoleFields_shouldPersistNormalizedAccountWithHashedPassword() throws Exception {
+        // Arrange
+        // Act
         String email = email();
         var input = new HashMap<>(registration("  " + email.toUpperCase(Locale.ROOT) + "  "));
         input.put("roles", List.of("ADMIN"));
@@ -146,6 +154,7 @@ class AuthFlowTests {
         assertThat(data(response).get("roles").toString()).isEqualTo("[\"USER\"]");
         assertThat(response.body()).doesNotContain(PASSWORD, "password", "accessToken");
         var stored = users.findByEmailIgnoreCase(email).orElseThrow();
+        // Assert
         assertThat(stored.getPasswordHash()).startsWith("$2").hasSize(60);
         assertThat(passwords.matches(PASSWORD, stored.getPasswordHash())).isTrue();
         assertThat(stored.getStatus().name()).isEqualTo("ACTIVE");
@@ -154,8 +163,11 @@ class AuthFlowTests {
     }
 
     @Test
-    void rejectsDuplicateEmailIgnoringCase() throws Exception {
+    void register_whenEmailMatchesExistingAccountIgnoringCase_shouldReturnConflict() throws Exception {
+        // Arrange
+        // Act
         String email = registerUser();
+        // Assert
         error(
             request(REGISTER, registration(email.toUpperCase(Locale.ROOT)), null),
             409,
@@ -164,7 +176,9 @@ class AuthFlowTests {
     }
 
     @Test
-    void concurrentDuplicateRegistrationReturnsConflict() throws Exception {
+    void register_whenSameEmailIsSubmittedConcurrently_shouldCreateOnlyOneAccount() throws Exception {
+        // Arrange
+        // Act
         String email = email();
         var calls = new ArrayList<CompletableFuture<HttpResponse<String>>>();
         for (int i = 0; i < 2; i++) calls.add(
@@ -176,6 +190,7 @@ class AuthFlowTests {
                 }
             })
         );
+        // Assert
         assertThat(
             calls
                 .stream()
@@ -185,7 +200,9 @@ class AuthFlowTests {
     }
 
     @Test
-    void rejectsInvalidRegistrationAndLogin() throws Exception {
+    void authenticate_whenRegistrationOrLoginInputIsInvalid_shouldReturnValidationError() throws Exception {
+        // Arrange
+        // Act
         error(request(REGISTER, Map.of(), null), 400, "VALIDATION_ERROR");
         error(request(LOGIN, Map.of(), null), 400, "VALIDATION_ERROR");
         for (var field : Map.of("fullName", " ", "email", "invalid", "password", "short").entrySet()) {
@@ -200,31 +217,44 @@ class AuthFlowTests {
         var response = request(REGISTER, input, null);
         error(response, 400, "VALIDATION_ERROR");
         var fieldErrors = mapper.readTree(response.body()).get("errors");
+        // Assert
         assertThat(fieldErrors.has("password")).isTrue();
         assertThat(fieldErrors.has("passwordWithinByteLimit")).isFalse();
         assertThat(response.body()).doesNotContain(input.get("password").toString());
     }
 
     @Test
-    void registrationEnforcesPasswordRulesWithoutPersistingInvalidUsers() throws Exception {
+    void register_whenPasswordFailsPolicy_shouldRejectWithoutPersistingAccount() throws Exception {
+        // Arrange
+
         for (String password : List.of("lowercase9", "UPPERCASE9", "NoDigitsHere", "Aa1short".repeat(10))) {
             String email = email();
             var input = new HashMap<>(registration(email));
             input.put("password", password);
             var response = request(REGISTER, input, null);
             error(response, 400, "VALIDATION_ERROR");
-            assertThat(mapper.readTree(response.body()).get("errors").has("password")).isTrue();
+            // Act
+
+            var actualResponse = mapper.readTree(response.body()).get("errors").has("password");
+
+            // Assert
+            assertThat(actualResponse).isTrue();
             assertThat(response.body()).doesNotContain(password);
             assertThat(users.existsByEmailIgnoreCase(email)).isFalse();
         }
     }
 
     @Test
-    void acceptsAsciiAndUnicodePasswordsAtBcryptByteLimit() throws Exception {
+    void register_whenPasswordFitsBcryptByteLimit_shouldAcceptAsciiAndUnicode() throws Exception {
+        // Arrange
+
         for (String password : List.of("Aa1" + "x".repeat(69), "Aa1" + "界".repeat(23))) {
             String email = email();
             var input = new HashMap<>(registration(email));
+            // Act
             input.put("password", password);
+
+            // Assert
             assertThat(request(REGISTER, input, null).statusCode()).isEqualTo(201);
             assertThat(login(email, password).statusCode()).isEqualTo(200);
             assertThat(
@@ -237,26 +267,33 @@ class AuthFlowTests {
     }
 
     @Test
-    void existingUsersCanLoginWithoutReapplyingRegistrationStrengthRules() throws Exception {
+    void login_whenExistingUserHasLegacyPassword_shouldAuthenticateWithoutApplyingRegistrationPolicy() throws Exception {
+        // Arrange
         String email = registerUser();
         String legacyPassword = "oldpassword";
+        // Act
         jdbc.update(
             "UPDATE users SET password_hash = ? WHERE email = ?",
             passwords.encode(legacyPassword),
             email
         );
+
+        // Assert
         assertThat(login(email, legacyPassword).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void logsInAndIssuesCompleteAccessClaims() throws Exception {
+    void login_whenCredentialsAreValid_shouldIssueCompleteAccessClaims() throws Exception {
+        // Arrange
         String email = registerUser();
+        // Act
         var response = login(" " + email.toUpperCase(Locale.ROOT) + " ", PASSWORD);
         assertThat(response.statusCode()).isEqualTo(200);
         var payload = data(response);
         assertThat(payload.get("tokenType").asString()).isEqualTo("Bearer");
         assertThat(payload.get("expiresIn").asLong()).isEqualTo(900);
         var claims = tokens.validate(payload.get("accessToken").asString());
+        // Assert
         assertThat(claims.getSubject()).isEqualTo(payload.get("user").get("id").asString());
         assertThat(claims.getIssuer()).isEqualTo("sgedu");
         assertThat(claims.get("tokenType")).isEqualTo("access");
@@ -266,34 +303,50 @@ class AuthFlowTests {
     }
 
     @Test
-    void hidesWrongEmailAndWrongPasswordBehindSameError() throws Exception {
+    void login_whenCredentialsAreInvalid_shouldReturnSameErrorForWrongEmailAndPassword() throws Exception {
+        // Arrange
+        // Act
         var wrongEmail = login(email(), PASSWORD);
         var wrongPassword = login(registerUser(), "Incorrect9!");
         error(wrongEmail, 401, "INVALID_CREDENTIALS");
         error(wrongPassword, 401, "INVALID_CREDENTIALS");
+        // Assert
         assertThat(mapper.readTree(wrongEmail.body()).get("message")).isEqualTo(
             mapper.readTree(wrongPassword.body()).get("message")
         );
     }
 
     @Test
-    void rejectsDisabledAndLockedAccountsAtLoginAndMe() throws Exception {
+    void login_whenAccountIsLockedOrDisabled_shouldDenyLoginAndProfileAccess() throws Exception {
         for (String status : List.of("DISABLED", "LOCKED")) {
+            // Arrange
             String email = registerUser();
             String token = data(login(email, PASSWORD)).get("accessToken").asString();
             jdbc.update("UPDATE users SET status = ? WHERE email = ?", status, email);
-            error(login(email, PASSWORD), 403, "ACCOUNT_" + status);
-            error(login(email, "Incorrect9!"), 401, "INVALID_CREDENTIALS");
-            error(request(ME, null, token), 403, "ACCOUNT_" + status);
+
+            // Act
+            var loginResponse = login(email, PASSWORD);
+            var incorrectPasswordResponse = login(email, "Incorrect9!");
+            var profileResponse = request(ME, null, token);
+
+            // Assert
+            error(loginResponse, 403, "ACCOUNT_" + status);
+            error(incorrectPasswordResponse, 401, "INVALID_CREDENTIALS");
+            error(profileResponse, 403, "ACCOUNT_" + status);
         }
     }
 
     @Test
-    void meLoadsDatabaseUserAndRequiresValidToken() throws Exception {
+    void me_whenAccessTokenIsValid_shouldLoadCurrentUserFromDatabase() throws Exception {
+        // Arrange
         String email = registerUser();
         String token = data(login(email, PASSWORD)).get("accessToken").asString();
         jdbc.update("UPDATE users SET full_name = ? WHERE email = ?", "Updated Name", email);
+
+        // Act
         var me = request(ME, null, token);
+
+        // Assert
         assertThat(me.statusCode()).isEqualTo(200);
         assertThat(data(me).get("fullName").asString()).isEqualTo("Updated Name");
         error(request(ME, null, null), 401, "UNAUTHORIZED");
@@ -312,19 +365,24 @@ class AuthFlowTests {
     }
 
     @Test
-    void repositoryUserDetailsMapsAllAuthoritiesAndStatuses() throws Exception {
+    void loadUserByUsername_whenAccountHasMultipleRoles_shouldMapAuthoritiesAndAccountStatus() throws Exception {
+        // Arrange
         String email = registerUser();
+        // Act
         var user = details.loadUserByUsername(" " + email.toUpperCase(Locale.ROOT) + " ");
         assertThat(user.getAuthorities()).extracting("authority").containsExactly("ROLE_USER");
         assertThat(passwords.matches(PASSWORD, user.getPassword())).isTrue();
         jdbc.update("UPDATE users SET status = 'LOCKED' WHERE email = ?", email);
         assertThat(details.loadUserByUsername(email).isAccountNonLocked()).isFalse();
         jdbc.update("UPDATE users SET status = 'DISABLED' WHERE email = ?", email);
+        // Assert
         assertThat(details.loadUserByUsername(email).isEnabled()).isFalse();
     }
 
     @Test
-    void multiRoleJwtEnforcesAdminAuthorization() throws Exception {
+    void authorize_whenTokenHasMultipleRoles_shouldEnforceAdminRole() throws Exception {
+        // Arrange
+        // Act
         String email = registerUser();
         String userToken = data(login(email, PASSWORD)).get("accessToken").asString();
         String adminPath = AuthServiceApplicationTests.BASE + "/admin";
@@ -334,6 +392,7 @@ class AuthFlowTests {
             email
         );
         String adminToken = data(login(email, PASSWORD)).get("accessToken").asString();
+        // Assert
         assertThat(tokens.roles(tokens.validate(adminToken))).containsExactlyInAnyOrder("USER", "ADMIN");
         assertThat(request(adminPath, null, adminToken).statusCode()).isEqualTo(200);
         assertThat(details.loadUserByUsername(email).getAuthorities())
@@ -342,12 +401,18 @@ class AuthFlowTests {
     }
 
     @Test
-    void flywayCreatesSchemaAndSeedsOnlyRoles() {
-        assertThat(
-            jdbc.queryForObject(
+    void migrate_whenDatabaseIsEmpty_shouldCreateSchemaAndSeedOnlyRoles() {
+        // Arrange
+        // Act
+
+        var response = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"flyway_schema_history\" WHERE \"success\" = TRUE AND \"type\" = 'SQL'",
                 Integer.class
-            )
+            );
+
+        // Assert
+        assertThat(
+            response
         ).isEqualTo(13);
         assertThat(
             jdbc.queryForObject(
@@ -368,12 +433,15 @@ class AuthFlowTests {
     }
 
     @Test
-    void googleRemainsExplicitlyUnavailableWithoutConfiguration() throws Exception {
+    void googleStart_whenConfigurationIsMissing_shouldReportSignInUnavailable() throws Exception {
+        // Arrange
+        // Act
         error(
             request("/api/v1/auth/google/start", Map.of("challenge", "c".repeat(43)), null),
             503,
             "GOOGLE_LOGIN_UNAVAILABLE"
         );
+        // Assert
         error(
             request(
                 "/api/v1/auth/google/exchange",

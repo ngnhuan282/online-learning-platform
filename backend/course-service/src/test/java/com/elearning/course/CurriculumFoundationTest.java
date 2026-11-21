@@ -18,7 +18,8 @@ import org.junit.jupiter.api.Test;
 public class CurriculumFoundationTest {
 
     @Test
-    void shouldCreateSectionAndLessonEntities() {
+    void createLesson_whenRelatedSectionExists_shouldPopulateCurriculumEntities() {
+        // Arrange
         Course course = new Course();
         course.setId(10L);
         course.setTitle("Spring Boot Deep Dive");
@@ -43,6 +44,7 @@ public class CurriculumFoundationTest {
         lesson.setCreatedAt(Instant.now());
         lesson.setUpdatedAt(Instant.now());
 
+        // Act
         section.getLessons().add(lesson);
 
         assertEquals(1L, section.getId());
@@ -59,6 +61,7 @@ public class CurriculumFoundationTest {
         assertEquals(1, sectionResponse.lessons().size());
 
         LessonResponse lessonResponse = sectionResponse.lessons().get(0);
+        // Assert
         assertEquals(100L, lessonResponse.id());
         assertEquals(1L, lessonResponse.sectionId());
         assertEquals(LessonType.VIDEO, lessonResponse.lessonType());
@@ -66,12 +69,15 @@ public class CurriculumFoundationTest {
     }
 
     @Test
-    void shouldHandleReorderRequest() {
+    void reorderLessons_whenOrderedIdsAreProvided_shouldPreserveRequestedOrder() {
+        // Arrange
+        // Act
         ReorderRequest request = new ReorderRequest(List.of(
             new ReorderRequest.Item(2L, 0),
             new ReorderRequest.Item(1L, 1)
         ));
 
+        // Assert
         assertEquals(2, request.items().size());
         assertEquals(2L, request.items().get(0).id());
         assertEquals(0, request.items().get(0).orderIndex());

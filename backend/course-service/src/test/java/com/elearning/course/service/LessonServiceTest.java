@@ -1,6 +1,7 @@
 package com.elearning.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -69,7 +70,8 @@ class LessonServiceTest {
     }
 
     @Test
-    void create_videoLessonWithoutUrl_throwsBadRequest() {
+    void create_whenVideoUrlIsMissing_shouldThrowBadRequest() {
+        // Arrange
         LessonRequest req = new LessonRequest(
             "Video Lesson",
             LessonType.VIDEO,
@@ -82,13 +84,18 @@ class LessonServiceTest {
 
         when(sectionRepository.findById(10L)).thenReturn(Optional.of(section));
 
-        assertThatThrownBy(() -> lessonService.create(10L, req))
+        // Act
+        var thrown = catchThrowable(() -> lessonService.create(10L, req));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.BAD_REQUEST);
     }
 
     @Test
-    void create_sectionNotFound_throwsNotFound() {
+    void create_whenSectionDoesNotExist_shouldThrowNotFound() {
+        // Arrange
         LessonRequest req = new LessonRequest(
             "Text Lesson",
             LessonType.TEXT,
@@ -101,13 +108,18 @@ class LessonServiceTest {
 
         when(sectionRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> lessonService.create(99L, req))
+        // Act
+        var thrown = catchThrowable(() -> lessonService.create(99L, req));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
 
     @Test
-    void create_success() {
+    void create_whenSectionAndRequestAreValid_shouldPersistLesson() {
+        // Arrange
         LessonRequest req = new LessonRequest(
             "Video Lesson",
             LessonType.VIDEO,
@@ -127,8 +139,10 @@ class LessonServiceTest {
             return l;
         });
 
+        // Act
         LessonResponse resp = lessonService.create(10L, req);
 
+        // Assert
         assertThat(resp).isNotNull();
         assertThat(resp.id()).isEqualTo(101L);
         assertThat(resp.title()).isEqualTo("Video Lesson");
@@ -138,7 +152,8 @@ class LessonServiceTest {
     }
 
     @Test
-    void update_success() {
+    void update_whenLessonExists_shouldPersistChangedFields() {
+        // Arrange
         LessonRequest req = new LessonRequest(
             "Intro to Java Updated",
             LessonType.TEXT,
@@ -152,23 +167,29 @@ class LessonServiceTest {
         when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
         when(lessonRepository.save(any(Lesson.class))).thenAnswer(i -> i.getArgument(0));
 
+        // Act
         LessonResponse resp = lessonService.update(100L, req);
 
+        // Assert
         assertThat(resp.title()).isEqualTo("Intro to Java Updated");
         assertThat(resp.content()).isEqualTo("Updated content");
     }
 
     @Test
-    void delete_success() {
+    void delete_whenLessonExists_shouldRemoveLesson() {
+        // Arrange
         when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
 
+        // Act
         lessonService.delete(100L);
 
+        // Assert
         verify(lessonRepository).delete(lesson);
     }
 
     @Test
-    void reorder_success() {
+    void reorder_whenLessonIdsAreValid_shouldPersistNewOrder() {
+        // Arrange
         Lesson lesson2 = new Lesson();
         lesson2.setId(200L);
         lesson2.setSection(section);
@@ -183,51 +204,67 @@ class LessonServiceTest {
             new ReorderRequest.Item(200L, 0)
         ));
 
+        // Act
         lessonService.reorder(10L, req);
 
+        // Assert
         assertThat(lesson.getOrderIndex()).isEqualTo(1);
         assertThat(lesson2.getOrderIndex()).isEqualTo(0);
         verify(lessonRepository).saveAll(any());
     }
 
     @Test
-    void getPlayUrl_previewLesson_successWithoutAuth() {
+    void getPlayUrl_whenLessonIsPreview_shouldAllowGuestPlayback() {
+        // Arrange
         lesson.setPreview(true);
         lesson.setLessonType(LessonType.VIDEO);
         lesson.setVideoUrl("videos/sample.mp4");
         when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
         when(storageService.generatePresignedUrl(eq("videos/sample.mp4"), any())).thenReturn("https://s3.amazonaws.com/signed-url");
 
+        // Act
         var response = lessonService.getPlayUrl(1L, 100L, null, false);
 
+        // Assert
         assertThat(response).isNotNull();
         assertThat(response.preview()).isTrue();
         assertThat(response.playUrl()).isEqualTo("https://s3.amazonaws.com/signed-url");
     }
 
     @Test
-    void getPlayUrl_privateLesson_unauthenticated_throwsUnauthorized() {
+    void getPlayUrl_whenCallerIsUnauthenticated_shouldThrowUnauthorized() {
+        // Arrange
         lesson.setPreview(false);
         when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
 
-        assertThatThrownBy(() -> lessonService.getPlayUrl(1L, 100L, null, false))
+        // Act
+        var thrown = catchThrowable(() -> lessonService.getPlayUrl(1L, 100L, null, false));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UNAUTHORIZED);
     }
 
     @Test
-    void getPlayUrl_privateLesson_notEnrolled_throwsForbidden() {
+    void getPlayUrl_whenCallerIsNotEnrolled_shouldThrowForbidden() {
+        // Arrange
         lesson.setPreview(false);
         when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
         when(enrollmentClient.isEnrolled(42L, 1L)).thenReturn(false);
 
-        assertThatThrownBy(() -> lessonService.getPlayUrl(1L, 100L, 42L, false))
+        // Act
+        var thrown = catchThrowable(() -> lessonService.getPlayUrl(1L, 100L, 42L, false));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
     }
 
     @Test
-    void getPlayUrl_privateLesson_enrolled_returnsPresignedUrl() {
+    void getPlayUrl_whenCallerIsEnrolled_shouldReturnPresignedUrl() {
+        // Arrange
         lesson.setPreview(false);
         lesson.setLessonType(LessonType.VIDEO);
         lesson.setVideoUrl("videos/private.mp4");
@@ -235,33 +272,43 @@ class LessonServiceTest {
         when(enrollmentClient.isEnrolled(42L, 1L)).thenReturn(true);
         when(storageService.generatePresignedUrl(eq("videos/private.mp4"), any())).thenReturn("https://s3.amazonaws.com/private-signed-url");
 
+        // Act
         var response = lessonService.getPlayUrl(1L, 100L, 42L, false);
 
+        // Assert
         assertThat(response).isNotNull();
         assertThat(response.preview()).isFalse();
         assertThat(response.playUrl()).isEqualTo("https://s3.amazonaws.com/private-signed-url");
     }
 
     @Test
-    void getPlayUrl_privateLesson_admin_bypassesEnrollmentCheck() {
+    void getPlayUrl_whenCallerIsAdmin_shouldSkipEnrollmentCheck() {
+        // Arrange
         lesson.setPreview(false);
         lesson.setLessonType(LessonType.VIDEO);
         lesson.setVideoUrl("videos/private.mp4");
         when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
         when(storageService.generatePresignedUrl(eq("videos/private.mp4"), any())).thenReturn("https://s3.amazonaws.com/admin-signed-url");
 
+        // Act
         var response = lessonService.getPlayUrl(1L, 100L, 999L, true);
 
+        // Assert
         assertThat(response).isNotNull();
         assertThat(response.playUrl()).isEqualTo("https://s3.amazonaws.com/admin-signed-url");
         verify(enrollmentClient, never()).isEnrolled(anyLong(), anyLong());
     }
 
     @Test
-    void getPlayUrl_wrongCourseId_throwsNotFound() {
+    void getPlayUrl_whenLessonBelongsToAnotherCourse_shouldThrowNotFound() {
+        // Arrange
         when(lessonRepository.findById(100L)).thenReturn(Optional.of(lesson));
 
-        assertThatThrownBy(() -> lessonService.getPlayUrl(999L, 100L, 42L, false))
+        // Act
+        var thrown = catchThrowable(() -> lessonService.getPlayUrl(999L, 100L, 42L, false));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }

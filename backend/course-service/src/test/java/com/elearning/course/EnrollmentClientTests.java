@@ -21,7 +21,8 @@ class EnrollmentClientTests {
     }
 
     @Test
-    void enrolledLessonCheckForwardsAuthenticationToLearning() throws Exception {
+    void isEnrolled_whenCallerHasAuthentication_shouldForwardBearerToLearning() throws Exception {
+        // Arrange
         var authorization = new AtomicReference<String>();
         var query = new AtomicReference<String>();
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -36,12 +37,15 @@ class EnrollmentClientTests {
             exchange.close();
         });
         server.start();
+
         try {
             var request = new MockHttpServletRequest();
             request.addHeader("Authorization", "Bearer validated-user-jwt");
             RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+            // Act
             var client = new EnrollmentClient("http://127.0.0.1:" + server.getAddress().getPort(), false);
 
+            // Assert
             assertThat(client.isEnrolled(42L, 7L)).isTrue();
             assertThat(authorization.get()).isEqualTo("Bearer validated-user-jwt");
             assertThat(query.get()).contains("userId=42", "courseId=7");
@@ -51,10 +55,13 @@ class EnrollmentClientTests {
     }
 
     @Test
-    void missingAuthenticationNeverAttemptsEnrollmentLookup() {
+    void isEnrolled_whenAuthenticationIsMissing_shouldSkipUpstreamLookup() {
+        // Arrange
         var client = new EnrollmentClient("http://127.0.0.1:1", false);
+        // Act
         assertThat(client.isEnrolled(42L, 7L)).isFalse();
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+        // Assert
         assertThat(client.isEnrolled(42L, 7L)).isFalse();
     }
 

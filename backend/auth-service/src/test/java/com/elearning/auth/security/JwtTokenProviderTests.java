@@ -16,7 +16,9 @@ class JwtTokenProviderTests {
     final JwtTokenProvider provider = new JwtTokenProvider(SECRET, "sgedu", 900);
 
     @Test
-    void rejectsWeakSecretsInvalidLifetimesAndMissingTokenArguments() {
+    void init_whenSecretLifetimeOrTokenArgumentIsInvalid_shouldRejectInput() {
+        // Arrange
+        // Act
         for (String secret : Arrays.asList(null, "", " ", "x".repeat(31))) {
             assertThatThrownBy(() -> new JwtTokenProvider(secret, "sgedu", 900))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -25,6 +27,7 @@ class JwtTokenProviderTests {
             assertThatThrownBy(() -> new JwtTokenProvider(SECRET, "sgedu", ttl))
                 .isInstanceOf(IllegalArgumentException.class);
         }
+        // Assert
         assertThat(new JwtTokenProvider("\u00e9".repeat(16), "sgedu", 86400).getAccessTokenSeconds())
             .isEqualTo(86400);
         for (String subject : Arrays.asList(null, " ")) {
@@ -39,19 +42,24 @@ class JwtTokenProviderTests {
     }
 
     @Test
-    void supportsLegacyClaimsAndDeduplicatesValidatedRoleAndPermissionCodes() {
+    void validate_whenClaimsAreLegacyOrRepeated_shouldReturnUniqueAuthorities() {
+        // Arrange
+        // Act
         var legacy = provider.validate(token(builder -> {}));
         assertThat(provider.roles(legacy)).containsExactly("USER");
         assertThat(provider.permissions(legacy)).isEmpty();
         var custom = provider.validate(
             provider.createAccessToken("7", List.of("ADMIN", "SUPPORT", "ADMIN"), List.of("USER_VIEW", "USER_VIEW"))
         );
+        // Assert
         assertThat(provider.roles(custom)).containsExactly("ADMIN", "SUPPORT");
         assertThat(provider.permissions(custom)).containsExactly("USER_VIEW");
     }
 
     @Test
-    void rejectsMalformedAndInconsistentRoleCollections() {
+    void validate_whenRolesAreMalformedOrInconsistent_shouldRejectToken() {
+        // Arrange
+        // Act
         for (Object invalid : List.of(
             "ADMIN",
             List.of(),
@@ -62,6 +70,7 @@ class JwtTokenProviderTests {
             assertThatThrownBy(() -> provider.validate(token(builder -> builder.claim("roles", invalid))))
                 .isInstanceOf(JwtException.class);
         }
+        // Assert
         assertThatThrownBy(() -> provider.validate(token(builder -> builder.claim("roles", List.of("ADMIN")))))
             .isInstanceOf(JwtException.class);
         for (Object invalid : List.of("USER_VIEW", List.of(1), List.of("bad-permission"))) {
@@ -72,7 +81,8 @@ class JwtTokenProviderTests {
     }
 
     @Test
-    void rejectsMissingOrInvalidIdentityAndTimeClaims() {
+    void validate_whenIdentityOrTimeClaimsAreInvalid_shouldRejectToken() {
+        // Arrange
         List<Consumer<JwtBuilder>> mutations = List.of(
             builder -> builder.subject(null),
             builder -> builder.subject(" "),
@@ -86,7 +96,11 @@ class JwtTokenProviderTests {
             builder -> builder.claim("tokenType", "refresh")
         );
         for (var mutation : mutations) {
-            assertThatThrownBy(() -> provider.validate(token(mutation))).isInstanceOf(JwtException.class);
+            // Act
+            var thrown = catchThrowable(() -> provider.validate(token(mutation)));
+
+            // Assert
+            assertThat(thrown).isInstanceOf(JwtException.class);
         }
     }
 

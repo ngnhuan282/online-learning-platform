@@ -25,7 +25,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 class CourseCatalogClientTests {
 
     @Test
-    void delegatesOnlyTheAuthenticatedCurrentRequestToReadPrivateCurriculum() throws Exception {
+    void getCurriculum_whenCallerIsAuthenticated_shouldForwardOnlyCurrentRequestIdentity() throws Exception {
+        // Arrange
         var received = new AtomicReference<String>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/v1/courses/42", exchange -> {
@@ -47,7 +48,9 @@ class CourseCatalogClientTests {
             }
         });
         server.start();
+
         try {
+            // Act
             var client = new CourseCatalogClient("http://127.0.0.1:" + server.getAddress().getPort());
             var request = new MockHttpServletRequest();
             request.addHeader("Authorization", "Bearer caller-one");
@@ -75,6 +78,7 @@ class CourseCatalogClientTests {
 
             RequestContextHolder.resetRequestAttributes();
             SecurityContextHolder.clearContext();
+            // Assert
             assertThat(client.getCurriculum(42L).sections().get(0).lessons().get(0).content()).isNull();
             assertThat(received.get()).isNull();
         } finally {
@@ -197,7 +201,8 @@ class CourseCatalogClientTests {
     }
 
     @Test
-    void validatesCourseThroughCourseServiceAndRejectsMissingOrUnavailableCourses() throws Exception {
+    void requireExistingCourse_whenUpstreamCannotConfirmCourse_shouldReturnApiError() throws Exception {
+        // Arrange
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/v1/courses/", exchange -> {
             String id = exchange.getRequestURI().getPath().replace("/api/v1/courses/", "");
@@ -218,9 +223,11 @@ class CourseCatalogClientTests {
         });
         server.start();
         try {
+            // Act
             CourseCatalogClient client = new CourseCatalogClient(
                 "http://127.0.0.1:" + server.getAddress().getPort()
             );
+            // Assert
             assertThatCode(() -> client.requireExistingCourse(42L)).doesNotThrowAnyException();
             assertThatThrownBy(() -> client.requireExistingCourse(43L))
                 .isInstanceOf(AppException.class)

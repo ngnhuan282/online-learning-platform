@@ -96,7 +96,9 @@ class EngagementCommunityIntegrationTests {
     }
 
     @Test
-    void vietnamMidnightStreakResetAndUniqueXp() {
+    void recordActivity_whenLearnerCrossesVietnamMidnight_shouldResetStreakAndAwardXpOnce() {
+        // Arrange
+        // Act
         engagement.lessonCompleted(101, 1);
         engagement.lessonCompleted(101, 1);
         assertThat(engagement.summary(101).totalXp()).isEqualTo(20);
@@ -113,12 +115,15 @@ class EngagementCommunityIntegrationTests {
         time.set(Instant.parse("2026-11-18T17:00:00Z"));
         assertThat(engagement.summary(101).currentStreak()).isZero();
         engagement.lessonCompleted(101, 3);
+        // Assert
         assertThat(engagement.summary(101).currentStreak()).isEqualTo(1);
         assertThat(engagement.summary(101).longestStreak()).isEqualTo(3);
     }
 
     @Test
-    void concurrentAwardsAndRewardClaimsAreIdempotent() throws Exception {
+    void claim_whenConcurrentRewardsAreRequested_shouldApplyAwardAndClaimIdempotently() throws Exception {
+        // Arrange
+        // Act
         try (var pool = Executors.newFixedThreadPool(6)) {
             var tasks = java.util.stream.IntStream.range(0, 12)
                     .mapToObj(i -> pool.submit(() -> engagement.lessonCompleted(102, 77)))
@@ -132,6 +137,7 @@ class EngagementCommunityIntegrationTests {
             for (var task : claims)
                 task.get(15, TimeUnit.SECONDS);
         }
+        // Assert
         assertThat(engagement.summary(102).gems()).isEqualTo(45);
         assertThat(engagement.equipFrame(102, "FIRST_LESSON").activeFrame()).isEqualTo("FIRST_LESSON");
         assertThat(
@@ -150,13 +156,16 @@ class EngagementCommunityIntegrationTests {
     }
 
     @Test
-    void leaderboardUsesVietnamMonthBoundariesAndStablePagination() {
+    void leaderboard_whenMonthlyWindowUsesVietnamTime_shouldReturnStablePagesWithinMonth() {
+        // Arrange
         time.set(Instant.parse("2026-10-31T16:59:59Z"));
         engagement.lessonCompleted(103, 1);
         time.set(Instant.parse("2026-10-31T17:00:00Z"));
         engagement.quizSubmitted(104, 1);
         engagement.lessonCompleted(105, 1);
+        // Act
         var november = engagement.leaderboard(104, "month", "2026-11", 0, 1);
+        // Assert
         assertThat(november.totalElements()).isEqualTo(2);
         assertThat(november.content().getFirst().userId()).isEqualTo(105);
         assertThat(november.me().rank()).isEqualTo(2);
@@ -165,12 +174,14 @@ class EngagementCommunityIntegrationTests {
     }
 
     @Test
-    void topicSearchAndOwnerEditsPreserveAcceptedAnswers() {
+    void updatePost_whenOwnerEditsTopic_shouldPreserveAcceptedAnswerAndSearchResult() {
+        // Arrange
         var topic = community.topics().getFirst();
         long post = community
                 .create(101, new PostRequest(topic.id(), "QUESTION", "Prefix study question", "Need help"), null).id();
         long other = community
                 .create(102, new PostRequest(topic.id(), "DISCUSSION", "Prefix study discussion", "Ideas"), null).id();
+        // Act
         assertThat(community.posts(topic.id(), "STUDY", "QUESTION", true, 0, 10).content())
                 .extracting(Post::id).containsExactly(post);
         assertThat(community.posts(topic.id(), "prefix", null, false, 0, 1).totalElements()).isEqualTo(2);
@@ -189,13 +200,16 @@ class EngagementCommunityIntegrationTests {
                 .isEqualTo("Updated title");
         assertThat(community.get(post).acceptedCommentId()).isEqualTo(comment.id());
         community.delete(102, false, other);
+        // Assert
         assertThat(community.posts(topic.id(), null, null, false, 0, 10).content())
                 .extracting(Post::id).containsExactly(post);
     }
 
     @Test
-    void forumOwnershipModerationAcceptanceAndSoftDeletion() throws Exception {
+    void moderate_whenPostOwnershipAndCommentAcceptanceChange_shouldEnforcePermissionsAndSoftDeletion() throws Exception {
+        // Arrange
         long post = createPost(201, "QUESTION", "How do I practise listening?");
+        // Act
         assertThat(
                 request(
                         202,
@@ -212,6 +226,7 @@ class EngagementCommunityIntegrationTests {
                 "{\"body\":\"Try daily dictation.\"}");
         assertThat(commentResponse.statusCode()).isEqualTo(201);
         long comment = mapper.readTree(commentResponse.body()).path("data").path("id").asLong();
+        // Assert
         assertThat(
                 request(
                         202,
@@ -269,7 +284,9 @@ class EngagementCommunityIntegrationTests {
     }
 
     @Test
-    void forumRejectsCrossPostAnswersInvalidInputAndSpamAndRequiresLogin() throws Exception {
+    void createPost_whenCallerIsAnonymousOrInputIsInvalid_shouldRejectSpamAndCrossPostReferences() throws Exception {
+        // Arrange
+        // Act
         long first = createPost(301, "QUESTION", "First question");
         long second = createPost(302, "QUESTION", "Second question");
         long comment = mapper
@@ -330,6 +347,7 @@ class EngagementCommunityIntegrationTests {
         )) {
             assertThat(request((Long) null, false, "GET", protectedGet, null).statusCode()).isEqualTo(401);
         }
+        // Assert
         assertThat(
             request((Long) null, false, "POST", "/community/posts", postJson("QUESTION", "Guest"))
                 .statusCode()
@@ -352,7 +370,9 @@ class EngagementCommunityIntegrationTests {
     }
 
     @Test
-    void shopEnforcesBalanceOwnershipAndRequestIdempotencyOverHttp() throws Exception {
+    void purchase_whenUserBuysItemOverHttp_shouldEnforceBalanceOwnershipAndIdempotency() throws Exception {
+        // Arrange
+        // Act
         assertThat(request(401, false, "GET", "/shop", null).statusCode()).isEqualTo(200);
         assertThat(
                 request(
@@ -418,6 +438,7 @@ class EngagementCommunityIntegrationTests {
                 "POST",
                 "/shop/purchases",
                 purchaseJson("FRAME_KITTY", "paid-claim-test-1"));
+        // Assert
         assertThat(first.statusCode()).isEqualTo(200);
         assertThat(mapper.readTree(first.body()).path("data").path("gemsSpent").asInt()).isEqualTo(150);
         assertThat(
@@ -462,9 +483,11 @@ class EngagementCommunityIntegrationTests {
     }
 
     @Test
-    void concurrentShopPurchasesSerializeSpendingAndFreezeCapacity() throws Exception {
+    void purchase_whenShopRequestsAreConcurrent_shouldSerializeBalanceAndFreezeCapacity() throws Exception {
+        // Arrange
         engagement.summary(402);
         jdbc.update("UPDATE learner_profiles SET gems = 500 WHERE user_id = 402");
+        // Act
         try (var pool = Executors.newFixedThreadPool(6)) {
             var tasks = java.util.stream.IntStream.range(0, 12)
                     .mapToObj(i -> pool.submit(
@@ -497,13 +520,16 @@ class EngagementCommunityIntegrationTests {
                     successful++;
             assertThat(successful).isEqualTo(1);
         }
+        // Assert
         assertThat(shop.state(402).streakFreezes()).isEqualTo(7);
         assertThat(shop.state(402).gems()).isEqualTo(300);
     }
 
     @Test
-    void freezesCoverOnlyClosedMissedDaysAndDailyGemsAreAwardedOnce() {
+    void recordActivity_whenDaysHaveBeenMissed_shouldUseFreezesOnlyForClosedDaysAndGrantGemsOnce() {
+        // Arrange
         time.set(Instant.parse("2026-11-14T03:00:00Z"));
+        // Act
         engagement.quizSubmitted(403, 1);
         engagement.quizSubmitted(403, 1);
         assertThat(engagement.summary(403).gems()).isEqualTo(25);
@@ -521,14 +547,17 @@ class EngagementCommunityIntegrationTests {
         assertThat(protectedDay.totalXp()).isEqualTo(10);
         assertThat(engagement.summary(403).frozenDays()).hasSize(1);
         engagement.quizSubmitted(403, 1);
+        // Assert
         assertThat(engagement.summary(403).currentStreak()).isEqualTo(2);
         assertThat(engagement.summary(403).gems()).isEqualTo(25);
         assertThat(engagement.summary(403).totalXp()).isEqualTo(10);
     }
 
     @Test
-    void exhaustedFreezesResetStreakAndNewPurchasesCannotRepairPastDays() {
+    void recordActivity_whenFreezeAllowanceIsExhausted_shouldResetStreakWithoutRepairingPastDays() {
+        // Arrange
         time.set(Instant.parse("2026-11-14T03:00:00Z"));
+        // Act
         engagement.quizSubmitted(404, 1);
         shop.purchase(404, new PurchaseRequest("STREAK_FREEZE", "freeze-exhaustion-1"));
         time.set(Instant.parse("2026-11-17T03:00:00Z"));
@@ -541,14 +570,17 @@ class EngagementCommunityIntegrationTests {
         engagement.quizSubmitted(404, 1);
         assertThat(engagement.summary(404).currentStreak()).isEqualTo(1);
         time.set(Instant.parse("2026-11-19T03:00:00Z"));
+        // Assert
         assertThat(engagement.summary(404).currentStreak()).isEqualTo(1);
         assertThat(engagement.summary(404).frozenDays()).contains(java.time.LocalDate.parse("2026-11-18"));
     }
 
     @Test
-    void differentItemsCannotOverspendTheSameBalance() throws Exception {
+    void purchase_whenDifferentItemsAreRequestedConcurrently_shouldPreventOverspending() throws Exception {
+        // Arrange
         engagement.summary(405);
         jdbc.update("UPDATE learner_profiles SET gems = 250 WHERE user_id = 405");
+        // Act
         try (var pool = Executors.newFixedThreadPool(2)) {
             var tasks = List.of("FRAME_KITTY", "FRAME_KOALA")
                     .stream()
@@ -569,6 +601,7 @@ class EngagementCommunityIntegrationTests {
                     successful++;
             assertThat(successful).isEqualTo(1);
         }
+        // Assert
         assertThat(shop.state(405).gems()).isIn(70, 100);
         assertThat(
                 jdbc.queryForObject("SELECT COUNT(*) FROM shop_inventory WHERE user_id = 405", Long.class))

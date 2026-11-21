@@ -25,7 +25,9 @@ class GoogleAuthorizationRequestTests {
         .build();
 
     @Test
-    void authorizationStateRequiresChallengeAndExpiresAfterFiveMinutes() {
+    void createAuthorizationState_whenChallengeIsPresent_shouldExpireStateAfterFiveMinutes() {
+        // Arrange
+        // Act
         assertThatThrownBy(() ->
             repository.saveAuthorizationRequest(authorization, request, response)
         ).isInstanceOf(OAuth2AuthenticationException.class);
@@ -37,23 +39,29 @@ class GoogleAuthorizationRequestTests {
         request
             .getSession()
             .setAttribute(GoogleOAuth2Config.class.getName() + ".startedAt", Instant.now().minusSeconds(301));
+        // Assert
         assertThat(repository.loadAuthorizationRequest(request)).isNull();
         assertThat(repository.removeAuthorizationRequest(request, response)).isNull();
     }
 
     @Test
-    void stateCannotBeSubstitutedOrConsumedTwice() {
+    void consumeState_whenStateIsSubstitutedOrReplayed_shouldRejectState() {
+        // Arrange
         request.setParameter("challenge", "c".repeat(43));
         repository.saveAuthorizationRequest(authorization, request, response);
         request.setParameter("state", "attacker-state");
+        // Act
         assertThat(repository.removeAuthorizationRequest(request, response)).isNull();
         request.setParameter("state", "expected-state");
+        // Assert
         assertThat(repository.removeAuthorizationRequest(request, response)).isSameAs(authorization);
         assertThat(repository.removeAuthorizationRequest(request, response)).isNull();
     }
 
     @Test
-    void configurationRejectsMissingSecretsAndUnsafeOrIncorrectCallbackUrls() {
+    void configureGoogleLogin_whenSecretsOrCallbackAreInvalid_shouldRejectConfiguration() {
+        // Arrange
+        // Act
         assertThatThrownBy(() -> new GoogleLoginProperties(true, "", "", "", "")).isInstanceOf(
             IllegalArgumentException.class
         );
@@ -73,6 +81,7 @@ class GoogleAuthorizationRequestTests {
                 )
             ).isInstanceOf(IllegalArgumentException.class);
         }
+        // Assert
         assertThatThrownBy(() ->
             new GoogleLoginProperties(
                 true,

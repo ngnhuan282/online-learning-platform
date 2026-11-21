@@ -1,6 +1,7 @@
 package com.elearning.course;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -32,7 +33,8 @@ class MediaDownloadTests {
     }
 
     @Test
-    void curriculumAndUploadTicketsRemainDownloadableAfterMerge() {
+    void downloadLocal_whenCurriculumOrUploadTicketIsValid_shouldReturnStoredMedia() {
+        // Arrange
         storedFile();
         var url = URI.create(tickets.signLocalUrl("/api/v1/media/download/videos/lesson.mp4"));
         var request = new MockHttpServletRequest();
@@ -40,19 +42,24 @@ class MediaDownloadTests {
             String[] parts = pair.split("=", 2);
             request.setParameter(parts[0], parts[1]);
         }
+        // Act
         var response = controller.downloadLocal("videos", "lesson.mp4",
             Long.valueOf(request.getParameter("expires")), null, request);
+        // Assert
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).isInstanceOf(ByteArrayResource.class);
         verify(storage, never()).verifySignedToken(anyString(), any(), any());
     }
 
     @Test
-    void playEndpointStorageTokensAlsoRemainDownloadable() {
+    void downloadLocal_whenPlayEndpointTokenIsValid_shouldReturnStoredMedia() {
+        // Arrange
         storedFile();
         when(storage.verifySignedToken("videos/lesson.mp4", 9999999999999L, "valid-storage-token")).thenReturn(true);
+        // Act
         var response = controller.downloadLocal("videos", "lesson.mp4", 9999999999999L,
             "valid-storage-token", new MockHttpServletRequest());
+        // Assert
         assertThat(response.getStatusCode().value()).isEqualTo(200);
     }
 
@@ -96,9 +103,14 @@ class MediaDownloadTests {
     }
 
     @Test
-    void removingOrTamperingWithSignatureNeverGrantsPrivateDownload() {
-        assertThatThrownBy(() -> controller.downloadLocal("videos", "lesson.mp4", null, null,
-            new MockHttpServletRequest())).hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    void downloadLocal_whenSignatureIsMissingOrTampered_shouldDenyPrivateDownload() {
+        // Arrange
+        // Act
+        var thrown = catchThrowable(() -> controller.downloadLocal("videos", "lesson.mp4", null, null,
+            new MockHttpServletRequest()));
+
+        // Assert
+        assertThat(thrown).hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
         assertThatThrownBy(() -> controller.downloadLocal("videos", "lesson.mp4", 9999999999999L,
             "invalid-token", new MockHttpServletRequest()))
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);

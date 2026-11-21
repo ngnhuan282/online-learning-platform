@@ -1,6 +1,7 @@
 package com.elearning.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -65,7 +66,8 @@ class CourseServiceTest {
     }
 
     @Test
-    void create_categoryNotFound_throwsAppException() {
+    void create_whenCategoryIsMissing_shouldThrowNotFound() {
+        // Arrange
         CourseRequest req = new CourseRequest(
             "New Course",
             "Description",
@@ -79,7 +81,11 @@ class CourseServiceTest {
 
         when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.create(req))
+        // Act
+        var thrown = catchThrowable(() -> courseService.create(req));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
 
@@ -87,7 +93,8 @@ class CourseServiceTest {
     }
 
     @Test
-    void create_slugConflict_throwsAppException() {
+    void create_whenSlugBelongsToAnotherCourse_shouldThrowConflict() {
+        // Arrange
         CourseRequest req = new CourseRequest(
             "Spring Boot Core",
             "Description",
@@ -102,13 +109,18 @@ class CourseServiceTest {
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(courseRepository.existsBySlug("spring-boot-core")).thenReturn(true);
 
-        assertThatThrownBy(() -> courseService.create(req))
+        // Act
+        var thrown = catchThrowable(() -> courseService.create(req));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT);
     }
 
     @Test
-    void create_success() {
+    void create_whenRequestIsValid_shouldPersistAndReturnCourse() {
+        // Arrange
         CourseRequest req = new CourseRequest(
             "Spring Boot Advanced",
             "Advanced course description",
@@ -130,8 +142,10 @@ class CourseServiceTest {
             return c;
         });
 
+        // Act
         CourseResponse resp = courseService.create(req);
 
+        // Assert
         assertThat(resp).isNotNull();
         assertThat(resp.id()).isEqualTo(11L);
         assertThat(resp.title()).isEqualTo("Spring Boot Advanced");
@@ -140,17 +154,23 @@ class CourseServiceTest {
     }
 
     @Test
-    void update_courseNotFound_throwsAppException() {
+    void update_whenCourseDoesNotExist_shouldThrowNotFound() {
+        // Arrange
         CourseRequest req = new CourseRequest("Title", "Desc", 1L, BigDecimal.ZERO, null, null, null, null);
         when(courseRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.update(999L, req))
+        // Act
+        var thrown = catchThrowable(() -> courseService.update(999L, req));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
 
     @Test
-    void update_success() {
+    void update_whenCourseExists_shouldPersistChangedFields() {
+        // Arrange
         CourseRequest req = new CourseRequest(
             "Spring Boot Core Updated",
             "Updated Desc",
@@ -167,48 +187,66 @@ class CourseServiceTest {
         when(courseRepository.existsBySlug("spring-boot-core-updated")).thenReturn(false);
         when(courseRepository.save(any(Course.class))).thenAnswer(i -> i.getArgument(0));
 
+        // Act
         CourseResponse resp = courseService.update(10L, req);
 
+        // Assert
         assertThat(resp.title()).isEqualTo("Spring Boot Core Updated");
         assertThat(resp.slug()).isEqualTo("spring-boot-core-updated");
         assertThat(resp.price()).isEqualByComparingTo(BigDecimal.valueOf(250000));
     }
 
     @Test
-    void delete_courseNotFound_throwsAppException() {
+    void delete_whenCourseDoesNotExist_shouldThrowNotFound() {
+        // Arrange
         when(courseRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.delete(999L))
+        // Act
+        var thrown = catchThrowable(() -> courseService.delete(999L));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
 
     @Test
-    void delete_success() {
+    void delete_whenCourseExists_shouldArchiveCourse() {
+        // Arrange
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
 
+        // Act
         courseService.delete(10L);
 
+        // Assert
         assertThat(course.getStatus()).isEqualTo(CourseStatus.ARCHIVED);
         org.mockito.Mockito.verify(courseRepository, org.mockito.Mockito.never()).delete(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
-    void get_success() {
+    void get_whenCourseExists_shouldReturnCourse() {
+        // Arrange
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
 
+        // Act
         CourseResponse resp = courseService.get(10L);
 
+        // Assert
         assertThat(resp).isNotNull();
         assertThat(resp.id()).isEqualTo(10L);
         assertThat(resp.title()).isEqualTo("Spring Boot Core");
     }
 
     @Test
-    void get_notFound_throwsAppException() {
+    void get_whenCourseDoesNotExist_shouldThrowNotFound() {
+        // Arrange
         when(courseRepository.findById(404L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.get(404L))
+        // Act
+        var thrown = catchThrowable(() -> courseService.get(404L));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
