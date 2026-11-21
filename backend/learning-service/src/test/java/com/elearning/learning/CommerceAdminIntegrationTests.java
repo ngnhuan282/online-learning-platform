@@ -41,8 +41,10 @@ class CommerceAdminIntegrationTests {
     ProPlanCatalog planCatalog;
 
     @Test
-    void archivedCustomPlanDoesNotBreakGrantReplayOrEditingExistingGrantReason() {
+    void updateGrant_whenPlanIsArchived_shouldAllowReplayAndReasonEdit() {
+        // Arrange
         doReturn(3).when(planCatalog).months("PRO_CUSTOM_GIFT");
+        // Act
         var request = new GrantRequest("PRO_CUSTOM_GIFT", UUID.randomUUID().toString(), "gift");
         pro.grantAdmin(7, 99, request);
         var expiry = pro.membership(7).expiresAt();
@@ -56,6 +58,7 @@ class CommerceAdminIntegrationTests {
         pro.grantAdmin(7, 99, request);
         long id = jdbc.queryForObject("SELECT id FROM pro_grants WHERE user_id=7", Long.class);
         pro.updateAdminGrant(7, id, 99, new GrantUpdateRequest("PRO_CUSTOM_GIFT", 0, "correct support note"));
+        // Assert
         assertThat(pro.membership(7).expiresAt()).isEqualTo(expiry);
         assertThat(
             jdbc.queryForObject("SELECT COUNT(*) FROM pro_grants WHERE user_id=7", Integer.class)
@@ -64,7 +67,9 @@ class CommerceAdminIntegrationTests {
     }
 
     @Test
-    void catalogDeleteAndRestorePreserveOwnershipAndRequireDeletePermission() throws Exception {
+    void restoreItem_whenItemIsOwned_shouldPreserveOwnershipAndRequireDeletePermission() throws Exception {
+        // Arrange
+        // Act
         admin.saveItem(
             null,
             new ItemRequest(
@@ -84,6 +89,7 @@ class CommerceAdminIntegrationTests {
         );
         admin.saveInventory(7, "FRAME_CRUD_TEST", new InventoryRequest(true, "gift"), 99);
         shop.equip(7, new EquipRequest("FRAME", "FRAME_CRUD_TEST"));
+        // Assert
         assertThat(
             request(
                 "DELETE",
@@ -126,7 +132,8 @@ class CommerceAdminIntegrationTests {
     }
 
     @Test
-    void customRewardsUseConfiguredCriteriaAndRestoringDoesNotPayAgain() throws Exception {
+    void claim_whenRewardIsRestored_shouldUseConfiguredCriteriaAndAvoidDoublePayment() throws Exception {
+        // Arrange
         var definition = new RewardDefinitionRequest(
             "CRUD_REWARD",
             "Reach level 4",
@@ -137,6 +144,7 @@ class CommerceAdminIntegrationTests {
             0,
             "create"
         );
+        // Act
         assertThat(
             request(
                 "POST",
@@ -174,11 +182,13 @@ class CommerceAdminIntegrationTests {
             99
         );
         engagement.claim(7, "CRUD_REWARD");
+        // Assert
         assertThat(engagement.summary(7).gems()).isEqualTo(19);
     }
 
     @Test
-    void forumContentCrudRejectsStaleEditsAndPreservesAuthorAndHiddenState() throws Exception {
+    void updatePost_whenEditIsStaleOrPostIsHidden_shouldProtectAuthorAndModerationState() throws Exception {
+        // Arrange
         var post = admin.savePost(
             null,
             new PostContentRequest(3, "QUESTION", "Admin question", "Original body", true, 0, "create"),
@@ -186,6 +196,7 @@ class CommerceAdminIntegrationTests {
         );
         long id = ((Number) post.get("id")).longValue();
         var edit = new PostContentRequest(3, "QUESTION", "Edited question", "Edited body", true, 0, "edit");
+        // Act
         assertThat(
             request(
                 "PUT",
@@ -209,13 +220,16 @@ class CommerceAdminIntegrationTests {
         admin.deleteComment(id, commentId, new DeleteRequest(1, "remove comment"), 99, false);
         admin.deleteComment(id, commentId, new DeleteRequest(2, "restore comment"), 99, true);
         admin.deletePost(id, new DeleteRequest(1, "archive"), 99, false);
+        // Assert
         assertThat(admin.posts(true, 0, 20).content()).anyMatch(
             r -> ((Number) r.get("id")).longValue() == id && ((Number) r.get("authorId")).longValue() == 99
         );
     }
 
     @Test
-    void adminGrantsAndUnusedCodesSupportVersionedEditsAndCodesHaveRealPagination() throws Exception {
+    void updateGrant_whenGrantOrUnusedCodeIsEdited_shouldEnforceVersionsAndPaginateCodes() throws Exception {
+        // Arrange
+        // Act
         pro.grantAdmin(7, 99, new GrantRequest("PRO_MONTH", UUID.randomUUID().toString(), "gift"));
         long grantId = jdbc.queryForObject("SELECT id FROM pro_grants WHERE user_id=7", Long.class);
         var expiry = pro.membership(7).expiresAt();
@@ -264,12 +278,15 @@ class CommerceAdminIntegrationTests {
         pro.grant(
             new com.elearning.learning.dto.ProModels.GrantRequest("PAID-CUSTOM-PLAN", 8L, "PRO_CUSTOM", 3)
         );
+        // Assert
         assertThat(pro.membership(8).active()).isTrue();
     }
 
     @Test
-    void inventoryGrantsAreIdempotentAndRevocationUnequipsWithoutChangingGems() {
+    void saveInventory_whenGrantIsReplayedOrRevoked_shouldUnequipWithoutChangingBalance() {
+        // Arrange
         var gift = new InventoryRequest(true, "support gift");
+        // Act
         admin.saveInventory(7, "FRAME_KITTY", gift, 99);
         admin.saveInventory(7, "FRAME_KITTY", gift, 99);
         assertThat(admin.inventory(7)).hasSize(1);
@@ -278,6 +295,7 @@ class CommerceAdminIntegrationTests {
         );
         shop.equip(7, new EquipRequest("FRAME", "FRAME_KITTY"));
         admin.saveInventory(7, "FRAME_KITTY", new InventoryRequest(false, "gift correction"), 99);
+        // Assert
         assertThat(engagement.summary(7).activeFrame()).isNull();
         assertThat(engagement.summary(7).gems()).isZero();
         assertThat(admin.inventory(7)).isEmpty();
@@ -287,12 +305,15 @@ class CommerceAdminIntegrationTests {
     }
 
     @Test
-    void proMembersWithoutLearningProfilesRemainManageable() {
+    void updateMember_whenLearningProfileDoesNotExist_shouldAllowProManagement() {
+        // Arrange
+        // Act
         pro.grant(
             new com.elearning.learning.dto.ProModels.GrantRequest("PAYMENT-API-ONLY", 15L, "PRO_MONTH", 1)
         );
         assertThat(admin.members("15", 0, 20).totalElements()).isEqualTo(1);
         admin.requireProTarget(15L);
+        // Assert
         assertThat(admin.grants(15L)).hasSize(1);
         assertThatThrownBy(() -> admin.requireProTarget(90000L)).isInstanceOf(
             com.elearning.learning.common.exception.AppException.class
@@ -401,7 +422,9 @@ class CommerceAdminIntegrationTests {
     }
 
     @Test
-    void granularPermissionsDenyLearnerForgedClaimsAndReadOnlyWrites() throws Exception {
+    void authorize_whenCallerLacksGranularPermission_shouldPreventAdministrativeWrite() throws Exception {
+        // Arrange
+        // Act
         assertThat(request("GET", "/shop/items", null, null).statusCode()).isEqualTo(401);
         assertThat(
             request("GET", "/shop/items", token("USER", "ADMIN_ACCESS", "SHOP_VIEW"), null).statusCode()
@@ -438,6 +461,7 @@ class CommerceAdminIntegrationTests {
             null,
             "support correction"
         );
+        // Assert
         assertThat(
             request(
                 "POST",
@@ -452,7 +476,8 @@ class CommerceAdminIntegrationTests {
     }
 
     @Test
-    void adjustmentsAreIdempotentAtomicAuditedAndBounded() throws Exception {
+    void adjust_whenAdjustmentIsReplayedOrExceedsLimits_shouldApplyOnceAndRecordAudit() throws Exception {
+        // Arrange
         var request = new AdjustmentRequest(
             UUID.randomUUID().toString(),
             50,
@@ -463,8 +488,10 @@ class CommerceAdminIntegrationTests {
             "reward correction"
         );
         var auth = actor("GEM_ADJUST", "XP_ADJUST", "STREAK_ADJUST");
+        // Act
         admin.adjust(7, request, auth);
         admin.adjust(7, request, auth);
+        // Assert
         assertThat(engagement.summary(7).gems()).isEqualTo(50);
         assertThat(engagement.summary(7).level()).isEqualTo(2);
         assertThat(engagement.summary(7).streakFreezes()).isEqualTo(2);
@@ -512,19 +539,24 @@ class CommerceAdminIntegrationTests {
     }
 
     @Test
-    void concurrentRepeatedAdjustmentAppliesOnce() throws Exception {
+    void adjust_whenSameRequestIsSubmittedConcurrently_shouldApplyOnce() throws Exception {
+        // Arrange
         var change = new AdjustmentRequest(UUID.randomUUID().toString(), 70, 0, null, 0, null, "one award");
+        // Act
         try (var executor = Executors.newFixedThreadPool(2)) {
             var a = executor.submit(() -> admin.adjust(7, change, actor("GEM_ADJUST")));
             var b = executor.submit(() -> admin.adjust(7, change, actor("GEM_ADJUST")));
             a.get(10, TimeUnit.SECONDS);
             b.get(10, TimeUnit.SECONDS);
         }
+        // Assert
         assertThat(engagement.summary(7).gems()).isEqualTo(70);
     }
 
     @Test
-    void configurableRewardsAndLevelsDriveRealLearningAndPreventStaleUpdates() {
+    void updateRules_whenRewardAndLevelSettingsAreEdited_shouldAffectLearningAndRejectStaleVersion() {
+        // Arrange
+        // Act
         admin.saveSettings(new SettingsRequest(30, 15, 40, 50, 0, "new learning rules"), 99);
         engagement.lessonCompleted(7, 101);
         assertThat(engagement.summary(7).totalXp()).isEqualTo(30);
@@ -555,11 +587,13 @@ class CommerceAdminIntegrationTests {
         );
         engagement.claim(7, "FIRST_LESSON");
         engagement.claim(7, "FIRST_LESSON");
+        // Assert
         assertThat(engagement.summary(7).gems()).isEqualTo(47);
     }
 
     @Test
-    void catalogCreatesRealEquippableItemsAndHidingPreservesOwnership() {
+    void createItem_whenNewItemIsPublished_shouldAllowEquipAndRetainOwnershipWhenHidden() {
+        // Arrange
         var item = new ItemRequest(
             "FRAME_ADMIN_TEST",
             "New kitty",
@@ -573,6 +607,7 @@ class CommerceAdminIntegrationTests {
             0,
             "new collectible"
         );
+        // Act
         admin.saveItem(null, item, 99);
         shop.purchase(7, new PurchaseRequest(item.code(), UUID.randomUUID().toString()));
         shop.equip(7, new EquipRequest("FRAME", item.code()));
@@ -594,6 +629,7 @@ class CommerceAdminIntegrationTests {
             ),
             99
         );
+        // Assert
         assertThat(
             shop
                 .state(7)
@@ -613,7 +649,9 @@ class CommerceAdminIntegrationTests {
     }
 
     @Test
-    void proAdminGrantsAndSuspensionPreservePaidGrantsAndNeverDoubleExtend() {
+    void grant_whenProAccountIsSuspended_shouldPreservePaidGrantsWithoutDoubleExtension() {
+        // Arrange
+        // Act
         pro.grant(
             new com.elearning.learning.dto.ProModels.GrantRequest("PAYMENT-ADMIN-TEST", 7L, "PRO_YEAR", 12)
         );
@@ -634,11 +672,13 @@ class CommerceAdminIntegrationTests {
             com.elearning.learning.common.exception.AppException.class
         );
         long giftId = jdbc.queryForObject("SELECT id FROM pro_grants WHERE source_type='ADMIN'", Long.class);
+        // Assert
         assertThat(pro.revokeAdmin(7, giftId, 99, "gift correction").active()).isTrue();
     }
 
     @Test
-    void moderationHidesRestoresAndClearsHiddenAcceptedAnswer() {
+    void moderate_whenHiddenCommentIsAcceptedAnswer_shouldClearAnswerAndAllowRestore() {
+        // Arrange
         jdbc.update(
             "INSERT INTO community_posts(id,author_id,topic_id,kind,title,body,created_at,updated_at) VALUES (100,7,1,'QUESTION','Question','text',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
         );
@@ -646,6 +686,7 @@ class CommerceAdminIntegrationTests {
             "INSERT INTO community_comments(id,post_id,author_id,body,created_at,updated_at) VALUES (101,100,7,'answer',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
         );
         jdbc.update("UPDATE community_posts SET accepted_comment_id=101 WHERE id=100");
+        // Act
         admin.moderate(100, new ModerationRequest(true, true, "moderation"), 99);
         assertThat(admin.posts(true, 0, 20).totalElements()).isEqualTo(1);
         admin.moderateComment(100, 101, new ModerationRequest(true, false, "spam"), 99);
@@ -653,12 +694,15 @@ class CommerceAdminIntegrationTests {
             jdbc.queryForObject("SELECT accepted_comment_id FROM community_posts WHERE id=100", Long.class)
         ).isNull();
         admin.moderate(100, new ModerationRequest(false, false, "restore"), 99);
+        // Assert
         assertThat(admin.posts(false, 0, 20).totalElements()).isEqualTo(1);
     }
 
     @Test
-    void codeAndQuizNotificationPermissionsAreDelegatable() throws Exception {
+    void authorize_whenAdminDelegatesCodeOrQuizNotificationPermissions_shouldHonorDelegation() throws Exception {
+        // Arrange
         String viewer = token("SUPPORT", "ADMIN_ACCESS", "PRO_CODE_VIEW", "QUIZ_VIEW", "NOTIFICATION_VIEW");
+        // Act
         assertThat(request("GET", "/pro/codes", viewer, null).statusCode()).isEqualTo(200);
         assertThat(
             request("POST", "/pro/codes", viewer, Map.of("planCode", "PRO_MONTH")).statusCode()
@@ -688,6 +732,7 @@ class CommerceAdminIntegrationTests {
                 )
             )
         );
+        // Assert
         assertThat(request("POST", "/quizzes", viewer, quiz).statusCode()).isEqualTo(403);
         assertThat(request("GET", "/notifications", viewer, null).statusCode()).isEqualTo(200);
         assertThat(

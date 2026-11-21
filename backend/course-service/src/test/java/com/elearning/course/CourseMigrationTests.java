@@ -12,8 +12,10 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 class CourseMigrationTests {
 
     @Test
-    void upgradingExistingCourseDataPastV6NeverReseedsOrDeletesIt() {
+    void migrate_whenDatabaseContainsExistingCourses_shouldPreserveRowsWithoutReseeding() {
+        // Arrange
         String url = "jdbc:h2:mem:course-upgrade-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
+        // Act
         Flyway.configure().dataSource(url, "sa", "").target("6").load().migrate();
         var jdbc = new JdbcTemplate(new DriverManagerDataSource(url, "sa", ""));
         jdbc.update("INSERT INTO categories (id, name, slug, created_at, updated_at) VALUES (901001, 'Existing category', 'existing-category', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
@@ -21,6 +23,7 @@ class CourseMigrationTests {
 
         Flyway.configure().dataSource(url, "sa", "").load().migrate();
 
+        // Assert
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM courses", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM categories", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT title FROM courses WHERE id = 902001", String.class))

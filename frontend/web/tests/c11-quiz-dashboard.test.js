@@ -15,6 +15,8 @@ const dom = new JSDOM('<!doctype html><div id="root"></div>', {
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 globalThis.Event = dom.window.Event;
+globalThis.HTMLElement = dom.window.HTMLElement;
+globalThis.DocumentFragment = dom.window.DocumentFragment;
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -170,6 +172,8 @@ after(async () => {
   delete globalThis.window;
   delete globalThis.document;
   delete globalThis.Event;
+  delete globalThis.HTMLElement;
+  delete globalThis.DocumentFragment;
   delete globalThis.requestAnimationFrame;
   delete globalThis.cancelAnimationFrame;
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -451,4 +455,107 @@ test('admin prevents resetting an editor while loading a quiz and reports list r
   assert.match(document.body.textContent, /Đã lưu bản nháp quiz/);
   assert.match(document.body.textContent, /Không thể tải danh sách quiz/);
   assert.ok(button('Lưu thay đổi'));
+});
+
+test('admin saves pending quiz edits before publishing and retries publication without resaving', async () => {
+  const writes = [];
+  learningApi.updateQuiz = async (id, payload) => {
+    writes.push(['update', id, payload]);
+    return { data: { id } };
+  };
+  let attempts = 0;
+  learningApi.publishQuiz = async id => {
+    writes.push(['publish', id]);
+    if (++attempts === 1) throw new Error('Publication temporarily unavailable');
+    return { data: { id, published: true } };
+  };
+  await render('/admin/quizzes');
+  await click('Bản nháp');
+  const editor = document.querySelector('.quiz-editor');
+  const title = editor.querySelector('input[maxlength="255"]');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(
+      title,
+      '  Vocabulary check  ',
+    );
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  await act(async () => editor.querySelectorAll('.quiz-option-editor input[type=checkbox]')[1].click());
+  assert.deepEqual(
+    [...editor.querySelectorAll('input[type=checkbox]')].map(input => input.checked),
+    [false, true],
+  );
+  await click('Thêm câu hỏi');
+  assert.equal(editor.querySelectorAll('.quiz-question-editor').length, 2);
+  const addedQuestion = editor.querySelectorAll('.quiz-question-editor')[1];
+  const removeQuestion = [...addedQuestion.querySelectorAll('button')].find(
+    item => item.textContent.trim() === 'Xóa câu hỏi',
+  );
+  assert.ok(removeQuestion);
+  await act(async () => removeQuestion.click());
+  assert.equal(editor.querySelectorAll('.quiz-question-editor').length, 1);
+  await click('Xuất bản');
+  assert.match(document.body.textContent, /Publication temporarily unavailable/);
+  await click('Xuất bản');
+
+  assert.match(document.body.textContent, /Quiz đã xuất bản/);
+  assert.equal(title.disabled, true);
+  assert.deepEqual(writes, [
+    [
+      'update',
+      21,
+      {
+        courseId: 42,
+        lessonId: null,
+        title: 'Vocabulary check',
+        description: '',
+        passingScore: 70,
+        timeLimitMinutes: 5,
+        questions: [
+          {
+            questionText: 'Câu hỏi thực tế',
+            questionType: 'SINGLE_CHOICE',
+            points: 2,
+            options: [
+              { optionText: 'Đáp án A', correct: false },
+              { optionText: 'Đáp án B', correct: true },
+            ],
+          },
+        ],
+      },
+    ],
+    ['publish', 21],
+    ['publish', 21],
+  ]);
+});
+
+test('admin can cancel deletion and confirm removal of the selected draft after a server rejection', async () => {
+  const deletions = [];
+  learningApi.deleteQuiz = async id => {
+    deletions.push(id);
+    if (deletions.length === 1) throw new Error('Draft is currently in use');
+    learningApi.getAdminQuizzes = async () => ({ data: [] });
+  };
+  await render('/admin/quizzes');
+  await click('Bản nháp');
+
+  async function confirm(label) {
+    const dialog = document.querySelector('[role=dialog]');
+    const control = [...dialog.querySelectorAll('button')].find(item => item.textContent.trim() === label);
+    assert.ok(control, `Missing confirmation button ${label}`);
+    await act(async () => control.click());
+  }
+
+  await click('Xóa bản nháp');
+  await confirm('Hủy');
+  assert.deepEqual(deletions, []);
+  await click('Xóa bản nháp');
+  await confirm('Xóa');
+  assert.match(document.body.textContent, /Draft is currently in use/);
+  await click('Xóa bản nháp');
+  await confirm('Xóa');
+  assert.deepEqual(deletions, [21, 21]);
+  assert.match(document.body.textContent, /Đã xóa bản nháp quiz/);
+  assert.match(document.querySelector('.quiz-admin-list').textContent, /Chưa có quiz/);
 });

@@ -339,7 +339,11 @@ async function render(path = '/dictation/lesson?attempt=run', user = { id: 1 }) 
       h(
         CacheProvider,
         { value: cache },
-        h(AuthContext.Provider, { value: { user, isAuthenticated: Boolean(user) } }, h(RouterProvider, { router })),
+        h(
+          AuthContext.Provider,
+          { value: { user, isAuthenticated: Boolean(user) } },
+          h(RouterProvider, { router }),
+        ),
       ),
     ),
   );
@@ -1238,11 +1242,15 @@ test('guests can browse the listening library, with history and practice requiri
     if (queries.length === 1) throw new Error('Temporary catalog failure');
     return {
       data: {
-        groups: [{
-          topic: 'Workplace',
-          total: 1,
-          items: [{ id: 'lesson', title: 'Guest listening preview', level: 'B1', duration: 4, sentenceCount: 2 }],
-        }],
+        groups: [
+          {
+            topic: 'Workplace',
+            total: 1,
+            items: [
+              { id: 'lesson', title: 'Guest listening preview', level: 'B1', duration: 4, sentenceCount: 2 },
+            ],
+          },
+        ],
       },
     };
   };
@@ -1341,12 +1349,166 @@ test('admin editing keeps published listening metadata and visibility in sync wi
     dialog.textContent.includes('Xuất bản cập nhật?'),
   );
   await click('Xác nhận', publish);
-  assert.match(document.querySelector('.dictation-admin-table').textContent, /Updated listening.*Đã xuất bản/s);
+  assert.match(
+    document.querySelector('.dictation-admin-table').textContent,
+    /Updated listening.*Đã xuất bản/s,
+  );
   assert.deepEqual(requests, [
     ['save', 'lesson', 3, 'Updated listening'],
     ['visibility', 'lesson', true],
     ['publish', 'lesson', 4, undefined],
   ]);
+});
+
+test('admin sees workbook row errors before choosing to replace the transcript', async () => {
+  const names = [];
+  const importedRows = [
+    { text: 'First imported sentence.', start: 0, end: 1 },
+    { text: 'Second imported sentence.', start: 1, end: 2 },
+  ];
+  dictationApi.query = async () => ({ data: { items: [], total: 0 } });
+  dictationApi.import = async file => {
+    names.push(file.name);
+    return {
+      data: {
+        sentences: importedRows,
+        errors: file.name === 'invalid.xlsx' ? [{ row: 8, message: 'Mốc kết thúc không hợp lệ' }] : [],
+      },
+    };
+  };
+  const selectWorkbook = async name => {
+    const control = document.querySelector('input[type="file"][accept=".xlsx"]');
+    assert.ok(control);
+    const workbook = new dom.window.File(['workbook fixture'], name);
+    await act(async () => {
+      Object.defineProperty(control, 'files', { configurable: true, value: [workbook] });
+      control.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+  const preview = () => document.querySelector('.dictation-import');
+  const waitForDialogExit = () => act(async () => new Promise(done => realSetTimeout(done, 260)));
+
+  await render('/admin/dictation');
+  await click('Thêm bài nghe');
+  await change(
+    document.querySelector('.dictation-editor textarea:not([aria-hidden])'),
+    'Unpublished sentence',
+  );
+  await selectWorkbook('invalid.xlsx');
+  assert.match(preview().textContent, /Dòng 8.*Mốc kết thúc không hợp lệ/s);
+  assert.equal(button('Thêm 2 câu', preview()).disabled, true);
+  await click('Hủy', preview());
+  await waitForDialogExit();
+  assert.equal(
+    document.querySelector('.dictation-editor textarea:not([aria-hidden])').value,
+    'Unpublished sentence',
+  );
+
+  await selectWorkbook('valid.xlsx');
+  assert.match(preview().textContent, /3 câu sau khi nhập/);
+  await click('Thay thế toàn bộ', preview());
+  assert.match(preview().textContent, /2 câu sau khi nhập/);
+  await click('Thay thế transcript', preview());
+  await waitForDialogExit();
+
+  const sentences = [...document.querySelectorAll('.dictation-editor-rows textarea:not([aria-hidden])')];
+  assert.deepEqual(
+    sentences.map(row => row.value),
+    importedRows.map(row => row.text),
+  );
+  assert.deepEqual(names, ['invalid.xlsx', 'valid.xlsx']);
+});
+
+test('admin uses audio position to time a sentence, previews the segment, and publishes the draft', async () => {
+  const uploads = [];
+  const published = [];
+  dictationApi.query = async () => ({ data: { items: [], total: 0 } });
+  dictationApi.upload = async file => {
+    uploads.push(file.name);
+    return { data: { key: 'sample-audio', name: file.name, duration: 8 } };
+  };
+  dictationApi.adminAudio = async key => {
+    assert.equal(key, 'sample-audio');
+    return new Blob(['audio'], { type: 'audio/mpeg' });
+  };
+  dictationApi.publish = async (id, version, definition) => {
+    published.push({ id, version, definition });
+  };
+
+  await render('/admin/dictation');
+  await click('Thêm bài nghe');
+  const editor = document.querySelector('.dictation-editor');
+  await click('Lưu bản nháp', editor);
+  assert.match(editor.textContent, /Vui lòng nhập tên bài nghe và chủ đề/);
+
+  const [title, topic] = editor.querySelectorAll('.dictation-editor-metadata input');
+  await change(title, '  Listening at work  ');
+  await change(topic, '  Workplace  ');
+  await change(editor.querySelector('.dictation-youtube-url-field input'), 'https://example.test/video');
+  await click('Lưu bản nháp', editor);
+  assert.match(editor.textContent, /Vui lòng nhập liên kết YouTube hợp lệ/);
+  await change(editor.querySelector('.dictation-youtube-url-field input'), '');
+  await change(
+    editor.querySelector('.dictation-editor-row textarea:not([aria-hidden])'),
+    '  Open the door.  ',
+  );
+
+  const audioInput = editor.querySelector('input[type=file][accept*="mp3"]');
+  const file = new dom.window.File(['audio'], 'workplace.mp3', { type: 'audio/mpeg' });
+  await act(async () => {
+    Object.defineProperty(audioInput, 'files', { configurable: true, value: [file] });
+    audioInput.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  assert.match(editor.querySelector('.dictation-audio-name').textContent, /workplace\.mp3/);
+  const audio = editor.querySelector('audio');
+  assert.ok(audio);
+  Object.defineProperty(audio, 'duration', { configurable: true, value: 8 });
+  for (const [position, label] of [
+    [1, 'Lấy mốc bắt đầu câu 1'],
+    [3, 'Lấy mốc kết thúc câu 1'],
+  ]) {
+    await act(async () => {
+      audio.currentTime = position;
+      audio.dispatchEvent(new Event('timeupdate'));
+    });
+    await clickElement(editor.querySelector(`button[aria-label="${label}"]`));
+  }
+  await clickElement(editor.querySelector('button[aria-label="Nghe thử câu 1"]'));
+  assert.equal(audio.currentTime, 1);
+  assert.equal(audio.paused, false);
+  await clickElement(editor.querySelector('button[aria-label="Tạm dừng câu 1"]'));
+  assert.equal(audio.paused, true);
+
+  await click('Thêm câu', editor);
+  await change(
+    editor.querySelector('.dictation-editor-row:nth-child(2) textarea:not([aria-hidden])'),
+    'Extra sentence',
+  );
+  await clickElement(
+    editor.querySelector('.dictation-editor-row:nth-child(2) button[aria-label="Chuyển câu lên"]'),
+  );
+  assert.equal(
+    editor.querySelector('.dictation-editor-row textarea:not([aria-hidden])').value,
+    'Extra sentence',
+  );
+  await clickElement(editor.querySelector('button[aria-label="Xóa câu 1"]'));
+  await click('Xuất bản', editor);
+  assert.deepEqual(uploads, ['workplace.mp3']);
+  assert.deepEqual(published, [
+    {
+      id: undefined,
+      version: 0,
+      definition: {
+        title: 'Listening at work',
+        description: '',
+        topic: 'Workplace',
+        level: 'B1',
+        audioKey: 'sample-audio',
+        sentences: [{ text: 'Open the door.', start: 1, end: 3 }],
+      },
+    },
+  ]);
+  assert.match(document.body.textContent, /Đã xuất bản bài nghe/);
 });
 
 test('level pills filter previews while topic links always open the full topic', async () => {

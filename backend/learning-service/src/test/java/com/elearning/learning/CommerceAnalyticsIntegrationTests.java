@@ -76,7 +76,9 @@ class CommerceAnalyticsIntegrationTests {
     }
 
     @Test
-    void authorizesEachReportAndValidatesTheDateWindow() throws Exception {
+    void report_whenPermissionOrDateWindowIsInvalid_shouldReturnForbiddenOrValidationError() throws Exception {
+        // Arrange
+        // Act
         assertThat(get("shop", null).statusCode()).isEqualTo(401);
         assertThat(get("shop", token("USER", "ADMIN_ACCESS", "SHOP_VIEW")).statusCode()).isEqualTo(403);
         String viewer = token("SUPPORT", "ADMIN_ACCESS", "ENGAGEMENT_VIEW");
@@ -91,6 +93,7 @@ class CommerceAnalyticsIntegrationTests {
             assertThat(get("shop" + invalid, token("ADMIN")).statusCode()).as(invalid).isEqualTo(400);
         }
         var empty = report("shop", token("ADMIN"));
+        // Assert
         assertThat(empty.path("range").path("from").asString()).isEqualTo("2026-10-21");
         assertThat(empty.path("range").path("to").asString()).isEqualTo("2026-11-19");
         assertThat(empty.path("previousRange").path("to").asString()).isEqualTo("2026-10-20");
@@ -104,7 +107,9 @@ class CommerceAnalyticsIntegrationTests {
     }
 
     @Test
-    void proReportsFirstAndRepeatGrantsAndOnlyRevealsMaskedCodesWithCodePermission() throws Exception {
+    void proReport_whenGrantsAndActivationCodesExist_shouldShowGrantCountsAndPermissionScopedMaskedCodes() throws Exception {
+        // Arrange
+        // Act
         member(11, "2026-11-25T00:00:00Z", false);
         member(12, "2027-01-01T00:00:00Z", false);
         member(13, "2026-11-19T10:00:00Z", false);
@@ -141,6 +146,7 @@ class CommerceAnalyticsIntegrationTests {
         assertThat(result.path("details").path("codes").isNull()).isTrue();
 
         var codes = report("pro" + RANGE, token("ADMIN")).path("details").path("codes");
+        // Assert
         assertThat(codes.path("created").asLong()).isEqualTo(3);
         assertThat(codes.path("redeemed").asLong()).isEqualTo(1);
         assertThat(codes.path("recent").get(0).path("maskedCode").asString()).endsWith("-RDM1");
@@ -149,7 +155,9 @@ class CommerceAnalyticsIntegrationTests {
     }
 
     @Test
-    void gemAccountingUsesActualAwardsWalletCreditsDebitsAndVietnamDateBoundaries() throws Exception {
+    void gemReport_whenAwardsCreditsAndDebitsSpanMidnight_shouldAccountWithinVietnamDateBounds() throws Exception {
+        // Arrange
+        // Act
         profile(61, 300);
         profile(62, 48);
         jdbc.update("""
@@ -168,6 +176,7 @@ class CommerceAnalyticsIntegrationTests {
 
         var result = report("gems" + RANGE, token("ADMIN"));
         var period = result.path("current");
+        // Assert
         assertThat(period.path("daily").asLong()).isEqualTo(35);
         assertThat(period.path("legacyActivityDays").asLong()).isEqualTo(1);
         assertThat(period.path("issued").asLong()).isEqualTo(260);
@@ -186,7 +195,9 @@ class CommerceAnalyticsIntegrationTests {
     }
 
     @Test
-    void shopSeparatesAcquisitionsLegacyReceiptsFreezeUsageAndCurrentInventory() throws Exception {
+    void shopReport_whenDifferentAcquisitionRecordsExist_shouldSeparateInventoryFromReceiptsAndFreezeUsage() throws Exception {
+        // Arrange
+        // Act
         profile(71, 0);
         profile(72, 0);
         jdbc.update("UPDATE learner_profiles SET active_frame='FRAME_KITTY',streak_freezes=3 WHERE user_id=71");
@@ -215,6 +226,7 @@ class CommerceAnalyticsIntegrationTests {
         assertThat(result.path("snapshot").path("equipRate").asDouble()).isEqualTo(50);
         assertThat(result.path("previous").path("purchases").asLong()).isEqualTo(1);
         var item = result.path("details").get(0);
+        // Assert
         assertThat(item.path("code").asString()).isEqualTo("FRAME_KITTY");
         assertThat(item.path("currentPrice").asInt()).isEqualTo(150);
         assertThat(item.path("gemSpent").asLong()).isEqualTo(75);
@@ -226,7 +238,9 @@ class CommerceAnalyticsIntegrationTests {
     }
 
     @Test
-    void currentActivityPersistsTheAwardAndCountsFreeItemsOnlyWhenGranted() throws Exception {
+    void recordActivity_whenLearnerEarnsDailyAward_shouldPersistAwardAndCountOnlyGrantedItems() throws Exception {
+        // Arrange
+        // Act
         engagement.lessonCompleted(81, 1);
         engagement.lessonCompleted(81, 2);
         shop.grantGems("REPORT_TOPUP", 81, 200);
@@ -240,6 +254,7 @@ class CommerceAnalyticsIntegrationTests {
         assertThat(gems.path("daily").asLong()).isEqualTo(25);
         assertThat(gems.path("legacyActivityDays").asLong()).isZero();
         var purchases = report("shop" + TODAY, token("ADMIN")).path("current");
+        // Assert
         assertThat(purchases.path("purchases").asLong()).isEqualTo(1);
         assertThat(purchases.path("gemSpent").asLong()).isZero();
         assertThat(purchases.path("unclassifiedReceipts").asLong()).isZero();

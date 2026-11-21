@@ -27,7 +27,9 @@ class AuthRepositoryIntegrationTests {
     @Autowired EntityManager entityManager;
 
     @Test
-    void emailLookupIsCaseInsensitiveAndFilteredPagesExcludeDeletedAccounts() {
+    void findByEmail_whenQueryUsesDifferentCase_shouldResolveAccountAndExcludeDeletedRowsFromLists() {
+        // Arrange
+        // Act
         Role role = roles.findByName("USER").orElseThrow();
         var active = users.saveAndFlush(new User("FilterActive@example.test", "hash", "Repository Learner", role));
         var locked = new User("filterLocked@example.test", "hash", "Repository Locked", role);
@@ -39,6 +41,7 @@ class AuthRepositoryIntegrationTests {
         assertThat(users.existsByEmailIgnoreCase("FILTERACTIVE@EXAMPLE.TEST")).isTrue();
         assertThat(users.findByEmailIgnoreCase("filteractive@example.test").orElseThrow().getId()).isEqualTo(active.getId());
         var result = users.findByFilter("repository", UserStatus.ACTIVE, "USER", PageRequest.of(0, 1));
+        // Assert
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent()).extracting(User::getId).containsExactly(active.getId());
         assertThat(users.findByFilter("FILTER", null, null, PageRequest.of(0, 10)).getTotalElements()).isEqualTo(2);
@@ -47,15 +50,18 @@ class AuthRepositoryIntegrationTests {
     }
 
     @Test
-    void refreshTokenQueriesPreserveOwnerSessionAndRevocation() {
+    void findByTokenHash_whenTokensBelongToDifferentSessions_shouldPreserveOwnerAndRevocation() {
+        // Arrange
         var user = users.saveAndFlush(new User("token-owner@example.test", "hash", "Token Owner", roles.findByName("USER").orElseThrow()));
         var token = tokens.saveAndFlush(new RefreshToken(user, "a".repeat(64), Instant.now().plusSeconds(600), "session-a", true));
         var independent = new RefreshToken(user, "b".repeat(64), Instant.now().plusSeconds(600));
+        // Act
         assertThat(independent.getSessionId()).isNotBlank().isNotEqualTo(token.getSessionId());
         token.revoke(); var revokedAt = token.getRevokedAt(); token.revoke();
         tokens.flush(); entityManager.clear();
         assertThat(tokens.findUserIdByTokenHash("a".repeat(64))).contains(user.getId());
         var persisted = tokens.findForUpdate("a".repeat(64)).orElseThrow();
+        // Assert
         assertThat(persisted.isPersistent()).isTrue();
         assertThat(persisted.getSessionId()).isEqualTo("session-a");
         assertThat(persisted.getRevokedAt()).isCloseTo(revokedAt, org.assertj.core.api.Assertions.within(1, java.time.temporal.ChronoUnit.MILLIS));

@@ -284,7 +284,8 @@ class PasswordResetTests {
     }
 
     @Test
-    void utf8MailUsesFixedFragmentLinkAndDatabaseStoresOnlyExpiringHash() throws Exception {
+    void forgotPassword_whenLocalEmailIsEligible_shouldSendUtf8FragmentLinkAndPersistOnlyExpiringHash() throws Exception {
+        // Arrange
         var local = account();
         String before = users.findById(local.id()).orElseThrow().getPasswordHash();
         String token = issue(" " + local.email().toUpperCase() + " ");
@@ -293,6 +294,7 @@ class PasswordResetTests {
             String.class,
             local.id()
         );
+        // Act
         assertThat(stored.equals(token)).isFalse();
         assertThat(stored.equals(hash(token))).isTrue();
         var expiry = jdbc
@@ -302,19 +304,23 @@ class PasswordResetTests {
                 local.id()
             )
             .toInstant();
+        // Assert
         assertThat(expiry).isBetween(Instant.now().plusSeconds(880), Instant.now().plusSeconds(901));
         assertThat(users.findById(local.id()).orElseThrow().getPasswordHash().equals(before)).isTrue();
         assertThat(request("/api/v1/auth/reset-password", null, null, null).statusCode()).isEqualTo(401);
     }
 
     @Test
-    void resetKeepsProfileRolesAndGoogleIdentityAndRevokesAllSessionsAndLinkIntents() throws Exception {
+    void resetPassword_whenTokenAndNewPasswordAreValid_shouldPreserveIdentityAndRevokeExistingSessions() throws Exception {
+        // Arrange
+        // Act
         var local = account();
         var second = login(local.email(), PASSWORD);
         var entity = users.findById(local.id()).orElseThrow();
         identities.save(new UserExternalIdentity(entity, UUID.randomUUID().toString(), local.email()));
         long identityId = identities.findByUserIdAndProvider(local.id(), "GOOGLE").orElseThrow().getId();
         var before = data(request("/api/v1/users/me", null, null, local.access()));
+        // Assert
         assertThat(
             request(
                 "/api/v1/auth/google/link/start",
@@ -378,17 +384,21 @@ class PasswordResetTests {
     }
 
     @Test
-    void newAcceptedRequestInvalidatesOlderLink() throws Exception {
+    void forgotPassword_whenRequestIsAcceptedAgain_shouldInvalidateOldLink() throws Exception {
+        // Arrange
+        // Act
         var local = account();
         String old = issue(local.email());
         releaseCooldown(local.email());
         String current = issue(local.email());
         invalid(resetPassword(old));
+        // Assert
         assertThat(resetPassword(current).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void expirationMalformedAndUnknownTokensCannotChangePassword() throws Exception {
+    void resetPassword_whenTokenIsExpiredMalformedOrUnknown_shouldPreservePassword() throws Exception {
+        // Arrange
         var local = account();
         String token = issue(local.email());
         jdbc.update(
@@ -396,12 +406,16 @@ class PasswordResetTests {
             Timestamp.from(Instant.now().minusSeconds(1)),
             local.id()
         );
+        // Act
         for (String value : List.of(token, "wrong", "x".repeat(43))) invalid(resetPassword(value));
+        // Assert
         assertThat(login(local.email(), PASSWORD).id()).isEqualTo(local.id());
     }
 
     @Test
-    void invalidPasswordAndConfirmationDoNotConsumeToken() throws Exception {
+    void resetPassword_whenPasswordOrConfirmationIsInvalid_shouldKeepTokenUsable() throws Exception {
+        // Arrange
+        // Act
         var local = account();
         String token = issue(local.email());
         for (var input : List.of(
@@ -426,11 +440,14 @@ class PasswordResetTests {
             ).isEqualTo(400);
             assertThat(tokenCount(local.id())).isEqualTo(1L);
         }
+        // Assert
         assertThat(resetPassword(token).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void unknownGoogleOnlyInactiveAndLocalEmailsGetSameNotice() throws Exception {
+    void forgotPassword_whenAddressesHaveDifferentAccountStates_shouldReturnSameNotice() throws Exception {
+        // Arrange
+        // Act
         var google = account();
         jdbc.update("UPDATE users SET password_hash = NULL WHERE id = ?", google.id());
         identities.save(
@@ -450,14 +467,17 @@ class PasswordResetTests {
             );
         }
         finishMailJobs();
+        // Assert
         verify(sender, never()).send(any(MimeMessage.class));
         assertThat(tokenCount(google.id())).isZero();
         assertThat(tokenCount(locked.id())).isZero();
     }
 
     @Test
-    void mysqlAccentInsensitiveLookupCannotSendResetToAnotherAddress() throws Exception {
+    void forgotPassword_whenMysqlMatchesEmailByIgnoringAccent_shouldAvoidSendingToAnotherAddress() throws Exception {
+        // Arrange
         String storedEmail = "é" + UUID.randomUUID() + "@example.test";
+        // Act
         assertThat(
             request(
                 "/api/v1/auth/register",
@@ -472,11 +492,12 @@ class PasswordResetTests {
         verify(sender, never()).send(any(MimeMessage.class));
         assertThat(tokenCount(local.id())).isZero();
         issue(storedEmail);
+        // Assert
         verify(sender, times(1)).send(any(MimeMessage.class));
     }
 
     @Test
-    void changingCapabilitiesOrStatusAfterIssuanceRejectsReset() throws Exception {
+    void resetPassword_whenUserCapabilityOrStatusHasChanged_shouldRejectIssuedToken() throws Exception {
         for (String update : List.of(
             "status = 'LOCKED'",
             "status = 'DISABLED'",
@@ -484,17 +505,25 @@ class PasswordResetTests {
             "password_hash = NULL",
             "credential_version = credential_version + 1"
         )) {
+            // Arrange
             var local = account();
             String token = issue(local.email());
             // Values are fixed test SQL fragments, never request data.
             jdbc.update("UPDATE users SET " + update + " WHERE id = ?", local.id());
-            invalid(resetPassword(token));
+
+            // Act
+            var response = resetPassword(token);
+
+            // Assert
+            invalid(response);
         }
     }
 
     @Test
-    void perEmailCooldownAndWindowLimitApplyEvenToUnknownAddresses() throws Exception {
+    void forgotPassword_whenRequestsExceedEmailRateLimit_shouldThrottleKnownAndUnknownEmails() throws Exception {
+        // Arrange
         String unknown = email();
+        // Act
         assertThat(forgot(unknown).statusCode()).isEqualTo(200);
         assertThat(forgot(" " + unknown.toUpperCase() + " ").statusCode()).isEqualTo(429);
         for (int count = 0; count < 2; count++) {
@@ -508,11 +537,13 @@ class PasswordResetTests {
             Timestamp.from(Instant.now().minusSeconds(901)),
             hash(unknown)
         );
+        // Assert
         assertThat(forgot(unknown).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void simultaneousForgotRequestsIssueOnlyOneEmailAndToken() throws Exception {
+    void forgotPassword_whenRequestsForOneAddressAreConcurrent_shouldIssueOneEmailAndToken() throws Exception {
+        // Arrange
         var local = account();
         var calls = IntStream.range(0, 3)
             .mapToObj(index ->
@@ -525,23 +556,30 @@ class PasswordResetTests {
                 })
             )
             .toList();
+        // Act
         assertThat(calls.stream().map(CompletableFuture::join).toList()).containsExactlyInAnyOrder(
             200,
             429,
             429
         );
         finishMailJobs();
+        // Assert
         verify(sender, times(1)).send(any(MimeMessage.class));
         assertThat(tokenCount(local.id())).isEqualTo(1L);
     }
 
     @Test
-    void concurrentResetConsumesExactlyOnce() throws Exception {
+    void resetPassword_whenSameTokenIsUsedConcurrently_shouldConsumeItOnce() throws Exception {
+        // Arrange
         var local = account();
         String token = issue(local.email());
         var first = CompletableFuture.supplyAsync(() -> resetStatus(token));
         var second = CompletableFuture.supplyAsync(() -> resetStatus(token));
-        assertThat(List.of(first.join(), second.join())).containsExactlyInAnyOrder(200, 400);
+        // Act
+        var result = List.of(first.join(), second.join());
+
+        // Assert
+        assertThat(result).containsExactlyInAnyOrder(200, 400);
         assertThat(tokenCount(local.id())).isZero();
         assertThat(users.findById(local.id()).orElseThrow().getCredentialVersion()).isEqualTo(1L);
     }
@@ -555,7 +593,9 @@ class PasswordResetTests {
     }
 
     @Test
-    void resetRacingRotationRevokesTheResultingRefreshCookieToo() throws Exception {
+    void resetPassword_whenRefreshRotatesConcurrently_shouldRevokeNewlyRotatedCookie() throws Exception {
+        // Arrange
+        // Act
         var local = account();
         login(local.email(), PASSWORD);
         String token = issue(local.email());
@@ -573,6 +613,7 @@ class PasswordResetTests {
         if (rotated.statusCode() == 200) assertThat(
             request("/api/v1/auth/refresh", Map.of(), cookie(rotated), null).statusCode()
         ).isEqualTo(401);
+        // Assert
         assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM refresh_tokens WHERE user_id = ? AND revoked_at IS NULL",
@@ -583,20 +624,24 @@ class PasswordResetTests {
     }
 
     @Test
-    void smtpFailureIsControlledAndDoesNotLeakOrLeaveUsableToken(CapturedOutput output) throws Exception {
+    void forgotPassword_whenSmtpDeliveryFails_shouldReturnControlledErrorAndInvalidateToken(CapturedOutput output) throws Exception {
+        // Arrange
         var local = account();
         String privateDetail = "SMTP-private-provider-detail-never-log";
         doThrow(new MailAuthenticationException(privateDetail)).when(sender).send(any(MimeMessage.class));
         var response = forgot(local.email());
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         finishMailJobs();
+        // Assert
         assertThat(tokenCount(local.id())).isZero();
         assertThat(response.body().contains(privateDetail)).isFalse();
         assertThat(output.getAll().contains(privateDetail)).isFalse();
     }
 
     @Test
-    void slowSmtpDoesNotHoldTheUserTransactionOrBlockReset() throws Exception {
+    void forgotPassword_whenSmtpDeliveryIsSlow_shouldReleaseUserTransactionBeforeSending() throws Exception {
+        // Arrange
         var local = account();
         var release = new CountDownLatch(1);
         doAnswer(call -> {
@@ -610,7 +655,10 @@ class PasswordResetTests {
             .when(sender)
             .send(any(MimeMessage.class));
         try {
+            // Act
             String token = issue(local.email());
+
+            // Assert
             assertThat(resetPassword(token).statusCode()).isEqualTo(200);
             assertThat(outsideTransaction.get()).isTrue();
         } finally {
@@ -619,7 +667,8 @@ class PasswordResetTests {
     }
 
     @Test
-    void olderSmtpFailureCannotDeleteAReplacementToken() throws Exception {
+    void forgotPassword_whenOlderSmtpDeliveryFails_shouldPreserveReplacementToken() throws Exception {
+        // Arrange
         var local = account();
         var release = new CountDownLatch(1);
         var first = new AtomicBoolean(true);
@@ -636,12 +685,14 @@ class PasswordResetTests {
             .when(sender)
             .send(any(MimeMessage.class));
         try {
+            // Act
             String old = issue(local.email());
             releaseCooldown(local.email());
             String replacement = issue(local.email());
             release.countDown();
             finishMailJobs();
             invalid(resetPassword(old));
+            // Assert
             assertThat(resetPassword(replacement).statusCode()).isEqualTo(200);
         } finally {
             release.countDown();
@@ -649,8 +700,12 @@ class PasswordResetTests {
     }
 
     @Test
-    void missingMailSettingsAndUnsafeResetUrlsAreUnavailable() {
+    void configurePasswordReset_whenMailSettingsOrResetUrlAreInvalid_shouldDisablePasswordReset() {
+        // Arrange
+
+        // Act
         assertThat(properties.ready()).isTrue();
+        // Assert
         for (var value : List.of(
             new PasswordResetProperties(
                 false,
@@ -709,14 +764,17 @@ class PasswordResetTests {
     }
 
     @Test
-    void cleanupExpiredRemovesOldRateLimitsAndExpiredTokens() {
+    void cleanupExpired_whenRateLimitsAndTokensHaveExpired_shouldRemoveOnlyExpiredRows() {
+        // Arrange
         String key = "expired-bucket-" + UUID.randomUUID();
         jdbc.update(
             "INSERT INTO password_reset_rate_limits (bucket_key, window_start, request_count) VALUES (?, ?, 1)",
             key,
             Timestamp.from(Instant.now().minusSeconds(90000))
         );
+        // Act
         resetService.cleanupExpired();
+        // Assert
         assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM password_reset_rate_limits WHERE bucket_key = ?",

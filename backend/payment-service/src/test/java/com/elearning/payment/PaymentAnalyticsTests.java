@@ -69,7 +69,9 @@ class PaymentAnalyticsTests {
     }
 
     @Test
-    void revenueFollowsPaidDateAndCreatedOrderCountKeepsItsOriginalMeaning() {
+    void report_whenOrderCreationAndPaymentDatesDiffer_shouldCountOrdersAndRevenueOnCorrectDates() {
+        // Arrange
+        // Act
         payment(
             490000,
             midnight(yesterday.minusDays(1)).plusSeconds(60),
@@ -90,6 +92,7 @@ class PaymentAnalyticsTests {
             )
             .findFirst()
             .orElseThrow();
+        // Assert
         assertThat(paidDay.amount()).isEqualByComparingTo("490000");
         assertThat(paidDay.orders()).isEqualTo(1);
         assertThat(createdDay.amount()).isEqualByComparingTo("0");
@@ -97,11 +100,14 @@ class PaymentAnalyticsTests {
     }
 
     @Test
-    void midnightBelongsToOnlyOneDayAndNonSuccessfulAmountsAreExcluded() {
+    void report_whenPaymentsSpanMidnightAndIncludeFailures_shouldCountOnlySuccessfulAmountsInOneDay() {
+        // Arrange
+        // Act
         payment(790000, midnight(yesterday), midnight(yesterday), PaymentStatus.SUCCESS);
         payment(890000, midnight(yesterday), midnight(yesterday), PaymentStatus.REFUNDED);
         payment(990000, midnight(yesterday), null, PaymentStatus.PENDING);
         var report = analytics.getAnalytics();
+        // Assert
         assertThat(
             report
                 .revenueSeries()

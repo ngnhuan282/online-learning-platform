@@ -13,7 +13,8 @@ import org.junit.jupiter.api.Test;
 class CourseSnapshotProviderTests {
 
     @Test
-    void usesPublishedCoursePriceAndRejectsUnavailableCourses() throws Exception {
+    void snapshot_whenCourseIsPublishedOrUnavailable_shouldReturnPublishedPriceOrRejectUnavailableCourse() throws Exception {
+        // Arrange
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/v1/courses/", exchange -> {
             String id = exchange.getRequestURI().getPath().replace("/api/v1/courses/", "");
@@ -45,12 +46,14 @@ class CourseSnapshotProviderTests {
             }
         });
         server.start();
+
         try {
             CourseSnapshotProvider provider = new CourseSnapshotProvider(
                 "http://127.0.0.1:" + server.getAddress().getPort()
             );
 
             var course = provider.requirePurchasableCourse(42L);
+            // Act
             assertThat(course.id()).isEqualTo(42L);
             assertThat(course.title()).isEqualTo("Business English");
             assertThat(course.price()).isEqualByComparingTo("790000");
@@ -64,6 +67,7 @@ class CourseSnapshotProviderTests {
             assertThat(discounted.discountAmount()).isEqualByComparingTo("200000");
 
             var inconsistentOriginal = provider.requirePurchasableCourse(46L);
+            // Assert
             assertThat(inconsistentOriginal.originalPrice()).isEqualByComparingTo("790000");
             assertThat(inconsistentOriginal.discountAmount()).isZero();
 

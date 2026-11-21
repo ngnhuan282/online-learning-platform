@@ -12,7 +12,8 @@ class AdminOverviewControllerTests {
 
     @Test
     @SuppressWarnings("unchecked")
-    void overviewAggregatesCourseStatusesLevelsLessonsAndReviews() {
+    void overview_whenStoredCoursesHaveDifferentStatusesAndLevels_shouldAggregateCoursesLessonsAndReviews() {
+        // Arrange
         var ds = new DriverManagerDataSource(
             "jdbc:h2:mem:course_overview_test;MODE=MySQL;DB_CLOSE_DELAY=-1",
             "sa",
@@ -42,8 +43,10 @@ class AdminOverviewControllerTests {
         jdbc.update("INSERT INTO reviews VALUES (1, 1, 5, FALSE), (2, 1, 4, FALSE), (3, 1, 1, TRUE)");
 
         var controller = new AdminOverviewController(jdbc);
+        // Act
         var data = (Map<String, Object>) controller.overview().data();
 
+        // Assert
         assertThat(data.get("total")).isEqualTo(2L);
         assertThat(data.get("published")).isEqualTo(1L);
         assertThat(data.get("draft")).isEqualTo(1L);

@@ -63,8 +63,10 @@ class ProPaymentIntegrationTests {
     }
 
     @Test
-    void proCatalogAndCheckoutUseServerPriceAndProductSnapshot() throws Exception {
+    void checkout_whenPlanIsAvailable_shouldUseServerPriceAndSnapshot() throws Exception {
+        // Arrange
         var guestCatalog = request(null, false, "GET", "/pro/plans", null);
+        // Act
         assertThat(guestCatalog.statusCode()).isEqualTo(200);
         assertThat(json.readTree(guestCatalog.body()).path("data").get(0).path("price").asInt()).isEqualTo(
             50000
@@ -77,6 +79,7 @@ class ProPaymentIntegrationTests {
             request(null, false, "POST", "/pro/checkout", checkoutBody("PRO_YEAR", key)).statusCode()
         ).isEqualTo(401);
         JsonNode order = checkout(1, "PRO_YEAR", key);
+        // Assert
         assertThat(
             request(null, false, "GET", "/orders/" + order.path("orderCode").asString(), null).statusCode()
         ).isEqualTo(401);
@@ -104,8 +107,10 @@ class ProPaymentIntegrationTests {
     }
 
     @Test
-    void concurrentCheckoutRetriesCreateOneOrder() throws Exception {
+    void checkout_whenProRequestsAreConcurrent_shouldCreateOneOrder() throws Exception {
+        // Arrange
         String key = UUID.randomUUID().toString();
+        // Act
         try (var pool = Executors.newFixedThreadPool(6)) {
             var tasks = java.util.stream.IntStream.range(0, 8)
                     .mapToObj(i -> pool.submit(() -> checkout(2, "PRO_QUARTER", key).path("orderCode").asString()))
@@ -115,6 +120,7 @@ class ProPaymentIntegrationTests {
                 codes.add(task.get(15, TimeUnit.SECONDS));
             assertThat(codes).hasSize(1);
         }
+        // Assert
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders WHERE user_id=2", Long.class)).isEqualTo(
                 1);
         assertThat(
@@ -123,7 +129,9 @@ class ProPaymentIntegrationTests {
     }
 
     @Test
-    void concurrentGemCheckoutWithTheSameKeyKeepsOneOrderAndOnePackageSnapshot() throws Exception {
+    void checkout_whenGemRequestsWithSameKeyAreConcurrent_shouldKeepOneOrderAndPackageSnapshot() throws Exception {
+        // Arrange
+        // Act
         String key = UUID.randomUUID().toString();
         String body = json.writeValueAsString(Map.of("packageCode", "GEM_200", "idempotencyKey", key));
         var submitted = new CyclicBarrier(6);
@@ -150,23 +158,31 @@ class ProPaymentIntegrationTests {
         String orderCode = codes.iterator().next();
         var confirmed = request(7, false, "POST", "/mock/orders/" + orderCode + "/complete",
                 "{\"status\":\"SUCCESS\"}");
+        // Assert
         assertThat(confirmed.statusCode()).isEqualTo(200);
         verify(learning).grantGems(orderCode, 7L, 200);
     }
 
     @Test
-    void invalidHistoryParametersAndUnsupportedMethodsUseThePublicErrorEnvelope() throws Exception {
+    void getHistory_whenHistoryFiltersOrPaymentMethodAreInvalid_shouldReturnPublicErrorEnvelope() throws Exception {
+        // Arrange
         var invalid = request(7, false, "GET", "/history?page=unparseable-secret-marker", null);
+        // Act
         assertThat(invalid.statusCode()).isEqualTo(400);
         assertThat(invalid.body()).contains("VALIDATION_ERROR", "page").doesNotContain("unparseable-secret-marker");
         var unsupported = request(7, false, "PUT", "/history", null);
+        // Assert
         assertThat(unsupported.statusCode()).isEqualTo(405);
         assertThat(unsupported.body()).contains("METHOD_NOT_ALLOWED");
     }
 
     @Test
-    void successfulMockPaymentGrantsProAndRefundRevokesItsReceipt() throws Exception {
+    void completeMock_whenProPaymentSucceedsAndIsRefunded_shouldGrantAndRevokeReceipt() throws Exception {
+        // Arrange
+        // Act
         String order = checkout(3, "PRO_MONTH", UUID.randomUUID().toString()).path("orderCode").asString();
+
+        // Assert
         assertThat(
                 request(
                         3,
@@ -202,8 +218,10 @@ class ProPaymentIntegrationTests {
     }
 
     @Test
-    void failuresNeverGrantProAndUnavailableActivationIsRetryable() throws Exception {
+    void activate_whenPaymentFailsOrLearningIsUnavailable_shouldAvoidProGrantAndAllowRetry() throws Exception {
+        // Arrange
         String failed = checkout(4, "PRO_MONTH", UUID.randomUUID().toString()).path("orderCode").asString();
+        // Act
         assertThat(
                 request(
                         4,
@@ -218,6 +236,7 @@ class ProPaymentIntegrationTests {
                 .doNothing()
                 .when(learning)
                 .grantPro(order, 4L, "PRO_QUARTER", 3);
+        // Assert
         assertThat(
                 request(
                         4,

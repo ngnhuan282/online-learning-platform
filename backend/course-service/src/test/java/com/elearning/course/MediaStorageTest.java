@@ -48,7 +48,8 @@ public class MediaStorageTest {
     }
 
     @Test
-    void shouldUploadAndLoadFileViaLocalStorage() throws IOException {
+    void upload_whenLocalStorageIsConfigured_shouldStoreAndReadFile() throws IOException {
+        // Arrange
         byte[] content = "Hello E-Learning Media!".getBytes();
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -56,6 +57,7 @@ public class MediaStorageTest {
                 "application/pdf",
                 content);
 
+        // Act
         MediaUploadResponse response = storageService.upload(file, "documents");
 
         assertNotNull(response);
@@ -73,11 +75,13 @@ public class MediaStorageTest {
 
         // Test delete
         storageService.delete(response.objectKey());
+        // Assert
         assertFalse(Files.exists(tempDir.resolve(response.objectKey())));
     }
 
     @Test
-    void shouldMapLessonResourceToResponse() {
+    void toResponse_whenLessonResourceExists_shouldMapResourceFields() {
+        // Arrange
         Lesson lesson = new Lesson();
         lesson.setId(55L);
         lesson.setTitle("Bài học mẫu");
@@ -93,8 +97,10 @@ public class MediaStorageTest {
         resource.setObjectKey("documents/slide1.pdf");
         resource.setDownloadUrl("/api/v1/media/download/documents/slide1.pdf");
 
+        // Act
         LessonResourceResponse response = LessonResourceResponse.from(resource);
 
+        // Assert
         assertEquals(10L, response.id());
         assertEquals(55L, response.lessonId());
         assertEquals(ResourceType.PDF, response.resourceType());
@@ -105,7 +111,9 @@ public class MediaStorageTest {
     }
 
     @Test
-    void shouldSupportCustomS3EndpointAndPathStyle() {
+    void configureS3_whenCustomEndpointAndPathStyleAreSet_shouldUseConfiguredClientOptions() {
+        // Arrange
+        // Act
         AwsS3StorageService service = new AwsS3StorageService(
                 "demo-bucket",
                 "ap-southeast-1",
@@ -115,12 +123,14 @@ public class MediaStorageTest {
                 true,
                 "http://localhost:9000");
 
+        // Assert
         assertEquals("http://localhost:9000", service.getEndpointUrl());
         assertTrue(service.isPathStyleEnabled());
     }
 
     @Test
-    void shouldSignDownloadUrlWithPublicEndpoint() {
+    void getDownloadUrl_whenPublicEndpointIsConfigured_shouldSignUsingPublicEndpoint() {
+        // Arrange
         AwsS3StorageService service = new AwsS3StorageService(
                 "demo-bucket",
                 "us-east-1",
@@ -130,31 +140,39 @@ public class MediaStorageTest {
                 true,
                 "http://localhost:9000");
 
+        // Act
         String downloadUrl = service.generatePresignedUrl("videos/sample.mp4", Duration.ofMinutes(15));
 
+        // Assert
         assertEquals("http://rustfs:9000", service.getEndpointUrl());
         assertEquals("http://localhost:9000", service.getPublicEndpointUrl());
         assertEquals("localhost", URI.create(downloadUrl).getHost());
     }
 
     @Test
-    void shouldRejectS3ModeWithoutBucketInsteadOfFallingBackToLocal() {
+    void configureS3_whenBucketIsMissing_shouldRejectS3Mode() {
+        // Arrange
         StorageConfig config = new StorageConfig();
         AwsS3StorageService s3Storage = new AwsS3StorageService(
                 "", "us-east-1", "access-key", "secret-key", "", false, "");
 
+        // Act
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
                 () -> config.storageService("s3", "", storageService, s3Storage));
 
+        // Assert
         assertTrue(error.getMessage().contains("AWS_S3_BUCKET"));
     }
 
     @Test
-    void shouldRejectPresignedUrlWithoutBucketInsteadOfReturningLocalUrl() {
+    void getDownloadUrl_whenS3BucketIsMissing_shouldRejectPresignRequest() {
+        // Arrange
+        // Act
         AwsS3StorageService s3Storage = new AwsS3StorageService(
                 "", "us-east-1", "access-key", "secret-key", "", false, "");
 
+        // Assert
         assertThrows(
                 com.elearning.course.common.exception.AppException.class,
                 () -> s3Storage.generatePresignedUrl("videos/sample.mp4", Duration.ofMinutes(15)));

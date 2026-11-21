@@ -97,9 +97,13 @@ class CourseServiceApplicationTests {
     }
 
     @Test
-    void granularReportPermissionIsRequiredAndSignedClaimsAreValidated() throws Exception {
+    void authorize_whenReportIsRequested_shouldRequireGranularPermissionAndValidClaims() throws Exception {
+        // Arrange
         String path = "/api/v1/admin/courses/overview";
+
+        // Act
         assertThat(request(path, token("USER", 60), null).statusCode()).isEqualTo(403);
+        // Assert
         for (Object claim : List.of(List.of("COURSE_VIEW"), List.of("USER_VIEW"), "COURSE_VIEW")) {
             String access = Jwts.builder()
                 .subject("123")
@@ -120,12 +124,20 @@ class CourseServiceApplicationTests {
     }
 
     @Test
-    void startsIndependentlyAndExposesHealth() throws Exception {
-        assertThat(request("/actuator/health", null, null).statusCode()).isEqualTo(200);
+    void health_whenServiceStarts_shouldReportUp() throws Exception {
+        // Arrange
+        // Act
+
+        var actualStatusCode = request("/actuator/health", null, null).statusCode();
+
+        // Assert
+        assertThat(actualStatusCode).isEqualTo(200);
     }
 
     @Test
-    void authenticatesWithoutTrustingIdentityHeaders() throws Exception {
+    void authenticate_whenIdentityHeadersAreSupplied_shouldUseVerifiedToken() throws Exception {
+        // Arrange
+        // Act
         error(request(BASE, null, null), 401, "UNAUTHORIZED", BASE);
         error(request(BASE, "malformed", null), 401, "UNAUTHORIZED", BASE);
         error(request(BASE, token("USER", -60), null), 401, "UNAUTHORIZED", BASE);
@@ -134,6 +146,7 @@ class CourseServiceApplicationTests {
         var success = request(BASE, token("USER", 60), null);
         assertThat(success.statusCode()).isEqualTo(200);
         JsonNode json = mapper.readTree(success.body());
+        // Assert
         assertThat(json.get("success").asBoolean()).isTrue();
         assertThat(json.get("message").asString()).isEqualTo("Success");
         assertThat(json.get("data").get("ready").asBoolean()).isTrue();
@@ -141,36 +154,50 @@ class CourseServiceApplicationTests {
     }
 
     @Test
-    void enforcesAdminAuthority() throws Exception {
+    void authorize_whenAdminAuthorityIsRequired_shouldRejectRegularUser() throws Exception {
+        // Arrange
+        // Act
         error(request(BASE + "/admin", token("USER", 60), null), 403, "FORBIDDEN", BASE + "/admin");
+        // Assert
         assertThat(request(BASE + "/admin", token("ADMIN", 60), null).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void normalizesValidationAndMalformedBodies() throws Exception {
+    void handleRequest_whenBodyIsInvalid_shouldReturnValidationError() throws Exception {
+        // Arrange
+        // Act
         var invalid = request(BASE, token("USER", 60), "{}");
         error(invalid, 400, "VALIDATION_ERROR", BASE);
+        // Assert
         assertThat(mapper.readTree(invalid.body()).get("errors").get("name").isArray()).isTrue();
         error(request(BASE, token("USER", 60), "{"), 400, "MALFORMED_REQUEST", BASE);
     }
 
     @Test
-    void normalizesDomainFallbackAndNotFound() throws Exception {
+    void handleException_whenDomainErrorOccurs_shouldReturnSafeError() throws Exception {
+        // Arrange
+        // Act
         error(request(BASE + "/conflict", token("USER", 60), null), 409, "CONFLICT", BASE + "/conflict");
+        // Assert
         error(request(BASE + "/failure", token("USER", 60), null), 500, "INTERNAL_ERROR", BASE + "/failure");
         error(request(BASE + "/missing", token("USER", 60), null), 404, "NOT_FOUND", BASE + "/missing");
     }
 
     @Test
-    void preservesPaginationMetadata() {
+    void list_whenResultsArePaginated_shouldPreserveMetadata() {
+        // Arrange
+        // Act
         var page = PageResponse.from(new PageImpl<>(List.of("item"), PageRequest.of(1, 2), 3));
+
+        // Assert
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.totalPages()).isEqualTo(2);
         assertThat(page.last()).isTrue();
     }
 
     @Test
-    void rejectsWrongSignatureIssuerTypeAndMissingExpiry() {
+    void authenticate_whenTokenClaimsOrSignatureAreInvalid_shouldRejectToken() {
+        // Arrange
         var key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         String noExpiry = Jwts.builder()
             .subject("u")
@@ -180,6 +207,7 @@ class CourseServiceApplicationTests {
             .issuedAt(new Date())
             .signWith(key)
             .compact();
+        // Act
         assertThatThrownBy(() -> tokens.validate(noExpiry)).isInstanceOf(JwtException.class);
         String wrongIssuer = Jwts.builder().subject("u").issuer("other").signWith(key).compact();
         assertThatThrownBy(() -> tokens.validate(wrongIssuer)).isInstanceOf(JwtException.class);
@@ -192,6 +220,7 @@ class CourseServiceApplicationTests {
         assertThatThrownBy(() -> tokens.validate(wrongType)).isInstanceOf(JwtException.class);
         var otherKey = Jwts.SIG.HS256.key().build();
         String wrongSignature = Jwts.builder().subject("u").signWith(otherKey).compact();
+        // Assert
         assertThatThrownBy(() -> tokens.validate(wrongSignature)).isInstanceOf(JwtException.class);
     }
 

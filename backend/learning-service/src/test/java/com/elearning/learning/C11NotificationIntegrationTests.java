@@ -93,23 +93,28 @@ class C11NotificationIntegrationTests {
     }
 
     @Test
-    void adminRoutesRequireAdminAndCannotChangeBusinessNotifications() throws Exception {
+    void authorize_whenNotificationWriteTargetsAdminFeed_shouldRequireAdminAndProtectBusinessEvents() throws Exception {
+        // Arrange
         long learner = USERS.incrementAndGet();
+        // Act
         assertThat(send("GET", ADMIN, null, null, null).statusCode()).isEqualTo(401);
         assertThat(send("GET", ADMIN, learner, "USER", null).statusCode()).isEqualTo(403);
         assertThat(send("POST", ADMIN, learner, "USER", message(learner)).statusCode()).isEqualTo(403);
         var saved = data(send("POST", ADMIN, learner, "ADMIN", message(learner)), 201);
         long id = saved.get("id").asLong();
+        // Assert
         assertThat(send("DELETE", ADMIN + "/" + id, learner, "ADMIN", null).statusCode()).isEqualTo(404);
         assertThat(send("PUT", ADMIN + "/" + id, learner, "ADMIN", message(learner)).statusCode()).isEqualTo(404);
     }
 
     @Test
-    void sendsSystemOnlyAndRetriesPreserveOriginalMessageAndReadState() throws Exception {
+    void send_whenEventIsSystemNotification_shouldPreserveOriginalMessageAndReadStateOnReplay() throws Exception {
+        // Arrange
         long admin = USERS.incrementAndGet();
         long owner = USERS.incrementAndGet();
         long stranger = USERS.incrementAndGet();
         var request = message(owner);
+        // Act
         var first = data(send("POST", ADMIN, admin, "ADMIN", request), 201);
         assertThat(first.get("type").asString()).isEqualTo("SYSTEM");
         assertThat(first.get("category").asString()).isEqualTo("SYSTEM");
@@ -121,6 +126,7 @@ class C11NotificationIntegrationTests {
         assertThat(retry.get("id").asLong()).isEqualTo(id);
         assertThat(retry.get("readAt").asString()).isEqualTo(read.get("readAt").asString());
         var conflict = new AdminNotificationRequest(request.eventId(), owner, "Nội dung khác", request.body());
+        // Assert
         assertThat(send("POST", ADMIN, admin, "ADMIN", conflict).statusCode()).isEqualTo(409);
         assertThat(repository.countByUserIdAndReadAtIsNull(owner)).isZero();
         assertThat(data(send("GET", USER + "/summary", stranger, "USER", null), 200)
@@ -128,7 +134,9 @@ class C11NotificationIntegrationTests {
     }
 
     @Test
-    void adminFeedFiltersRecipientCategoryUnreadAndOrdersTies() throws Exception {
+    void listAdmin_whenRecipientCategoryAndUnreadFiltersAreSupplied_shouldReturnMatchingRowsInStableOrder() throws Exception {
+        // Arrange
+        // Act
         long owner = USERS.incrementAndGet();
         long other = USERS.incrementAndGet();
         Instant now = Instant.now();
@@ -145,6 +153,7 @@ class C11NotificationIntegrationTests {
         var second = data(send("GET", filter + "&page=1", other, "ADMIN", null), 200);
         assertThat(second.get("content").get(0).get("id").asLong()).isLessThan(firstId);
         data(send("PATCH", USER + "/" + firstId + "/read", owner, "USER", null), 200);
+        // Assert
         assertThat(data(send("GET", filter + "&unreadOnly=true", other, "ADMIN", null), 200)
             .get("totalElements").asLong()).isEqualTo(1);
         assertThat(data(send("GET", ADMIN + "?userId=" + other, other, "ADMIN", null), 200)
@@ -152,8 +161,10 @@ class C11NotificationIntegrationTests {
     }
 
     @Test
-    void validatesPayloadAndAdminFiltersWithoutServerErrors() throws Exception {
+    void send_whenPayloadOrFilterIsInvalid_shouldReturnClientError() throws Exception {
+        // Arrange
         long admin = USERS.incrementAndGet();
+        // Act
         for (String query : List.of("?page=-1", "?size=101", "?size=0", "?userId=0", "?userId=abc", "?category=UNKNOWN")) {
             assertThat(send("GET", ADMIN + query, admin, "ADMIN", null).statusCode()).isEqualTo(400);
         }
@@ -165,11 +176,14 @@ class C11NotificationIntegrationTests {
         )) {
             assertThat(send("POST", ADMIN, admin, "ADMIN", request).statusCode()).isEqualTo(400);
         }
+        // Assert
         assertThat(repository.countByUserIdAndReadAtIsNull(admin)).isZero();
     }
 
     @Test
-    void concurrentSendCreatesOneRowAndRollbackLeavesNoMessage() throws Exception {
+    void send_whenRequestsAreConcurrentOrRollback_shouldCreateOneRowOnlyForCommittedEvent() throws Exception {
+        // Arrange
+        // Act
         long recipient = USERS.incrementAndGet();
         var request = message(recipient);
         try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -184,6 +198,7 @@ class C11NotificationIntegrationTests {
             notifications.sendSystem(message(rollbackRecipient));
             status.setRollbackOnly();
         });
+        // Assert
         assertThat(repository.countByUserIdAndReadAtIsNull(rollbackRecipient)).isZero();
     }
 }

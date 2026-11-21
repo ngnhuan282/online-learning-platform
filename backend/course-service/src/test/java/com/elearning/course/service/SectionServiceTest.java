@@ -1,6 +1,7 @@
 package com.elearning.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -65,28 +66,37 @@ class SectionServiceTest {
     }
 
     @Test
-    void listByCourse_success() {
+    void listByCourse_whenCourseExists_shouldReturnSections() {
+        // Arrange
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
         when(sectionRepository.findByCourseIdWithLessons(1L)).thenReturn(List.of(section));
 
+        // Act
         List<SectionResponse> result = sectionService.listByCourse(1L);
 
+        // Assert
         assertThat(result).hasSize(1);
         assertThat(result.get(0).title()).isEqualTo("Chapter 1: Intro");
         assertThat(result.get(0).courseId()).isEqualTo(1L);
     }
 
     @Test
-    void listByCourse_courseNotFound_throwsAppException() {
+    void listByCourse_whenCourseDoesNotExist_shouldThrowNotFound() {
+        // Arrange
         when(courseRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> sectionService.listByCourse(99L))
+        // Act
+        var thrown = catchThrowable(() -> sectionService.listByCourse(99L));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
 
     @Test
-    void create_success() {
+    void create_whenCourseExists_shouldPersistSection() {
+        // Arrange
         SectionRequest req = new SectionRequest("Chapter 2: Setup", 1);
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
         when(sectionRepository.save(any(Section.class))).thenAnswer(i -> {
@@ -98,8 +108,10 @@ class SectionServiceTest {
             return s;
         });
 
+        // Act
         SectionResponse resp = sectionService.create(1L, req);
 
+        // Assert
         assertThat(resp).isNotNull();
         assertThat(resp.id()).isEqualTo(11L);
         assertThat(resp.title()).isEqualTo("Chapter 2: Setup");
@@ -107,37 +119,49 @@ class SectionServiceTest {
     }
 
     @Test
-    void update_success() {
+    void update_whenSectionExists_shouldPersistSectionChanges() {
+        // Arrange
         SectionRequest req = new SectionRequest("Chapter 1: Updated", 0);
         when(sectionRepository.findById(10L)).thenReturn(Optional.of(section));
         when(sectionRepository.save(any(Section.class))).thenAnswer(i -> i.getArgument(0));
 
+        // Act
         SectionResponse resp = sectionService.update(1L, 10L, req);
 
+        // Assert
         assertThat(resp.title()).isEqualTo("Chapter 1: Updated");
     }
 
     @Test
-    void update_wrongCourseId_throwsAppException() {
+    void update_whenSectionBelongsToAnotherCourse_shouldThrowNotFound() {
+        // Arrange
         SectionRequest req = new SectionRequest("Chapter 1: Updated", 0);
         when(sectionRepository.findById(10L)).thenReturn(Optional.of(section));
 
-        assertThatThrownBy(() -> sectionService.update(999L, 10L, req))
+        // Act
+        var thrown = catchThrowable(() -> sectionService.update(999L, 10L, req));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
 
     @Test
-    void delete_success() {
+    void delete_whenSectionExists_shouldRemoveSection() {
+        // Arrange
         when(sectionRepository.findById(10L)).thenReturn(Optional.of(section));
 
+        // Act
         sectionService.delete(1L, 10L);
 
+        // Assert
         verify(sectionRepository).delete(section);
     }
 
     @Test
-    void reorder_success() {
+    void reorder_whenSectionIdsAreValid_shouldPersistNewOrder() {
+        // Arrange
         Section sec2 = new Section();
         sec2.setId(20L);
         sec2.setCourse(course);
@@ -153,8 +177,10 @@ class SectionServiceTest {
             new ReorderRequest.Item(20L, 0)
         ));
 
+        // Act
         sectionService.reorder(1L, reorderReq);
 
+        // Assert
         assertThat(section.getOrderIndex()).isEqualTo(1);
         assertThat(sec2.getOrderIndex()).isEqualTo(0);
         verify(sectionRepository).saveAll(any());

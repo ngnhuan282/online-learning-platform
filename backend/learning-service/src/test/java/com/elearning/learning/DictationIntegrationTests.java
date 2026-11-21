@@ -101,7 +101,9 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void legacyAudioCatalogIsAvailableWithoutEnrollment() {
+    void catalog_whenLearnerHasNoEnrollment_shouldReturnLegacyAudioExercise() {
+        // Arrange
+        // Act
         var catalog = service.catalog(5001, "picnic", "B1", "Test 1", 0, 12, false);
         assertThat(catalog.total()).isGreaterThanOrEqualTo(1);
         var item = catalog
@@ -110,6 +112,7 @@ class DictationIntegrationTests {
             .filter(value -> value.id().equals(sampleId))
             .findFirst()
             .orElseThrow();
+        // Assert
         assertThat(item.sentenceCount()).isEqualTo(13);
         assertThat(item.duration()).isBetween(31.0, 32.0);
         assertThat(item.topic()).isEqualTo("Test 1");
@@ -165,7 +168,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void topicGroupsPreviewPublishedExercisesAndFilterFullResultsByLatestAttempt() throws Exception {
+    void topicGroups_whenExerciseHasLatestAttempt_shouldPreviewPublishedExercisesAndFilterByProgress() throws Exception {
+        // Arrange
         long learner = 5091;
         String keyword = "TestGroupingFixture";
         var sentences = List.of(new Sentence("Hello there.", 0.0, 3.0));
@@ -179,6 +183,7 @@ class DictationIntegrationTests {
             ids.add(lesson.id());
         }
         service.visibility(ids.get(5), true);
+        // Act
         var groups = service.topicGroups(learner, keyword, "B1", "", "").groups();
         assertThat(groups).extracting(TopicGroup::topic).containsExactly("Test 2", "Travel & Food");
         assertThat(groups.getFirst().total()).isEqualTo(5);
@@ -217,6 +222,7 @@ class DictationIntegrationTests {
         var draft = service.save(old.id(), new SaveRequest(reclassified, old.version()));
         assertThat(service.catalog(learner, keyword, "", "Travel & Food", 0, 12, false).total()).isEqualTo(1);
         service.publish(draft.id(), draft.version());
+        // Assert
         assertThat(service.catalog(learner, keyword, "", "Travel & Food", 0, 12, false).items())
             .extracting(Item::id)
             .containsExactlyInAnyOrder(old.id(), ids.getLast());
@@ -225,7 +231,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void youtubeThumbnailsFollowPublishedLessonsInCaseInsensitiveTopicGroups() throws Exception {
+    void topicGroups_whenPublishedYouTubeVideosShareCaseInsensitiveTopic_shouldUsePublishedThumbnail() throws Exception {
+        // Arrange
         long learner = 5096;
         String keyword = "YoutubeCoverFixture";
         String id = "_R7nrvhNmrI";
@@ -251,6 +258,7 @@ class DictationIntegrationTests {
                 0
             )
         );
+        // Act
         var groups = service.topicGroups(learner, keyword, "", "", "").groups();
         assertThat(groups).hasSize(1);
         assertThat(groups.getFirst().total()).isEqualTo(2);
@@ -269,17 +277,20 @@ class DictationIntegrationTests {
         );
         assertThat(response.statusCode()).isEqualTo(200);
         var catalog = json.readTree(response.body()).path("data");
+        // Assert
         assertThat(catalog.path("total").asLong()).isEqualTo(2);
         assertThat(catalog.path("items").get(0).path("thumbnailUrl").asText())
             .startsWith("https://i.ytimg.com/vi/");
     }
 
     @Test
-    void cloudVideoUsesItsRevisionDurationAndTranscriptWithoutAnAudioUpload() throws Exception {
+    void start_whenExerciseUsesCloudVideo_shouldReturnRevisionDurationAndTranscript() throws Exception {
+        // Arrange
         var video = new Video("https://media.example.test/videos/sample.mp4", 34.8);
         var sentences = List.of(new Sentence("Sounds good.", 30.0, 35.0));
         var definition = new Definition("Cloud video", "", "Conversation", "A1", null, sentences, video);
         var lesson = service.saveAndPublish(null, new SaveRequest(definition, 0));
+        // Act
         assertThat(lesson.audio()).isNull();
         assertThat(lesson.definition().video()).isEqualTo(video);
         assertThat(lesson.definition().sentences().getFirst().end()).isEqualTo(34.8);
@@ -305,14 +316,17 @@ class DictationIntegrationTests {
         var invalid = new Definition(
             "Insecure video", "", "Conversation", "A1", null, sentences, new Video("http://example.test/video.mp4", 40.0)
         );
+        // Assert
         assertThatThrownBy(() -> service.save(null, new SaveRequest(invalid, 0)))
             .hasMessage("Vui lòng nhập URL HTTPS trực tiếp của video.");
     }
 
     @Test
-    void levelGroupsFilterBothThePreviewsAndThePaginatedTestCatalog() throws Exception {
+    void catalog_whenLevelGroupIsSelected_shouldFilterPreviewAndPaginatedResults() throws Exception {
+        // Arrange
         String keyword = "LevelGroupFixture";
         var sentences = List.of(new Sentence("Hello there.", 0.0, 3.0));
+        // Act
         for (String level : List.of("A1", "A2", "B1", "C2")) {
             var definition = new Definition(
                 keyword + " " + level, "", "Test 4", level, sampleAudioKey, sentences
@@ -331,6 +345,7 @@ class DictationIntegrationTests {
 
         var first = service.catalog(learner, keyword, "ADVANCED", "Test 4", 0, 1, false, "NOT_STARTED");
         var second = service.catalog(learner, keyword, "ADVANCED", "Test 4", 1, 1, false, "NOT_STARTED");
+        // Assert
         assertThat(first.total()).isEqualTo(2);
         assertThat(second.total()).isEqualTo(2);
         assertThat(List.of(first.items().getFirst().level(), second.items().getFirst().level()))
@@ -376,7 +391,9 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void graderAlignsMissingExtraWordsAndNormalizesPunctuationWithoutGuessingWords() {
+    void grade_whenAnswerContainsMissingExtraOrPunctuatedWords_shouldAlignAndNormalizeWithoutGuessing() {
+        // Arrange
+        // Act
         assertThat(grader.grade("There's a video.", "THERE’S   A VIDEO!").accuracy()).isEqualTo(100);
         var missing = grader.grade("we really enjoyed the company picnic", "we enjoyed the company picnic");
         assertThat(missing.correct()).isEqualTo(5);
@@ -387,14 +404,17 @@ class DictationIntegrationTests {
                 .filter(word -> word.type().equals("missing"))
         ).hasSize(1);
         var extra = grader.grade("we enjoyed it", "we really enjoyed it");
+        // Assert
         assertThat(extra.extra()).isEqualTo(1);
         assertThat(extra.accuracy()).isLessThan(100);
         assertThat(grader.grade("I'll", "I will").accuracy()).isLessThan(100);
     }
 
     @Test
-    void unansweredTranscriptIsHiddenAndOtherUsersCannotReadOrWriteAttempts() throws Exception {
+    void attempt_whenCallerIsAnotherUserOrTranscriptIsUnanswered_shouldProtectPrivateAttemptAndAnswers() throws Exception {
+        // Arrange
         var attempt = start(5002, sampleId);
+        // Act
         assertThat(attempt.responses()).allSatisfy(response -> {
             assertThat(response.answer()).isNull();
             assertThat(response.grade()).isNull();
@@ -420,18 +440,22 @@ class DictationIntegrationTests {
                     "{\"index\":0,\"wordIndex\":0,\"text\":\"test\"}"
                 ).statusCode()
             ).isEqualTo(404);
+        // Assert
         assertThat(service.history(5003, "", "", "", "", 0, 20).items()).isEmpty();
     }
 
     @Test
-    void revealingEveryWordCompletesTheSentenceAndPersistsWithoutGivingCredit() {
+    void hint_whenAllWordsAreRevealed_shouldCompleteSentenceWithoutAwardingCredit() {
+        // Arrange
         var detail = create("All hints", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
+        // Act
         String id = start(5030, detail.id()).id();
         service.progress(5030, id, new AnswerRequest(0, "my draft"));
         assertThat(service.hint(5030, id, new HintRequest(0, 0)).completed()).isZero();
         assertThat(service.hint(5030, id, new HintRequest(0, 1)).responses().getFirst().answer()).isNull();
         var complete = service.hint(5030, id, new HintRequest(0, 2));
+        // Assert
         assertThat(complete.completed()).isEqualTo(1);
         assertThat(complete.responses().getFirst().revealed()).isTrue();
         assertThat(complete.responses().getFirst().answer()).isEqualTo("We enjoyed it.");
@@ -448,9 +472,11 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void olderFullyHintedResponsesAreRecognizedAndEarnedScoresSurviveLaterHints() {
+    void progress_whenLegacyResponsesWereFullyHinted_shouldPreserveCompletionAndPreviouslyEarnedCredit() {
+        // Arrange
         var detail = create("Legacy all hints", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
+        // Act
         String id = start(5031, detail.id()).id();
         service.hint(5031, id, new HintRequest(0, 0));
         service.hint(5031, id, new HintRequest(0, 1));
@@ -467,14 +493,17 @@ class DictationIntegrationTests {
             .getFirst()
             .firstAccuracy();
         for (int word = 0; word < 3; word++) service.hint(5032, graded, new HintRequest(0, word));
+        // Assert
         assertThat(service.attempt(5032, graded).responses().getFirst().firstAccuracy()).isEqualTo(first);
     }
 
     @Test
-    void wordHintsArePrivatePersistentAndDiscountOnlyWordsNotAlreadyEarned() throws Exception {
+    void hint_whenLearnerRevealsWord_shouldPersistPrivateHintAndDiscountOnlyUnearnedWords() throws Exception {
+        // Arrange
         var detail = create("Word hints", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
         var attempt = start(5020, detail.id());
+        // Act
         String id = attempt.id();
         assertThat(attempt.sentences().getFirst().wordLengths()).containsExactly(2, 6, 7, 2);
         assertThatThrownBy(() -> service.hint(5021, id, new HintRequest(0, 1))).isInstanceOf(
@@ -514,6 +543,7 @@ class DictationIntegrationTests {
         assertThat(checked.responses().getFirst().firstAccuracy()).isEqualTo(75);
         service.hint(5020, id, new HintRequest(0, 0));
         service.check(5020, id, new AnswerRequest(0, "We really enjoyed it"));
+        // Assert
         assertThat(service.finish(5020, id).accuracy()).isEqualTo(75);
         assertThatThrownBy(() -> service.hint(5020, id, new HintRequest(0, 2))).isInstanceOf(
             AppException.class
@@ -521,18 +551,23 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void hintsDoNotDoublePenalizeWrongWordsOrShiftAfterMissingAndExtraWords() {
+    void hint_whenAnswerHasWrongMissingOrExtraWords_shouldAvoidDuplicatePenaltiesAndKeepWordIndices() {
+        // Arrange
         var missing = grader.grade("we really enjoyed it", "we enjoyed it");
+        // Act
         assertThat(grader.withoutHintCredit(missing, List.of(1)).correct()).isEqualTo(3);
         assertThat(grader.withoutHintCredit(missing, List.of(2)).correct()).isEqualTo(2);
         var extra = grader.grade("we enjoyed it", "we really enjoyed it");
+        // Assert
         assertThat(grader.withoutHintCredit(extra, List.of(1)).accuracy()).isEqualTo(33.3);
     }
 
     @Test
-    void liveProgressReturnsSafeIndexedFeedbackAndPreservesActualTokenOrder() throws Exception {
+    void progress_whenLearnerTypesOutOfOrder_shouldReturnSafeIndexedFeedbackInActualOrder() throws Exception {
+        // Arrange
         var detail = create("Live feedback", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
+        // Act
         String id = start(5050, detail.id()).id();
         var response = request(
             5050L,
@@ -582,6 +617,7 @@ class DictationIntegrationTests {
                 .answer()
         ).isNull();
         var blank = service.check(5050, id, new AnswerRequest(0, ""));
+        // Assert
         assertThat(blank.completed()).isZero();
         assertThat(blank.accuracy()).isEqualTo(25);
         assertThat(blank.responses().getFirst().feedback()).allMatch(word -> word.state().equals("empty"));
@@ -591,9 +627,11 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void hintsBeforeAndAfterEarningWordsRespectThePersistentLedger() {
+    void hint_whenWordsWereEarnedBeforeOrAfterHint_shouldPreservePersistentCreditLedger() {
+        // Arrange
         var detail = create("Live ledger", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
+        // Act
         String id = start(5051, detail.id()).id();
         assertThat(service.progress(5051, id, new AnswerRequest(0, "We really")).accuracy()).isEqualTo(50);
         assertThat(service.hint(5051, id, new HintRequest(0, 1)).accuracy()).isEqualTo(50);
@@ -611,6 +649,7 @@ class DictationIntegrationTests {
             )
         ).isEqualTo("[0,1]");
         var done = service.progress(5051, id, new AnswerRequest(0, "We really enjoyed it"));
+        // Assert
         assertThat(done.completed()).isEqualTo(1);
         assertThat(done.accuracy()).isEqualTo(75);
         assertThat(done.responses().getFirst().completed()).isTrue();
@@ -623,10 +662,12 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void extraWordsPreventCompletionAndDoNotBankNewCreditBeforeReveal() {
+    void progress_whenAnswerHasExtraWords_shouldPreventCompletionAndDoNotBankNewCredit() {
+        // Arrange
         var detail = create("Extra words", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
         String id = start(5052, detail.id()).id();
+        // Act
         var extra = service.progress(5052, id, new AnswerRequest(0, "We really enjoyed it extra"));
         assertThat(extra.completed()).isZero();
         assertThat(extra.responses().getFirst().answer()).isNull();
@@ -651,16 +692,19 @@ class DictationIntegrationTests {
         String retained = start(5056, detail.id()).id();
         service.progress(5056, retained, new AnswerRequest(0, "We"));
         service.progress(5056, retained, new AnswerRequest(0, "We really enjoyed it extra"));
+        // Assert
         assertThat(service.revealOrSkip(5056, retained, 0, true).accuracy()).isEqualTo(33.3);
     }
 
     @Test
-    void revealSkipAndAllHintsKeepEarnedWordsAndScoreByWordCount() {
+    void finish_whenLearnerUsedRevealSkipOrHints_shouldScorePreviouslyEarnedWordsByWordCount() {
+        // Arrange
         var detail = create(
             "Weighted live score",
             List.of(new Sentence("We enjoyed it.", 0.0, 3.0), new Sentence("Thanks.", 3.0, 4.0))
         );
         service.publish(detail.id(), detail.version());
+        // Act
         String id = start(5053, detail.id()).id();
         service.progress(5053, id, new AnswerRequest(0, "We wrong"));
         assertThat(service.revealOrSkip(5053, id, 0, true).accuracy()).isEqualTo(25);
@@ -679,6 +723,7 @@ class DictationIntegrationTests {
         service.progress(5054, hinted, new AnswerRequest(0, "We wrong"));
         for (int word = 0; word < 3; word++) service.hint(5054, hinted, new HintRequest(0, word));
         var allHints = service.attempt(5054, hinted);
+        // Assert
         assertThat(allHints.completed()).isEqualTo(1);
         assertThat(allHints.responses().getFirst().completed()).isTrue();
         assertThat(allHints.responses().getFirst().revealed()).isTrue();
@@ -689,13 +734,15 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void wrongAnswersCanEarnFullCreditOnRetryAndRevealedOrSkippedSentencesLock() {
+    void progress_whenLearnerRetriesWrongAnswer_shouldAllowFullCreditAndKeepRevealedSentencesLocked() {
+        // Arrange
         var detail = create(
             "Scoring",
             List.of(new Sentence("We enjoyed it.", 0.0, 3.0), new Sentence("All right, thanks.", 3.0, 6.0))
         );
         service.publish(detail.id(), detail.version());
         var attempt = start(5004, detail.id());
+        // Act
         attempt = service.check(5004, attempt.id(), new AnswerRequest(0, "We it"));
         double first = attempt.responses().getFirst().firstAccuracy();
         assertThat(first).isEqualTo(66.7);
@@ -712,6 +759,7 @@ class DictationIntegrationTests {
             service.check(5004, id, new AnswerRequest(1, "All right thanks"))
         ).isInstanceOf(AppException.class);
         var finished = service.finish(5004, attempt.id());
+        // Assert
         assertThat(finished.accuracy()).isEqualTo(50);
         assertThat(service.finish(5004, attempt.id()).completedAt()).isEqualTo(finished.completedAt());
         assertThat(service.check(5004, id, new AnswerRequest(0, "We enjoyed it")).accuracy()).isEqualTo(50);
@@ -725,11 +773,13 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void savesResumeCorrectSentenceAndStartIsIdempotentUnderConcurrentRequests() throws Exception {
+    void start_whenConcurrentRequestsResumePractice_shouldReuseAttemptAndSavedSentence() throws Exception {
+        // Arrange
         var definition = create("Concurrency", List.of(new Sentence("Hello there.", 0.0, 3.0)));
         service.publish(definition.id(), definition.version());
         String requestId = UUID.randomUUID().toString();
         Set<String> ids = new HashSet<>();
+        // Act
         try (var pool = Executors.newFixedThreadPool(4)) {
             var futures = java.util.stream.IntStream.range(0, 8)
                 .mapToObj(i ->
@@ -743,6 +793,7 @@ class DictationIntegrationTests {
         assertThat(ids).hasSize(1);
         String id = ids.iterator().next();
         service.progress(5005, id, new AnswerRequest(0, "unsent draft"));
+        // Assert
         assertThat(
             service
                 .start(5005, definition.id(), new StartRequest(UUID.randomUUID().toString(), false))
@@ -757,9 +808,11 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void startReopensTheLatestCompletedAttemptAndRestartRetainsOldRows() {
+    void start_whenLatestAttemptIsComplete_shouldReopenByDefaultAndPreserveHistoryOnRestart() {
+        // Arrange
         var detail = create("Latest run", List.of(new Sentence("Hello there.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
+        // Act
         String old = start(5060, detail.id()).id();
         service.progress(5060, old, new AnswerRequest(0, "draft"));
         String requestId = UUID.randomUUID().toString();
@@ -778,6 +831,7 @@ class DictationIntegrationTests {
             detail.id(),
             new StartRequest(UUID.randomUUID().toString(), true)
         );
+        // Assert
         assertThat(restarted.id()).isNotIn(old, latest);
         assertThat(restarted.scoringMode()).isEqualTo("LIVE");
         assertThat(restarted.accuracy()).isZero();
@@ -800,10 +854,12 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void concurrentProgressAndHintsSerializeWithoutLosingEarnedCreditOrHints() throws Exception {
+    void progress_whenHintAndAnswerAreSubmittedConcurrently_shouldPreserveEarnedCreditAndHints() throws Exception {
+        // Arrange
         var detail = create("Concurrent mutations", List.of(new Sentence("We really enjoyed it.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
         String id = start(5061, detail.id()).id();
+        // Act
         service.progress(5061, id, new AnswerRequest(0, "We"));
         try (var pool = Executors.newFixedThreadPool(3)) {
             var gate = new java.util.concurrent.CountDownLatch(1);
@@ -825,6 +881,7 @@ class DictationIntegrationTests {
             hint2.get();
         }
         var saved = service.attempt(5061, id);
+        // Assert
         assertThat(saved.responses().getFirst().hints()).containsExactlyInAnyOrder(
             new Hint(0, "we"),
             new Hint(2, "enjoyed")
@@ -837,9 +894,11 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void latestRevisionIsSelectedBeforeSearchLevelTopicStatusAndTopicChoices() {
+    void history_whenContentHasMultipleRevisions_shouldChooseLatestAttemptBeforeFiltering() {
+        // Arrange
         var original = create("Stale history title", List.of(new Sentence("Hello there.", 0.0, 3.0)));
         service.publish(original.id(), original.version());
+        // Act
         String old = start(5062, original.id()).id();
         service.progress(5062, old, new AnswerRequest(0, "Hello there"));
         service.finish(5062, old);
@@ -865,6 +924,7 @@ class DictationIntegrationTests {
         assertThat(service.history(5062, "", "", "Workplace", "", 0, 20).total()).isZero();
         assertThat(service.history(5062, "", "", "", "COMPLETED", 0, 20).total()).isZero();
         var history = service.history(5062, "Current", "A2", "Travel", "IN_PROGRESS", 0, 1);
+        // Assert
         assertThat(history.total()).isEqualTo(1);
         assertThat(history.items()).extracting(Attempt::id).containsExactly(latest.id());
         assertThat(history.topics()).containsExactly("Travel");
@@ -873,7 +933,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void restartsStayLatestWhenTheClockIsFixedOrMovesBackwards() {
+    void start_whenClockIsFixedOrMovesBackwards_shouldKeepRestartAsLatestAttempt() {
+        // Arrange
         var detail = create("Fixed clock", List.of(new Sentence("Hello there.", 0.0, 3.0)));
         service.publish(detail.id(), detail.version());
         Instant instant = Instant.parse("2026-01-01T00:00:00.000000499Z");
@@ -885,6 +946,7 @@ class DictationIntegrationTests {
             java.time.Clock.fixed(instant, java.time.ZoneOffset.UTC)
         );
         var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        // Act
         var first = tx.execute(status ->
             fixed.start(5064, detail.id(), new StartRequest(UUID.randomUUID().toString(), true))
         );
@@ -901,6 +963,7 @@ class DictationIntegrationTests {
         var third = tx.execute(status ->
             backwards.start(5064, detail.id(), new StartRequest(UUID.randomUUID().toString(), true))
         );
+        // Assert
         assertThat(second.startedAt()).isEqualTo(first.startedAt().plusNanos(1000));
         assertThat(third.startedAt()).isEqualTo(second.startedAt().plusNanos(1000));
         assertThat(start(5064, detail.id()).id()).isEqualTo(third.id());
@@ -910,8 +973,10 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void contentRevisionsAndArchiveDoNotRewriteOldHistory() {
+    void publish_whenExerciseIsEditedOrArchived_shouldPreserveHistoricalRevision() {
+        // Arrange
         var original = create("Original title", List.of(new Sentence("Original words.", 0.0, 3.0)));
+        // Act
         service.publish(original.id(), original.version());
         var old = start(5006, original.id());
         var edited = service.save(
@@ -940,6 +1005,7 @@ class DictationIntegrationTests {
         ).isEqualTo(100);
         assertThat(service.attempt(5006, old.id()).version()).isEqualTo(1);
         service.visibility(original.id(), true);
+        // Assert
         assertThatThrownBy(() -> start(5009, original.id())).isInstanceOf(AppException.class);
         assertThat(
             service.history(5006, "Original", "B1", "Workplace", "", 0, 20).items().getFirst().title()
@@ -951,8 +1017,9 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void archivedLessonsBlockExistingPracticeButPreserveCompletedResultsAndResumeAfterRestore()
+    void visibility_whenExistingLessonIsArchived_shouldBlockPracticeAndResumeAfterRestore()
         throws Exception {
+        // Arrange
         var lesson = create("Archived access", List.of(new Sentence("We enjoyed it.", 0.0, 3.0)));
         service.publish(lesson.id(), lesson.version());
         var active = start(5101, lesson.id());
@@ -960,6 +1027,7 @@ class DictationIntegrationTests {
         var finished = start(5102, lesson.id());
         service.progress(5102, finished.id(), new AnswerRequest(0, "We enjoyed it"));
         finished = service.finish(5102, finished.id());
+        // Act
         service.visibility(lesson.id(), true);
 
         for (String action : List.of("progress", "check", "hint", "reveal", "skip", "finish")) {
@@ -1009,17 +1077,20 @@ class DictationIntegrationTests {
         service.visibility(lesson.id(), false);
         assertThat(service.attempt(5101, active.id()).responses()).isEqualTo(draft.responses());
         var resumed = service.progress(5101, active.id(), new AnswerRequest(0, "We enjoyed it"));
+        // Assert
         assertThat(resumed.archived()).isFalse();
         assertThat(resumed.completed()).isEqualTo(1);
     }
 
     @Test
-    void correctSentencesAreLockedButNavigationAndWrongAnswerRetriesRemainAvailable() throws Exception {
+    void progress_whenSentenceIsAlreadyCorrect_shouldLockItAndAllowNavigationAndRetriesElsewhere() throws Exception {
+        // Arrange
         var detail = create(
             "Locked answers",
             List.of(new Sentence("We enjoyed it.", 0.0, 3.0), new Sentence("All right, thanks.", 3.0, 6.0))
         );
         service.publish(detail.id(), detail.version());
+        // Act
         String id = start(5040, detail.id()).id();
         var wrong = service.check(5040, id, new AnswerRequest(0, "We it"));
         assertThat(wrong.responses().getFirst().revealed()).isFalse();
@@ -1048,6 +1119,7 @@ class DictationIntegrationTests {
         assertThat(service.revealOrSkip(5040, id, 0, true).responses().getFirst().revealed()).isFalse();
         assertThat(service.hint(5040, id, new HintRequest(0, 0)).responses().getFirst().hints()).isEmpty();
         service.progress(5040, id, new AnswerRequest(1, "my next draft"));
+        // Assert
         assertThat(service.progress(5040, id, new AnswerRequest(0, "We enjoyed it")).currentIndex()).isZero();
         assertThat(service.attempt(5040, id).currentIndex()).isZero();
         assertThat(start(5040, detail.id()).currentIndex()).isZero();
@@ -1056,7 +1128,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void historyFiltersAndExactPageTotalsAreScopedToTheOwnerAndStoredRevision() throws Exception {
+    void history_whenOwnerUsesFiltersAndPagination_shouldReturnTotalsForOwnedRevision() throws Exception {
+        // Arrange
         var lesson = create("History filter lesson", List.of(new Sentence("Hello there.", 0.0, 3.0)));
         service.publish(lesson.id(), lesson.version());
         String completed = null;
@@ -1085,6 +1158,7 @@ class DictationIntegrationTests {
         service.publish(other.id(), other.version());
         start(5042, other.id());
         start(5043, lesson.id());
+        // Act
         var firstPage = service.history(5042, "", "", "", "", 0, 20);
         var secondPage = service.history(5042, "", "", "", "", 1, 20);
         assertThat(firstPage.total()).isEqualTo(2);
@@ -1129,6 +1203,7 @@ class DictationIntegrationTests {
             USER + "/attempts?keyword=History&level=B1&topic=Workplace&status=COMPLETED",
             null
         );
+        // Assert
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(json.readTree(response.body()).path("data").path("total").asLong()).isZero();
         assertThat(
@@ -1137,7 +1212,9 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void draftCanHaveNoTimingButPublishingRejectsMissingOverlappingOrOutOfBoundsTimes() {
+    void publish_whenDraftTimingIsMissingOverlappingOrInvalid_shouldRejectPublication() {
+        // Arrange
+        // Act
         for (var rows : List.of(
             List.of(new Sentence("No timing.", null, null)),
             List.of(new Sentence("First.", 0.0, 4.0), new Sentence("Second.", 3.0, 5.0))
@@ -1147,13 +1224,15 @@ class DictationIntegrationTests {
                 com.elearning.learning.common.exception.DictationValidationException.class
             );
         }
+        // Assert
         assertThatThrownBy(() ->
             create("Beyond audio", List.of(new Sentence("Hello.", 999.0, 1000.0)))
         ).isInstanceOf(com.elearning.learning.common.exception.DictationValidationException.class);
     }
 
     @Test
-    void overlongEndTimesUseTheExactAudioEndForDraftsAndDirectPublication() {
+    void publish_whenEndTimeExceedsDuration_shouldClampToExactAudioEnd() {
+        // Arrange
         String key = UUID.randomUUID() + ".mp3";
         jdbc.update(
             "INSERT INTO dictation_audio (audio_key, original_name, duration_seconds) VALUES (?, ?, ?)",
@@ -1171,6 +1250,7 @@ class DictationIntegrationTests {
         );
         var request = new SaveRequest(definition, 0);
         var draft = service.save(null, request);
+        // Act
         assertThat(draft.definition().sentences().getFirst().end()).isEqualTo(35.8);
         service.publish(draft.id(), draft.version());
         assertThat(start(5095, draft.id()).sentences().getFirst().end()).isEqualTo(35.8);
@@ -1191,6 +1271,7 @@ class DictationIntegrationTests {
                 0
             )
         );
+        // Assert
         assertThat(shorter.definition().sentences().getFirst().end()).isEqualTo(35.0);
         assertThatThrownBy(() ->
             service.saveAndPublish(
@@ -1211,7 +1292,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void directPublicationCreatesAndUpdatesWithoutASeparateDraftSave() throws Exception {
+    void publish_whenDefinitionIsProvided_shouldCreateOrUpdateWithoutSeparateDraft() throws Exception {
+        // Arrange
         var definition = new Definition(
             "Direct publication",
             "",
@@ -1227,6 +1309,7 @@ class DictationIntegrationTests {
             ADMIN + "/publish",
             json.writeValueAsString(new SaveRequest(definition, 0))
         );
+        // Act
         assertThat(response.statusCode()).isEqualTo(201);
         String id = json.readTree(response.body()).path("data").path("id").asString();
         var original = service.adminDetail(id);
@@ -1248,6 +1331,7 @@ class DictationIntegrationTests {
             request(5091L, true, "POST", ADMIN + "/" + id + "/publish", payload).statusCode()
         ).isEqualTo(200);
         var current = service.adminDetail(id);
+        // Assert
         assertThat(current.version()).isEqualTo(2);
         assertThat(current.definition()).isEqualTo(updated);
         assertThat(current.hasDraft()).isFalse();
@@ -1272,7 +1356,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void invalidDirectPublicationDoesNotLeaveAPartialLessonOrOverwritePublishedContent() throws Exception {
+    void publish_whenDefinitionIsInvalid_shouldAvoidPartialLessonOrOverwritingPublishedContent() throws Exception {
+        // Arrange
         int before = jdbc.queryForObject("SELECT COUNT(*) FROM dictation_exercises", Integer.class);
         var invalid = new Definition(
             "Invalid publication",
@@ -1282,6 +1367,7 @@ class DictationIntegrationTests {
             sampleAudioKey,
             List.of(new Sentence("Missing end.", 0.0, null))
         );
+        // Act
         assertThat(
             request(
                 5093L,
@@ -1296,6 +1382,7 @@ class DictationIntegrationTests {
         );
         var draft = create("Preserved publication", List.of(new Sentence("Keep these words.", 0.0, 3.0)));
         var published = service.publish(draft.id(), draft.version());
+        // Assert
         assertThat(
             request(
                 5093L,
@@ -1309,10 +1396,13 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void mergedTemplateImportsLessonDetailsAndAllowsTranscriptOnlyImport() throws Exception {
+    void importWorkbook_whenWorkbookHasMetadataOrTranscriptOnly_shouldReturnAvailableFields() throws Exception {
+        // Arrange
         byte[] template = workbooks.template();
         var samples = workbooks.parse(xlsx(template));
+        // Act
         assertThat(samples.errors()).isEmpty();
+        // Assert
         assertThat(samples.sentences()).hasSize(2);
         assertThat(samples.sentences().getFirst().text()).isEqualTo("Thank you for joining us today.");
         assertThat(samples.sentences().get(1).start()).isEqualTo(4.0);
@@ -1371,7 +1461,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void inboxPublishesYouTubeWorkbooksAndRecognizesAnAlreadyImportedLesson(@TempDir Path inbox) throws Exception {
+    void scan_whenYouTubeWorkbookWasAlreadyImported_shouldAvoidRepublishingLesson(@TempDir Path inbox) throws Exception {
+        // Arrange
         String title = "What day is it today?";
         String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
         byte[] first = lessonWorkbook(title, "https://youtu.be/_R7nrvhNmrI?t=7", "1:32");
@@ -1379,6 +1470,7 @@ class DictationIntegrationTests {
         Files.write(inbox.resolve("~$conversation.xlsx"), first);
         Files.createDirectory(inbox.resolve("clips.xlsx"));
         var importer = workbookImporter(inbox);
+        // Act
         importer.scan();
         assertThat(service.catalog(5098, title, "", "", 0, 12, false).items()).isEmpty();
 
@@ -1414,13 +1506,15 @@ class DictationIntegrationTests {
         }
         service.visibility(id, true);
         workbookImporter(inbox).scan();
+        // Assert
         assertThat(service.catalog(5098, title, "", "", 0, 12, false).items()).isEmpty();
         assertThat(service.catalog(0, title, "", "", 0, 12, true).items()).extracting(Item::id).containsExactly(id);
         assertThat(service.adminDetail(id).archived()).isTrue();
     }
 
     @Test
-    void inboxPublishesOtherBooksAndRetriesAWorkbookAfterItIsCorrected(@TempDir Path inbox) throws Exception {
+    void scan_whenWorkbookIsCorrectedAfterFailure_shouldRetryImportAndPublish(@TempDir Path inbox) throws Exception {
+        // Arrange
         String keyword = "VPS workbook validation";
         String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
         Files.write(inbox.resolve("bad-link.xlsx"), lessonWorkbook(keyword + " bad link", "https://example.org/a", "92"));
@@ -1429,6 +1523,7 @@ class DictationIntegrationTests {
         Files.write(inbox.resolve("bad-duration.xlsx"), lessonWorkbook(keyword + " bad duration", url, "0"));
         Files.write(inbox.resolve("bad-timing.xlsx"), lessonWorkbook(keyword + " bad timing", url, "3"));
         Files.write(inbox.resolve("blank-title.xlsx"), lessonWorkbook("", url, "92"));
+        // Act
         byte[] missingTopic = lessonWorkbook(keyword + " missing topic", "", "B1", url, "92");
         Files.write(inbox.resolve("missing-topic.xlsx"), missingTopic);
         assertThatThrownBy(() -> workbooks.parseLesson(missingTopic)).hasMessageContaining("Chưa điền mục “Chủ đề”");
@@ -1449,17 +1544,20 @@ class DictationIntegrationTests {
 
         Files.write(inbox.resolve("partially-copied.xlsx"), lessonWorkbook(keyword + " corrected", url, "92"));
         importer.scan();
+        // Assert
         assertThat(service.catalog(5099, keyword, "", "", 0, 12, false).items())
             .extracting(Item::title).containsExactlyInAnyOrder(keyword + " valid", keyword + " corrected");
     }
 
     @Test
-    void concurrentInboxScansPublishASingleLesson(@TempDir Path inbox) throws Exception {
+    void scan_whenInboxScansAreConcurrent_shouldPublishOneLesson(@TempDir Path inbox) throws Exception {
+        // Arrange
         String title = "VPS workbook concurrent import";
         Files.write(
             inbox.resolve("conversation.xlsx"),
             lessonWorkbook(title, "https://www.youtube.com/watch?v=_R7nrvhNmrI", "92")
         );
+        // Act
         try (var executor = Executors.newFixedThreadPool(2)) {
             var first = executor.submit(workbookImporter(inbox)::scan);
             var second = executor.submit(workbookImporter(inbox)::scan);
@@ -1467,6 +1565,7 @@ class DictationIntegrationTests {
             second.get();
         }
         var items = service.catalog(0, title, "", "", 0, 12, true).items();
+        // Assert
         assertThat(items).hasSize(1);
         assertThat(jdbc.queryForList(
             "SELECT exercise_id FROM dictation_workbook_imports WHERE exercise_id=?", String.class, items.getFirst().id()
@@ -1474,7 +1573,10 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void importReportsRowsAndRejectsFormulasAndUnknownLayouts() throws Exception {
+    void importWorkbook_whenWorkbookHasFormulasOrUnknownLayout_shouldReportRowErrors() throws Exception {
+        // Arrange
+        // Act
+
         try (
             var workbook = new XSSFWorkbook(new ByteArrayInputStream(workbooks.template()));
             var output = new java.io.ByteArrayOutputStream()
@@ -1485,6 +1587,7 @@ class DictationIntegrationTests {
             row.getCell(2).setCellValue("2 seconds");
             workbook.write(output);
             var result = workbooks.parse(xlsx(output.toByteArray()));
+            // Assert
             assertThat(result.errors())
                 .hasSize(2)
                 .allSatisfy(error -> assertThat(error.row()).isEqualTo(TEMPLATE_FIRST_SENTENCE_ROW + 1));
@@ -1514,7 +1617,9 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void httpEnforcesAuthenticationAdminRoleValidationAndBinaryAudio() throws Exception {
+    void handleRequest_whenDictationRoutesReceiveForbiddenOrInvalidCalls_shouldEnforceRoleAndServeAuthorizedAudio() throws Exception {
+        // Arrange
+        // Act
         for (String path : List.of(ADMIN, ADMIN + "/template", ADMIN + "/audio/" + sampleAudioKey))
             assertThat(request(5010L, false, "GET", path, null).statusCode()).isEqualTo(403);
         var template = request(5010L, true, "GET", ADMIN + "/template", null);
@@ -1542,14 +1647,17 @@ class DictationIntegrationTests {
             ).statusCode()
         ).isEqualTo(400);
         var bytes = request(5010L, false, "GET", USER + "/attempts/" + attempt.id() + "/audio", null);
+        // Assert
         assertThat(bytes.statusCode()).isEqualTo(200);
         assertThat(bytes.body()).isEqualTo(silentMp3());
         assertThat(bytes.headers().firstValue("content-type")).hasValue("audio/mpeg");
     }
 
     @Test
-    void mp3UploadIsValidatedAndStoredOutsideSource() throws Exception {
+    void upload_whenMp3IsValidOrInvalid_shouldStoreValidAudioOutsideSourceAndRejectInvalidInput() throws Exception {
+        // Arrange
         byte[] bytes = silentMp3();
+        // Act
         var uploaded = audio.upload(new MockMultipartFile("file", "picnic.mp3", "audio/mpeg", bytes));
         try {
             assertThat(uploaded.duration()).isBetween(31.0, 32.0);
@@ -1558,6 +1666,7 @@ class DictationIntegrationTests {
             jdbc.update("DELETE FROM dictation_audio WHERE audio_key=?", uploaded.key());
             Files.deleteIfExists(Path.of("./target/dictation-test-uploads").resolve(uploaded.key()));
         }
+        // Assert
         assertThatThrownBy(() ->
             audio.upload(
                 new MockMultipartFile(

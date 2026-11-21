@@ -16,9 +16,11 @@ class CategoryServiceTests {
     final CategoryService service = new CategoryService(repository);
 
     @Test
-    void createsNormalizedCategoryAndPreservesVisibilityOnPartialUpdate() {
+    void updateCategory_whenCategoryFieldsArePartial_shouldNormalizeNewValuesAndPreserveVisibility() {
+        // Arrange
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         var created = service.create(new CategoryRequest("  Business English  ", "  Description  ", false));
+        // Act
         assertThat(created.name()).isEqualTo("Business English");
         assertThat(created.slug()).isEqualTo("business-english");
         assertThat(created.description()).isEqualTo("Description");
@@ -26,6 +28,7 @@ class CategoryServiceTests {
         var category = category(1, false);
         when(repository.findById(1L)).thenReturn(Optional.of(category));
         var updated = service.update(1L, new CategoryRequest(" Renamed ", null, null));
+        // Assert
         assertThat(updated.slug()).isEqualTo("renamed");
         assertThat(updated.description()).isNull();
         assertThat(updated.active()).isFalse();
@@ -33,27 +36,33 @@ class CategoryServiceTests {
     }
 
     @Test
-    void duplicateSlugsAndMissingCategoriesAreRejectedWithoutSaving() {
+    void createCategory_whenSlugIsDuplicateOrCategoryMissing_shouldRejectWithoutSaving() {
+        // Arrange
         when(repository.existsBySlug("english")).thenReturn(true);
+        // Act
         assertThatThrownBy(() -> service.create(new CategoryRequest("English", null, null))).isInstanceOf(AppException.class);
         when(repository.findById(1L)).thenReturn(Optional.of(category(1, true)));
+        // Assert
         assertThatThrownBy(() -> service.update(1L, new CategoryRequest("English", null, null))).isInstanceOf(AppException.class);
         assertThatThrownBy(() -> service.get(999L)).isInstanceOf(AppException.class);
         verify(repository, never()).save(any());
     }
 
     @Test
-    void publicListExcludesArchivedCategoriesWhileAdminCanRestoreThem() {
+    void listCategories_whenCategoryIsArchived_shouldHideFromPublicAndAllowAdminRestore() {
+        // Arrange
         var active = category(1, true);
         var archived = category(2, false);
         when(repository.findAll(any(Sort.class))).thenReturn(List.of(active, archived));
         when(repository.findById(1L)).thenReturn(Optional.of(active));
         when(repository.findById(2L)).thenReturn(Optional.of(archived));
+        // Act
         assertThat(service.list()).extracting("id").containsExactly(1L);
         assertThat(service.adminList()).hasSize(2);
         assertThat(service.get(1L).active()).isTrue();
         assertThatThrownBy(() -> service.get(2L)).isInstanceOf(AppException.class);
         service.delete(1L);
+        // Assert
         assertThat(active.isActive()).isFalse();
         verify(repository, never()).delete(any());
     }

@@ -13,7 +13,8 @@ import tools.jackson.databind.json.JsonMapper;
 class GatewayExceptionHandlerTests {
 
     @Test
-    void normalizesConnectionTimeoutAndUnexpectedFailures() {
+    void handleException_whenUpstreamFailsOrTimesOut_shouldReturnSafeGatewayStatus() {
+        // Arrange
         var mapper = JsonMapper.builder().build();
         var handler = new GatewayExceptionHandler(mapper);
         Throwable[] errors = {
@@ -24,6 +25,7 @@ class GatewayExceptionHandlerTests {
         int[] statuses = { 503, 504, 500 };
         String[] codes = { "SERVICE_UNAVAILABLE", "GATEWAY_TIMEOUT", "GATEWAY_ERROR" };
         for (int i = 0; i < errors.length; i++) {
+            // Act
             var exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/v1/courses?secret=hidden")
             );
@@ -32,6 +34,7 @@ class GatewayExceptionHandlerTests {
             String body = exchange.getResponse().getBodyAsString().block();
             assertThat(body).doesNotContain("hidden", "private-host", "internal", "trace");
             var json = mapper.readTree(body);
+            // Assert
             assertThat(json.get("code").asString()).isEqualTo(codes[i]);
             assertThat(json.get("path").asString()).isEqualTo("/api/v1/courses");
             assertThat(json.get("errors").isNull()).isTrue();

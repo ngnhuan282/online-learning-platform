@@ -125,14 +125,24 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void startsWithoutBusinessServicesOrDatabase() throws Exception {
-        assertThat(request("/actuator/health", null, "GET", null).statusCode()).isEqualTo(200);
+    void checkHealth_whenBusinessServicesAreOffline_shouldStartGatewayAndReportLiveness() throws Exception {
+        // Arrange
+        // Act
+
+        var actualStatusCode = request("/actuator/health", null, "GET", null).statusCode();
+
+        // Assert
+        assertThat(actualStatusCode).isEqualTo(200);
         assertThat(request("/v3/api-docs", null, "GET", null).body()).startsWith("/v3/api-docs|");
     }
 
     @Test
-    void readinessTracksDependenciesWhileLivenessStaysUpAndDetailsRemainPrivate() throws Exception {
+    void checkReadiness_whenDependencyBecomesUnavailable_shouldReportNotReadyWithoutExposingDetails() throws Exception {
+        // Arrange
+
+        // Act
         assertThat(request("/actuator/health/readiness", null, "GET", null).statusCode()).isEqualTo(200);
+        // Assert
         dependencyUp = false;
         try {
             var readiness = request("/actuator/health/readiness", null, "GET", null);
@@ -145,10 +155,15 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void routesAllSixNamespacesAndStripsSpoofedHeaders() throws Exception {
+    void routeRequest_whenRequestsUseSupportedNamespaces_shouldForwardToServicesAndRemoveSpoofedHeaders() throws Exception {
+        // Arrange
+
         for (String namespace : new String[] { "auth", "users", "courses", "learning", "payments", "ai" }) {
             String path = "/api/v1/" + namespace + "/probe";
+            // Act
             var response = request(path, token(60), "GET", null);
+
+            // Assert
             assertThat(response.statusCode()).isEqualTo(200);
             assertThat(response.body()).isEqualTo(path + "|null|null|null|true");
             assertThat(response.headers().firstValue("X-Request-ID")).isPresent();
@@ -156,13 +171,16 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void protectsPaymentRoutesAndForwardsOnlyValidatedAuthorization() throws Exception {
+    void filter_whenPaymentRequestRequiresAuthentication_shouldForwardOnlyValidatedAuthorization() throws Exception {
+        // Arrange
         String path = "/api/v1/payments/history";
+        // Act
         assertThat(request(path, null, "GET", null).statusCode()).isEqualTo(401);
         assertThat(request(path, "broken", "GET", null).statusCode()).isEqualTo(401);
         assertThat(request(path, token(-60), "GET", null).statusCode()).isEqualTo(401);
 
         var response = request(path, token(60), "GET", null);
+        // Assert
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo(path + "|null|null|null|true");
         assertThat(response.headers().firstValue("X-Test-Payment-Client-IP"))
@@ -170,8 +188,14 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void permitsOnlyExplicitGuestOperations() throws Exception {
-        assertThat(request("/api/v1/auth/login", null, "POST", null).statusCode()).isEqualTo(200);
+    void filter_whenGuestRequestsApi_shouldPermitOnlyPublicOperations() throws Exception {
+        // Arrange
+        // Act
+
+        var actualStatusCode = request("/api/v1/auth/login", null, "POST", null).statusCode();
+
+        // Assert
+        assertThat(actualStatusCode).isEqualTo(200);
         assertThat(request("/api/v1/auth/register", null, "POST", null).statusCode()).isEqualTo(200);
         assertThat(request("/api/v1/courses", null, "GET", null).statusCode()).isEqualTo(200);
         assertThat(request("/api/v1/auth/private", null, "GET", null).statusCode()).isEqualTo(401);
@@ -180,7 +204,9 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void permitsOnlyExactGetVnpayCallbacksWithoutRelaxingPaymentAuth() throws Exception {
+    void filter_whenRequestTargetsVnpayCallback_shouldRequireExplicitPathAndGetMethod() throws Exception {
+        // Arrange
+        // Act
         for (String suffix : new String[] {"return", "ipn"}) {
             String path = "/api/v1/payments/vnpay/" + suffix;
             var result = request(path + "?vnp_Amount=1&vnp_SecureHash=invalid", null, "GET", null);
@@ -189,13 +215,18 @@ class ApiGatewayApplicationTests {
             assertThat(request(path, null, "POST", null).statusCode()).isEqualTo(401);
             assertThat(request(path + "/private", null, "GET", null).statusCode()).isEqualTo(401);
         }
+        // Assert
         assertThat(request("/api/v1/payments/checkout", null, "POST", null).statusCode()).isEqualTo(401);
         assertThat(request("/api/v1/payments/admin/analytics", null, "GET", null).statusCode()).isEqualTo(401);
     }
 
     @Test
-    void forwardsMediaAndLessonResourceRoutesWithValidAuth() throws Exception {
+    void routeRequest_whenMediaRequestHasValidToken_shouldForwardLessonAndResourceRequests() throws Exception {
+        // Arrange
+        // Act
         String adminToken = token(60);
+
+        // Assert
         assertThat(request("/api/v1/media/download/documents/test.txt", null, "GET", null).statusCode()).isEqualTo(200);
         assertThat(request("/api/v1/lessons/42/resources", null, "GET", null).statusCode()).isEqualTo(200);
         assertThat(request("/api/v1/admin/media/upload", adminToken, "POST", null).statusCode()).isEqualTo(200);
@@ -203,11 +234,16 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void normalizesAuthenticationErrorsWithCors() throws Exception {
+    void handleException_whenAuthenticationFails_shouldReturnSafeErrorWithCorsHeaders() throws Exception {
+        // Arrange
+
         for (String jwt : new String[] { "broken", token(-60) }) {
             var response = request("/api/v1/users/me", jwt, "GET", "http://localhost:5173");
             assertThat(response.statusCode()).isEqualTo(401);
+            // Act
             var json = mapper.readTree(response.body());
+
+            // Assert
             assertThat(json.get("success").asBoolean()).isFalse();
             assertThat(json.get("code").asString()).isEqualTo("UNAUTHORIZED");
             assertThat(json.get("path").asString()).isEqualTo("/api/v1/users/me");
@@ -220,20 +256,25 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void handlesPreflightAndUnknownRoutes() throws Exception {
+    void routeRequest_whenRequestIsPreflightOrUnmapped_shouldReturnCorsOrNotFound() throws Exception {
+        // Arrange
         var preflight = request("/api/v1/users/me", null, "OPTIONS", "http://localhost:5173");
+        // Act
         assertThat(preflight.statusCode()).isEqualTo(200);
         assertThat(preflight.headers().firstValue("X-Request-ID")).isPresent();
         var rejected = request("/api/v1/users/me", null, "OPTIONS", "https://untrusted.example");
         assertThat(rejected.statusCode()).isEqualTo(403);
         assertThat(mapper.readTree(rejected.body()).get("code").asString()).isEqualTo("FORBIDDEN");
         var missing = request("/api/v1/unknown", token(60), "GET", null);
+        // Assert
         assertThat(missing.statusCode()).isEqualTo(404);
         assertThat(mapper.readTree(missing.body()).get("code").asString()).isEqualTo("NOT_FOUND");
     }
 
     @Test
-    void permitsCookieAuthEndpointsWithoutValidAccessAndEnablesCredentialCors() throws Exception {
+    void filter_whenAuthCookieEndpointHasNoValidAccessToken_shouldAllowCookieOperationsAndCredentialCors() throws Exception {
+        // Arrange
+        // Act
         for (String path : new String[] { "/api/v1/auth/refresh", "/api/v1/auth/logout",
             "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password",
             "/api/v1/auth/google/start", "/api/v1/auth/google/exchange" }) {
@@ -251,11 +292,14 @@ class ApiGatewayApplicationTests {
         var config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("*"));
         config.setAllowCredentials(true);
+        // Assert
         assertThatThrownBy(config::validateAllowCredentials).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void permitsOnlyExactGoogleBrowserEndpointsWithoutJwt() throws Exception {
+    void filter_whenRequestTargetsGoogleBrowserEndpoint_shouldMatchOnlyExplicitPublicEndpoints() throws Exception {
+        // Arrange
+        // Act
         for (String path : List.of(
             "/api/v1/auth/google/authorize/google",
             "/api/v1/auth/google/callback/google"
@@ -265,14 +309,20 @@ class ApiGatewayApplicationTests {
             assertThat(response.body()).startsWith(path + "|null|null|null|false");
             assertThat(request(path, null, "POST", null).statusCode()).isEqualTo(401);
         }
+        // Assert
         assertThat(request("/api/v1/auth/google/private", null, "GET", null).statusCode()).isEqualTo(401);
     }
 
     @Test
-    void googleLinkAndMethodStatusRequireJwtAtGateway() throws Exception {
+    void filter_whenGuestRequestsGoogleLinkOrMethodStatus_shouldRequireValidToken() throws Exception {
+        // Arrange
+
         for (String path : List.of("/api/v1/auth/google/link/start", "/api/v1/auth/google/link/complete",
             "/api/v1/users/me/linked-accounts")) {
+            // Act
             String method = path.endsWith("linked-accounts") ? "GET" : "POST";
+
+            // Assert
             assertThat(request(path, null, method, null).statusCode()).isEqualTo(401);
             assertThat(request(path, token(60), method, null).statusCode()).isEqualTo(200);
         }

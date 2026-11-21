@@ -25,11 +25,13 @@ class DictationMigrationTests {
     private static final String YOUTUBE_URL = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
 
     @Test
-    void v14ToV16ExtendMainWithoutChangingItsHistoryOrExistingSettings() {
+    void migrate_whenDatabaseStartsAtVersionFourteen_shouldPreserveExistingHistoryAndSettings() {
+        // Arrange
         String url = "jdbc:h2:mem:dictation-main-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         var source = new DriverManagerDataSource(url, "sa", "");
         FluentConfiguration config = Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""));
+        // Act
         config.target("13").load().migrate();
         var jdbc = new JdbcTemplate(source);
         String mainHistory = "SELECT \"version\",\"script\",\"checksum\" FROM \"flyway_schema_history\" "
@@ -39,6 +41,7 @@ class DictationMigrationTests {
 
         var migrated = config.target("16").load().migrate();
 
+        // Assert
         assertThat(migrated.migrationsExecuted).isEqualTo(3);
         assertThat(jdbc.queryForList(mainHistory)).isEqualTo(before).hasSize(13);
         assertThat(jdbc.queryForObject("SELECT lesson_xp FROM engagement_settings WHERE id=1", Integer.class))
@@ -49,11 +52,13 @@ class DictationMigrationTests {
     }
 
     @Test
-    void v16PreservesCompletedLegacyScoresAndMovesUnfinishedChecksToLiveScoring() {
+    void migrate_whenLegacyAttemptsAreCompletedOrUnfinished_shouldPreserveScoresAndMoveUnfinishedToLiveScoring() {
+        // Arrange
         String url = "jdbc:h2:mem:dictation-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         var source = new DriverManagerDataSource(url, "sa", "");
         FluentConfiguration config = Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""));
+        // Act
         config.target("15").load().migrate();
         var jdbc = new JdbcTemplate(source);
         var grader = new DictationGrader();
@@ -108,6 +113,7 @@ class DictationMigrationTests {
             .allSatisfy(edit -> assertThat(edit.expected()).isNull());
         assertThat(unfinished.accuracy()).isEqualTo(66.7);
         var corrected = service.progress(7001, live, new AnswerRequest(0, "We enjoyed it"));
+        // Assert
         assertThat(corrected.completed()).isEqualTo(1);
         assertThat(corrected.accuracy()).isEqualTo(100);
         assertThat(corrected.responses().getFirst().firstAccuracy()).isEqualTo(100);
@@ -150,13 +156,15 @@ class DictationMigrationTests {
     }
 
     @Test
-    void v24DeletesTheYouTubeStarterWithItsExistingProgress() {
+    void migrate_whenYouTubeStarterExists_shouldRemoveStarterAndItsProgress() {
+        // Arrange
         var source = new DriverManagerDataSource(
             "jdbc:h2:mem:dictation-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
         );
         var config = Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""
         ));
+        // Act
         config.target("23").load().migrate();
         var jdbc = new JdbcTemplate(source);
         var audio = mock(DictationAudioService.class);
@@ -188,6 +196,7 @@ class DictationMigrationTests {
         assertThat(config.target("24").load().migrate().migrationsExecuted).isEqualTo(1);
         config.load().validate();
 
+        // Assert
         assertThat(service.catalog(7021, "", "", "", 0, 12, false).items()).isEmpty();
         assertThat(service.history(7021, "", "", "", "", 0, 12).items()).isEmpty();
         assertThat(jdbc.queryForList("SELECT id FROM dictation_exercises WHERE id=?", String.class, YOUTUBE_STARTER))

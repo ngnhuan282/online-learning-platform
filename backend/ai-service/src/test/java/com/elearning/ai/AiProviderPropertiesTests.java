@@ -18,8 +18,11 @@ import org.springframework.core.io.ClassPathResource;
 class AiProviderPropertiesTests {
 
     @Test
-    void optionalEnvironmentVariablesHaveSafeDefaults() {
+    void bindProperties_whenOptionalSettingsAreMissing_shouldApplySafeDefaults() {
+        // Arrange
+        // Act
         context(Map.of()).run(context -> {
+            // Assert
             assertThat(context).hasNotFailed();
             AiProviderProperties properties = context.getBean(AiProviderProperties.class);
             assertThat(properties.getApiKey()).isEmpty();
@@ -32,10 +35,13 @@ class AiProviderPropertiesTests {
     }
 
     @Test
-    void bindsComposeEnvironmentVariablesThroughApplicationConfiguration() {
+    void bindProperties_whenComposeVariablesAreSet_shouldLoadConfiguredValues() {
+        // Arrange
+        // Act
         context(
             Map.of("AI_API_KEY", "test-ai-key", "AI_MODEL", "test-model", "AI_REQUEST_TIMEOUT_MS", "9000")
         ).run(context -> {
+            // Assert
             assertThat(context).hasNotFailed();
             AiProviderProperties properties = context.getBean(AiProviderProperties.class);
             assertThat(properties.getApiKey()).isEqualTo("test-ai-key");
@@ -45,9 +51,12 @@ class AiProviderPropertiesTests {
     }
 
     @Test
-    void acceptsBothTimeoutBounds() {
+    void bindProperties_whenTimeoutIsAtEitherBoundary_shouldAcceptConfiguration() {
+        // Arrange
+        // Act
         for (int timeout : new int[] { 1000, 60000 }) {
             context(Map.of("AI_REQUEST_TIMEOUT_MS", Integer.toString(timeout))).run(context -> {
+                // Assert
                 assertThat(context).hasNotFailed();
                 assertThat(context.getBean(AiProviderProperties.class).getRequestTimeoutMs()).isEqualTo(
                     timeout
@@ -57,9 +66,12 @@ class AiProviderPropertiesTests {
     }
 
     @Test
-    void rejectsTimeoutOutsideValidatedRange() {
+    void bindProperties_whenTimeoutIsOutsideAllowedRange_shouldRejectConfiguration() {
+        // Arrange
+        // Act
         for (int timeout : new int[] { 999, 60001 }) {
             context(Map.of("AI_REQUEST_TIMEOUT_MS", Integer.toString(timeout))).run(context -> {
+                // Assert
                 assertThat(context).hasFailed();
                 assertThat(context.getStartupFailure()).hasRootCauseInstanceOf(BindValidationException.class);
             });

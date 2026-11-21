@@ -15,7 +15,8 @@ class AdminOverviewControllerTests {
 
     @Test
     @SuppressWarnings("unchecked")
-    void overviewAggregatesEnrollmentsQuizzesToeicDictationStreaksAndActivity() {
+    void overview_whenLearningActivityExists_shouldAggregateEnrollmentPracticeAndStreakMetrics() {
+        // Arrange
         var ds = new DriverManagerDataSource(
             "jdbc:h2:mem:learning_overview_test;MODE=MySQL;DB_CLOSE_DELAY=-1",
             "sa",
@@ -45,8 +46,10 @@ class AdminOverviewControllerTests {
         );
 
         var controller = new AdminOverviewController(jdbc);
+        // Act
         var data = (Map<String, Object>) controller.overview().data();
 
+        // Assert
         assertThat(data.get("enrollments")).isEqualTo(2L);
         assertThat(data.get("completed")).isEqualTo(1L);
         assertThat(data.get("activeEnrollments")).isEqualTo(1L);

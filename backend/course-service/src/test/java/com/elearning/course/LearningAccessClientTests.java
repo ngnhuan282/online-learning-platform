@@ -15,7 +15,8 @@ import org.slf4j.MDC;
 
 class LearningAccessClientTests {
     @Test
-    void accessRequiresActiveOrCompletedEnrollmentAndFailsClosedDuringUpstreamErrors() throws Exception {
+    void hasAccess_whenEnrollmentIsInactiveOrLookupFails_shouldDenyAccess() throws Exception {
+        // Arrange
         var body = new AtomicReference<>("""
             {"success":true,"data":[{"courseId":1,"status":"ACTIVE"},
              {"courseId":2,"status":"COMPLETED"},{"courseId":3,"status":"CANCELLED"}]}
@@ -35,9 +36,12 @@ class LearningAccessClientTests {
             }
         });
         server.start();
+
         try (var mdc = MDC.putCloseable("requestId", "course-request-1")) {
             var client = new LearningAccessClient("http://127.0.0.1:" + server.getAddress().getPort());
+            // Act
             assertThat(client.isEnrolled(1L, "Bearer test")).isTrue();
+            // Assert
             assertThat(client.isEnrolled(2L, "Bearer test")).isTrue();
             assertThat(client.isEnrolled(3L, "Bearer test")).isFalse();
             assertThat(client.isEnrolled(4L, "Bearer test")).isFalse();

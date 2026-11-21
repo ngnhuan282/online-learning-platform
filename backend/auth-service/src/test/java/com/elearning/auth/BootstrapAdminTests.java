@@ -32,14 +32,17 @@ class BootstrapAdminTests {
     BootstrapAdmin bootstrap;
 
     @Test
-    void createsOneHashedAdministratorAndRepeatedStartupDoesNotResetIt() {
+    void run_whenAdminBootstrapRunsTwice_shouldCreateOnlyOneAdminWithHashedPassword() {
+        // Arrange
         var admin = users.findByEmailIgnoreCase("initial-admin@example.test").orElseThrow();
+        // Act
         assertThat(encoder.matches("InitialAdminTest123!", admin.getPasswordHash())).isTrue();
         assertThat(admin.getRoles())
             .extracting(role -> role.getName())
             .containsExactlyInAnyOrder("USER", "ADMIN");
         String hash = admin.getPasswordHash();
         bootstrap.run(null);
+        // Assert
         assertThat(users.count()).isEqualTo(1);
         assertThat(users.findById(admin.getId()).orElseThrow().getPasswordHash()).isEqualTo(hash);
     }

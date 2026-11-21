@@ -147,7 +147,9 @@ class NotificationIntegrationTests {
     }
 
     @Test
-    void feedPreservesLegacyTypesOrdersTiesAndCountsBeyondTwenty() throws Exception {
+    void listNotifications_whenFeedExceedsDefaultPageSize_shouldPreserveLegacyTypesStableOrderAndUnreadCount() throws Exception {
+        // Arrange
+        // Act
         long owner = USERS.incrementAndGet();
         Instant now = Instant.now();
         for (int i = 0; i < 25; i++) seed(owner, NotificationType.ENROLLMENT, now);
@@ -167,11 +169,14 @@ class NotificationIntegrationTests {
         for (String query : new String[]{"?page=-1", "?size=0", "?size=101", "?category=UNKNOWN"}) {
             assertThat(send("GET", BASE + "/feed" + query, owner, null, null).statusCode()).isEqualTo(400);
         }
+        // Assert
         assertThat(send("GET", BASE + "/summary", null, null, null).statusCode()).isEqualTo(401);
     }
 
     @Test
-    void readsAreOwnedIdempotentAndBulkReadDoesNotTouchAnotherUser() throws Exception {
+    void markRead_whenOwnerReadsOrRepeatsBulkRead_shouldKeepOtherUserRowsUnchanged() throws Exception {
+        // Arrange
+        // Act
         long owner = USERS.incrementAndGet();
         long stranger = USERS.incrementAndGet();
         var n = seed(owner, NotificationType.QUIZ, Instant.now());
@@ -183,6 +188,7 @@ class NotificationIntegrationTests {
         assertThat(read.get("category").asString()).isEqualTo("LEARNING");
         assertThat(data(send("PATCH", path, owner, null, null)).get("readAt")).isEqualTo(read.get("readAt"));
         seed(owner, NotificationType.PROGRESS, Instant.now());
+        // Assert
         assertThat(data(send("GET", BASE + "/feed?unreadOnly=true", owner, null, null))
             .get("totalElements").asLong()).isEqualTo(1);
         assertThat(data(send("PATCH", BASE + "/read-all", owner, null, null))
@@ -193,10 +199,12 @@ class NotificationIntegrationTests {
     }
 
     @Test
-    void receiverRequiresItsKeyValidatesPayloadAndPreservesReadStateOnRetry() throws Exception {
+    void receiveNotification_whenEventIsRetriedOrCredentialIsInvalid_shouldValidateKeyAndPreserveReadState() throws Exception {
+        // Arrange
         long user = USERS.incrementAndGet();
         String event = "{\"eventId\":\"payment-1\",\"userId\":" + user +
             ",\"type\":\"PAYMENT_SUCCESS\",\"orderCode\":\"ORDER-1\"}";
+        // Act
         assertThat(send("POST", EVENTS, user, event, null).statusCode()).isEqualTo(401);
         assertThat(send("POST", EVENTS, user, event, "wrong").statusCode()).isEqualTo(401);
         var created = data(send("POST", EVENTS, null, event, KEY));
@@ -221,12 +229,15 @@ class NotificationIntegrationTests {
         }
         String course = "{\"eventId\":\"course-1\",\"userId\":" + user +
             ",\"type\":\"COURSE_ENROLLED\",\"courseId\":42}";
+        // Assert
         assertThat(data(send("POST", EVENTS, null, course, KEY)).get("actionUrl").asString())
             .isEqualTo("/learning/42");
     }
 
     @Test
-    void concurrentEventRetriesCreateOneNotification() throws Exception {
+    void receiveNotification_whenEventRetriesAreConcurrent_shouldCreateOneNotification() throws Exception {
+        // Arrange
+        // Act
         long user = USERS.incrementAndGet();
         String event = "{\"eventId\":\"concurrent\",\"userId\":" + user +
             ",\"type\":\"PAYMENT_FAILED\",\"orderCode\":\"ORDER-2\"}";
@@ -240,11 +251,14 @@ class NotificationIntegrationTests {
                 assertThat(result).isEqualTo(id);
             }
         }
+        // Assert
         assertThat(repository.countByUserIdAndReadAtIsNull(user)).isEqualTo(1);
     }
 
     @Test
-    void learningTransitionsCreateOneNotificationForEachSuccessfulEvent() throws Exception {
+    void recordTransition_whenLearningEventSucceeds_shouldCreateOneNotificationPerEvent() throws Exception {
+        // Arrange
+        // Act
         long user = USERS.incrementAndGet();
         String enroll = "/api/v1/learning/enrollments";
         data(send("POST", enroll, user, "{\"courseId\":42}", null));
@@ -254,13 +268,16 @@ class NotificationIntegrationTests {
         data(send("PATCH", complete, user, null, null));
         assertThat(repository.countByUserIdAndReadAtIsNull(user)).isEqualTo(2);
         var items = data(send("GET", BASE, user, null, null));
+        // Assert
         assertThat(items.get(0).get("type").asString()).isEqualTo("LESSON_COMPLETED");
         assertThat(items.get(1).get("type").asString()).isEqualTo("COURSE_ENROLLED");
         assertThat(send("PATCH", complete, USERS.incrementAndGet(), null, null).statusCode()).isEqualTo(403);
     }
 
     @Test
-    void streamPublishesOnlyCommittedChangesToItsOwnerAndCleansUp() throws Exception {
+    void subscribe_whenOwnerTransactionCommits_shouldPublishOwnChangesAndCleanUpStream() throws Exception {
+        // Arrange
+        // Act
         long owner = USERS.incrementAndGet();
         long stranger = USERS.incrementAndGet();
         try (var mine = stream(owner, 60); var other = stream(stranger, 60)) {
@@ -286,12 +303,17 @@ class NotificationIntegrationTests {
         }
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (streams.connectionCount(owner) > 0 && System.nanoTime() < deadline) Thread.sleep(25);
+        // Assert
         assertThat(streams.connectionCount(owner)).isZero();
     }
 
     @Test
-    void streamClosesAtTokenExpiryAndRejectsMissingAuthentication() throws Exception {
+    void subscribe_whenTokenExpiresOrIsMissing_shouldCloseStreamOrDenyConnection() throws Exception {
+        // Arrange
+
+        // Act
         assertThat(send("GET", BASE + "/stream", null, null, null).statusCode()).isEqualTo(401);
+        // Assert
         long user = USERS.incrementAndGet();
         try (var stream = stream(user, 2)) {
             assertThat(stream.events.poll(1, TimeUnit.SECONDS)).isEqualTo("connected");

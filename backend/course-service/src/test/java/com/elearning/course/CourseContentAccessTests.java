@@ -64,9 +64,11 @@ class CourseContentAccessTests {
     }
 
     @Test
-    void guestGetsMetadataAndPreviewButNoPrivateContentOrResources() {
+    void loadContent_whenCallerIsGuest_shouldReturnMetadataAndPreviewWithoutPrivateContent() {
+        // Arrange
         Course course = course();
         Lesson privateLesson = lesson(course, false);
+        // Act
         assertThat(access.canReadPrivate(course)).isFalse();
         SectionResponse response = SectionResponse.forReader(privateLesson.getSection(), false, tickets);
         assertThat(response.lessons().getFirst().content()).isNull();
@@ -76,61 +78,78 @@ class CourseContentAccessTests {
 
         Lesson preview = lesson(course, true);
         access.requireLesson(preview);
+        // Assert
         assertThat(SectionResponse.forReader(preview.getSection(), false, tickets).lessons().getFirst().content())
                 .isEqualTo("private-content");
         verifyNoInteractions(learning);
     }
 
     @Test
-    void forwardsValidatedJwtAndRequiresEnrollmentForPrivateLesson() {
+    void authorizeLesson_whenUserRequestsPrivateLesson_shouldRequireEnrollmentAndForwardJwt() {
+        // Arrange
+        // Act
         authenticate("USER");
         Course course = course();
         when(learning.isEnrolled(42L, "Bearer validated-user-jwt")).thenReturn(false, true);
         Lesson lesson = lesson(course, false);
         assertThatThrownBy(() -> access.requireLesson(lesson)).hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
         access.requireLesson(lesson);
+        // Assert
         verify(learning, times(2)).isEnrolled(42L, "Bearer validated-user-jwt");
     }
 
     @Test
-    void draftAndDependencyFailureNeverGrantPrivateAccess() {
+    void authorizeLesson_whenCourseIsDraftOrLearningUnavailable_shouldDenyPrivateAccess() {
+        // Arrange
         Course course = course();
         course.setStatus(CourseStatus.DRAFT);
+        // Act
         assertThatThrownBy(() -> access.requirePublished(course)).hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
         authenticate("USER");
         course.setStatus(CourseStatus.PUBLISHED);
         when(learning.isEnrolled(42L, "Bearer validated-user-jwt")).thenThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE));
+        // Assert
         assertThatThrownBy(() -> access.requireLesson(lesson(course, false)))
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SERVICE_UNAVAILABLE);
     }
 
     @Test
-    void adminCanEditDraftWithoutCallingLearning() {
+    void authorizeLesson_whenAdminEditsDraft_shouldSkipEnrollmentCheck() {
+        // Arrange
+        // Act
         authenticate("ADMIN");
         Course course = course();
         course.setStatus(CourseStatus.DRAFT);
         access.requireLesson(lesson(course, false));
+        // Assert
         assertThat(access.canReadPrivate(course)).isTrue();
         verifyNoInteractions(learning);
     }
 
     @Test
-    void archivedCourseKeepsPurchasedAccessAndRejectsOtherReaders() {
+    void authorizeLesson_whenCourseIsArchived_shouldAllowOnlyPreviouslyPurchasedAccess() {
+        // Arrange
         Course course = course();
         course.setStatus(CourseStatus.ARCHIVED);
+        // Act
         assertThatThrownBy(() -> access.requirePublished(course)).hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
         authenticate("USER");
         when(learning.isEnrolled(42L, "Bearer validated-user-jwt")).thenReturn(false);
         assertThatThrownBy(() -> access.requirePublished(course)).hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
         when(learning.isEnrolled(42L, "Bearer validated-user-jwt")).thenReturn(true);
         access.requireLesson(lesson(course, false));
+        // Assert
         assertThat(access.canReadPrivate(course)).isTrue();
     }
 
     @Test
-    void mediaTicketsAreBoundToObjectAndExpireWithoutAcceptingTampering() {
+    void validateTicket_whenObjectDoesNotMatchOrTicketIsInvalid_shouldRejectDownload() {
+        // Arrange
         String url = tickets.signLocalUrl("/api/v1/media/download/videos/test.mp4");
+        // Act
         var parts = url.split("[?&=]");
+
+        // Assert
         assertThat(tickets.valid("videos/test.mp4", parts[2], parts[4])).isTrue();
         assertThat(tickets.valid("videos/other.mp4", parts[2], parts[4])).isFalse();
         assertThat(tickets.valid("videos/test.mp4", "1", parts[4])).isFalse();
