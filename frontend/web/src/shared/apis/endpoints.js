@@ -24,6 +24,11 @@ export const ENDPOINTS = Object.freeze({
   courses: `${API_PREFIX}/courses`,
   adminCourses: `${API_PREFIX}/admin/courses`,
   categories: `${API_PREFIX}/categories`,
+  community: {
+    topics: `${API_PREFIX}/learning/community/topics`,
+    posts: `${API_PREFIX}/learning/community/posts`,
+  },
+  proPlans: `${API_PREFIX}/payments/pro/plans`,
   toeic: {
     exams: `${API_PREFIX}/learning/toeic/exams`,
     dictionary: `${API_PREFIX}/learning/toeic/dictionary`,

@@ -16,6 +16,7 @@ Object.assign(globalThis, {
   window: dom.window,
   document: dom.window.document,
   Event: dom.window.Event,
+  FormData: dom.window.FormData,
   HTMLElement: dom.window.HTMLElement,
   Node: dom.window.Node,
   DocumentFragment: dom.window.DocumentFragment,
@@ -44,6 +45,7 @@ const { default: NotificationBell } = await load('features/learning/components/N
 const { EngagementContext } = await load('features/engagement/context/EngagementContext.jsx');
 const { NotificationsContext } = await load('features/learning/context/NotificationsContext.jsx');
 const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
+const { default: ProtectedRoute } = await load('routes/ProtectedRoute.jsx');
 const { engagementApi } = await load('features/engagement/api/engagementApi.js');
 const { communityApi } = await load('features/community/api/communityApi.js');
 const { setLocale, t, getIntlLocale } = await load('shared/i18n/locale.js');
@@ -98,7 +100,7 @@ async function render(path, user = { id: 1, roles: ['USER'] }) {
         { value: cache },
         h(
           AuthContext.Provider,
-          { value: { user } },
+          { value: { user, isAuthenticated: Boolean(user) } },
           h(
             MemoryRouter,
             { initialEntries: [path] },
@@ -107,12 +109,16 @@ async function render(path, user = { id: 1, roles: ['USER'] }) {
               Routes,
               null,
               h(Route, { path: '/login', element: h(LoginEcho) }),
-              h(Route, { path: '/payment/gem-checkout', element: h('p', { id: 'gem-checkout-gate' }, 'Gem') }),
+              h(
+                Route,
+                { element: h(ProtectedRoute) },
+                h(Route, { path: '/payment/gem-checkout', element: h('p', { id: 'gem-checkout-gate' }, 'Gem') }),
+                h(Route, { path: '/community/:id', element: h(CommunityPostPage) }),
+              ),
               h(Route, { path: '/achievements', element: h(AchievementsPage) }),
               h(Route, { path: '/shop', element: h(ShopPage) }),
               h(Route, { path: '/leaderboard', element: h(LeaderboardPage) }),
               h(Route, { path: '/community', element: h(CommunityPage) }),
-              h(Route, { path: '/community/:id', element: h(CommunityPostPage) }),
             ),
           ),
         ),
@@ -402,7 +408,7 @@ test('locked discussion disables posting', async () => {
   assert.equal(document.querySelector('textarea'), null);
 });
 
-test('guests preview shop items and top-up packages without balances, and login is required to buy or view inventory', async () => {
+test('guests preview shop items without balances, and login is required to buy or view inventory', async () => {
   let purchaseCalls = 0;
   shopApi.state = async () => ({
     data: {
@@ -433,6 +439,21 @@ test('guests preview shop items and top-up packages without balances, and login 
   assert.equal(document.getElementById('login-gate')?.textContent, 'Login from:/shop');
 });
 
+test('guests preview gem packages and preserve the selected package when redirected to login', async () => {
+  shopApi.state = async () => ({ data: { ...shopFixture(), gems: 0 } });
+
+  await render('/shop?tab=topup', null);
+  assert.equal(document.querySelector('.shop-wallet'), null);
+  const packages = document.querySelectorAll('.topup-card');
+  assert.equal(packages.length, 3);
+
+  await act(async () => packages[1].querySelector('button').click());
+  assert.equal(
+    document.getElementById('login-gate')?.textContent,
+    'Login from:/payment/gem-checkout?package=GEM_500',
+  );
+});
+
 test('guests preview the leaderboard and see a login CTA in place of personal rank', async () => {
   engagementApi.leaderboard = async () => ({
     data: {
@@ -453,4 +474,40 @@ test('guests browse community posts and clicking create post redirects to login'
   assert.equal(document.querySelector('.post-preview h2 a')?.getAttribute('href'), '/community/11');
   await click('Viết bài mới');
   assert.equal(document.getElementById('login-gate')?.textContent, 'Login from:/community');
+});
+
+test('guests can retry a failed forum load, filter posts and open the login gate from a result', async () => {
+  let topics = 0;
+  const filters = [];
+  communityApi.topics = async () => {
+    if (++topics === 1) throw new Error('Temporary failure');
+    return { data: [{ id: 1, code: 'learning' }] };
+  };
+  communityApi.posts = async params => {
+    filters.push(params);
+    return { data: { ...page([post()]).data, totalPages: 3 } };
+  };
+  communityApi.post = async () => assert.fail('Guest must sign in before loading post detail');
+
+  await render('/community?page=1', null);
+  assert.match(document.querySelector('[role="alert"]').textContent, /Không thể tải dữ liệu/);
+  await click('Thử lại');
+  assert.equal(topics, 2);
+  assert.equal(document.querySelector('[role="alert"]'), null);
+
+  await input(document.querySelector('select[aria-label="Chủ đề"]'), '1');
+  await input(document.querySelector('select[aria-label="Loại bài"]'), 'unanswered');
+  await input(document.querySelector('input[aria-label="Tìm kiếm"]'), '  test  ');
+  await act(async () => document.querySelector('form[role="search"]').requestSubmit());
+  assert.deepEqual(filters.at(-1), {
+    page: 0,
+    size: 20,
+    keyword: 'test',
+    topicId: '1',
+    kind: undefined,
+    unanswered: true,
+  });
+
+  await act(async () => document.querySelector('.post-preview h2 a').click());
+  assert.equal(document.getElementById('login-gate')?.textContent, 'Login from:/community/11');
 });

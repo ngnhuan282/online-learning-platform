@@ -272,3 +272,17 @@ test('guests preview Pro plans and pricing, while activation code redirects to l
   await click('Kích hoạt');
   assert.equal(document.getElementById('login-gate')?.textContent, 'Login from:/pro');
 });
+
+test('guest pricing retries an invalid catalog and renders the recovered prices', async () => {
+  let calls = 0;
+  const invalidPlans = [{ code: 'PRO_MONTH', price: -1 }];
+  proApi.plans = async () => ({ data: ++calls === 1 ? invalidPlans : plans });
+
+  await render('/pro', null, null);
+  assert.match(document.querySelector('[role="alert"]').textContent, /Không thể tải dữ liệu/);
+  assert.equal(document.querySelector('.pro-price-block'), null);
+
+  await click('Thử lại');
+  assert.equal(calls, 2);
+  assert.match(document.querySelector('.pro-price-block strong').textContent, /499.000/);
+});

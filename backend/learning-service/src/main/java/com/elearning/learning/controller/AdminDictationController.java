@@ -38,7 +38,7 @@ public class AdminDictationController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "12") int size
     ) {
-        return ApiResponse.success(service.catalog(0, keyword, level, topic, page, size, true, status));
+        return ApiResponse.success(service.catalog(null, keyword, level, topic, page, size, true, status));
     }
 
     @GetMapping("/{id}")

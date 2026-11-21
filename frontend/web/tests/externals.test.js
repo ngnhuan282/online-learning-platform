@@ -6,7 +6,9 @@ import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { JSDOM } from 'jsdom';
-import { getAiErrorMessage, readCapabilities } from '../src/features/ai-assistant/utils/aiState.js';
+import { loadSource } from './load-source.js';
+
+const { getAiErrorMessage, readCapabilities } = await loadSource('../src/features/ai-assistant/utils/aiState.js', import.meta.url);
 
 process.env.VITE_API_URL = 'http://gateway.test';
 const server = await createServer({

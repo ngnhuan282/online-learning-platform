@@ -35,6 +35,29 @@ function cookieFrom(headers) {
 }
 
 await request('/actuator/health/readiness');
+for (const service of [
+  '/learning/community/topics',
+  '/learning/community/posts',
+  '/learning/dictation',
+  '/learning/dictation/topic-groups',
+  '/learning/shop',
+  '/learning/engagement/leaderboard',
+  '/payments/pro/plans',
+]) {
+  const { data } = await request(`/api/v1${service}`);
+  assert.ok(data, `Guest preview payload missing for ${service}`);
+}
+for (const [method, service] of [
+  ['GET', '/learning/community/posts/1'],
+  ['GET', '/learning/dictation/attempts'],
+  ['POST', '/learning/community/posts'],
+  ['POST', '/learning/dictation/exercises/sample/attempts'],
+  ['POST', '/learning/shop/purchases'],
+  ['POST', '/payments/gem/checkout'],
+  ['POST', '/payments/pro/checkout'],
+]) {
+  await request(`/api/v1${service}`, { method, status: 401 });
+}
 for (const path of ['/api/v1/users/me', '/api/v1/learning/enrollments/me', '/api/v1/payments/history']) {
   await request(path, { status: 401 });
   await request(path, { token: 'invalid-jwt', status: 401 });

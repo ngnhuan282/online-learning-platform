@@ -7,13 +7,15 @@ import createCache from '@emotion/cache';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
-import {
+import { loadSource } from './load-source.js';
+
+const {
   getCheckoutErrorMessage,
   getPaymentDisplayStatus,
   getResumePaymentUrl,
   needsPaymentRefresh,
   readCheckoutRedirect,
-} from '../src/features/payment/utils/paymentFlow.js';
+} = await loadSource('../src/features/payment/utils/paymentFlow.js', import.meta.url);
 
 process.env.VITE_API_URL = 'http://gateway.test';
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost:5173' });

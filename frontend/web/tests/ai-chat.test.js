@@ -6,13 +6,15 @@ import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
-import {
+import { loadSource } from './load-source.js';
+
+const {
   mergeMessages,
   readContext,
   getAiErrorMessage,
   groupConversations,
   readUsage,
-} from '../src/features/ai-assistant/utils/aiState.js';
+} = await loadSource('../src/features/ai-assistant/utils/aiState.js', import.meta.url);
 
 process.env.VITE_API_URL = 'http://gateway.test';
 const dom = new JSDOM('<!doctype html><div id="root"></div>', {
