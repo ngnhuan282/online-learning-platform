@@ -73,17 +73,26 @@ Chi tiết nguồn và các hiệu chỉnh đã ghi nhận: [Ghi chú dữ liệ
 | --- | --- |
 | `backend/learning-service/src/main/resources/toeic/ets2024-reading.json` | 10 bộ đề, 40 bản ghi bài học, 1.000 câu, đáp án và lời giải; chỉ đóng gói ở backend |
 | `frontend/web/public/toeic-assets/ets2024-reading/` | Hình câu hỏi và đoạn đọc từ đề không có đáp án |
-| `frontend/web/resources/toeic/test01.tar.gz` … `test10.tar.gz` | Mười gói ảnh được commit; ảnh trong `public` là dữ liệu giải nén tự động, không commit riêng |
+| `$TOEIC_ARCHIVES_DIR/toeic/test01.tar.gz` … `test10.tar.gz` | Mười gói ảnh Reading lưu ngoài Git. Frontend giải nén chúng vào `public` |
 | `docs/learning/TOEIC_SOURCE_AUDIT.json` | Tham chiếu nguồn, SHA-256, kết quả đối chiếu và hiệu chỉnh |
 | `infra/scripts/toeic/source-overrides/` | Bằng chứng đối chiếu và hiệu chỉnh nguồn; không dùng khi ứng dụng chạy |
 
 Không chép JSON chứa đáp án vào `public` hoặc import nó từ frontend. Learning Service
 nạp seed khi khởi động; Admin có thể chỉnh nội dung đã nạp trong database.
 
-Mười gói ảnh đã được tạo sẵn và cần được giữ trong repo để máy khác có thể chạy website.
-`npm run dev`, `npm run build` và `npm test` tự giải nén các gói bằng `tar` có sẵn
-trên Windows/Linux. Có thể chuẩn bị ảnh thủ công bằng `npm run prepare:toeic` trong
-`frontend/web`. Bài học, câu hỏi và đường dẫn ảnh không thay đổi.
+Lấy 19 gói từ thư mục dữ liệu trên VPS và đặt `TOEIC_ARCHIVES_DIR` trỏ tới thư mục
+chứa `toeic` và `toeic-listening`. Ví dụ khi chạy local trên PowerShell trong `frontend/web`:
+
+```powershell
+$env:TOEIC_ARCHIVES_DIR = 'D:\toeic-data'
+npm run dev
+```
+
+`npm run dev`, `npm run build` và `npm test` đối chiếu checksum và giải nén media khi
+có bộ gói. Dùng `npm run prepare:toeic` để chạy riêng bước chuẩn bị và yêu cầu có đầy
+đủ các gói. CI có thể chạy build và kiểm thử cấu trúc đề bằng dữ liệu thử nhỏ. Khi cung
+cấp bộ gói thật, kiểm thử cũng đối chiếu ảnh/audio mà câu hỏi tham chiếu.
+Xem [cách cấu hình production](../deployment/PRODUCTION.md#2-kiểm-tra-cấu-hình-tạo-admin-và-khởi-động).
 Ảnh tùy chỉnh mới nên đặt ngoài thư mục sinh tự động `ets2024-reading` để được Git theo dõi.
 
 ## 5. Tạo và sửa nội dung tiếp theo bằng Admin
@@ -190,7 +199,7 @@ câu hỏi và bốn lựa chọn. Dùng cùng đường dẫn MP3 cho ba câu l
 nhóm. **Xem trước câu hỏi** để kiểm tra bản cắt trước khi lưu và xuất bản.
 
 Dữ liệu phát hành nằm trong `ets2024-listening.json` của Learning Service và chín
-gói media trong `frontend/web/resources/toeic-listening`. Lệnh `npm run prepare:toeic`
+gói media trong `$TOEIC_ARCHIVES_DIR/toeic-listening`. Lệnh `npm run prepare:toeic`
 giải nén ảnh và audio khi chạy frontend. Learning Service tự chạy migration V22 và
 thêm các đề Listening khi khởi động với chức năng seed bật.
 

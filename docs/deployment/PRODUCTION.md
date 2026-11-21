@@ -39,6 +39,26 @@ trình duyệt phải truy cập được endpoint public qua HTTPS.
 
 ## 2. Kiểm tra cấu hình, tạo admin và khởi động
 
+### Chuẩn bị ảnh và audio TOEIC
+
+Trước khi merge bản bỏ các gói khỏi Git, sao chép 10 gói Reading và 9 gói Listening
+vào thư mục `.tmp/toeic-data` trong repo trên VPS. Nếu các gói vẫn nằm trong
+`frontend/web/resources`, chạy lệnh sau một lần.
+
+```bash
+cd "$HOME/online-learning-platform"
+mkdir -p .tmp/toeic-data
+cp -an -- frontend/web/resources/toeic frontend/web/resources/toeic-listening .tmp/toeic-data/
+```
+
+Script mặc định đọc hai thư mục con `toeic` và `toeic-listening` từ `.tmp/toeic-data`.
+Git bỏ qua `.tmp`. Nếu tải các gói lên vị trí khác, đặt `TOEIC_ARCHIVES_DIR` bằng đường
+dẫn thư mục đó trong `.env.production`. `check` đối chiếu SHA-256 của từng gói với
+manifest. `up` đưa bộ gói đã xác minh vào build Docker để frontend tiếp tục phục vụ
+qua `/toeic-assets/`. Giữ một bản sao riêng để có thể khôi phục khi clone lại repo hoặc
+dọn các file Git bỏ qua. Có thể tìm tên và checksum các gói trong
+[`toeic-archives.json`](../../frontend/web/resources/toeic-archives.json).
+
 ```powershell
 node infra/scripts/production.mjs check --env-file .env.production --project sgsphere-production
 node infra/scripts/production.mjs up --env-file .env.production --project sgsphere-production
