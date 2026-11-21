@@ -1141,7 +1141,7 @@ function installLibraryFixture(levels = [], catalogTopics = []) {
       completed: item.completed,
       progressTotal: item.sentences.length,
       attemptCompleted: Boolean(item.completedAt),
-      description: '',
+      description: 'Mô tả cũ của bài nghe',
     });
     if (path === dictationApi.topicGroupsPath) {
       return {
@@ -1176,6 +1176,7 @@ test('the TOEIC group preview opens its own paginated catalog and keeps the late
   assert.equal(document.querySelector('[role="combobox"][aria-label="Chủ đề"]'), null);
   assert.ok(!Object.hasOwn(queries.at(-1), 'topic'));
   assert.equal(document.querySelectorAll('.dictation-lesson-card').length, 4);
+  assert.ok(!document.querySelector('.dictation-library-grid').textContent.includes('Mô tả cũ của bài nghe'));
   const openAll = document.querySelector('.dictation-topic-heading a');
   assert.equal(openAll.getAttribute('href'), '/dictation?topic=Test+1');
   await clickElement(openAll);
@@ -1270,7 +1271,10 @@ test('topic labels use title case and video cards show a thumbnail with a fallba
   const pill = document.querySelector('.dictation-topic-pills a');
   assert.equal(pill.textContent, displayName);
   assert.equal(document.querySelector('.dictation-topic-heading h2').textContent, displayName);
-  assert.equal(document.querySelector('.dictation-lesson-topic span').textContent, displayName);
+  assert.deepEqual(
+    [...document.querySelector('.dictation-lesson-meta').children].map(item => item.textContent),
+    ['01:32', '7 câu'],
+  );
   const artwork = document.querySelector('.dictation-lesson-art');
   assert.equal(artwork.querySelector('img').getAttribute('src'), thumbnailUrl);
   await act(async () => artwork.querySelector('img').dispatchEvent(new Event('error')));

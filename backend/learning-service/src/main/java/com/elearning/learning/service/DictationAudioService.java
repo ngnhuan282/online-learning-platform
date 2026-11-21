@@ -18,16 +18,13 @@ public class DictationAudioService {
 
     private final JdbcTemplate jdbc;
     private final Path root;
-    private final Path samples;
 
     public DictationAudioService(
         JdbcTemplate jdbc,
-        @Value("${dictation.storage-dir:./uploads/dictation}") String root,
-        @Value("${dictation.sample-dir:../../docs/resources/audio}") String samples
+        @Value("${dictation.storage-dir:./uploads/dictation}") String root
     ) {
         this.jdbc = jdbc;
         this.root = Path.of(root).toAbsolutePath().normalize();
-        this.samples = Path.of(samples).toAbsolutePath().normalize();
     }
 
     public Audio upload(MultipartFile file) {
@@ -89,13 +86,8 @@ public class DictationAudioService {
 
     public Resource resource(String key) {
         if (metadata(key) == null) throw new AppException(ErrorCode.NOT_FOUND);
-        Path path = "sample-ets-2024-test-1".equals(key)
-            ? samples.resolve("Audio 1.mp3")
-            : root.resolve(key).normalize();
-        if (
-            (!"sample-ets-2024-test-1".equals(key) && !path.getParent().equals(root)) ||
-            !Files.isRegularFile(path)
-        ) {
+        Path path = root.resolve(key).normalize();
+        if (!root.equals(path.getParent()) || !Files.isRegularFile(path)) {
             throw new AppException(ErrorCode.NOT_FOUND);
         }
         return new FileSystemResource(path);
