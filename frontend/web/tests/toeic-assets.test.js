@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { after, test } from 'node:test';
 import {
   copyFileSync,
@@ -7,59 +7,75 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   realpathSync,
   rmSync,
   unlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { prepareToeicAssets } from '../scripts/prepare-toeic-assets.mjs';
+import {
+  prepareToeicAssets,
+  prepareToeicListeningAssets,
+  verifyToeicArchives,
+} from '../scripts/prepare-toeic-assets.mjs';
 
 const workspace = fileURLToPath(new URL('../../../', import.meta.url));
-const archiveDirectory = fileURLToPath(new URL('../resources/toeic/', import.meta.url));
-const existingImages = fileURLToPath(new URL('../public/toeic-assets/ets2024-reading/', import.meta.url));
 const temporaryParent = join(workspace, '.tmp');
 mkdirSync(temporaryParent, { recursive: true });
 const temporary = mkdtempSync(join(temporaryParent, 'toeic-packs-'));
-const outputDirectory = join(temporary, 'images');
-const hash = file => createHash('sha256').update(readFileSync(file)).digest('hex');
+const fixture = join(temporary, 'fixtures');
+const image = 'test01/question-101.webp';
+const audio = 'test01/audio-032-034.mp3';
+const archiveDirectory = join(temporary, 'reading');
+const listeningArchives = join(temporary, 'listening');
+mkdirSync(join(fixture, 'test01'), { recursive: true });
+for (const [directory, file] of [
+  [archiveDirectory, image],
+  [listeningArchives, audio],
+]) {
+  mkdirSync(directory);
+  writeFileSync(join(fixture, file), `fixture ${file}`);
+  execFileSync('tar', ['-czf', join(directory, 'test01.tar.gz'), '-C', fixture, file]);
+}
 after(() => {
   const target = realpathSync(temporary);
   assert.ok(target.startsWith(resolve(temporaryParent) + sep));
   rmSync(target, { recursive: true, force: true });
 });
 
-test('ten versioned archives restore every TOEIC source image byte-for-byte on a clean checkout', () => {
-  prepareToeicAssets();
-  assert.equal(readdirSync(archiveDirectory).filter(name => name.endsWith('.tar.gz')).length, 10);
+test('TOEIC preparation preserves bytes and paths for both media collections', () => {
+  const outputDirectory = join(temporary, 'images');
   const result = prepareToeicAssets({ archiveDirectory, outputDirectory });
-  assert.equal(result.archives, 10);
-  assert.equal(result.images, 1220);
-  assert.equal(result.extracted, 1220);
-  let compared = 0;
-  for (const test of readdirSync(outputDirectory).filter(name => /^test\d{2}$/.test(name))) {
-    for (const file of readdirSync(join(outputDirectory, test))) {
-      assert.equal(
-        hash(join(outputDirectory, test, file)),
-        hash(join(existingImages, test, file)),
-        `${test}/${file}`,
-      );
-      compared++;
-    }
-  }
-  assert.equal(compared, 1220);
+  assert.deepEqual(result, { archives: 1, images: 1, extracted: 1 });
+  assert.deepEqual(readFileSync(join(outputDirectory, image)), readFileSync(join(fixture, image)));
+  const audioOutput = join(temporary, 'audio');
+  assert.deepEqual(
+    prepareToeicListeningAssets({ archiveDirectory: listeningArchives, outputDirectory: audioOutput }),
+    { archives: 1, files: 1, extracted: 1 },
+  );
+  assert.deepEqual(readFileSync(join(audioOutput, audio)), readFileSync(join(fixture, audio)));
 });
 
 test('cached preparation skips intact packs and restores a removed generated image', () => {
+  const outputDirectory = join(temporary, 'cache');
+  prepareToeicAssets({ archiveDirectory, outputDirectory });
   const cached = prepareToeicAssets({ archiveDirectory, outputDirectory });
   assert.equal(cached.extracted, 0);
-  const file = join(outputDirectory, 'test01/question-101.webp');
+  const file = join(outputDirectory, image);
   assert.ok(resolve(file).startsWith(resolve(temporary) + sep));
   unlinkSync(file);
   const recovered = prepareToeicAssets({ archiveDirectory, outputDirectory });
   assert.ok(recovered.extracted > 0);
-  assert.equal(hash(file), hash(join(existingImages, 'test01/question-101.webp')));
+  assert.deepEqual(readFileSync(file), readFileSync(join(fixture, image)));
+});
+
+test('a configured release directory rejects missing archives and altered content', () => {
+  const releasePath = join(temporary, 'release');
+  assert.throws(() => verifyToeicArchives(releasePath, { optional: true }), /Missing TOEIC archive/);
+  mkdirSync(join(releasePath, 'toeic'), { recursive: true });
+  copyFileSync(join(archiveDirectory, 'test01.tar.gz'), join(releasePath, 'toeic/test01.tar.gz'));
+  assert.throws(() => verifyToeicArchives(releasePath), /TOEIC archive checksum mismatch/);
 });
 
 test('an archive containing paths for another test is rejected before extraction', () => {

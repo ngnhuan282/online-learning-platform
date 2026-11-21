@@ -1,0 +1,25 @@
+{
+    "toeic":  {
+                  "test01.tar.gz":  "14ba18787de73bec97babf0cd5b19d6080dd61bab8f155ffa5940bd6b62d9eef",
+                  "test02.tar.gz":  "6ae6f63e6b95deb7b4ba97772335839348e3bf13d89543b95cda76bbd4493629",
+                  "test03.tar.gz":  "4dd86e1f51e12d88a51efc77758cd65e2b508c24c59682b5062211a503b986bc",
+                  "test04.tar.gz":  "d22b571cddaa65d7119531050f6c1c67e4677cd506f45ce0eb410413e0485037",
+                  "test05.tar.gz":  "bb711e1e977d209d8765e41976bbdbad676f3663bc7651931ec889fb1e0736a2",
+                  "test06.tar.gz":  "a6b988d8aa601c68e875a1c31e9ff6117f1917533fac8fe8832c851eaef54cca",
+                  "test07.tar.gz":  "d56881b49acec8a6bdd6008b603f8ff97585d4fb926bcf7468a0f35406c39826",
+                  "test08.tar.gz":  "05ab49b6a91b4f953c300aa189672fdfbbcdb3206f39e1d93fa6bf8deabb2fd2",
+                  "test09.tar.gz":  "1b615e20db2fb351b2c15b2f05c0da1bd660d0317b72dd89eb22cad5a5337678",
+                  "test10.tar.gz":  "5d7f97eaf64a891bcf47f7f6d25027c83a59390a055ccfda6aa88496fc131b2a"
+              },
+    "toeic-listening":  {
+                            "test01.tar.gz":  "92baec5cf23042229cdf2930005dbdafa4776214ab364eb6b6caa31876018015",
+                            "test02.tar.gz":  "45e6a3f6c402efdaa36e533679151dfd22f44bb06133a03d297583e6bd65e3ea",
+                            "test03.tar.gz":  "30fd7f8e80960b6f23a160b61f347bfa85d1bba5c9850e53162b3bf9bfacd269",
+                            "test05.tar.gz":  "69199e076129c756009fa2d8c75e1d719c308b3d7f01732b83a0f5848487629e",
+                            "test06.tar.gz":  "ba3d88954a78eb3a0f06ea6b8b8f0eee03868b9c3312ee71b04fc075fa945cd2",
+                            "test07.tar.gz":  "cbe3dc70d4e1cac4cc0600a27cd95d90c4d6ff41de23b685ba5bb5b825eecabf",
+                            "test08.tar.gz":  "5c419d7aec4454c15ce028d71d31ceb6de93da77c67b40d5654af13ff504fbc1",
+                            "test09.tar.gz":  "23f4ae2920428efe109fc95f7b88f4eb3fab862b37b73fd6c0e9cec31e5cc3e5",
+                            "test10.tar.gz":  "3163d3a4ff42570851837085e0a422618442458fa3989f3f9060a8047af238c5"
+                        }
+}

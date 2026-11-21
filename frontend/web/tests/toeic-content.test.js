@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { test } from 'node:test';
-import { prepareToeicAssets, prepareToeicListeningAssets } from '../scripts/prepare-toeic-assets.mjs';
+import { prepareToeicRelease } from '../scripts/prepare-toeic-assets.mjs';
 
-prepareToeicAssets();
+const media = prepareToeicRelease({ optional: true });
 
 const seedUrl = new URL(
   '../../../backend/learning-service/src/main/resources/toeic/ets2024-reading.json',
@@ -63,7 +63,7 @@ test('every source question is answerable, has four choices and retains a source
       for (const image of [question.imageUrl, ...(question.passageImageUrls ?? [])].filter(Boolean)) {
         assert.match(image, /^\/toeic-assets\/[\w/.-]+\.(?:png|jpe?g|webp)$/);
         assert.equal(image.includes('..'), false);
-        assert.equal(existsSync(new URL(`../public${image}`, import.meta.url)), true, image);
+        if (media) assert.equal(existsSync(new URL(`../public${image}`, import.meta.url)), true, image);
       }
     }
   }
@@ -79,10 +79,7 @@ test('known source questions retain the official keys, including the corrected T
   assert.notEqual(key(8, 195).explanation, key(8, 196).explanation);
 });
 
-test('nine Listening packs provide all 900 questions, matched recordings, transcripts and illustrations', () => {
-  const media = prepareToeicListeningAssets();
-  assert.equal(media.archives, 9);
-  assert.equal(media.files, 585);
+test('nine Listening seeds provide all 900 questions, aligned recordings, transcripts and illustrations', () => {
   const exams = JSON.parse(readFileSync(new URL('ets2024-listening.json', seedUrl), 'utf8'));
   assert.equal(exams.length, 9);
   assert.equal(new Set(exams.map(exam => exam.seedKey)).size, 9);
@@ -127,12 +124,21 @@ test('nine Listening packs provide all 900 questions, matched recordings, transc
       for (const file of [audioUrl, question.imageUrl, ...(question.passageImageUrls ?? [])].filter(
         Boolean,
       )) {
-        assert.equal(existsSync(new URL(`../public${file}`, import.meta.url)), true, file);
+        if (media) assert.equal(existsSync(new URL(`../public${file}`, import.meta.url)), true, file);
         assetFiles.add(file);
       }
     }
     assert.deepEqual(counts, [6, 25, 39, 30]);
   }
   assert.equal(groups.size, 486);
-  assert.equal(assetFiles.size, media.files);
+  assert.equal(assetFiles.size, 585);
 });
+
+test(
+  'the external release supplies all Reading and Listening media',
+  { skip: !media && 'TOEIC archives not supplied' },
+  () => {
+    assert.deepEqual([media.reading.archives, media.reading.images], [10, 1220]);
+    assert.deepEqual([media.listening.archives, media.listening.files], [9, 585]);
+  },
+);
