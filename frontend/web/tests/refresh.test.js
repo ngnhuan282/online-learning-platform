@@ -240,3 +240,18 @@ test('role mismatch 403 remains visible without rotating or clearing a valid ses
   assert.equal(calls, 1);
   assert.equal(tokens.getAccessToken(), old);
 });
+
+test('cleared guest sessions do not attempt refresh on 401 responses', async () => {
+  tokens.clearTokens();
+  let calls = 0;
+  await assert.rejects(
+    client.get('/api/v1/learning/shop', {
+      adapter: config => {
+        calls++;
+        return unauthorized(config);
+      },
+    }),
+    { status: 401 },
+  );
+  assert.equal(calls, 1);
+});

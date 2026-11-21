@@ -1,14 +1,17 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { engagementApi } from '../api/engagementApi';
+import useAuth from '../../auth/hooks/useAuth';
 import useLearningResource from '../../learning/hooks/useLearningResource';
 import { Pagination, WorkspaceState } from '../components/WorkspaceUi';
+import { ROUTES } from '../../../shared/constants/routes';
 import { t, getIntlLocale } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
 import LearnerAvatar from '../../../shared/components/LearnerAvatar';
 
 export default function LeaderboardPage() {
   useLocale();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [filter, setFilter] = useState({
     period: 'month',
     month: new Intl.DateTimeFormat('en-CA', {
@@ -19,7 +22,7 @@ export default function LeaderboardPage() {
     page: 0,
   });
   const load = useCallback(options => engagementApi.leaderboard({ ...filter, size: 20 }, options), [filter]);
-  const resource = useLearningResource(load, null);
+  const resource = useLearningResource(load, null, user?.id ?? 'guest', !isAuthLoading);
   const data = resource.data;
   const change = values => setFilter(current => ({ ...current, ...values, page: 0 }));
 
@@ -66,11 +69,20 @@ export default function LeaderboardPage() {
       {data && !resource.error && (
         <>
           <p className="ranking-self">
-            <span>
-              {data.me
-                ? t('Hạng của bạn: {rank}', { rank: data.me.rank })
-                : t('Chưa có điểm trong kỳ này. Hoàn thành bài học để tham gia!')}
-            </span>
+            {user ? (
+              <span>
+                {data.me
+                  ? t('Hạng của bạn: {rank}', { rank: data.me.rank })
+                  : t('Chưa có điểm trong kỳ này. Hoàn thành bài học để tham gia!')}
+              </span>
+            ) : (
+              <>
+                <span>{t('Đăng nhập để theo dõi thứ hạng của bạn trên bảng xếp hạng.')}</span>
+                <Link className="button button-soft" to={ROUTES.LOGIN} state={{ from: ROUTES.LEADERBOARD }}>
+                  {t('Đăng nhập')}
+                </Link>
+              </>
+            )}
           </p>
 
           {podiumEntries.length === 3 && (

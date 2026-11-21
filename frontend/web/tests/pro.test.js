@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, afterEach, beforeEach, test } from 'node:test';
 import { JSDOM } from 'jsdom';
 import { act, createElement as h } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import { createServer } from 'vite';
@@ -49,7 +49,19 @@ const plans = [
   { code: 'PRO_QUARTER', durationMonths: 3, price: 120000, originalPrice: 150000, currency: 'VND' },
   { code: 'PRO_YEAR', durationMonths: 12, price: 499000, originalPrice: 600000, currency: 'VND' },
 ];
-async function render(path = '/pro', membership = { userId: 1, active: false }) {
+function LoginEcho() {
+  const { state } = useLocation();
+  return h('p', { id: 'login-gate' }, `Login from:${state?.from || ''}`);
+}
+
+const defaultUser = {
+  id: 1,
+  fullName: 'Pro Learner',
+  roles: ['ADMIN'],
+  permissions: ['ADMIN_ACCESS', 'PRO_CODE_VIEW', 'PRO_CODE_CREATE', 'PRO_CODE_REVOKE'],
+};
+
+async function render(path = '/pro', membership = { userId: 1, active: false }, user = defaultUser) {
   root = createRoot(document.getElementById('root'));
   await act(async () =>
     root.render(
@@ -58,16 +70,7 @@ async function render(path = '/pro', membership = { userId: 1, active: false }) 
         { value: cache },
         h(
           AuthContext.Provider,
-          {
-            value: {
-              user: {
-                id: 1,
-                fullName: 'Pro Learner',
-                roles: ['ADMIN'],
-                permissions: ['ADMIN_ACCESS', 'PRO_CODE_VIEW', 'PRO_CODE_CREATE', 'PRO_CODE_REVOKE'],
-              },
-            },
-          },
+          { value: { user } },
           h(
             ProContext.Provider,
             {
@@ -82,10 +85,12 @@ async function render(path = '/pro', membership = { userId: 1, active: false }) 
               MemoryRouter,
               { initialEntries: [path] },
               h(LanguageSwitcher),
-              h(ProUpgradeButton),
+              user && h(ProUpgradeButton),
               h(
                 Routes,
                 null,
+                h(Route, { path: '/login', element: h(LoginEcho) }),
+                h(Route, { path: '/courses', element: h('p', null, 'Courses') }),
                 h(Route, { path: '/pro', element: h(ProPage) }),
                 h(Route, { path: '/payment/pro-checkout', element: h(ProCheckoutPage) }),
                 h(Route, { path: '/admin/pro-codes', element: h(AdminProCodesPage) }),
@@ -255,4 +260,15 @@ test('an active member sees the management entry and renewal action with their e
   assert.equal(document.querySelector('.header-pro-button').getAttribute('aria-label'), 'Pro của bạn');
   assert.ok(document.querySelector('.pro-membership-card.is-pro'));
   assert.equal(button('Gia hạn Pro').disabled, false);
+});
+
+test('guests preview Pro plans and pricing, while activation code redirects to login', async () => {
+  await render('/pro', null, null);
+  assert.equal(document.querySelector('.pro-membership-card'), null);
+  assert.equal(document.querySelector('.free-action')?.getAttribute('href'), '/courses');
+  assert.match(document.querySelector('.pro-price-block strong').textContent, /499.000/);
+  await click('1 tháng');
+  assert.match(document.querySelector('.pro-price-block strong').textContent, /50.000/);
+  await click('Kích hoạt');
+  assert.equal(document.getElementById('login-gate')?.textContent, 'Login from:/pro');
 });

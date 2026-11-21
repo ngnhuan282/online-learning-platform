@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { dictationApi } from '../api/dictationApi';
 
-export function useDictationQuery(path, params = {}) {
+export function useDictationQuery(path, params = {}, options = {}) {
+  const { enabled = true, scope = '' } = options;
   const key = JSON.stringify(params);
-  const [state, setState] = useState({ loading: true, data: null, error: null });
+  const [state, setState] = useState({ loading: Boolean(path), data: null, error: null });
   const [retry, setRetry] = useState(0);
-  const queryKey = JSON.stringify([path, key, retry]);
+  const queryKey = JSON.stringify([path, key, scope, retry]);
   useEffect(() => {
-    if (!path) return;
+    if (!path || !enabled) return undefined;
     const controller = new AbortController();
     let active = true;
     Promise.resolve()
@@ -25,8 +26,9 @@ export function useDictationQuery(path, params = {}) {
       active = false;
       controller.abort();
     };
-  }, [path, key, retry, queryKey]);
-  const current = state.queryKey === queryKey ? state : { loading: Boolean(path), data: null, error: null };
+  }, [path, key, retry, queryKey, enabled]);
+  const current =
+    enabled && state.queryKey === queryKey ? state : { loading: Boolean(path), data: null, error: null };
   return { ...current, reload: () => setRetry(value => value + 1) };
 }
 

@@ -27,10 +27,9 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     SecurityFilterChain securityFilterChain(
-        HttpSecurity http,
-        JwtTokenProvider tokens,
-        SecurityErrorHandler errors
-    ) throws Exception {
+            HttpSecurity http,
+            JwtTokenProvider tokens,
+            SecurityErrorHandler errors) throws Exception {
         return http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -51,7 +50,13 @@ public class SecurityConfig {
                     .requestMatchers(
                         org.springframework.http.HttpMethod.GET,
                         "/api/v1/learning/toeic/exams",
-                        "/api/v1/learning/toeic/dictionary"
+                        "/api/v1/learning/toeic/dictionary",
+                        "/api/v1/learning/dictation",
+                        "/api/v1/learning/dictation/topic-groups",
+                        "/api/v1/learning/shop",
+                        "/api/v1/learning/engagement/leaderboard",
+                        "/api/v1/learning/community/topics",
+                        "/api/v1/learning/community/posts"
                     )
                     .permitAll()
                     .requestMatchers("/internal/v1/learning/enrollments")

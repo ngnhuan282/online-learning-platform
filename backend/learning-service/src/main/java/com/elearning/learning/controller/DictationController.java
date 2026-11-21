@@ -31,17 +31,9 @@ public class DictationController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "12") int size
     ) {
+        Long userId = user == null ? null : Long.parseLong(user.getName());
         return ApiResponse.success(
-            dictation.catalog(
-                Long.parseLong(user.getName()),
-                keyword,
-                level,
-                topic,
-                page,
-                size,
-                false,
-                status
-            )
+            dictation.catalog(userId, keyword, level, topic, page, size, false, status)
         );
     }
 
@@ -53,9 +45,8 @@ public class DictationController {
         @RequestParam(defaultValue = "") String topic,
         @RequestParam(defaultValue = "") String status
     ) {
-        return ApiResponse.success(
-            dictation.topicGroups(Long.parseLong(user.getName()), keyword, level, topic, status)
-        );
+        Long userId = user == null ? null : Long.parseLong(user.getName());
+        return ApiResponse.success(dictation.topicGroups(userId, keyword, level, topic, status));
     }
 
     @PostMapping("/exercises/{id}/attempts")

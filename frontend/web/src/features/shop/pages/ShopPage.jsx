@@ -20,23 +20,24 @@ import useWorkspaceMutation from '../../engagement/hooks/useWorkspaceMutation';
 import { ActionError, WorkspaceState } from '../../engagement/components/WorkspaceUi';
 import LearnerAvatar from '../../../shared/components/LearnerAvatar';
 import ConfirmDialog from '../../../shared/components/ConfirmDialog';
+import { ROUTES } from '../../../shared/constants/routes';
 import { t, getIntlLocale } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
 import '../styles/shop.css';
 
 const TOPUP_PACKAGES = [
-  { code: 'GEM_200',  gems: 200,  price: 19000, label: '19.000 \u20AB', badge: null,            color: '#24b8ec' },
-  { code: 'GEM_500',  gems: 500,  price: 45000, label: '45.000 \u20AB', badge: '\uD83D\uDD25 Ph\u1ED5 bi\u1EBFn', color: '#a855f7' },
+  { code: 'GEM_200', gems: 200, price: 19000, label: '19.000 \u20AB', badge: null, color: '#24b8ec' },
+  { code: 'GEM_500', gems: 500, price: 45000, label: '45.000 \u20AB', badge: '\uD83D\uDD25 Ph\u1ED5 bi\u1EBFn', color: '#a855f7' },
   { code: 'GEM_1200', gems: 1200, price: 99000, label: '99.000 \u20AB', badge: '\uD83D\uDC8E T\u1ED1t nh\u1EA5t', color: '#f59e0b' },
 ];
 
 export default function ShopPage() {
   useLocale();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const load = useCallback(options => shopApi.state(options), []);
-  const resource = useLearningResource(load, null);
+  const resource = useLearningResource(load, null, user?.id ?? 'guest', !isAuthLoading);
   const mutation = useWorkspaceMutation();
   const tab = ['shop', 'inventory', 'topup'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'shop';
   const setTab = value => setSearchParams(previous => {
@@ -61,6 +62,10 @@ export default function ShopPage() {
   const number = value => value.toLocaleString(getIntlLocale());
 
   function choosePurchase(item) {
+    if (!user) {
+      navigate(ROUTES.LOGIN, { state: { from: ROUTES.SHOP } });
+      return;
+    }
     setNotice('');
     setPendingPurchase({ item, requestId: crypto.randomUUID() });
   }
@@ -96,7 +101,7 @@ export default function ShopPage() {
           <h1>{t('C\u1EEDa h\u00E0ng')}</h1>
           <p>{t('H\u1ECDc \u0111\u1EC1u m\u1ED7i ng\u00E0y \u0111\u1EC3 thu th\u1EADp kim c\u01B0\u01A1ng v\u00E0 m\u1EDF kh\u00F3a nh\u1EEFng v\u1EADt ph\u1EA9m y\u00EAu th\u00EDch.')}</p>
         </div>
-        {data && (
+        {data && user && (
           <span className="shop-wallet" aria-label={t('S\u1ED1 d\u01B0 kim c\u01B0\u01A1ng')}>
             <DiamondRounded />
             {number(data.gems)}
@@ -140,10 +145,12 @@ export default function ShopPage() {
                   <h2>{t('N\u1EA1p Kim C\u01B0\u01A1ng')}</h2>
                   <p>{t('Ch\u1ECDn g\u00F3i kim c\u01B0\u01A1ng ph\u00F9 h\u1EE3p v\u1EDBi b\u1EA1n. Kim c\u01B0\u01A1ng d\u00F9ng \u0111\u1EC3 mua v\u1EADt ph\u1EA9m trong c\u1EEDa h\u00E0ng.')}</p>
                 </div>
-                <span className="shop-wallet" aria-label={t('S\u1ED1 d\u01B0')}>
-                  <DiamondRounded />
-                  {number(data.gems)}
-                </span>
+                {user && (
+                  <span className="shop-wallet" aria-label={t('S\u1ED1 d\u01B0')}>
+                    <DiamondRounded />
+                    {number(data.gems)}
+                  </span>
+                )}
               </div>
 
               {notice && (
@@ -181,7 +188,21 @@ export default function ShopPage() {
           )}
 
           {/* ── SHOP / INVENTORY TABS ── */}
-          {tab !== 'topup' && (
+          {tab === 'inventory' && !user && (
+            <div className="shop-empty">
+              <Inventory2Outlined />
+              <h2>{t('Kho đồ của bạn')}</h2>
+              <p>{t('Đăng nhập để xem kho đồ và tùy chỉnh hồ sơ')}</p>
+              <button
+                className="shop-button"
+                onClick={() => navigate(ROUTES.LOGIN, { state: { from: `${ROUTES.SHOP}?tab=inventory` } })}
+              >
+                {t('Đăng nhập')}
+              </button>
+            </div>
+          )}
+
+          {tab !== 'topup' && (tab !== 'inventory' || user) && (
             <>
               {tab === 'inventory' && <ProfileAppearance compact />}
               {freeze && (
@@ -197,10 +218,12 @@ export default function ShopPage() {
                       )}
                     </p>
                     <div className="freeze-details">
-                      <span>
-                        <AcUnitRounded fontSize="small" />
-                        {data.streakFreezes} / {data.freezeCapacity}
-                      </span>
+                      {user && (
+                        <span>
+                          <AcUnitRounded fontSize="small" />
+                          {data.streakFreezes} / {data.freezeCapacity}
+                        </span>
+                      )}
                       <span>
                         <DiamondRounded fontSize="small" />
                         {number(freeze.price)}
@@ -210,12 +233,13 @@ export default function ShopPage() {
                   <button
                     className="shop-button"
                     disabled={
-                      mutation.busy || data.gems < freeze.price || data.streakFreezes >= data.freezeCapacity
+                      Boolean(user) &&
+                      (mutation.busy || data.gems < freeze.price || data.streakFreezes >= data.freezeCapacity)
                     }
                     onClick={() => choosePurchase(freeze)}
                   >
                     <ShoppingBagOutlined fontSize="small" />
-                    {t(data.streakFreezes >= data.freezeCapacity ? '\u0110\u00E3 \u0111\u1EA7y' : 'Mua freeze')}
+                    {t(user && data.streakFreezes >= data.freezeCapacity ? '\u0110\u00E3 \u0111\u1EA7y' : 'Mua freeze')}
                   </button>
                 </article>
               )}
@@ -277,7 +301,7 @@ export default function ShopPage() {
                     >
                       {item.itemType === 'FRAME' ? (
                         <LearnerAvatar
-                          name={user?.fullName}
+                          name={user?.fullName || t('Học viên ChitChatGo')}
                           avatarUrl={user?.avatarUrl}
                           frame={item.code}
                           assetKey={item.assetKey}
@@ -286,13 +310,13 @@ export default function ShopPage() {
                       ) : (
                         <span className="background-preview-card">
                           <LearnerAvatar
-                            name={user?.fullName}
+                            name={user?.fullName || t('Học viên ChitChatGo')}
                             avatarUrl={user?.avatarUrl}
                             frame={data.activeFrame}
                             assetKey={data.items.find(value => value.code === data.activeFrame)?.assetKey}
                             size="medium"
                           />
-                          <span>{user?.fullName}</span>
+                          <span>{user?.fullName || t('Học viên ChitChatGo')}</span>
                         </span>
                       )}
                       <span className="shop-rarity">{item.rarity}</span>
@@ -320,13 +344,13 @@ export default function ShopPage() {
                     ) : (
                       <button
                         className="shop-button"
-                        disabled={mutation.busy || data.gems < item.price}
+                        disabled={Boolean(user) && (mutation.busy || data.gems < item.price)}
                         onClick={() => choosePurchase(item)}
                       >
                         {t(
                           item.price === 0
                             ? 'Nh\u1EADn mi\u1EC5n ph\u00ED'
-                            : data.gems < item.price
+                            : user && data.gems < item.price
                               ? 'Ch\u01B0a \u0111\u1EE7 kim c\u01B0\u01A1ng'
                               : 'Mua',
                         )}
@@ -346,9 +370,9 @@ export default function ShopPage() {
         description={
           pendingPurchase
             ? t('D\u00F9ng {price} kim c\u01B0\u01A1ng \u0111\u1EC3 nh\u1EADn {name}?', {
-                price: number(pendingPurchase.item.price),
-                name: t(pendingPurchase.item.nameKey),
-              })
+              price: number(pendingPurchase.item.price),
+              name: t(pendingPurchase.item.nameKey),
+            })
             : undefined
         }
         confirmLabel={t('X\u00E1c nh\u1EADn mua')}

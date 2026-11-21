@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AUTH_CHANGED_EVENT } from '../../../shared/constants/appConstants';
 import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 
-export default function useLearningResource(loader, emptyData, revision = 0) {
+export default function useLearningResource(loader, emptyData, revision = 0, enabled = true) {
   const sessionVersion = getSessionVersion();
   const [state, setState] = useState({
     data: emptyData,
@@ -19,6 +19,7 @@ export default function useLearningResource(loader, emptyData, revision = 0) {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     let active = true;
     const controller = new AbortController();
     const isCurrent = () => active && sessionVersion === getSessionVersion();
@@ -64,7 +65,7 @@ export default function useLearningResource(loader, emptyData, revision = 0) {
       active = false;
       controller.abort();
     };
-  }, [loader, emptyData, revision, attempt, sessionVersion]);
+  }, [loader, emptyData, revision, enabled, attempt, sessionVersion]);
 
   useEffect(() => {
     window.addEventListener('focus', reload);
@@ -80,7 +81,7 @@ export default function useLearningResource(loader, emptyData, revision = 0) {
   }, [reload, sessionVersion]);
 
   const visible =
-    state.sessionVersion === sessionVersion
+    enabled && state.sessionVersion === sessionVersion
       ? state
       : { data: emptyData, error: null, loading: true, usingFallback: false };
   return { ...visible, reload };

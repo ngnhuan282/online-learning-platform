@@ -6,6 +6,7 @@ import {
   getSessionVersion,
   isTokenExpired,
   setAccessToken,
+  wasSessionCleared,
 } from '../utils/tokenUtils';
 import { normalizeApiError } from '../utils/errorUtils';
 import { ENDPOINTS } from './endpoints';
@@ -122,7 +123,8 @@ axiosClient.interceptors.response.use(
       !isPublicCatalogRequest(config) &&
       !config.skipAuth &&
       !authPaths.has(config.url) &&
-      config.sessionVersion === getSessionVersion()
+      config.sessionVersion === getSessionVersion() &&
+      !wasSessionCleared()
     ) {
       if (config.retriedAfterRefresh) {
         clearTokens();
