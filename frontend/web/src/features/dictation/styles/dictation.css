@@ -461,36 +461,25 @@
   color: #197660;
 }
 .dictation-lesson-body {
-  padding: 14px 16px 0;
+  padding: 10px 12px 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
   flex: 1;
 }
-.dictation-lesson-topic {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.dictation-lesson-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 8px;
-  color: var(--dictation-muted);
-  font-size: 12px;
 }
-.dictation-lesson-topic span,
-.dictation-page .dictation-lesson-body p {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dictation-lesson-topic b {
-  flex-shrink: 0;
+.dictation-lesson-level {
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 2px 5px;
   background: #eef4ff;
   color: var(--dictation-accent);
-}
-.dictation-page .dictation-lesson-body p {
-  font-size: 12px;
-  color: var(--dictation-muted);
+  font-size: 11px;
+  font-weight: 700;
 }
 .dictation-lesson-footer {
   display: flex;
@@ -498,8 +487,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px 12px;
-  margin: 0 -16px;
-  padding: 11px 16px;
+  margin: 0 -12px;
+  padding: 7px 12px;
   border-top: 1px solid var(--dictation-border);
   background: #f3f6fb;
   color: var(--dictation-muted);
@@ -523,17 +512,15 @@
 }
 .dictation-lesson-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  padding: 3px 0 8px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 3px;
   margin-top: auto;
   color: var(--dictation-muted);
   font-size: 12px;
 }
-.dictation-lesson-meta span:last-child {
-  margin-inline-start: auto;
-}
-.dictation-lesson-meta span,
+.dictation-lesson-meta > span,
 .dictation-back-row > span {
   display: inline-flex;
   align-items: center;
@@ -1561,9 +1548,6 @@
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 110px;
   gap: 20px;
 }
-.dictation-editor-description {
-  grid-column: 1 / -1;
-}
 .dictation-section-heading {
   display: flex;
   justify-content: space-between;
@@ -1587,6 +1571,10 @@
   margin: 20px 0 24px;
   border-top: 1px solid var(--dictation-border);
   border-bottom: 1px solid var(--dictation-border);
+}
+.dictation-youtube-url-field .MuiOutlinedInput-notchedOutline {
+  /* The floating label is 0.75 times the default label font size. */
+  font-size: 1rem;
 }
 .dictation-editor-audio audio {
   display: block;

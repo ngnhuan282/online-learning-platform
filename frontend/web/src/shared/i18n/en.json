@@ -2350,6 +2350,7 @@
   "{count} câu sau khi nhập": "{count} sentences after import",
   "Thay thế {count} câu hiện tại bằng transcript từ Excel.": "Replace the current {count} sentences with the Excel transcript.",
   "Giữ nguyên {count} câu hiện tại và nối các câu mới xuống dưới.": "Keep the current {count} sentences and append the new ones below.",
+  "Tên bài, chủ đề, trình độ và video lấy từ form.": "The lesson title, topic, level, and video come from the form.",
   "Mốc thời gian được giữ nguyên. Thay đổi chưa được lưu.": "Timestamps are preserved. Changes have not been saved.",
   "Bài nghe chỉ được có tối đa 200 câu. Chọn thay thế hoặc giảm số câu nhập.": "A lesson can have at most 200 sentences. Choose Replace all or import fewer sentences.",
   "Mốc thời gian từ Excel chồng lên câu trước. Hãy chỉnh lại trước khi xuất bản.": "Excel timestamps overlap the previous sentence. Adjust them before publishing.",

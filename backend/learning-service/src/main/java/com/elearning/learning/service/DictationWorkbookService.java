@@ -1,157 +1,196 @@
 package com.elearning.learning.service;
 
+import static com.elearning.learning.dto.DictationModels.LEVEL_PATTERN;
+
 import com.elearning.learning.common.exception.DictationValidationException;
 import com.elearning.learning.dto.DictationModels.*;
 import java.io.*;
 import java.util.*;
+import java.util.regex.Pattern;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class DictationWorkbookService {
 
+    static final int MAX_WORKBOOK_BYTES = 5 * 1024 * 1024;
+    private static final ClassPathResource TEMPLATE = new ClassPathResource("dictation/transcript-template.xlsx");
     private static final List<String> HEADERS = List.of("Thứ tự", "Transcript", "Bắt đầu", "Kết thúc");
+    private static final String DURATION_LABEL = "Thời gian";
+    private static final Set<String> LEGACY_DURATION_LABELS = Set.of("Thời lượng (mm:ss)", "Thời lượng (giây)");
+    private static final List<String> LESSON_HEADERS = List.of(
+        "Tên bài nghe", "Chủ đề", "Trình độ", "Link YouTube", DURATION_LABEL
+    );
+    private static final Pattern DURATION_CLOCK = Pattern.compile("([0-9]+):([0-5][0-9](?:\\.[0-9]+)?)");
+    private static final int TRANSCRIPT_HEADER_ROW = LESSON_HEADERS.size() + 2;
+    private static final String UNREADABLE_WORKBOOK =
+        "Không đọc được file. Hãy dùng file Excel mẫu và không nhập công thức.";
 
     public byte[] template() {
-        try (var workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
-            Sheet input = workbook.createSheet("Transcript");
-            header(workbook, input, HEADERS);
-            input.createFreezePane(0, 1);
-            input.setAutoFilter(new CellRangeAddress(0, 200, 0, 3));
-            CellStyle text = workbook.createCellStyle();
-            text.setDataFormat(workbook.createDataFormat().getFormat("@"));
-            for (int index = 1; index <= 200; index++) {
-                Row row = input.createRow(index);
-                for (int column = 0; column < 4; column++) row.createCell(column).setCellStyle(text);
-            }
-            String[][] sampleRows = {
-                { "1", "Thank you for joining us today.", "00:00", "00:04" },
-                { "2", "We will begin in a moment.", "00:04", "00:08" },
-            };
-            for (int index = 0; index < sampleRows.length; index++) {
-                Row row = input.getRow(index + 1);
-                for (int column = 0; column < 4; column++) row.getCell(column).setCellValue(
-                    sampleRows[index][column]
-                );
-            }
-            input.setColumnWidth(0, 12 * 256);
-            input.setColumnWidth(1, 80 * 256);
-            input.setColumnWidth(2, 16 * 256);
-            input.setColumnWidth(3, 16 * 256);
-            Sheet help = workbook.createSheet("Hướng dẫn");
-            header(workbook, help, List.of("Cột / ví dụ", "Nội dung", "Bắt đầu", "Kết thúc"));
-            String[][] examples = {
-                { "Thứ tự", "Nhập số liên tiếp từ 1; mỗi dòng là một câu nghe.", "", "" },
-                {
-                    "Transcript",
-                    "Nhập đúng nội dung tiếng Anh trong audio, không thêm số câu hay tên người nói.",
-                    "",
-                    "",
-                },
-                {
-                    "Thời gian",
-                    "Dùng mm:ss. Có thể để trống rồi đánh dấu bằng audio trên web.",
-                    "00:02",
-                    "00:06",
-                },
-                { "Ví dụ 1", "Thank you for joining us today.", "00:00", "00:04" },
-                { "Ví dụ 2", "We will begin in a moment.", "00:04", "00:08" },
-                {
-                    "Lưu ý",
-                    "Chỉ sheet Transcript được nhập. Thay hoặc xóa 2 dòng ví dụ trong sheet Transcript trước khi nhập bài của bạn.",
-                    "",
-                    "",
-                },
-                {
-                    "Xuất bản",
-                    "Cần đủ mốc bắt đầu/kết thúc, đúng thứ tự, không chồng lấn. Mốc kết thúc vượt thời lượng sẽ lấy đến cuối audio.",
-                    "",
-                    "",
-                },
-                {
-                    "Giới hạn",
-                    "Tối đa 200 câu; 1.500 ký tự/câu. Không dùng công thức Excel hoặc đổi tên cột.",
-                    "",
-                    "",
-                },
-            };
-            for (int i = 0; i < examples.length; i++) {
-                Row row = help.createRow(i + 1);
-                for (int c = 0; c < 4; c++) row.createCell(c).setCellValue(examples[i][c]);
-            }
-            help.setColumnWidth(0, 20 * 256);
-            help.setColumnWidth(1, 110 * 256);
-            help.setColumnWidth(2, 16 * 256);
-            help.setColumnWidth(3, 16 * 256);
-            workbook.write(output);
-            return output.toByteArray();
+        try (var input = TEMPLATE.getInputStream()) {
+            return input.readAllBytes();
         } catch (IOException ex) {
-            throw new IllegalStateException("Cannot generate transcript template", ex);
+            throw new IllegalStateException("Cannot read transcript template", ex);
         }
     }
 
     public ImportResult parse(MultipartFile file) {
         if (
             file.isEmpty() ||
-            file.getSize() > 5L * 1024 * 1024 ||
+            file.getSize() > MAX_WORKBOOK_BYTES ||
             file.getOriginalFilename() == null ||
             !file.getOriginalFilename().toLowerCase(Locale.ROOT).endsWith(".xlsx")
         ) throw new DictationValidationException("Vui lòng chọn file Excel .xlsx không quá 5 MB.");
-        List<ImportIssue> errors = new ArrayList<>();
-        List<Sentence> sentences = new ArrayList<>();
         try (var workbook = new XSSFWorkbook(file.getInputStream())) {
-            Sheet sheet = workbook.getSheet("Transcript");
-            if (sheet == null) return new ImportResult(
-                List.of(),
-                List.of(new ImportIssue(1, "Không tìm thấy sheet Transcript."))
-            );
-            for (int col = 0; col < HEADERS.size(); col++) {
-                if (!HEADERS.get(col).equals(value(sheet.getRow(0), col))) errors.add(
-                    new ImportIssue(1, "Tên cột phải là: " + String.join(", ", HEADERS))
-                );
-            }
-            if (!errors.isEmpty()) return new ImportResult(List.of(), errors);
-            if (sheet.getLastRowNum() > 1000) throw new DictationValidationException(
-                "File chứa quá nhiều dòng. Tối đa 200 câu."
-            );
-            for (int index = 1; index <= sheet.getLastRowNum(); index++) {
-                Row row = sheet.getRow(index);
-                String order = value(row, 0),
-                    text = value(row, 1),
-                    start = value(row, 2),
-                    end = value(row, 3);
-                if ((order + text + start + end).isBlank()) continue;
-                if (sentences.size() >= 200) throw new DictationValidationException(
-                    "Tối đa 200 câu trong một bài."
-                );
-                int number = index + 1;
-                if (!order.equals(Integer.toString(sentences.size() + 1))) errors.add(
-                    new ImportIssue(number, "Thứ tự phải liên tiếp từ 1.")
-                );
-                if (text.isBlank() || text.length() > 1500) errors.add(
-                    new ImportIssue(number, "Transcript cần từ 1 đến 1.500 ký tự.")
-                );
-                Double from = time(start, number, errors),
-                    to = time(end, number, errors);
-                if (from != null && to != null && from >= to) errors.add(
-                    new ImportIssue(number, "Kết thúc phải sau bắt đầu.")
-                );
-                sentences.add(new Sentence(text, from, to));
-            }
-            if (sentences.isEmpty()) errors.add(
-                new ImportIssue(2, "Chưa có câu nào trong sheet Transcript.")
-            );
-            return new ImportResult(sentences, errors);
+            return transcript(workbook);
         } catch (DictationValidationException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new DictationValidationException(
-                "Không đọc được file. Hãy dùng file Excel mẫu và không nhập công thức."
+            throw new DictationValidationException(UNREADABLE_WORKBOOK);
+        }
+    }
+
+    public Definition parseLesson(byte[] contents) {
+        if (contents.length == 0 || contents.length > MAX_WORKBOOK_BYTES) {
+            throw new DictationValidationException("Tệp Excel cần có dữ liệu và tối đa 5 MB.");
+        }
+        try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(contents))) {
+            List<String> details = lessonFields(workbook);
+            for (int field = 0; field < details.size(); field++) {
+                if (details.get(field).isBlank()) {
+                    throw new DictationValidationException("Chưa điền mục “" + LESSON_HEADERS.get(field) + "”.");
+                }
+            }
+            String level = details.get(2).toUpperCase(Locale.ROOT);
+            if (!level.matches(LEVEL_PATTERN)) {
+                throw new DictationValidationException("Trình độ phải là A1, A2, B1, B2, C1 hoặc C2.");
+            }
+            String videoId = DictationService.youtubeVideoId(details.get(3));
+            if (videoId == null) throw new DictationValidationException("Cần link YouTube HTTPS hợp lệ.");
+            double duration = durationInSeconds(details.get(4));
+            ImportResult imported = transcript(workbook);
+            if (!imported.errors().isEmpty()) {
+                ImportIssue issue = imported.errors().getFirst();
+                throw new DictationValidationException("Transcript dòng " + issue.row() + " " + issue.message());
+            }
+            return new Definition(
+                details.get(0),
+                "",
+                details.get(1),
+                level,
+                null,
+                imported.sentences(),
+                new Video("https://www.youtube.com/watch?v=" + videoId, duration)
+            );
+        } catch (DictationValidationException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new DictationValidationException(UNREADABLE_WORKBOOK);
+        }
+    }
+
+    private List<String> lessonFields(Workbook workbook) {
+        List<String> details = new ArrayList<>();
+        Sheet transcript = workbook.getSheet("Transcript");
+        if (transcript != null && transcriptHeaderRow(transcript) == TRANSCRIPT_HEADER_ROW) {
+            for (int field = 0; field < LESSON_HEADERS.size(); field++) {
+                Row row = transcript.getRow(field + 1);
+                if (!lessonLabelMatches(field, value(row, 0))) {
+                    throw new DictationValidationException("Giữ nguyên tên và thứ tự các mục thông tin bài nghe.");
+                }
+                details.add(value(row, 1));
+            }
+            return details;
+        }
+
+        Sheet previous = workbook.getSheet("Bài nghe");
+        if (previous == null) {
+            throw new DictationValidationException("Thiếu phần thông tin bài nghe. Hãy dùng file Excel mẫu mới.");
+        }
+        for (int col = 0; col < LESSON_HEADERS.size(); col++) {
+            if (!lessonLabelMatches(col, value(previous.getRow(0), col))) {
+                throw new DictationValidationException("Giữ nguyên tên và thứ tự cột trong sheet Bài nghe.");
+            }
+            details.add(value(previous.getRow(1), col));
+        }
+        return details;
+    }
+
+    private boolean lessonLabelMatches(int field, String label) {
+        String expected = LESSON_HEADERS.get(field);
+        return expected.equals(label) || (DURATION_LABEL.equals(expected) && LEGACY_DURATION_LABELS.contains(label));
+    }
+
+    private int transcriptHeaderRow(Sheet sheet) {
+        if (HEADERS.getFirst().equals(value(sheet.getRow(0), 0))) return 0;
+        boolean hasLessonFields = LESSON_HEADERS.getFirst().equals(value(sheet.getRow(1), 0));
+        boolean hasTranscriptHeader = HEADERS.getFirst().equals(value(sheet.getRow(TRANSCRIPT_HEADER_ROW), 0));
+        return hasLessonFields || hasTranscriptHeader ? TRANSCRIPT_HEADER_ROW : 0;
+    }
+
+    private double durationInSeconds(String value) {
+        String normalized = value.replace(',', '.');
+        var clock = DURATION_CLOCK.matcher(normalized);
+        try {
+            double seconds = clock.matches()
+                ? Double.parseDouble(clock.group(1)) * 60 + Double.parseDouble(clock.group(2))
+                : Double.parseDouble(normalized);
+            if (Double.isFinite(seconds) && seconds > 0) return seconds;
+        } catch (NumberFormatException invalidDuration) {
+            // An empty or nonnumeric cell uses the same message as an invalid duration.
+        }
+        throw new DictationValidationException("Nhập thời lượng video theo mm:ss (ví dụ 01:30) hoặc bằng số giây lớn hơn 0.");
+    }
+
+    private ImportResult transcript(Workbook workbook) {
+        List<ImportIssue> errors = new ArrayList<>();
+        List<Sentence> sentences = new ArrayList<>();
+        Sheet sheet = workbook.getSheet("Transcript");
+        if (sheet == null) return new ImportResult(
+            List.of(),
+            List.of(new ImportIssue(1, "Không tìm thấy sheet Transcript."))
+        );
+        int headerRow = transcriptHeaderRow(sheet);
+        for (int col = 0; col < HEADERS.size(); col++) {
+            if (!HEADERS.get(col).equals(value(sheet.getRow(headerRow), col))) errors.add(
+                new ImportIssue(headerRow + 1, "Tên cột phải là: " + String.join(", ", HEADERS))
             );
         }
+        if (!errors.isEmpty()) return new ImportResult(List.of(), errors);
+        if (sheet.getLastRowNum() - headerRow > 1000) throw new DictationValidationException(
+            "File chứa quá nhiều dòng. Tối đa 200 câu."
+        );
+        for (int index = headerRow + 1; index <= sheet.getLastRowNum(); index++) {
+            Row row = sheet.getRow(index);
+            String order = value(row, 0),
+                text = value(row, 1),
+                start = value(row, 2),
+                end = value(row, 3);
+            if ((order + text + start + end).isBlank()) continue;
+            if (sentences.size() >= 200) throw new DictationValidationException(
+                "Tối đa 200 câu trong một bài."
+            );
+            int number = index + 1;
+            if (!order.equals(Integer.toString(sentences.size() + 1))) errors.add(
+                new ImportIssue(number, "Thứ tự phải liên tiếp từ 1.")
+            );
+            if (text.isBlank() || text.length() > 1500) errors.add(
+                new ImportIssue(number, "Transcript cần từ 1 đến 1.500 ký tự.")
+            );
+            Double from = time(start, number, errors),
+                to = time(end, number, errors);
+            if (from != null && to != null && from >= to) errors.add(
+                new ImportIssue(number, "Kết thúc phải sau bắt đầu.")
+            );
+            sentences.add(new Sentence(text, from, to));
+        }
+        if (sentences.isEmpty()) errors.add(
+            new ImportIssue(headerRow + 2, "Chưa có câu nào trong sheet Transcript.")
+        );
+        return new ImportResult(sentences, errors);
     }
 
     private String value(Row row, int col) {
@@ -173,21 +212,5 @@ public class DictationWorkbookService {
         }
         String[] parts = text.split(":");
         return Double.parseDouble(parts[0]) * 60 + Double.parseDouble(parts[1]);
-    }
-
-    private void header(Workbook workbook, Sheet sheet, List<String> names) {
-        Row row = sheet.createRow(0);
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setColor(IndexedColors.WHITE.getIndex());
-        CellStyle style = workbook.createCellStyle();
-        style.setFont(font);
-        style.setFillForegroundColor(IndexedColors.ROYAL_BLUE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        for (int i = 0; i < names.size(); i++) {
-            Cell cell = row.createCell(i);
-            cell.setCellValue(names.get(i));
-            cell.setCellStyle(style);
-        }
     }
 }

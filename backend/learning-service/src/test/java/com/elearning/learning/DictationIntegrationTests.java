@@ -7,7 +7,9 @@ import com.elearning.learning.dto.DictationModels.*;
 import com.elearning.learning.service.*;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.validation.Validator;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -15,15 +17,18 @@ import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
+import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest(
@@ -36,16 +41,15 @@ import tools.jackson.databind.json.JsonMapper;
     }
 )
 @ActiveProfiles("test")
-@Sql(
-    statements = "UPDATE dictation_exercises SET archived=FALSE WHERE id='ets-2024-company-picnic'",
-    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS
-)
 class DictationIntegrationTests {
 
+    private static final int TEMPLATE_FIRST_SENTENCE_ROW = 8;
+
     private static final String SECRET = "dictation-test-secret-with-more-than-thirty-two-bytes";
-    private static final String SAMPLE = "ets-2024-company-picnic";
     private static final String USER = "/api/v1/learning/dictation";
     private static final String ADMIN = "/api/v1/learning/admin/dictation";
+    private static String sampleId;
+    private static String sampleAudioKey;
 
     @Autowired
     DictationService service;
@@ -55,6 +59,9 @@ class DictationIntegrationTests {
 
     @Autowired
     DictationWorkbookService workbooks;
+
+    @Autowired
+    Validator validator;
 
     @Autowired
     DictationAudioService audio;
@@ -73,6 +80,26 @@ class DictationIntegrationTests {
 
     final HttpClient http = HttpClient.newHttpClient();
 
+    @BeforeAll
+    static void publishAudioFixture(@Autowired DictationService service, @Autowired DictationAudioService audio) {
+        sampleAudioKey = audio.upload(new MockMultipartFile("file", "practice.mp3", "audio/mpeg", silentMp3())).key();
+        var sentences = new ArrayList<Sentence>();
+        for (int index = 0; index < 13; index++) {
+            sentences.add(new Sentence("Practice sentence " + (index + 1) + ".", index * 2.0, (index + 1) * 2.0));
+        }
+        sampleId = service.saveAndPublish(
+            null,
+            new SaveRequest(new Definition("Picnic practice fixture", "", "Test 1", "B1", sampleAudioKey, sentences), 0)
+        ).id();
+    }
+
+    @AfterAll
+    static void deleteAudioFixture() throws Exception {
+        if (sampleAudioKey != null) {
+            Files.deleteIfExists(Path.of("./target/dictation-test-uploads").resolve(sampleAudioKey));
+        }
+    }
+
     @Test
     void legacyAudioCatalogIsAvailableWithoutEnrollment() {
         var catalog = service.catalog(5001, "picnic", "B1", "Test 1", 0, 12, false);
@@ -80,13 +107,13 @@ class DictationIntegrationTests {
         var item = catalog
             .items()
             .stream()
-            .filter(value -> value.id().equals(SAMPLE))
+            .filter(value -> value.id().equals(sampleId))
             .findFirst()
             .orElseThrow();
         assertThat(item.sentenceCount()).isEqualTo(13);
         assertThat(item.duration()).isBetween(31.0, 32.0);
         assertThat(item.topic()).isEqualTo("Test 1");
-        assertThat(service.adminDetail(SAMPLE).definition().topic()).isEqualTo("Test 1");
+        assertThat(service.adminDetail(sampleId).definition().topic()).isEqualTo("Test 1");
         assertThat(
             service.catalog(5001, "nothing-matches-this-query", "", "", 0, 12, false).items()
         ).isEmpty();
@@ -102,7 +129,7 @@ class DictationIntegrationTests {
         for (int index = 0; index < 7; index++) {
             String topic = index < 6 ? (index % 2 == 0 ? "  test  02  " : "Test 2") : "Travel & Food";
             var definition = new Definition(
-                keyword + " " + index, "", topic, "B1", "sample-ets-2024-test-1", sentences
+                keyword + " " + index, "", topic, "B1", sampleAudioKey, sentences
             );
             var lesson = service.saveAndPublish(null, new SaveRequest(definition, 0));
             ids.add(lesson.id());
@@ -244,7 +271,7 @@ class DictationIntegrationTests {
         var sentences = List.of(new Sentence("Hello there.", 0.0, 3.0));
         for (String level : List.of("A1", "A2", "B1", "C2")) {
             var definition = new Definition(
-                keyword + " " + level, "", "Test 4", level, "sample-ets-2024-test-1", sentences
+                keyword + " " + level, "", "Test 4", level, sampleAudioKey, sentences
             );
             service.saveAndPublish(null, new SaveRequest(definition, 0));
         }
@@ -319,7 +346,7 @@ class DictationIntegrationTests {
 
     @Test
     void unansweredTranscriptIsHiddenAndOtherUsersCannotReadOrWriteAttempts() throws Exception {
-        var attempt = start(5002, SAMPLE);
+        var attempt = start(5002, sampleId);
         assertThat(attempt.responses()).allSatisfy(response -> {
             assertThat(response.answer()).isNull();
             assertThat(response.grade()).isNull();
@@ -777,7 +804,7 @@ class DictationIntegrationTests {
                     "",
                     "Travel",
                     "A2",
-                    "sample-ets-2024-test-1",
+                    sampleAudioKey,
                     List.of(new Sentence("New words.", 0.0, 3.0))
                 ),
                 original.version()
@@ -847,7 +874,7 @@ class DictationIntegrationTests {
                     "",
                     "Workplace",
                     "B1",
-                    "sample-ets-2024-test-1",
+                    sampleAudioKey,
                     List.of(new Sentence("Different words.", 0.0, 3.0))
                 ),
                 original.version()
@@ -1001,7 +1028,7 @@ class DictationIntegrationTests {
                     "",
                     "Travel",
                     "A2",
-                    "sample-ets-2024-test-1",
+                    sampleAudioKey,
                     List.of(new Sentence("Hello there.", 0.0, 3.0))
                 ),
                 0
@@ -1142,7 +1169,7 @@ class DictationIntegrationTests {
             "",
             "Workplace",
             "B1",
-            "sample-ets-2024-test-1",
+            sampleAudioKey,
             List.of(new Sentence("Original words.", 0.0, 3.0))
         );
         var response = request(
@@ -1204,7 +1231,7 @@ class DictationIntegrationTests {
             "",
             "Workplace",
             "B1",
-            "sample-ets-2024-test-1",
+            sampleAudioKey,
             List.of(new Sentence("Missing end.", 0.0, null))
         );
         assertThat(
@@ -1234,31 +1261,168 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void templateHasTwoEditableExamplesAndImportDoesNotReadInstructionSheet() throws Exception {
+    void mergedTemplateImportsLessonDetailsAndAllowsTranscriptOnlyImport() throws Exception {
         byte[] template = workbooks.template();
         var samples = workbooks.parse(xlsx(template));
         assertThat(samples.errors()).isEmpty();
         assertThat(samples.sentences()).hasSize(2);
         assertThat(samples.sentences().getFirst().text()).isEqualTo("Thank you for joining us today.");
         assertThat(samples.sentences().get(1).start()).isEqualTo(4.0);
+        var lesson = workbooks.parseLesson(template);
+        assertThat(lesson.title()).isEqualTo("What day is it today?");
+        assertThat(lesson.video().duration()).isEqualTo(92.0);
+        assertThat(lesson.sentences()).isEqualTo(samples.sentences());
         try (
             var workbook = new XSSFWorkbook(new ByteArrayInputStream(template));
             var output = new java.io.ByteArrayOutputStream()
         ) {
-            assertThat(workbook.getSheet("Hướng dẫn")).isNotNull();
-            var row = workbook.getSheet("Transcript").getRow(1);
+            assertThat(workbook.getNumberOfSheets()).isEqualTo(1);
+            var transcript = workbook.getSheet("Transcript");
+            assertThat(transcript.getMergedRegions()).extracting(range -> range.formatAsString())
+                .containsExactly("B1:D1", "B2:D2", "B3:D3", "B4:D4", "B5:D5", "B6:D6");
+            assertThat(transcript.getDataValidations()).singleElement().satisfies(validation -> {
+                assertThat(validation.getRegions().getCellRangeAddresses()[0].formatAsString()).isEqualTo("B4");
+                assertThat(validation.getValidationConstraint().getExplicitListValues())
+                    .containsExactly("A1", "A2", "B1", "B2", "C1", "C2");
+            });
+            var duration = transcript.getRow(5);
+            assertThat(duration.getCell(0).getStringCellValue()).isEqualTo("Thời gian");
+            assertThat(duration.getCell(1).getStringCellValue()).isEqualTo("01:32");
+            assertThat(duration.getCell(1).getCellStyle().getDataFormatString()).isEqualTo("@");
+            duration.getCell(0).setCellValue("Thời lượng (mm:ss)");
+            workbook.write(output);
+            assertThat(workbooks.parseLesson(output.toByteArray()).video().duration()).isEqualTo(92.0);
+            output.reset();
+            assertThat(transcript.getRow(TEMPLATE_FIRST_SENTENCE_ROW - 1).getCell(0).getStringCellValue())
+                .isEqualTo("Thứ tự");
+            var row = transcript.getRow(TEMPLATE_FIRST_SENTENCE_ROW);
             assertThat(row.getCell(2).getCellStyle().getDataFormatString()).isEqualTo("@");
+            transcript.getRow(0).getCell(0).setCellValue("Tên khác cho phần thông tin");
+            transcript.getRow(1).getCell(1).setBlank();
             row.getCell(0).setCellValue("1");
             row.getCell(1).setCellValue("Hello there.");
             row.getCell(2).setCellValue("00:02");
             row.getCell(3).setCellValue("00:04");
-            workbook.getSheet("Transcript").removeRow(workbook.getSheet("Transcript").getRow(2));
+            transcript.removeRow(transcript.getRow(TEMPLATE_FIRST_SENTENCE_ROW + 1));
             workbook.write(output);
+            assertThatThrownBy(() -> workbooks.parseLesson(output.toByteArray()))
+                .hasMessageContaining("Chưa điền mục “Tên bài nghe”");
             var imported = workbooks.parse(xlsx(output.toByteArray()));
             assertThat(imported.errors()).isEmpty();
             assertThat(imported.sentences()).hasSize(1);
             assertThat(imported.sentences().getFirst().start()).isEqualTo(2.0);
+
+            var last = transcript.getRow(TEMPLATE_FIRST_SENTENCE_ROW + 199);
+            writeWorkbookRow(last, "2", "Thank you.", "00:04", "00:07");
+            output.reset();
+            workbook.write(output);
+            var extended = workbooks.parse(xlsx(output.toByteArray()));
+            assertThat(extended.errors()).isEmpty();
+            assertThat(extended.sentences()).extracting(Sentence::text).containsExactly("Hello there.", "Thank you.");
         }
+    }
+
+    @Test
+    void inboxPublishesYouTubeWorkbooksAndRecognizesAnAlreadyImportedLesson(@TempDir Path inbox) throws Exception {
+        String title = "VPS conversation import";
+        String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
+        byte[] first = lessonWorkbook(title, "https://youtu.be/_R7nrvhNmrI?t=7", "1:32");
+        Path transferring = Files.write(inbox.resolve("conversation.xlsx.part"), first);
+        Files.write(inbox.resolve("~$conversation.xlsx"), first);
+        Files.createDirectory(inbox.resolve("clips.xlsx"));
+        var importer = workbookImporter(inbox);
+        importer.scan();
+        assertThat(service.catalog(5098, title, "", "", 0, 12, false).items()).isEmpty();
+
+        Files.move(transferring, inbox.resolve("conversation.XLSX"));
+        importer.scan();
+        var catalog = service.catalog(5098, title, "A1", "daily english conversation", 0, 12, false);
+        assertThat(catalog.items()).hasSize(1);
+        String id = catalog.items().getFirst().id();
+        var lesson = service.adminDetail(id);
+        assertThat(lesson.published()).isTrue();
+        assertThat(lesson.definition().video()).isEqualTo(new Video(url, 92.0));
+        assertThat(lesson.definition().sentences()).hasSize(2);
+        assertThat(request(5098L, false, "GET", USER + "?keyword=VPS%20conversation%20import", null).statusCode())
+            .isEqualTo(200);
+        importer.scan();
+
+        try (
+            var oldTemplate = new XSSFWorkbook();
+            var output = new ByteArrayOutputStream()
+        ) {
+            var metadata = oldTemplate.createSheet("Bài nghe");
+            writeWorkbookRow(
+                metadata.createRow(0), "Tên bài nghe", "Chủ đề", "Trình độ", "Link YouTube", "Thời lượng (giây)", "Mô tả"
+            );
+            writeWorkbookRow(metadata.createRow(1), title, "Daily English Conversation", "A1", url, "92.0", "Mô tả cũ");
+            var transcript = oldTemplate.createSheet("Transcript");
+            writeWorkbookRow(transcript.createRow(0), "Thứ tự", "Transcript", "Bắt đầu", "Kết thúc");
+            writeWorkbookRow(transcript.createRow(1), "1", "Thank you for joining us today.", "00:00", "00:04");
+            writeWorkbookRow(transcript.createRow(2), "2", "We will begin in a moment.", "00:04", "00:08");
+            oldTemplate.write(output);
+            assertThat(workbooks.parse(xlsx(output.toByteArray())).sentences()).hasSize(2);
+            Files.write(inbox.resolve("renamed.xlsx"), output.toByteArray());
+        }
+        service.visibility(id, true);
+        workbookImporter(inbox).scan();
+        assertThat(service.catalog(5098, title, "", "", 0, 12, false).items()).isEmpty();
+        assertThat(service.catalog(0, title, "", "", 0, 12, true).items()).extracting(Item::id).containsExactly(id);
+        assertThat(service.adminDetail(id).archived()).isTrue();
+    }
+
+    @Test
+    void inboxPublishesOtherBooksAndRetriesAWorkbookAfterItIsCorrected(@TempDir Path inbox) throws Exception {
+        String keyword = "VPS workbook validation";
+        String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
+        Files.write(inbox.resolve("bad-link.xlsx"), lessonWorkbook(keyword + " bad link", "https://example.org/a", "92"));
+        Files.write(inbox.resolve("bad-number.xlsx"), lessonWorkbook(keyword + " bad number", url, "12 seconds"));
+        Files.write(inbox.resolve("bad-clock.xlsx"), lessonWorkbook(keyword + " bad clock", url, "1:60"));
+        Files.write(inbox.resolve("bad-duration.xlsx"), lessonWorkbook(keyword + " bad duration", url, "0"));
+        Files.write(inbox.resolve("bad-timing.xlsx"), lessonWorkbook(keyword + " bad timing", url, "3"));
+        Files.write(inbox.resolve("blank-title.xlsx"), lessonWorkbook("", url, "92"));
+        byte[] missingTopic = lessonWorkbook(keyword + " missing topic", "", "B1", url, "92");
+        Files.write(inbox.resolve("missing-topic.xlsx"), missingTopic);
+        assertThatThrownBy(() -> workbooks.parseLesson(missingTopic)).hasMessageContaining("Chưa điền mục “Chủ đề”");
+        byte[] invalidLevel = lessonWorkbook(keyword + " bad level", "Daily English Conversation", "B3", url, "92");
+        Files.write(inbox.resolve("bad-level.xlsx"), invalidLevel);
+        assertThatThrownBy(() -> workbooks.parseLesson(invalidLevel)).hasMessageContaining("Trình độ phải là");
+        var manualImport = workbooks.parse(xlsx(invalidLevel));
+        assertThat(manualImport.errors()).isEmpty();
+        assertThat(manualImport.sentences()).hasSize(2);
+        Files.write(inbox.resolve("large.xlsx"), new byte[5 * 1024 * 1024 + 1]);
+        Files.write(inbox.resolve("empty.xlsx"), new byte[0]);
+        Files.writeString(inbox.resolve("partially-copied.xlsx"), "unfinished");
+        Files.write(inbox.resolve("valid.xlsx"), lessonWorkbook(keyword + " valid", url, "92,0"));
+        var importer = workbookImporter(inbox);
+        importer.scan();
+        assertThat(service.catalog(5099, keyword, "", "", 0, 12, true).items())
+            .extracting(Item::title).containsExactly(keyword + " valid");
+
+        Files.write(inbox.resolve("partially-copied.xlsx"), lessonWorkbook(keyword + " corrected", url, "92"));
+        importer.scan();
+        assertThat(service.catalog(5099, keyword, "", "", 0, 12, false).items())
+            .extracting(Item::title).containsExactlyInAnyOrder(keyword + " valid", keyword + " corrected");
+    }
+
+    @Test
+    void concurrentInboxScansPublishASingleLesson(@TempDir Path inbox) throws Exception {
+        String title = "VPS workbook concurrent import";
+        Files.write(
+            inbox.resolve("conversation.xlsx"),
+            lessonWorkbook(title, "https://www.youtube.com/watch?v=_R7nrvhNmrI", "92")
+        );
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(workbookImporter(inbox)::scan);
+            var second = executor.submit(workbookImporter(inbox)::scan);
+            first.get();
+            second.get();
+        }
+        var items = service.catalog(0, title, "", "", 0, 12, true).items();
+        assertThat(items).hasSize(1);
+        assertThat(jdbc.queryForList(
+            "SELECT exercise_id FROM dictation_workbook_imports WHERE exercise_id=?", String.class, items.getFirst().id()
+        )).containsExactly(items.getFirst().id());
     }
 
     @Test
@@ -1267,7 +1431,7 @@ class DictationIntegrationTests {
             var workbook = new XSSFWorkbook(new ByteArrayInputStream(workbooks.template()));
             var output = new java.io.ByteArrayOutputStream()
         ) {
-            var row = workbook.getSheet("Transcript").getRow(1);
+            var row = workbook.getSheet("Transcript").getRow(TEMPLATE_FIRST_SENTENCE_ROW);
             row.getCell(0).setCellValue("3");
             row.getCell(1).setCellValue("Hello.");
             row.getCell(2).setCellValue("2 seconds");
@@ -1275,13 +1439,13 @@ class DictationIntegrationTests {
             var result = workbooks.parse(xlsx(output.toByteArray()));
             assertThat(result.errors())
                 .hasSize(2)
-                .allSatisfy(error -> assertThat(error.row()).isEqualTo(2));
+                .allSatisfy(error -> assertThat(error.row()).isEqualTo(TEMPLATE_FIRST_SENTENCE_ROW + 1));
         }
         try (
             var workbook = new XSSFWorkbook(new ByteArrayInputStream(workbooks.template()));
             var output = new java.io.ByteArrayOutputStream()
         ) {
-            workbook.getSheet("Transcript").getRow(1).getCell(1).setCellFormula("1+1");
+            workbook.getSheet("Transcript").getRow(TEMPLATE_FIRST_SENTENCE_ROW).getCell(1).setCellFormula("1+1");
             workbook.write(output);
             assertThatThrownBy(() -> workbooks.parse(xlsx(output.toByteArray()))).isInstanceOf(
                 com.elearning.learning.common.exception.DictationValidationException.class
@@ -1292,19 +1456,23 @@ class DictationIntegrationTests {
     @Test
     void httpEnforcesAuthenticationAdminRoleValidationAndBinaryAudio() throws Exception {
         assertThat(request(null, false, "GET", USER, null).statusCode()).isEqualTo(401);
-        for (String path : List.of(ADMIN, ADMIN + "/template", ADMIN + "/audio/sample-ets-2024-test-1"))
+        for (String path : List.of(ADMIN, ADMIN + "/template", ADMIN + "/audio/" + sampleAudioKey))
             assertThat(request(5010L, false, "GET", path, null).statusCode()).isEqualTo(403);
-        assertThat(request(5010L, true, "GET", ADMIN + "/template", null).statusCode()).isEqualTo(200);
+        var template = request(5010L, true, "GET", ADMIN + "/template", null);
+        assertThat(template.statusCode()).isEqualTo(200);
+        assertThat(template.headers().firstValue("Content-Disposition"))
+            .contains("attachment; filename=transcript-template.xlsx");
+        assertThat(template.body()).isEqualTo(workbooks.template());
         assertThat(
             request(
                 5010L,
                 false,
                 "POST",
                 ADMIN,
-                json.writeValueAsString(new SaveRequest(service.adminDetail(SAMPLE).definition(), 0))
+                json.writeValueAsString(new SaveRequest(service.adminDetail(sampleId).definition(), 0))
             ).statusCode()
         ).isEqualTo(403);
-        var attempt = start(5010, SAMPLE);
+        var attempt = start(5010, sampleId);
         assertThat(
             request(
                 5010L,
@@ -1316,13 +1484,13 @@ class DictationIntegrationTests {
         ).isEqualTo(400);
         var bytes = request(5010L, false, "GET", USER + "/attempts/" + attempt.id() + "/audio", null);
         assertThat(bytes.statusCode()).isEqualTo(200);
-        assertThat(bytes.body().length).isGreaterThan(1000000);
+        assertThat(bytes.body()).isEqualTo(silentMp3());
         assertThat(bytes.headers().firstValue("content-type")).hasValue("audio/mpeg");
     }
 
     @Test
     void mp3UploadIsValidatedAndStoredOutsideSource() throws Exception {
-        byte[] bytes = Files.readAllBytes(Path.of("../../docs/resources/audio/Audio 1.mp3"));
+        byte[] bytes = silentMp3();
         var uploaded = audio.upload(new MockMultipartFile("file", "picnic.mp3", "audio/mpeg", bytes));
         try {
             assertThat(uploaded.duration()).isBetween(31.0, 32.0);
@@ -1343,11 +1511,25 @@ class DictationIntegrationTests {
         ).isInstanceOf(com.elearning.learning.common.exception.DictationValidationException.class);
     }
 
+    private static byte[] silentMp3() {
+        // MPEG-1 Layer III mono frames at 64 kbps and 48 kHz, with silent payloads.
+        byte[] frame = new byte[192];
+        frame[0] = (byte) 0xff;
+        frame[1] = (byte) 0xfb;
+        frame[2] = 0x54;
+        frame[3] = (byte) 0xc0;
+        byte[] audio = new byte[frame.length * 1312];
+        for (int offset = 0; offset < audio.length; offset += frame.length) {
+            System.arraycopy(frame, 0, audio, offset, frame.length);
+        }
+        return audio;
+    }
+
     private AdminDetail create(String title, List<Sentence> sentences) {
         return service.save(
             null,
             new SaveRequest(
-                new Definition(title, "", "Workplace", "B1", "sample-ets-2024-test-1", sentences),
+                new Definition(title, "", "Workplace", "B1", sampleAudioKey, sentences),
                 0
             )
         );
@@ -1355,6 +1537,31 @@ class DictationIntegrationTests {
 
     private Attempt start(long user, String exercise) {
         return service.start(user, exercise, new StartRequest(UUID.randomUUID().toString(), false));
+    }
+
+    private DictationWorkbookImporter workbookImporter(Path directory) {
+        return new DictationWorkbookImporter(workbooks, service, validator, jdbc, json, transactions, directory.toString());
+    }
+
+    private byte[] lessonWorkbook(String title, String url, String duration) throws Exception {
+        return lessonWorkbook(title, "Daily English Conversation", "a1", url, duration);
+    }
+
+    private byte[] lessonWorkbook(String title, String topic, String level, String url, String duration) throws Exception {
+        try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(workbooks.template()));
+             var output = new ByteArrayOutputStream()) {
+            String[] values = { title, topic, level, url, duration };
+            var sheet = workbook.getSheet("Transcript");
+            for (int field = 0; field < values.length; field++) {
+                sheet.getRow(field + 1).getCell(1).setCellValue(values[field]);
+            }
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    private void writeWorkbookRow(Row row, String... values) {
+        for (int index = 0; index < values.length; index++) row.createCell(index).setCellValue(values[index]);
     }
 
     private MockMultipartFile xlsx(byte[] bytes) {
