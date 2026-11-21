@@ -119,13 +119,36 @@ class DictationMigrationTests {
     }
 
     @Test
-    void latestMigrationsPublishOnlyTheYouTubeStarterInANewDatabase() {
+    void latestMigrationsLeaveTheLibraryEmptyOnANewDatabase() {
         var source = new DriverManagerDataSource(
-            "jdbc:h2:mem:dictation-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
+            "jdbc:h2:mem:dictation-empty-library-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
         );
         Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""
         )).load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        var service = new DictationService(
+            jdbc, JsonMapper.builder().build(), new DictationGrader(),
+            mock(DictationAudioService.class), Clock.systemUTC()
+        );
+
+        assertThat(service.catalog(7021, "", "", "", 0, 12, false).items()).isEmpty();
+        assertThat(service.topicGroups(7021, "", "", "", "").groups()).isEmpty();
+        assertThat(jdbc.queryForList("SELECT id FROM dictation_exercises", String.class)).isEmpty();
+        assertThat(jdbc.queryForList(
+            "SELECT audio_key FROM dictation_audio WHERE audio_key=?", String.class, "sample-ets-2024-test-1"
+        )).isEmpty();
+    }
+
+    @Test
+    void v24DeletesTheYouTubeStarterWithItsExistingProgress() {
+        var source = new DriverManagerDataSource(
+            "jdbc:h2:mem:dictation-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
+        );
+        var config = Flyway.configure().dataSource(source).placeholders(Map.of(
+            "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""
+        ));
+        config.target("23").load().migrate();
         var jdbc = new JdbcTemplate(source);
         var audio = mock(DictationAudioService.class);
         var service = new DictationService(
@@ -152,17 +175,22 @@ class DictationMigrationTests {
         assertThat(attempt.video()).isEqualTo(definition.video());
         assertThat(attempt.sentences()).hasSize(7);
         assertThat(attempt.sentences().getLast().end()).isEqualTo(34.0);
+        service.progress(7021, attempt.id(), new AnswerRequest(0, "Can you play"));
+        assertThat(config.target("24").load().migrate().migrationsExecuted).isEqualTo(1);
+        config.load().validate();
+
+        assertThat(service.catalog(7021, "", "", "", 0, 12, false).items()).isEmpty();
+        assertThat(service.history(7021, "", "", "", "", 0, 12).items()).isEmpty();
+        assertThat(jdbc.queryForList("SELECT id FROM dictation_exercises WHERE id=?", String.class, YOUTUBE_STARTER))
+            .isEmpty();
         assertThat(jdbc.queryForList(
-            "SELECT id FROM dictation_exercises WHERE id=?", String.class, LEGACY_STARTER
-        )).isEmpty();
-        assertThat(jdbc.queryForList(
-            "SELECT audio_key FROM dictation_audio WHERE audio_key=?", String.class, "sample-ets-2024-test-1"
+            "SELECT answer_text FROM dictation_responses WHERE attempt_id=?", String.class, attempt.id()
         )).isEmpty();
         verifyNoInteractions(audio);
     }
 
     @Test
-    void v24DeletesTheLegacyStarterAndOnlyItsProgress() {
+    void v24DeletesTheAudioStarterAndKeepsAnIndependentlyPublishedYouTubeLesson() {
         var source = new DriverManagerDataSource(
             "jdbc:h2:mem:dictation-existing-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
         );
@@ -195,7 +223,7 @@ class DictationMigrationTests {
         assertThat(service.adminDetail(lesson.id()).definition()).isEqualTo(imported);
         assertThat(service.attempt(7022, attempt.id()).responses().getFirst().text()).isEqualTo("Thank you so much");
 
-        config.target("24").load().migrate();
+        config.target("latest").load().migrate();
 
         assertThat(service.topicGroups(7022, "", "", "", "").groups()).singleElement().satisfies(group -> {
             assertThat(group.topic()).isEqualTo("Daily English Conversation");

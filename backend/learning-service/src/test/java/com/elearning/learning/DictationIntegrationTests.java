@@ -1324,7 +1324,7 @@ class DictationIntegrationTests {
 
     @Test
     void inboxPublishesYouTubeWorkbooksAndRecognizesAnAlreadyImportedLesson(@TempDir Path inbox) throws Exception {
-        String title = "VPS conversation import";
+        String title = "What day is it today?";
         String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
         byte[] first = lessonWorkbook(title, "https://youtu.be/_R7nrvhNmrI?t=7", "1:32");
         Path transferring = Files.write(inbox.resolve("conversation.xlsx.part"), first);
@@ -1343,7 +1343,7 @@ class DictationIntegrationTests {
         assertThat(lesson.published()).isTrue();
         assertThat(lesson.definition().video()).isEqualTo(new Video(url, 92.0));
         assertThat(lesson.definition().sentences()).hasSize(2);
-        assertThat(request(5098L, false, "GET", USER + "?keyword=VPS%20conversation%20import", null).statusCode())
+        assertThat(request(5098L, false, "GET", USER + "?keyword=What%20day%20is%20it%20today%3F", null).statusCode())
             .isEqualTo(200);
         importer.scan();
 

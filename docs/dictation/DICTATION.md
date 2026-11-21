@@ -14,15 +14,13 @@ Learning Service lưu dữ liệu bài nghe trong các bảng `dictation_*` củ
 - Flyway V14 tạo các bảng và bài audio mẫu **The company picnic**.
 - Flyway V15 bổ sung chỉ số các từ đã dùng gợi ý, không thay đổi điểm hiện có hoặc checksum của V14.
 - Flyway V16 bổ sung chấm điểm trực tiếp và lưu riêng các từ người học tự nhập đúng. Các lượt luyện cũ đã hoàn thành vẫn giữ nguyên điểm đã lưu.
-- Flyway V21 thêm bài YouTube **What day is it today?**, trình độ A1, chủ đề **Daily English Conversation**. Bài mẫu có 7 câu và được xuất bản sẵn trên database mới.
+- Flyway V21 tạo sẵn bài YouTube **What day is it today?**.
 - Flyway V23 ghi nhận các workbook đã nhập để dùng lại bài tương ứng khi nhận cùng nội dung.
-- Flyway V24 xóa bài audio mẫu **The company picnic** cùng điểm và tiến độ của riêng bài này.
+- Flyway V24 xóa hai bài mẫu **The company picnic** và **What day is it today?** cùng điểm và tiến độ của riêng hai bài mẫu.
 
 V10-V13 thuộc các migration thương mại, danh mục và TOEIC hiện có trên `main`, không được sửa. Database local từng chạy migration luyện nghe dưới tên V10-V12 cần được sao lưu rồi đối chiếu, điều chỉnh lịch sử migration. Chỉ đổi tên tệp nguồn không tự cập nhật lịch sử trong database đã chạy.
 
-Bài YouTube mẫu được khởi tạo từ link video, thời lượng và các câu kèm mốc thời gian trong V21. File Excel gốc có thể lưu trên VPS hoặc Drive chung.
-
-Từ V24, bản cài mới có sẵn bài YouTube **What day is it today?**. File `Audio 1.mp3` đã được gỡ khỏi project.
+Thư viện trên database mới sẽ trống cho đến khi một bài được xuất bản. Để đưa **What day is it today?** lên thư viện, dùng workbook của bài trong thư mục tự nhập như các bài khác.
 
 Lệnh khởi động backend vẫn là:
 
@@ -30,7 +28,7 @@ Lệnh khởi động backend vẫn là:
 docker compose --profile backend up --build -d
 ```
 
-Compose lưu các audio admin đã tải lên trong volume riêng `dictation_uploads`. Flyway tự tạo bảng và bài mẫu khi khởi động backend trên database mới.
+Compose lưu các audio admin đã tải lên trong volume riêng `dictation_uploads`. Flyway tự tạo bảng khi khởi động backend trên database mới.
 
 Khi chạy Maven từ `backend/learning-service`, thư mục lưu audio mặc định là `./uploads/dictation`. Có thể cấu hình đường dẫn này bằng `DICTATION_STORAGE_DIR`.
 
@@ -49,9 +47,9 @@ Các bài seed có thể dùng cùng cấu trúc dữ liệu với `video.url` l
 
 1. Trên VPS, tạo thư mục dành riêng cho file muốn xuất bản, chẳng hạn `/home/ubuntu/dictation-sources/inbox/`. Đặt `DICTATION_IMPORT_HOST_DIR=/home/ubuntu/dictation-sources/inbox` trong `.env.production` rồi deploy phiên bản có V23 theo luồng deploy của nhóm. Khi để trống biến này, Compose dùng `dictation-inbox.local/` trong thư mục dự án. Learning Service đọc thư mục qua bind mount chỉ đọc, nên tài khoản chạy trong container cần có quyền đọc thư mục và file.
 2. Trên web, vào **Quản lý bài nghe → Thêm bài nghe → Tải Excel mẫu** để tải `transcript-template.xlsx`. Mẫu có một sheet **Transcript**. Thay dữ liệu minh họa trong phần **Nội dung** bằng tên bài, chủ đề, trình độ, link YouTube HTTPS và thời lượng của bài. Dùng dạng `mm:ss` cho thời lượng, ví dụ `01:32`. Các file cũ ghi thời lượng bằng số giây vẫn nhập được. Bảng transcript bắt đầu ở dòng 8. Thay hai câu ví dụ và điền mốc theo dạng `mm:ss`. Mỗi file `.xlsx` chứa một bài và có dung lượng tối đa 5 MB.
-3. Chép file `.xlsx` hoàn chỉnh vào thư mục ở bước 1. Khi chép trực tiếp vào thư mục, có thể dùng đuôi `.xlsx.part` trong lúc tải lên rồi đổi thành `.xlsx` khi xong. Dịch vụ quét thư mục sau mỗi khoảng nghỉ 15 giây, kiểm tra và xuất bản bài hợp lệ. Tải lại thư viện để thấy bài. Nếu file lỗi, tìm tên file và lý do trong log `learning-service`, sửa nội dung rồi thay file.
+3. Nếu nhận một file ZIP, giải nén rồi chép từng file `.xlsx` trực tiếp vào thư mục ở bước 1. Dịch vụ quét cấp thư mục đó và lấy chủ đề từ ô **Chủ đề** trong Excel. Có thể dùng đuôi `.xlsx.part` trong lúc tải lên rồi đổi thành `.xlsx` khi xong. Dịch vụ đợi 15 giây giữa các lượt quét, kiểm tra và xuất bản bài hợp lệ. Tải lại thư viện để thấy bài. Nếu file lỗi, tìm tên file và lý do trong log `learning-service`, sửa nội dung rồi thay file.
 
-Thư mục này dành cho quản trị viên VPS vì workbook hợp lệ được xuất bản tự động. Mỗi nội dung workbook được nhập một lần, kể cả khi chép lại dưới tên khác hoặc khởi động lại dịch vụ. Để chỉnh bài đã xuất bản, dùng trang quản lý bài nghe. Workbook có nội dung khác được tạo thành bài riêng. Web đọc các bài đã nhập từ database, nên bạn có thể dời file nguồn ra khỏi thư mục nhận bài sau khi xác nhận đã xuất bản.
+Thư mục này dành cho quản trị viên VPS vì workbook hợp lệ được xuất bản tự động. Mỗi nội dung workbook được nhập một lần, kể cả khi chép lại dưới tên khác hoặc khởi động lại dịch vụ. Workbook có nội dung khác được tạo thành bài riêng. Web đọc các bài đã nhập từ database, nên bạn có thể dời file nguồn ra khỏi thư mục nhận bài sau khi xác nhận đã xuất bản. Để chỉnh bài hoặc gỡ bài khỏi thư viện, dùng trang quản lý bài nghe.
 
 ### Nhập và kiểm tra mốc
 
