@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-- Mục `Luyện nghe` trong menu hiển thị với mọi người; trang `/dictation` yêu cầu đăng nhập và hoạt động độc lập với khóa học, đăng ký học và gói PRO.
+- Khách có thể xem các chủ đề và bài đã xuất bản tại `/dictation`. Bắt đầu luyện, tiếp tục bài và xem tiến độ yêu cầu đăng nhập. Luyện nghe hoạt động độc lập với khóa học, đăng ký học và gói PRO.
 - Hỗ trợ thanh thời gian cho toàn bộ audio, nghe và phát lại từng câu, gợi ý từng từ, phản hồi chấm từ trực tiếp từ backend, lưu để luyện tiếp và xem tiến độ mới nhất của mỗi bài.
 - Trang quản lý `/admin/dictation` chỉ dành cho vai trò `ADMIN`, được kiểm tra ở cả frontend và backend.
 - Bài mới dùng video YouTube có thể nhúng. Các bài MP3 và MP4 đã có vẫn dùng trình phát tương ứng.

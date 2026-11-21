@@ -6,11 +6,13 @@ import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
-import {
+import { loadSource } from './load-source.js';
+
+const {
   consumeNotificationStream,
   notificationActionUrl,
   notificationCategory,
-} from '../src/features/learning/utils/notificationStream.js';
+} = await loadSource('../src/features/learning/utils/notificationStream.js', import.meta.url);
 
 process.env.VITE_API_URL = 'http://gateway.test';
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost' });

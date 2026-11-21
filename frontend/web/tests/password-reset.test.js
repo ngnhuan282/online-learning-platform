@@ -2,16 +2,21 @@ import assert from 'node:assert/strict';
 import { after, afterEach, beforeEach, test } from 'node:test';
 import { JSDOM } from 'jsdom';
 import { act, createElement as h, StrictMode } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
 import { createServer } from 'vite';
 
 process.env.VITE_API_URL = 'http://gateway.test';
-const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/reset-password' });
+const dom = new JSDOM('<!doctype html><div id="root"></div>', {
+  url: 'http://localhost/reset-password',
+  pretendToBeVisual: true,
+});
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 globalThis.Event = dom.window.Event;
+globalThis.FormData = dom.window.FormData;
+globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { createRoot } = await import('react-dom/client');
 const cache = createCache({ key: 'reset' });
@@ -24,6 +29,10 @@ const server = await createServer({
 const load = path => server.ssrLoadModule(`/src/${path}`);
 const { default: ForgotPasswordPage } = await load('features/auth/pages/ForgotPasswordPage.jsx');
 const { default: ResetPasswordPage } = await load('features/auth/pages/ResetPasswordPage.jsx');
+const { default: LoginPage } = await load('features/auth/pages/LoginPage.jsx');
+const { default: RegisterPage } = await load('features/auth/pages/RegisterPage.jsx');
+const { AuthContext } = await load('features/auth/context/AuthContext.jsx');
+const { ToastContext } = await load('shared/context/ToastContext.jsx');
 const { default: client } = await load('shared/apis/axiosClient.js');
 const { authApi } = await load('features/auth/api/authApi.js');
 const tokens = await load('shared/utils/tokenUtils.js');
@@ -75,6 +84,98 @@ async function submit(twice = false) {
     if (twice) form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   });
 }
+
+function Destination() {
+  const { pathname, search, state } = useLocation();
+  return h('output', null, `${pathname}${search} from ${state?.from || ''}`);
+}
+
+async function mountGuestForm(path, Component, from, auth, showToast) {
+  await mount(
+    () =>
+      h(
+        AuthContext.Provider,
+        { value: auth },
+        h(
+          ToastContext.Provider,
+          { value: showToast },
+          h(
+            Routes,
+            null,
+            h(Route, { path, element: h(Component) }),
+            h(Route, { path: '*', element: h(Destination) }),
+          ),
+        ),
+      ),
+    { pathname: path, state: { from } },
+  );
+}
+
+test('the login form validates input and resumes the gem package selected before login', async () => {
+  const from = '/payment/gem-checkout?package=GEM_500';
+  const requests = [];
+  const alerts = [];
+  let finishLogin;
+  const auth = {
+    login: values => {
+      requests.push(values);
+      return new Promise(resolve => {
+        finishLogin = resolve;
+      });
+    },
+  };
+
+  await mountGuestForm('/login', LoginPage, from, auth, message => alerts.push(message));
+  await submit();
+  assert.equal(document.activeElement.name, 'email');
+  assert.equal(requests.length, 0);
+
+  await input('email', 'guest@example.test');
+  await input('password', password);
+  await act(async () => document.querySelector('[name="remember"]').click());
+  await submit(true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].remember, true);
+  assert.equal(document.querySelector('.auth-submit').disabled, true);
+
+  await act(async () => finishLogin({ id: 1, roles: ['USER'] }));
+  assert.equal(document.querySelector('output').textContent, `${from} from `);
+  assert.deepEqual(alerts, ['Đăng nhập thành công.']);
+});
+
+test('the registration form shows an existing-email error and carries the listening route into login', async () => {
+  const from = '/dictation/preview-lesson';
+  const requests = [];
+  const alerts = [];
+  const auth = {
+    register: async values => {
+      requests.push(values);
+      if (requests.length === 1)
+        throw Object.assign(new Error('Email exists'), { code: 'EMAIL_ALREADY_EXISTS' });
+    },
+  };
+
+  await mountGuestForm('/register', RegisterPage, from, auth, message => alerts.push(message));
+  await input('fullName', 'Preview Learner');
+  await input('email', 'existing@example.test');
+  await input('password', password);
+  await input('confirmPassword', password);
+  await submit();
+  assert.equal(requests.length, 0);
+  assert.equal(document.querySelector('[name="terms"]').getAttribute('aria-invalid'), 'true');
+
+  await act(async () => document.querySelector('[name="terms"]').click());
+  await submit();
+  assert.equal(document.querySelector('[name="email"]').getAttribute('aria-invalid'), 'true');
+  assert.match(document.body.textContent, /Email này đã được đăng ký/);
+
+  await input('email', 'new@example.test');
+  await submit();
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].email, 'new@example.test');
+  assert.equal(document.querySelector('output').textContent, `/login from ${from}`);
+  assert.deepEqual(alerts, ['Tạo tài khoản thành công. Vui lòng đăng nhập.']);
+});
 
 test('reset APIs use Gateway without bearer/refresh and strip unrelated fields', async () => {
   tokens.setAccessToken(access);

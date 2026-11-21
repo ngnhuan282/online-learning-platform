@@ -1,7 +1,3 @@
-
-
-
-
 {
   "Ngôn ngữ": "Language",
   "Trang chủ": "Home",
@@ -2358,7 +2354,6 @@
   "{count} câu sau khi nhập": "{count} sentences after import",
   "Thay thế {count} câu hiện tại bằng transcript từ Excel.": "Replace the current {count} sentences with the Excel transcript.",
   "Giữ nguyên {count} câu hiện tại và nối các câu mới xuống dưới.": "Keep the current {count} sentences and append the new ones below.",
-  "Tên bài, chủ đề, trình độ và video lấy từ form.": "The lesson title, topic, level, and video come from the form.",
   "Mốc thời gian được giữ nguyên. Thay đổi chưa được lưu.": "Timestamps are preserved. Changes have not been saved.",
   "Bài nghe chỉ được có tối đa 200 câu. Chọn thay thế hoặc giảm số câu nhập.": "A lesson can have at most 200 sentences. Choose Replace all or import fewer sentences.",
   "Mốc thời gian từ Excel chồng lên câu trước. Hãy chỉnh lại trước khi xuất bản.": "Excel timestamps overlap the previous sentence. Adjust them before publishing.",
@@ -2451,9 +2446,10 @@
   "Thêm câu hỏi Reading hoặc Listening để bắt đầu.": "Add a Reading or Listening question to get started.",
   "Câu {number} cần đường dẫn MP3 dưới /toeic-assets/.": "Question {number} requires an MP3 path under /toeic-assets/.",
   "Câu {number} cần audio và transcript để xuất bản.": "Question {number} needs a recording and transcript before publishing.",
-  "Câu {number} Part 1 cần hình ảnh.": "Part 1 question {number} needs a photo."
+  "Câu {number} Part 1 cần hình ảnh.": "Part 1 question {number} needs a photo.",
+  "Đăng nhập để xem tiến độ bài học": "Sign in to view your lesson progress",
+  "Kho đồ của bạn": "Your inventory",
+  "Đăng nhập để xem kho đồ và tùy chỉnh hồ sơ": "Sign in to view your inventory and customize your profile",
+  "Học viên ChitChatGo": "ChitChatGo learner",
+  "Đăng nhập để theo dõi thứ hạng của bạn trên bảng xếp hạng.": "Sign in to track your position on the leaderboard."
 }
-
-
-
-

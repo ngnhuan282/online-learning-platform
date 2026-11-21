@@ -34,6 +34,19 @@ const { createRoot } = await import('react-dom/client');
 const iconModule = '\0dictation-test-icons';
 const icons = [
   'ArrowBackRounded',
+  'AddRounded',
+  'ArrowDownwardRounded',
+  'ArrowUpwardRounded',
+  'CloseRounded',
+  'DeleteOutlineRounded',
+  'DownloadOutlined',
+  'EditOutlined',
+  'MyLocationRounded',
+  'PublishOutlined',
+  'RestartAlt',
+  'SaveOutlined',
+  'UploadFileOutlined',
+  'VisibilityOffOutlined',
   'ArrowForwardRounded',
   'CheckRounded',
   'CheckCircleOutlineRounded',
@@ -84,10 +97,15 @@ const { default: Page } = await server.ssrLoadModule(
 const { default: Library } = await server.ssrLoadModule(
   '/src/features/dictation/pages/DictationLibraryPage.jsx',
 );
+const { default: AdminLibrary } = await server.ssrLoadModule(
+  '/src/features/dictation/pages/AdminDictationPage.jsx',
+);
 const { default: Score } = await server.ssrLoadModule(
   '/src/features/dictation/components/DictationScore.jsx',
 );
 const { dictationApi } = await server.ssrLoadModule('/src/features/dictation/api/dictationApi.js');
+const { AuthContext } = await server.ssrLoadModule('/src/features/auth/context/AuthContext.jsx');
+const { default: ProtectedRoute } = await server.ssrLoadModule('/src/routes/ProtectedRoute.jsx');
 const original = { ...dictationApi };
 const cache = createCache({ key: 'dictation-ui-test' });
 const realSetTimeout = globalThis.setTimeout;
@@ -304,17 +322,27 @@ after(async () => {
   dom.window.close();
 });
 
-async function render(path = '/dictation/lesson?attempt=run') {
+async function render(path = '/dictation/lesson?attempt=run', user = { id: 1 }) {
   router = createMemoryRouter(
     [
-      { path: '/dictation/:id', element: h(Page) },
+      { element: h(ProtectedRoute), children: [{ path: '/dictation/:id', element: h(Page) }] },
       { path: '/dictation', element: h(Library) },
+      { path: '/admin/dictation', element: h(AdminLibrary) },
+      { path: '/login', element: h('p', null, 'Đăng nhập') },
       { path: '/elsewhere', element: h('p', null, 'Elsewhere') },
     ],
     { initialEntries: [path] },
   );
   root = createRoot(document.getElementById('root'));
-  await act(async () => root.render(h(CacheProvider, { value: cache }, h(RouterProvider, { router }))));
+  await act(async () =>
+    root.render(
+      h(
+        CacheProvider,
+        { value: cache },
+        h(AuthContext.Provider, { value: { user, isAuthenticated: Boolean(user) } }, h(RouterProvider, { router })),
+      ),
+    ),
+  );
   assertNoCheck();
 }
 
@@ -1200,6 +1228,125 @@ test('the TOEIC group preview opens its own paginated catalog and keeps the late
   assert.equal(queries.at(-1).topic, 'Test 1');
   await clickElement(document.querySelector('.dictation-library-back'));
   assert.equal(queries.at(-1).path, dictationApi.topicGroupsPath);
+});
+
+test('guests can browse the listening library, with history and practice requiring login', async () => {
+  const queries = [];
+  dictationApi.query = async path => {
+    queries.push(path);
+    assert.equal(path, dictationApi.topicGroupsPath);
+    if (queries.length === 1) throw new Error('Temporary catalog failure');
+    return {
+      data: {
+        groups: [{
+          topic: 'Workplace',
+          total: 1,
+          items: [{ id: 'lesson', title: 'Guest listening preview', level: 'B1', duration: 4, sentenceCount: 2 }],
+        }],
+      },
+    };
+  };
+
+  await render('/dictation', null);
+  assert.match(document.body.textContent, /Không thể tải dữ liệu/);
+  await click('Thử lại');
+  assert.match(document.querySelector('.dictation-lesson-card').textContent, /Guest listening preview/);
+  await click('Tiến độ bài học');
+  assert.match(document.body.textContent, /Đăng nhập để xem tiến độ bài học/);
+  assert.deepEqual(queries, [dictationApi.topicGroupsPath, dictationApi.topicGroupsPath]);
+
+  await click('Thư viện bài nghe');
+  await clickElement(document.querySelector('.dictation-lesson-card a[href="/dictation/lesson"]'));
+  assert.equal(router.state.location.pathname, '/login');
+  assert.deepEqual(router.state.location.state, { from: '/dictation/lesson' });
+  assert.deepEqual(starts, []);
+});
+
+test('admin editing keeps published listening metadata and visibility in sync with the catalog', async () => {
+  const requests = [];
+  const details = {
+    id: 'lesson',
+    version: 3,
+    published: true,
+    hasDraft: false,
+    archived: false,
+    audio: { duration: 4 },
+    definition: {
+      title: 'Published listening',
+      description: '',
+      topic: 'Workplace',
+      level: 'B1',
+      audioKey: 'sample',
+      sentences: [{ text: 'A sentence.', start: 0, end: 2 }],
+    },
+  };
+  const snapshot = () => ({ data: structuredClone(details) });
+  dictationApi.query = async (path, params) => {
+    assert.equal(path, dictationApi.adminPath);
+    const status = details.archived ? 'ARCHIVED' : 'PUBLISHED';
+    const item = {
+      id: details.id,
+      ...details.definition,
+      status,
+      hasDraft: details.hasDraft,
+      duration: 4,
+      sentenceCount: 1,
+    };
+    const matchesStatus = !params.status || params.status === status;
+    const matchesKeyword = item.title.includes(params.keyword);
+    const items = matchesStatus && matchesKeyword ? [item] : [];
+    return { data: { items, total: items.length } };
+  };
+  dictationApi.detail = async id => {
+    assert.equal(id, details.id);
+    return snapshot();
+  };
+  dictationApi.adminAudio = async () => new Blob(['audio'], { type: 'audio/mpeg' });
+  dictationApi.save = async (id, { definition, version }) => {
+    requests.push(['save', id, version, definition.title]);
+    Object.assign(details, { definition, version: version + 1, hasDraft: true });
+    return snapshot();
+  };
+  dictationApi.visibility = async (id, archived) => {
+    requests.push(['visibility', id, archived]);
+    details.archived = archived;
+    return snapshot();
+  };
+  dictationApi.publish = async (id, version, definition) => {
+    requests.push(['publish', id, version, definition]);
+    Object.assign(details, { archived: false, hasDraft: false, version: version + 1 });
+    return snapshot();
+  };
+
+  await render('/admin/dictation?q=does-not-match');
+  assert.match(document.body.textContent, /Chưa có bài nghe phù hợp/);
+  await click('Đặt lại bộ lọc');
+  assert.match(document.querySelector('.dictation-admin-table').textContent, /Published listening/);
+  await click('Chỉnh sửa');
+  const editor = document.querySelector('.dictation-editor');
+  assert.ok(editor);
+  const title = editor.querySelector('.dictation-editor-metadata input');
+  await change(title, 'Updated listening');
+  assert.equal(button('Ẩn bài nghe', editor).disabled, true);
+  await click('Lưu bản nháp', editor);
+  assert.match(editor.textContent, /Đã lưu bản nháp/);
+
+  await click('Ẩn bài nghe', editor);
+  await click('Xác nhận');
+  assert.match(editor.textContent, /Đã cập nhật hiển thị/);
+  assert.match(document.querySelector('.dictation-admin-table').textContent, /Đã ẩn/);
+
+  await click('Xuất bản', editor);
+  const publish = [...document.querySelectorAll('[role="dialog"]')].find(dialog =>
+    dialog.textContent.includes('Xuất bản cập nhật?'),
+  );
+  await click('Xác nhận', publish);
+  assert.match(document.querySelector('.dictation-admin-table').textContent, /Updated listening.*Đã xuất bản/s);
+  assert.deepEqual(requests, [
+    ['save', 'lesson', 3, 'Updated listening'],
+    ['visibility', 'lesson', true],
+    ['publish', 'lesson', 4, undefined],
+  ]);
 });
 
 test('level pills filter previews while topic links always open the full topic', async () => {

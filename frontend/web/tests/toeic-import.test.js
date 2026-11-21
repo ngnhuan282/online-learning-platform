@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
+import { loadSource } from './load-source.js';
+
+const {
   IMPORT_LIMITS,
   createQuestionTemplate,
   parseQuestionFile,
   validateImportRows,
-} from '../src/features/learning/utils/toeicQuestionImport.js';
+} = await loadSource('../src/features/learning/utils/toeicQuestionImport.js', import.meta.url);
 
 const HEADER = ['Số câu', 'Part', 'Đoạn đọc', 'Câu hỏi', 'A', 'B', 'C', 'D', 'Đáp án', 'Giải thích', 'Nguồn'];
 const ROW = [

@@ -31,10 +31,9 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(
-        HttpSecurity http,
-        JwtTokenProvider tokens,
-        SecurityErrorHandler errors
-    ) throws Exception {
+            HttpSecurity http,
+            JwtTokenProvider tokens,
+            SecurityErrorHandler errors) throws Exception {
         return http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -49,7 +48,8 @@ public class SecurityConfig {
                     .requestMatchers(
                         HttpMethod.GET,
                         "/api/v1/payments/vnpay/return",
-                        "/api/v1/payments/vnpay/ipn"
+                        "/api/v1/payments/vnpay/ipn",
+                        "/api/v1/payments/pro/plans"
                     )
                     .permitAll()
                     .anyRequest()

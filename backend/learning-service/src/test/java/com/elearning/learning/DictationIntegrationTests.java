@@ -121,6 +121,50 @@ class DictationIntegrationTests {
     }
 
     @Test
+    void catalog_whenGuest_shouldReturnOnlyPublishedExercisesWithoutAttempts() throws Exception {
+        // Arrange
+        start(5110L, sampleId);
+        create("Picnic practice draft", List.of(new Sentence("Draft sentence.", 0.0, 2.0)));
+        var archived = service.saveAndPublish(
+            null,
+            new SaveRequest(
+                new Definition(
+                    "Picnic practice archived",
+                    "",
+                    "Test 1",
+                    "B1",
+                    sampleAudioKey,
+                    List.of(new Sentence("Archived sentence.", 0.0, 2.0))
+                ),
+                0
+            )
+        );
+        service.visibility(archived.id(), true);
+
+        // Act
+        var catalog = request(null, false, "GET", USER + "?keyword=picnic&status=NOT_STARTED", null);
+        var groups = request(null, false, "GET", USER + "/topic-groups?keyword=picnic", null);
+        var started = request(null, false, "GET", USER + "?keyword=picnic&status=IN_PROGRESS", null);
+        var createAttempt = request(null, false, "POST", USER + "/exercises/" + sampleId + "/attempts", "{}");
+
+        // Assert
+        assertThat(catalog.statusCode()).isEqualTo(200);
+        var items = json.readTree(catalog.body()).path("data").path("items");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).path("id").asText()).isEqualTo(sampleId);
+        assertThat(items.get(0).hasNonNull("attemptId")).isFalse();
+
+        assertThat(groups.statusCode()).isEqualTo(200);
+        var grouped = json.readTree(groups.body()).path("data").path("groups");
+        assertThat(grouped).hasSize(1);
+        assertThat(grouped.get(0).path("items").get(0).path("id").asText()).isEqualTo(sampleId);
+
+        assertThat(started.statusCode()).isEqualTo(200);
+        assertThat(json.readTree(started.body()).path("data").path("items")).isEmpty();
+        assertThat(createAttempt.statusCode()).isEqualTo(401);
+    }
+
+    @Test
     void topicGroupsPreviewPublishedExercisesAndFilterFullResultsByLatestAttempt() throws Exception {
         long learner = 5091;
         String keyword = "TestGroupingFixture";
@@ -294,7 +338,8 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void adminStatusFilterUsesTheSameRulesForRowsAndPaginationTotals() throws Exception {
+    void catalog_whenAdminFiltersByStatus_shouldReturnMatchingRowsAndTotals() throws Exception {
+        // Arrange
         var sentences = List.of(new Sentence("Hello there.", 0.0, 3.0));
         var draft = create("StatusFilter draft", sentences);
         var visible = create("StatusFilter visible", sentences);
@@ -304,8 +349,16 @@ class DictationIntegrationTests {
         service.visibility(hidden.id(), true);
         service.save(visible.id(), new SaveRequest(visible.definition(), visible.version()));
 
-        var first = service.catalog(0, "StatusFilter", "B1", "Workplace", 0, 1, true, "PUBLISHED");
-        var second = service.catalog(0, "StatusFilter", "B1", "Workplace", 1, 1, true, "PUBLISHED");
+        // Act
+        var first = service.catalog(null, "StatusFilter", "B1", "Workplace", 0, 1, true, "PUBLISHED");
+        var second = service.catalog(null, "StatusFilter", "B1", "Workplace", 1, 1, true, "PUBLISHED");
+        var drafts = service.catalog(null, "StatusFilter", "", "", 0, 12, true, "DRAFT");
+        var archived = service.catalog(null, "StatusFilter", "", "", 0, 12, true, "ARCHIVED");
+        var unfiltered = service.catalog(0, "StatusFilter", "", "", 0, 12, true);
+        var response = request(5090L, true, "GET", ADMIN + "?keyword=StatusFilter&status=ARCHIVED", null);
+        var invalidStatus = request(5090L, true, "GET", ADMIN + "?status=unknown", null);
+
+        // Assert
         assertThat(first.total()).isEqualTo(2);
         assertThat(second.total()).isEqualTo(2);
         assertThat(first.items())
@@ -314,17 +367,12 @@ class DictationIntegrationTests {
         assertThat(second.items())
             .hasSize(1)
             .noneMatch(item -> item.id().equals(first.items().getFirst().id()));
-        assertThat(service.catalog(0, "StatusFilter", "", "", 0, 12, true, "DRAFT").items())
-            .extracting(Item::id)
-            .containsExactly(draft.id());
-        assertThat(service.catalog(0, "StatusFilter", "", "", 0, 12, true, "ARCHIVED").items())
-            .extracting(Item::id)
-            .containsExactly(hidden.id());
-        assertThat(service.catalog(0, "StatusFilter", "", "", 0, 12, true).total()).isEqualTo(4);
-        var response = request(5090L, true, "GET", ADMIN + "?keyword=StatusFilter&status=ARCHIVED", null);
+        assertThat(drafts.items()).extracting(Item::id).containsExactly(draft.id());
+        assertThat(archived.items()).extracting(Item::id).containsExactly(hidden.id());
+        assertThat(unfiltered.total()).isEqualTo(4);
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(json.readTree(response.body()).path("data").path("total").asLong()).isEqualTo(1);
-        assertThat(request(5090L, true, "GET", ADMIN + "?status=unknown", null).statusCode()).isEqualTo(400);
+        assertThat(invalidStatus.statusCode()).isEqualTo(400);
     }
 
     @Test
@@ -1454,8 +1502,19 @@ class DictationIntegrationTests {
     }
 
     @Test
+    void history_whenGuest_shouldRequireAuthentication() throws Exception {
+        // Arrange
+        String path = USER + "/attempts";
+
+        // Act
+        var response = request(null, false, "GET", path, null);
+
+        // Assert
+        assertThat(response.statusCode()).isEqualTo(401);
+    }
+
+    @Test
     void httpEnforcesAuthenticationAdminRoleValidationAndBinaryAudio() throws Exception {
-        assertThat(request(null, false, "GET", USER, null).statusCode()).isEqualTo(401);
         for (String path : List.of(ADMIN, ADMIN + "/template", ADMIN + "/audio/" + sampleAudioKey))
             assertThat(request(5010L, false, "GET", path, null).statusCode()).isEqualTo(403);
         var template = request(5010L, true, "GET", ADMIN + "/template", null);

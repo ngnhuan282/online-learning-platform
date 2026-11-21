@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { resolveMediaUrl } from '../src/shared/utils/mediaUrl.js';
+import { loadSource } from './load-source.js';
+
+const { resolveMediaUrl } = await loadSource('../src/shared/utils/mediaUrl.js', import.meta.url);
 
 test('media URLs use the API gateway while absolute URLs remain unchanged', () => {
   assert.equal(

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, afterEach, test } from 'node:test';
 import { createServer } from 'vite';
-import {
+import { loadSource } from './load-source.js';
+
+const {
   answerTokens,
   definitionPayload,
   draftError,
@@ -15,7 +17,7 @@ import {
   sentenceState,
   transcriptImportBase,
   wordFeedback,
-} from '../src/features/dictation/utils/dictation.js';
+} = await loadSource('../src/features/dictation/utils/dictation.js', import.meta.url);
 
 const server = await createServer({
   cacheDir: 'node_modules/.vite-tests/dictation',

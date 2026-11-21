@@ -57,4 +57,55 @@ class EnrollmentClientTests {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         assertThat(client.isEnrolled(42L, 7L)).isFalse();
     }
+
+    @Test
+    void isEnrolled_whenMockEnabled_shouldRequireBothIdentifiers() {
+        // Arrange
+        var client = new EnrollmentClient("http://127.0.0.1:1", true);
+
+        // Act
+        boolean missingUser = client.isEnrolled(null, 7L);
+        boolean missingCourse = client.isEnrolled(42L, null);
+        boolean bothPresent = client.isEnrolled(42L, 7L);
+
+        // Assert
+        assertThat(missingUser).isFalse();
+        assertThat(missingCourse).isFalse();
+        assertThat(bothPresent).isTrue();
+    }
+
+    @Test
+    void isEnrolled_whenLearningResponseIsMissingOrUnavailable_shouldDenyEnrollment() throws Exception {
+        // Arrange
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/v1/learning/enrollments/check", exchange -> {
+            try (exchange) {
+                if (exchange.getRequestURI().getQuery().contains("courseId=8")) {
+                    exchange.sendResponseHeaders(503, -1);
+                    return;
+                }
+                byte[] body = "{\"success\":true}".getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+            }
+        });
+        server.start();
+        try {
+            var request = new MockHttpServletRequest();
+            request.addHeader("Authorization", "Bearer validated-user-jwt");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+            var client = new EnrollmentClient("http://127.0.0.1:" + server.getAddress().getPort(), false);
+
+            // Act
+            boolean missingPayload = client.isEnrolled(42L, 7L);
+            boolean unavailable = client.isEnrolled(42L, 8L);
+
+            // Assert
+            assertThat(missingPayload).isFalse();
+            assertThat(unavailable).isFalse();
+        } finally {
+            server.stop(0);
+        }
+    }
 }

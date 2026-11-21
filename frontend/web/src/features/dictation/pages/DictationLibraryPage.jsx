@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -32,6 +32,8 @@ import {
 } from '@mui/icons-material';
 import { t, getIntlLocale } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
+import { ROUTES } from '../../../shared/constants/routes';
+import { AuthContext } from '../../auth/context/AuthContext';
 import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
 import { dictationApi } from '../api/dictationApi';
@@ -57,6 +59,7 @@ export default function DictationLibraryPage() {
     params.get('topic')?.trim() || (/^[1-9][0-9]?$/.test(legacyTest) ? `Test ${legacyTest}` : null);
   const requestedTier = params.get('tier')?.toUpperCase();
   const tier = tiers.includes(requestedTier) ? requestedTier : '';
+  const initialTab = !groupTopic && params.get('tab') === 'history' ? 1 : 0;
 
   function changeTier(value) {
     const next = new URLSearchParams(params);
@@ -66,13 +69,23 @@ export default function DictationLibraryPage() {
   }
 
   return (
-    <DictationLibrary key={groupTopic ?? ''} groupTopic={groupTopic} tier={tier} onTierChange={changeTier} />
+    <DictationLibrary
+      key={groupTopic ?? ''}
+      groupTopic={groupTopic}
+      tier={tier}
+      onTierChange={changeTier}
+      initialTab={initialTab}
+    />
   );
 }
 
-function DictationLibrary({ groupTopic, tier, onTierChange }) {
+function DictationLibrary({ groupTopic, tier, onTierChange, initialTab }) {
   useLocale();
-  const [tab, setTab] = useState(0);
+  const auth = useContext(AuthContext);
+  const user = auth?.user ?? null;
+  const isAuthLoading = Boolean(auth?.isLoading);
+  const scope = user?.id ? String(user.id) : 'guest';
+  const [tab, setTab] = useState(initialTab);
   const [keyword, setKeyword] = useState('');
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState('');
@@ -82,14 +95,21 @@ function DictationLibrary({ groupTopic, tier, onTierChange }) {
   const pageSize = tab ? 20 : 12;
   const grouped = !tab && groupTopic === null;
   const selectedGroup = !tab && groupTopic !== null;
-  const overview = useDictationQuery(grouped ? dictationApi.topicGroupsPath : null, {
-    keyword: '',
-    level: '',
-    status: '',
-  });
+  const guestHistoryPrompt = tab === 1 && !isAuthLoading && !user;
+  const overview = useDictationQuery(
+    grouped ? dictationApi.topicGroupsPath : null,
+    {
+      keyword: '',
+      level: '',
+      status: '',
+    },
+    { enabled: !isAuthLoading, scope },
+  );
   const results = useDictationQuery(
     tab
-      ? dictationApi.historyPath
+      ? user
+        ? dictationApi.historyPath
+        : null
       : selectedGroup
         ? dictationApi.catalogPath
         : tier
@@ -103,6 +123,7 @@ function DictationLibrary({ groupTopic, tier, onTierChange }) {
       ...(!grouped ? { page, size: pageSize } : {}),
       ...(selectedGroup ? { topic: groupTopic } : {}),
     },
+    { enabled: !isAuthLoading && (!tab || Boolean(user)), scope },
   );
   const { data, loading, error, reload } = grouped && (!tier || !overview.data) ? overview : results;
   const topicGroups = overview.data?.groups ?? [];
@@ -192,7 +213,7 @@ function DictationLibrary({ groupTopic, tier, onTierChange }) {
             )}
           </div>
         )}
-        {!grouped && (
+        {!grouped && !guestHistoryPrompt && (
           <form
             className={`dictation-filters ${tab ? 'is-history' : 'is-catalog'}`}
             onSubmit={event => {
@@ -292,7 +313,7 @@ function DictationLibrary({ groupTopic, tier, onTierChange }) {
                   </MenuItem>
                 ))}
               </TextField>
-            ) : (
+            ) : user ? (
               <TextField
                 select
                 size="small"
@@ -310,13 +331,27 @@ function DictationLibrary({ groupTopic, tier, onTierChange }) {
                 <MenuItem value="IN_PROGRESS">{t('Đang luyện')}</MenuItem>
                 <MenuItem value="COMPLETED">{t('Đã hoàn thành')}</MenuItem>
               </TextField>
-            )}
+            ) : null}
             <Button type="submit" variant={tab ? 'contained' : 'outlined'} startIcon={<SearchOutlined />}>
               {t('Tìm kiếm')}
             </Button>
           </form>
         )}
-        {error ? (
+        {guestHistoryPrompt ? (
+          <EmptyState
+            title="Đăng nhập để xem tiến độ bài học"
+            action={
+              <Button
+                component={Link}
+                to={ROUTES.LOGIN}
+                state={{ from: `${ROUTES.DICTATION}?tab=history` }}
+                variant="contained"
+              >
+                {t('Đăng nhập')}
+              </Button>
+            }
+          />
+        ) : error ? (
           <ErrorState error={error} onRetry={reload} />
         ) : loading ? (
           <div className={tab ? 'dictation-history' : 'dictation-library-grid'}>
@@ -461,7 +496,7 @@ function DictationLibrary({ groupTopic, tier, onTierChange }) {
         ) : (
           <DictationLessonGrid items={items} />
         )}
-        {!loading && !error && data?.total > 0 && (tab || data.total > pageSize) && (
+        {!guestHistoryPrompt && !loading && !error && data?.total > 0 && (tab || data.total > pageSize) && (
           <div className={`dictation-pagination ${tab ? 'is-history' : ''}`}>
             {Boolean(tab) && items.length > 0 && (
               <p className="dictation-page-range" role="status">

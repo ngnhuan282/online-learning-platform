@@ -19,7 +19,7 @@ export default function SiteHeader() {
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { pathname, hash } = useLocation();
+  const { pathname, search: locationSearch, hash } = useLocation();
 
   function submitSearch(event) {
     event.preventDefault();
@@ -82,6 +82,7 @@ export default function SiteHeader() {
             <Link
               className="button button-outline login-link"
               to="/login"
+              state={pathname !== '/login' ? { from: `${pathname}${locationSearch}${hash}` } : undefined}
               aria-current={pathname === '/login' ? 'page' : undefined}
             >
               {t('Đăng nhập')}

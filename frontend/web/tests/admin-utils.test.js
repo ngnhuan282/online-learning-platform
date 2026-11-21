@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { can, csvCell, togglePermission } from '../src/features/admin/utils/adminUtils.js';
+import { loadSource } from './load-source.js';
+
+const { can, csvCell, togglePermission } = await loadSource('../src/features/admin/utils/adminUtils.js', import.meta.url);
 
 const catalog = [
   { code: 'ADMIN_ACCESS', dependencies: [] },

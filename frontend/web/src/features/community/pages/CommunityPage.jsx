@@ -1,17 +1,21 @@
 import { useCallback, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { communityApi } from '../api/communityApi';
+import useAuth from '../../auth/hooks/useAuth';
 import useLearningResource from '../../learning/hooks/useLearningResource';
 import useWorkspaceMutation from '../../engagement/hooks/useWorkspaceMutation';
 import { Pagination, WorkspaceState } from '../../engagement/components/WorkspaceUi';
 import PostEditor from '../components/PostEditor';
 import { topicLabels } from '../utils/communityUi';
+import { ROUTES } from '../../../shared/constants/routes';
 import { t, getIntlLocale } from '../../../shared/i18n/locale';
 import useLocale from '../../../shared/i18n/useLocale';
 
 const emptyTopics = [];
 export default function CommunityPage() {
   useLocale();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(params.get('q') || '');
   const [editing, setEditing] = useState(false);
@@ -21,7 +25,7 @@ export default function CommunityPage() {
   const topicId = params.get('topic') || '';
   const mode = params.get('mode') || '';
   const keyword = params.get('q') || '';
-  const topics = useLearningResource(communityApi.topics, emptyTopics);
+  const topics = useLearningResource(communityApi.topics, emptyTopics, 0, !isAuthLoading);
   const load = useCallback(
     options =>
       communityApi.posts(
@@ -37,7 +41,7 @@ export default function CommunityPage() {
       ),
     [page, keyword, topicId, mode],
   );
-  const posts = useLearningResource(load, null);
+  const posts = useLearningResource(load, null, 0, !isAuthLoading);
   function change(values) {
     const next = new URLSearchParams(params);
     next.delete('page');
@@ -54,8 +58,14 @@ export default function CommunityPage() {
         </div>
         <button
           className="button button-primary"
-          disabled={topics.loading || !topics.data.length}
-          onClick={() => setEditing(true)}
+          disabled={Boolean(user) && (topics.loading || !topics.data.length)}
+          onClick={() => {
+            if (!user) {
+              navigate(ROUTES.LOGIN, { state: { from: `${location.pathname}${location.search}` } });
+              return;
+            }
+            setEditing(true);
+          }}
         >
           {t('Viết bài mới')}
         </button>

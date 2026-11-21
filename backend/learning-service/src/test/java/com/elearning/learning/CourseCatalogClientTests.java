@@ -3,6 +3,7 @@ package com.elearning.learning;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.elearning.learning.common.exception.AppException;
 import com.elearning.learning.common.exception.ErrorCode;
@@ -10,7 +11,9 @@ import com.elearning.learning.service.CourseCatalogClient;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -82,7 +85,8 @@ class CourseCatalogClientTests {
     }
 
     @Test
-    void onlyPublishedFreeCoursesAllowDirectEnrollment() throws Exception {
+    void requireFreeCourse_whenCatalogContainsMixedCourses_shouldAllowOnlyPublishedFreeCourse() throws Exception {
+        // Arrange
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/v1/courses/", exchange -> {
             long id = Long.parseLong(exchange.getRequestURI().getPath().replace("/api/v1/courses/", ""));
@@ -108,13 +112,85 @@ class CourseCatalogClientTests {
             CourseCatalogClient client = new CourseCatalogClient(
                 "http://127.0.0.1:" + server.getAddress().getPort()
             );
-            assertThatCode(() -> client.requireFreeCourse(1L)).doesNotThrowAnyException();
-            for (long id : new long[] { 2, 3, 4 }) {
-                assertThatThrownBy(() -> client.requireFreeCourse(id))
+            // Act
+            var freeEnrollment = catchThrowable(() -> client.requireFreeCourse(1L));
+            var paidEnrollment = catchThrowable(() -> client.requireFreeCourse(2L));
+            var draftEnrollment = catchThrowable(() -> client.requireFreeCourse(3L));
+            var unknownPriceEnrollment = catchThrowable(() -> client.requireFreeCourse(4L));
+            boolean publishedFree = client.requirePublishedCourse(1L);
+            boolean publishedPaid = client.requirePublishedCourse(2L);
+            var publishedDraft = catchThrowable(() -> client.requirePublishedCourse(3L));
+
+            // Assert
+            assertThat(freeEnrollment).isNull();
+            assertThat(publishedFree).isTrue();
+            assertThat(publishedPaid).isFalse();
+            assertThat(new Throwable[] { paidEnrollment, draftEnrollment, unknownPriceEnrollment, publishedDraft }).allSatisfy(
+                error -> assertThat(error)
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                    .isEqualTo(ErrorCode.FORBIDDEN)
+            );
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void getCurriculum_whenUpstreamResponseIsInvalidOrUnavailable_shouldRejectWithExpectedApiError() throws Exception {
+        // Arrange
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/v1/courses/", exchange -> {
+            try (exchange) {
+                String[] path = exchange.getRequestURI().getPath().split("/");
+                String id = path[4];
+                boolean sections = path.length > 5;
+                int status = sections ? switch (id) {
+                    case "401" -> 401;
+                    case "403" -> 403;
+                    case "404" -> 404;
+                    case "503" -> 503;
+                    default -> 200;
+                } : 200;
+                String body;
+                if (!sections) {
+                    body = "{\"success\":true,\"data\":{\"id\":" + id + "}}";
+                } else if (id.equals("43")) {
+                    body = "invalid JSON";
+                } else {
+                    body = """
+                        {"success":true,"data":[{"id":9,"courseId":%s,"lessons":[{"id":1,"sectionId":10}]}]}
+                        """.formatted(id);
+                }
+                byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(status, bytes.length);
+                exchange.getResponseBody().write(bytes);
+            }
+        });
+        server.start();
+        try {
+            var client = new CourseCatalogClient("http://127.0.0.1:" + server.getAddress().getPort());
+            var outcomes = Map.of(
+                401L, ErrorCode.UNAUTHORIZED,
+                403L, ErrorCode.FORBIDDEN,
+                404L, ErrorCode.NOT_FOUND,
+                503L, ErrorCode.SERVICE_UNAVAILABLE,
+                42L, ErrorCode.SERVICE_UNAVAILABLE,
+                43L, ErrorCode.SERVICE_UNAVAILABLE
+            );
+            // Act
+            var failures = new HashMap<Long, Throwable>();
+            outcomes.keySet().forEach(course -> failures.put(course, catchThrowable(() -> client.getCurriculum(course))));
+
+            // Assert
+            outcomes.forEach((course, error) ->
+                assertThat(failures.get(course))
+                    .as("Curriculum for course %s", course)
                     .isInstanceOf(AppException.class)
                     .extracting("errorCode")
-                    .isEqualTo(ErrorCode.FORBIDDEN);
-            }
+                    .isEqualTo(error)
+            );
         } finally {
             server.stop(0);
         }

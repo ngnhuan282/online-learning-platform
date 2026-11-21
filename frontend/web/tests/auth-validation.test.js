@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateAuth, validatePasswordReset } from '../src/features/auth/schemas/authValidation.js';
+import { loadSource } from './load-source.js';
+
+const { validateAuth, validatePasswordReset } = await loadSource('../src/features/auth/schemas/authValidation.js', import.meta.url);
 
 const registration = password => ({
   fullName: 'Nguyễn Văn A',

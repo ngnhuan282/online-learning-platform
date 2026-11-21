@@ -6,6 +6,7 @@ import {
   getSessionVersion,
   isTokenExpired,
   setAccessToken,
+  wasSessionCleared,
 } from '../utils/tokenUtils';
 import { normalizeApiError } from '../utils/errorUtils';
 import { ENDPOINTS } from './endpoints';
@@ -18,11 +19,16 @@ const gatewayUrl = (import.meta.env.VITE_API_URL?.trim() || globalThis.window?.l
 const axiosClient = axios.create({ baseURL: gatewayUrl, timeout: API_TIMEOUT_MS, withCredentials: true });
 const authPaths = new Set(Object.values(ENDPOINTS.auth));
 // These lists contain only published, public data and never vary by account.
-const isPublicCatalogRequest = config =>
-  config?.method === 'get' &&
-  [ENDPOINTS.courses, ENDPOINTS.categories, ENDPOINTS.toeic.exams, ENDPOINTS.toeic.dictionary].includes(
-    config.url,
-  );
+const publicCatalogPaths = new Set([
+  ENDPOINTS.courses,
+  ENDPOINTS.categories,
+  ENDPOINTS.toeic.exams,
+  ENDPOINTS.toeic.dictionary,
+  ENDPOINTS.community.topics,
+  ENDPOINTS.community.posts,
+  ENDPOINTS.proPlans,
+]);
+const isPublicCatalogRequest = config => config?.method === 'get' && publicCatalogPaths.has(config.url);
 let refreshFlight = null;
 
 export function refreshAccessToken(options = {}) {
@@ -122,7 +128,8 @@ axiosClient.interceptors.response.use(
       !isPublicCatalogRequest(config) &&
       !config.skipAuth &&
       !authPaths.has(config.url) &&
-      config.sessionVersion === getSessionVersion()
+      config.sessionVersion === getSessionVersion() &&
+      !wasSessionCleared()
     ) {
       if (config.retriedAfterRefresh) {
         clearTokens();

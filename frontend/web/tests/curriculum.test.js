@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { normalizeLessonFormData, buildLessonPayload } from '../src/features/courses/utils/lessonForm.js';
+import { loadSource } from './load-source.js';
+
+const { normalizeLessonFormData, buildLessonPayload } = await loadSource('../src/features/courses/utils/lessonForm.js', import.meta.url);
 
 test('lesson edit payload preserves all editable lesson fields', () => {
   const lesson = {

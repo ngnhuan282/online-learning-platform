@@ -32,8 +32,7 @@ public class AuthenticationFilter implements WebFilter, Ordered {
         String path = exchange.getRequest().getPath().value();
         HttpMethod method = exchange.getRequest().getMethod();
         String authorization = exchange.getRequest().getHeaders().getFirst("Authorization");
-        boolean publicAuth =
-            (method == HttpMethod.POST &&
+        boolean publicAuth = (method == HttpMethod.POST &&
                 Set.of(
                     "/api/v1/auth/login",
                     "/api/v1/auth/register",
@@ -66,6 +65,13 @@ public class AuthenticationFilter implements WebFilter, Ordered {
                 (path.equals("/api/v1/courses") ||
                     path.equals("/api/v1/learning/toeic/exams") ||
                     path.equals("/api/v1/learning/toeic/dictionary") ||
+                    path.equals("/api/v1/learning/dictation") ||
+                    path.equals("/api/v1/learning/dictation/topic-groups") ||
+                    path.equals("/api/v1/learning/shop") ||
+                    path.equals("/api/v1/learning/engagement/leaderboard") ||
+                    path.equals("/api/v1/learning/community/topics") ||
+                    path.equals("/api/v1/learning/community/posts") ||
+                    path.equals("/api/v1/payments/pro/plans") ||
                     path.matches("/api/v1/courses/[^/]+") ||
                     path.matches("/api/v1/courses/[^/]+/sections") ||
                     path.matches("/api/v1/courses/[^/]+/reviews") ||
@@ -76,9 +82,9 @@ public class AuthenticationFilter implements WebFilter, Ordered {
                     path.startsWith("/api/v1/media/")));
         if (authorization != null && !publicAuth) {
             try {
-                if (!authorization.regionMatches(true, 0, "Bearer ", 0, 7)) throw new JwtException(
-                    "Invalid scheme"
-                );
+                if (!authorization.regionMatches(true, 0, "Bearer ", 0, 7))
+                    throw new JwtException(
+                            "Invalid scheme");
                 tokens.validate(authorization.substring(7));
             } catch (JwtException | IllegalArgumentException ex) {
                 return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
@@ -88,24 +94,25 @@ public class AuthenticationFilter implements WebFilter, Ordered {
         }
         // Services validate the forwarded JWT, never caller-supplied identity headers.
         var request = exchange
-            .getRequest()
-            .mutate()
-            .headers(headers -> {
-                headers.remove("X-User-Id");
-                headers.remove("X-User-Role");
-                headers.remove("X-User-Roles");
-                headers.remove("X-Payment-Client-IP");
-                var remote = exchange.getRequest().getRemoteAddress();
-                if (remote != null) {
-                    // ForwardedHeaderTransformer may expose an unresolved address even for a numeric IP.
-                    String address =
-                        remote.getAddress() == null
-                            ? remote.getHostString()
-                            : remote.getAddress().getHostAddress();
-                    if (address.matches("[0-9a-fA-F:.]{3,45}")) headers.set("X-Payment-Client-IP", address);
-                }
-            })
-            .build();
+                .getRequest()
+                .mutate()
+                .headers(headers -> {
+                    headers.remove("X-User-Id");
+                    headers.remove("X-User-Role");
+                    headers.remove("X-User-Roles");
+                    headers.remove("X-Payment-Client-IP");
+                    var remote = exchange.getRequest().getRemoteAddress();
+                    if (remote != null) {
+                        // ForwardedHeaderTransformer may expose an unresolved address even for a
+                        // numeric IP.
+                        String address = remote.getAddress() == null
+                                ? remote.getHostString()
+                                : remote.getAddress().getHostAddress();
+                        if (address.matches("[0-9a-fA-F:.]{3,45}"))
+                            headers.set("X-Payment-Client-IP", address);
+                    }
+                })
+                .build();
         return chain.filter(exchange.mutate().request(request).build());
     }
 }

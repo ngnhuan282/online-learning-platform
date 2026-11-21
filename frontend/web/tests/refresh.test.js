@@ -23,6 +23,8 @@ globalThis.window = {
 };
 const tokens = await server.ssrLoadModule('/src/shared/utils/tokenUtils.js');
 const { default: client, refreshAccessToken } = await server.ssrLoadModule('/src/shared/apis/axiosClient.js');
+const { communityApi } = await server.ssrLoadModule('/src/features/community/api/communityApi.js');
+const { proApi } = await server.ssrLoadModule('/src/features/pro/api/proApi.js');
 const makeToken = id =>
   `h.${Buffer.from(JSON.stringify({ sub: '1', jti: id, exp: Math.floor(Date.now() / 1000) + 600 })).toString('base64url')}.s`;
 const old = makeToken('old'),
@@ -37,7 +39,13 @@ after(async () => {
 });
 
 test('public catalog lists survive a failed session restore and never send bearer credentials', async () => {
-  for (const path of ['/api/v1/courses', '/api/v1/categories']) {
+  for (const path of [
+    '/api/v1/courses',
+    '/api/v1/categories',
+    '/api/v1/learning/community/topics',
+    '/api/v1/learning/community/posts',
+    '/api/v1/payments/pro/plans',
+  ]) {
     tokens.setAccessToken(old);
     let release;
     let sentAuthorization;
@@ -54,6 +62,76 @@ test('public catalog lists survive a failed session restore and never send beare
     release();
     assert.equal((await pending).data[0].id, 42);
     assert.equal(sentAuthorization, false);
+  }
+});
+
+test('personalized previews and account actions still send the current access token', async () => {
+  tokens.setAccessToken(old);
+  const adapter = config => {
+    assert.equal(config.headers.get('Authorization'), `Bearer ${old}`);
+    return Promise.resolve(response(config, { ok: true }));
+  };
+  for (const path of [
+    '/api/v1/learning/shop',
+    '/api/v1/learning/engagement/leaderboard',
+    '/api/v1/learning/dictation',
+    '/api/v1/learning/dictation/topic-groups',
+  ]) {
+    assert.equal((await client.get(path, { adapter })).data.ok, true);
+  }
+  assert.equal((await client.post('/api/v1/learning/community/posts', {}, { adapter })).data.ok, true);
+});
+
+test('community and plan APIs preserve their public reads and authenticated detail or write requests', async () => {
+  tokens.setAccessToken(old);
+  const original = client.defaults.adapter;
+  const requests = [];
+  client.defaults.adapter = async config => {
+    requests.push([
+      config.method,
+      config.url,
+      config.headers.has('Authorization'),
+      config.params,
+      config.data && JSON.parse(config.data),
+    ]);
+    return response(config, { ok: true });
+  };
+
+  try {
+    const post = { title: 'Course discussion', body: 'What did you learn?' };
+    const filters = { page: 1, topicId: 7 };
+    await communityApi.topics();
+    await communityApi.posts(filters);
+    await proApi.plans();
+    await communityApi.post(17);
+    await communityApi.create(post);
+    await communityApi.update(17, post);
+    await communityApi.lock(17, true);
+    await communityApi.comments(17, { page: 2 });
+    await communityApi.addComment(17, 'First reply');
+    await communityApi.updateComment(17, 12, 'Edited reply');
+    await communityApi.answer(17, 12);
+    await communityApi.removeComment(17, 12);
+    await communityApi.remove(17);
+
+    const posts = '/api/v1/learning/community/posts';
+    assert.deepEqual(requests, [
+      ['get', '/api/v1/learning/community/topics', false, undefined, undefined],
+      ['get', posts, false, filters, undefined],
+      ['get', '/api/v1/payments/pro/plans', false, undefined, undefined],
+      ['get', `${posts}/17`, true, undefined, undefined],
+      ['post', posts, true, undefined, post],
+      ['put', `${posts}/17`, true, undefined, post],
+      ['patch', `${posts}/17/lock`, true, undefined, { locked: true }],
+      ['get', `${posts}/17/comments`, true, { page: 2 }, undefined],
+      ['post', `${posts}/17/comments`, true, undefined, { body: 'First reply' }],
+      ['put', `${posts}/17/comments/12`, true, undefined, { body: 'Edited reply' }],
+      ['patch', `${posts}/17/answer`, true, undefined, { commentId: 12 }],
+      ['delete', `${posts}/17/comments/12`, true, undefined, undefined],
+      ['delete', `${posts}/17`, true, undefined, undefined],
+    ]);
+  } finally {
+    client.defaults.adapter = original;
   }
 });
 
@@ -239,4 +317,19 @@ test('role mismatch 403 remains visible without rotating or clearing a valid ses
   );
   assert.equal(calls, 1);
   assert.equal(tokens.getAccessToken(), old);
+});
+
+test('cleared guest sessions do not attempt refresh on 401 responses', async () => {
+  tokens.clearTokens();
+  let calls = 0;
+  await assert.rejects(
+    client.get('/api/v1/learning/shop', {
+      adapter: config => {
+        calls++;
+        return unauthorized(config);
+      },
+    }),
+    { status: 401 },
+  );
+  assert.equal(calls, 1);
 });

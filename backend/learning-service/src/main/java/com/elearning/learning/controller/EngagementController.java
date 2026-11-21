@@ -21,9 +21,8 @@ public class EngagementController {
 
     @GetMapping("/me")
     public ApiResponse<Summary> me(
-        Principal principal,
-        @RequestHeader(value = "Authorization", required = false) String token
-    ) {
+            Principal principal,
+            @RequestHeader(value = "Authorization", required = false) String token) {
         long userId = Long.parseLong(principal.getName());
         engagement.syncProfile(userId, profiles.current(token));
         return ApiResponse.success(engagement.summary(userId));
@@ -36,24 +35,20 @@ public class EngagementController {
 
     @GetMapping("/leaderboard")
     public ApiResponse<Leaderboard> leaderboard(
-        Principal principal,
-        @RequestParam(defaultValue = "month") String period,
-        @RequestParam(required = false) String month,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "20") int size
-    ) {
-        return ApiResponse.success(
-            engagement.leaderboard(Long.parseLong(principal.getName()), period, month, page, size)
-        );
+            Principal principal,
+            @RequestParam(defaultValue = "month") String period,
+            @RequestParam(required = false) String month,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Long userId = principal == null ? null : Long.parseLong(principal.getName());
+        return ApiResponse.success(engagement.leaderboard(userId, period, month, page, size));
     }
 
     @PostMapping("/frame")
     public ApiResponse<Summary> frame(
-        Principal principal,
-        @jakarta.validation.Valid @RequestBody FrameRequest request
-    ) {
+            Principal principal,
+            @jakarta.validation.Valid @RequestBody FrameRequest request) {
         return ApiResponse.success(
-            engagement.equipFrame(Long.parseLong(principal.getName()), request.code())
-        );
+                engagement.equipFrame(Long.parseLong(principal.getName()), request.code()));
     }
 }
