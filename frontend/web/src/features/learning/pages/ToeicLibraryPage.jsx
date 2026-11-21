@@ -20,7 +20,6 @@ import useLocale from '../../../shared/i18n/useLocale';
 import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import useToeicBookmarks from '../hooks/useToeicBookmarks';
-import { LISTENING_PARTS, READING_PARTS } from '../utils/toeicSections';
 
 const EMPTY = [];
 const PAGE_SIZE = 6;
@@ -44,7 +43,6 @@ export default function ToeicLibraryPage() {
   const savedOnly = params.get('view') === 'saved';
   const listening = params.get('section') === 'listening';
   const sectionExams = exams.filter(exam => (exam.section === 'LISTENING') === listening);
-  const featured = sectionExams[0];
   const SectionIcon = listening ? HeadphonesOutlined : MenuBookOutlined;
   const search = normalize(query.trim());
   const exactNumber = search.match(/^(?:test\s*)?0*(\d+)$/)?.[1];
@@ -66,6 +64,7 @@ export default function ToeicLibraryPage() {
   const page = Number.isSafeInteger(requested) && requested > 0 ? Math.min(requested, totalPages) : 1;
   const start = (page - 1) * PAGE_SIZE;
   const rows = filtered.slice(start, start + PAGE_SIZE);
+  const featured = rows[0];
   function filter(key, value) {
     const next = new URLSearchParams(params);
     next.delete('page');
@@ -87,11 +86,7 @@ export default function ToeicLibraryPage() {
       <header className="toeic-page-heading">
         <div>
           <h1>{t('Luyện thi TOEIC')}</h1>
-          <p>
-            {t(
-              'Chọn chế độ Luyện tập linh hoạt (tùy chỉnh thời gian, xem đáp án thoải mái) hoặc Thi thực chiến chuẩn giờ thật ngay trên web.',
-            )}
-          </p>
+          <p>{t('Tự chọn thời gian khi luyện tập hoặc thi thử theo thời gian của bộ đề.')}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {user && (
@@ -117,11 +112,6 @@ export default function ToeicLibraryPage() {
           <SectionIcon />
         </div>
         <div className="toeic-featured-copy">
-          <div className="toeic-featured-tags">
-            <span>ETS 2024</span>
-            <span>{listening ? 'Listening · Part 1–4' : 'Reading · Part 5, 6, 7'}</span>
-            <span>{t('Luyện tập & Thi thực chiến')}</span>
-          </div>
           <h2 id="toeic-collection-title">
             {t(listening ? 'Luyện nghe TOEIC theo từng Part' : 'Luyện đề chủ động. Bứt phá điểm Reading.')}
           </h2>
@@ -144,13 +134,7 @@ export default function ToeicLibraryPage() {
         <div>
           <span>01</span>
           <strong>{t('Chọn bộ đề & phần thi')}</strong>
-          <p>
-            {t(
-              listening
-                ? 'Luyện riêng Part 1, 2, 3, 4 hoặc làm trọn bộ Listening.'
-                : 'Luyện riêng từng Part 5, 6, 7 hoặc làm trọn bộ 100 câu Reading.',
-            )}
-          </p>
+          <p>{t('Luyện từng Part hoặc trọn bộ đề')}</p>
         </div>
         <div>
           <span>02</span>
@@ -229,8 +213,8 @@ export default function ToeicLibraryPage() {
             value={params.get('sort') === 'desc' ? 'desc' : 'asc'}
             onChange={event => filter('sort', event.target.value)}
           >
-            <option value="asc">{t('Test tăng dần')}</option>
-            <option value="desc">{t('Test giảm dần')}</option>
+            <option value="asc">{t('Tên A–Z')}</option>
+            <option value="desc">{t('Tên Z–A')}</option>
           </select>
         </label>
       </div>
@@ -316,12 +300,6 @@ export default function ToeicLibraryPage() {
                     <SectionIcon />
                   </span>
                 </div>
-                <div className="toeic-test-tags">
-                  {(listening ? LISTENING_PARTS : READING_PARTS).map(part => (
-                    <span key={part}>Part {part}</span>
-                  ))}
-                  <span className="is-highlight">{t('2 chế độ thi')}</span>
-                </div>
                 <div className="toeic-test-meta">
                   <span>
                     <FactCheckOutlined />
@@ -329,7 +307,7 @@ export default function ToeicLibraryPage() {
                   </span>
                   <span>
                     <AccessTimeRounded />
-                    {t('Chuẩn {minutes} phút', { minutes: exam.durationMinutes })}
+                    {t('{minutes} phút', { minutes: exam.durationMinutes })}
                   </span>
                   <span>
                     <BoltRounded />

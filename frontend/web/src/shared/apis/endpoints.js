@@ -37,6 +37,8 @@ export const ENDPOINTS = Object.freeze({
     answers: id => `${API_PREFIX}/learning/toeic/attempts/${id}/answers`,
     submit: id => `${API_PREFIX}/learning/toeic/attempts/${id}/submit`,
     adminExams: `${API_PREFIX}/learning/admin/toeic/exams`,
+    adminMedia: `${API_PREFIX}/learning/admin/toeic/media`,
+    adminMediaItem: id => `${API_PREFIX}/learning/admin/toeic/media/${id}`,
     adminExam: id => `${API_PREFIX}/learning/admin/toeic/exams/${id}`,
     publish: id => `${API_PREFIX}/learning/admin/toeic/exams/${id}/publish`,
   },

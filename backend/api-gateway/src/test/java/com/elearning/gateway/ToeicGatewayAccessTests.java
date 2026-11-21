@@ -8,6 +8,7 @@ import com.elearning.gateway.filter.AuthenticationFilter;
 import com.elearning.gateway.security.JwtTokenProvider;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
@@ -38,12 +39,27 @@ class ToeicGatewayAccessTests {
             "/api/v1/learning/toeic/exams/1/progress",
             "/api/v1/learning/toeic/attempts/1",
             "/api/v1/learning/admin/toeic/exams",
+            "/api/v1/learning/admin/toeic/media",
             "/api/v1/learning/toeic/exams-extra"
         }) {
             assertUnauthenticated(MockServerHttpRequest.get(path).build());
         }
         assertUnauthenticated(MockServerHttpRequest.post("/api/v1/learning/toeic/exams").build());
         assertUnauthenticated(MockServerHttpRequest.post("/api/v1/learning/toeic/attempts/1/submit").build());
+    }
+
+    @Test
+    void browsersCanReadToeicMediaWithoutJwtButCannotMutateIt() {
+        String path = "/api/v1/learning/toeic/media/6bad05a0-4da8-47e8-8915-597bd372ebab";
+        for (HttpMethod method : new HttpMethod[] { HttpMethod.GET, HttpMethod.HEAD }) {
+            AtomicBoolean forwarded = new AtomicBoolean();
+            filter.filter(MockServerWebExchange.from(MockServerHttpRequest.method(method, path)), exchange -> {
+                forwarded.set(true);
+                return Mono.empty();
+            }).block();
+            assertThat(forwarded).isTrue();
+        }
+        assertUnauthenticated(MockServerHttpRequest.delete(path).build());
     }
 
     private void assertUnauthenticated(MockServerHttpRequest request) {

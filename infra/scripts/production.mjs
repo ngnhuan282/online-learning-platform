@@ -8,6 +8,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadProductionEnv, validateProductionEnv } from './production-env.mjs';
 import { stageToeicArchives, verifyToeicArchives } from '../../frontend/web/scripts/prepare-toeic-assets.mjs';
+import { checkToeicS3, withToeicS3Archives } from './toeic-s3.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const command = process.argv[2];
@@ -80,14 +81,18 @@ try {
   if (['check', 'up'].includes(command)) {
     const errors = validateProductionEnv(env);
     if (errors.length) throw new Error(errors.join('\n'));
+    const s3Uri = process.env.TOEIC_ARCHIVES_S3_URI ?? env.TOEIC_ARCHIVES_S3_URI;
+    const s3Source = { uri: s3Uri?.trim(), region: env.AWS_REGION, temporaryRoot: resolve(root, '.tmp') };
     const toeicArchiveDirectory = resolve(
       root,
       process.env.TOEIC_ARCHIVES_DIR || env.TOEIC_ARCHIVES_DIR || '.tmp/toeic-data',
     );
-    const toeicArchives = verifyToeicArchives(toeicArchiveDirectory);
+    const toeicArchives = s3Source.uri ? null : verifyToeicArchives(toeicArchiveDirectory);
     await docker('config', '-q');
+    if (command === 'check' && s3Source.uri) await checkToeicS3(s3Source);
     if (command === 'up') {
-      stageToeicArchives(toeicArchives);
+      if (s3Source.uri) await withToeicS3Archives(s3Source, stageToeicArchives);
+      else stageToeicArchives(toeicArchives);
       await docker('build');
       await docker('up', '-d', '--wait', '--wait-timeout', '300');
     }
