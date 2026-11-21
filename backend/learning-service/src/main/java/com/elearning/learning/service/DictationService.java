@@ -263,9 +263,14 @@ public class DictationService {
     }
 
     private String youtubeThumbnail(Video video) {
-        if (video == null || video.url() == null) return null;
+        String id = video == null ? null : youtubeVideoId(video.url());
+        return id == null ? null : "https://i.ytimg.com/vi/" + id + "/mqdefault.jpg";
+    }
+
+    static String youtubeVideoId(String value) {
+        if (value == null) return null;
         try {
-            URI url = URI.create(video.url());
+            URI url = URI.create(value);
             String host = Objects.requireNonNullElse(url.getHost(), "").toLowerCase(Locale.ROOT);
             if (!"https".equalsIgnoreCase(url.getScheme()) || url.getUserInfo() != null) return null;
 
@@ -275,15 +280,15 @@ public class DictationService {
                 id = path.startsWith("/") ? path.substring(1) : "";
             } else if (YOUTUBE_HOSTS.contains(host)) {
                 if ("/watch".equals(path)) {
-                    String value = UriComponentsBuilder.fromUri(url).build().getQueryParams().getFirst("v");
-                    id = value == null ? "" : UriUtils.decode(value, StandardCharsets.UTF_8);
+                    String queryId = UriComponentsBuilder.fromUri(url).build().getQueryParams().getFirst("v");
+                    id = queryId == null ? "" : UriUtils.decode(queryId, StandardCharsets.UTF_8);
                 } else {
                     id = YOUTUBE_VIDEO_PATH.matcher(path).replaceFirst("");
                 }
             } else {
                 return null;
             }
-            return YOUTUBE_VIDEO_ID.matcher(id).matches() ? "https://i.ytimg.com/vi/" + id + "/mqdefault.jpg" : null;
+            return YOUTUBE_VIDEO_ID.matcher(id).matches() ? id : null;
         } catch (IllegalArgumentException invalidUrl) {
             return null;
         }

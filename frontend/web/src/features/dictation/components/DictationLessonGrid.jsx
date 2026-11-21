@@ -9,7 +9,7 @@ import {
   SubjectOutlined,
 } from '@mui/icons-material';
 import { t } from '../../../shared/i18n/locale';
-import { formatTime, formatTopicName, isToeicTopic } from '../utils/dictation';
+import { formatTime, isToeicTopic } from '../utils/dictation';
 
 function LessonArtwork({ thumbnailUrl, video, topic }) {
   const [failedThumbnail, setFailedThumbnail] = useState(null);
@@ -50,7 +50,6 @@ export default function DictationLessonGrid({ items, heading: Heading = 'h2' }) 
         const attempt = item.attemptId ? `?attempt=${encodeURIComponent(item.attemptId)}` : '';
         const action = item.attemptCompleted ? 'Xem kết quả' : attempt ? 'Tiếp tục' : 'Bắt đầu';
         const status = item.attemptCompleted ? 'Đã hoàn thành' : attempt ? 'Đang luyện' : 'Chưa luyện';
-        const topicName = formatTopicName(item.topic);
         return (
           <article key={item.id} className="dictation-lesson-card">
             <Link
@@ -59,12 +58,10 @@ export default function DictationLessonGrid({ items, heading: Heading = 'h2' }) 
             >
               <LessonArtwork thumbnailUrl={item.thumbnailUrl} video={item.video} topic={item.topic} />
               <div className="dictation-lesson-body">
-                <div className="dictation-lesson-topic">
-                  <span title={topicName}>{topicName}</span>
-                  <b>{item.level}</b>
+                <div className="dictation-lesson-heading">
+                  <Heading title={item.title}>{item.title}</Heading>
+                  <span className="dictation-lesson-level">{item.level}</span>
                 </div>
-                <Heading title={item.title}>{item.title}</Heading>
-                {item.description && <p title={item.description}>{item.description}</p>}
                 <div className="dictation-lesson-meta">
                   <span>
                     <AccessTimeOutlined />
