@@ -372,6 +372,11 @@ public class DictationService {
         return adminDetail(id);
     }
 
+    Integer publishedVideoVersion(String id) {
+        Integer version = exercise(id, false).published();
+        return version == null || definition(id, version).video() == null ? null : version;
+    }
+
     public Attempt start(long user, String id, StartRequest request) {
         Exercise exercise = exercise(id, true);
         if (exercise.archived() || exercise.published() == null) throw new AppException(ErrorCode.NOT_FOUND);

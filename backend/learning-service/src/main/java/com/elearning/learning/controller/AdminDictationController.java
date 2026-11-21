@@ -18,15 +18,18 @@ public class AdminDictationController {
     private final DictationService service;
     private final DictationAudioService audio;
     private final DictationWorkbookService workbooks;
+    private final DictationAdminPublication publication;
 
     public AdminDictationController(
         DictationService service,
         DictationAudioService audio,
-        DictationWorkbookService workbooks
+        DictationWorkbookService workbooks,
+        DictationAdminPublication publication
     ) {
         this.service = service;
         this.audio = audio;
         this.workbooks = workbooks;
+        this.publication = publication;
     }
 
     @GetMapping
@@ -63,7 +66,7 @@ public class AdminDictationController {
         @Valid @RequestBody SaveRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
-            ApiResponse.success(service.saveAndPublish(null, request))
+            ApiResponse.success(publication.publish(null, new PublishRequest(request.version(), request.definition())))
         );
     }
 
@@ -72,11 +75,7 @@ public class AdminDictationController {
         @PathVariable String id,
         @Valid @RequestBody PublishRequest request
     ) {
-        return ApiResponse.success(
-            request.definition() == null
-                ? service.publish(id, request.version())
-                : service.saveAndPublish(id, new SaveRequest(request.definition(), request.version()))
-        );
+        return ApiResponse.success(publication.publish(id, request));
     }
 
     @PutMapping("/{id}/visibility")
@@ -84,7 +83,7 @@ public class AdminDictationController {
         @PathVariable String id,
         @RequestBody VisibilityRequest request
     ) {
-        return ApiResponse.success(service.visibility(id, request.archived()));
+        return ApiResponse.success(publication.visibility(id, request.archived()));
     }
 
     @PostMapping(value = "/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -102,12 +101,22 @@ public class AdminDictationController {
 
     @GetMapping("/template")
     public ResponseEntity<byte[]> template() {
+        return workbookResponse("transcript-template.xlsx", workbooks.template());
+    }
+
+    @GetMapping("/{id}/workbook")
+    public ResponseEntity<byte[]> workbook(@PathVariable String id) {
+        return workbookResponse("dictation-" + id + ".xlsx", publication.download(id));
+    }
+
+    private ResponseEntity<byte[]> workbookResponse(String filename, byte[] body) {
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=transcript-template.xlsx")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+            .cacheControl(CacheControl.noStore())
             .contentType(
                 MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             )
-            .body(workbooks.template());
+            .body(body);
     }
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

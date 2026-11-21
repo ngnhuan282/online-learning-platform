@@ -535,7 +535,7 @@ export default function AdminDictationPage() {
       ) : list.loading ? (
         <Skeleton variant="rounded" height={240} />
       ) : !list.data?.items?.length ? (
-        <EmptyState title="Chưa có bài nghe phù hợp" />
+        <EmptyState title={keyword || status ? 'Chưa có bài nghe phù hợp' : 'Chưa có bài nghe'} />
       ) : (
         <div className="admin-card admin-table-card dictation-admin-table">
           <div className="dictation-table-scroll">
@@ -839,6 +839,22 @@ export default function AdminDictationPage() {
                 <span>{t('{count} câu', { count: form.sentences.length })}</span>
               </h3>
               <div className="dictation-toolbar">
+                {selected?.published && !selected.archived && selected.definition.video && (
+                  <Button
+                    startIcon={<DownloadOutlined />}
+                    disabled={busy}
+                    onClick={() =>
+                      act(async () =>
+                        downloadWorkbook(
+                          await dictationApi.workbook(selected.id),
+                          `dictation-${selected.id}.xlsx`,
+                        ),
+                      )
+                    }
+                  >
+                    {t('Tải Excel bài nghe')}
+                  </Button>
+                )}
                 <Button
                   variant="outlined"
                   startIcon={<DownloadOutlined />}

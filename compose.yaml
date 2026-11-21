@@ -152,6 +152,16 @@ services:
       NOTIFICATION_EVENT_API_KEY: ${NOTIFICATION_EVENT_API_KEY:-}
       DICTATION_STORAGE_DIR: /app/uploads/dictation
       DICTATION_IMPORT_DIR: /app/dictation-inbox
+      DICTATION_S3_IMPORT_ENABLED: ${DICTATION_S3_IMPORT_ENABLED:-false}
+      DICTATION_S3_PREFIX: ${DICTATION_S3_PREFIX:-documents/transcripts/}
+      DICTATION_WORKBOOK_STORAGE: ${DICTATION_WORKBOOK_STORAGE:-local}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
     volumes:
       - dictation_uploads:/app/uploads
       - ${DICTATION_IMPORT_HOST_DIR:-./dictation-inbox.local}:/app/dictation-inbox:ro

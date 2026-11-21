@@ -368,7 +368,9 @@ function DictationLibrary({ groupTopic, tier, onTierChange, initialTab }) {
                   : status === 'COMPLETED'
                     ? 'Chưa có bài nghe đã hoàn thành'
                     : 'Chưa có bài nghe đang luyện'
-                : 'Chưa có bài nghe phù hợp'
+                : filtered
+                  ? 'Chưa có bài nghe phù hợp'
+                  : 'Chưa có bài nghe'
             }
             action={
               filtered && <Button onClick={clearFilters}>{t(grouped ? 'Xem tất cả' : 'Xóa bộ lọc')}</Button>

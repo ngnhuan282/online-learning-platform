@@ -51,6 +51,22 @@ Các bài seed có thể dùng cùng cấu trúc dữ liệu với `video.url` l
 
 Thư mục này dành cho quản trị viên VPS vì workbook hợp lệ được xuất bản tự động. Mỗi nội dung workbook được nhập một lần, kể cả khi chép lại dưới tên khác hoặc khởi động lại dịch vụ. Workbook có nội dung khác được tạo thành bài riêng. Web đọc các bài đã nhập từ database, nên bạn có thể dời file nguồn ra khỏi thư mục nhận bài sau khi xác nhận đã xuất bản. Để chỉnh bài hoặc gỡ bài khỏi thư viện, dùng trang quản lý bài nghe.
 
+### Tự nhập bài từ Amazon S3
+
+1. Trong `.env.production` trên VPS, đặt `DICTATION_S3_IMPORT_ENABLED=true` và `DICTATION_S3_PREFIX=documents/transcripts/`. Learning Service dùng `AWS_S3_BUCKET`, `AWS_REGION` và thông tin xác thực AWS hiện có. Cấp quyền `s3:ListBucket` cho prefix này và `s3:GetObject` cho các file bên trong. Sau đó deploy để container nhận cấu hình.
+2. Trong S3, tải từng file `.xlsx` theo mẫu vào `documents/transcripts/` của bucket. Có thể đặt file trong các thư mục con. Dịch vụ đợi 15 giây giữa các lượt quét, lấy chủ đề từ Excel và xuất bản bài hợp lệ. Nếu bài chưa hiện, kiểm tra log `learning-service` theo tên file.
+
+Có thể dùng S3 và thư mục VPS cùng lúc. Cả hai nguồn dùng chung cơ chế chống nhập trùng nội dung. Bài đã xuất bản được lưu trong database và vẫn hiển thị nếu file nguồn bị xóa khỏi S3.
+
+### Lưu Excel khi quản lý bài nghe (1 bài = 1 tệp đồng bộ 2 chiều)
+
+Khi admin xuất bản bài YouTube, Learning Service lưu bài trong database và đồng bộ đúng **một tệp `.xlsx`** theo bài nghe. Xuất bản bản chỉnh sửa cập nhật trực tiếp tệp đó (nếu bài được nhập từ S3, hệ thống ghi đè đúng tệp nguồn trên S3 thay vì tạo thêm bản sao). Ngược lại, nếu chỉnh sửa trực tiếp tệp `.xlsx` đã nhập trên S3 hoặc thư mục local và tải đè lại cùng tên tệp, lượt quét tiếp theo cập nhật bài nghe hiện có thay vì tạo bài trùng. Nút **Tải Excel bài nghe** tải bản đã xuất bản. Khi ẩn bài, dịch vụ gỡ tệp workbook của bài đó và giữ lịch sử luyện tập. Khi hiện lại bài, dịch vụ khôi phục đúng tên tệp cũ từ bản đã xuất bản. Bản nháp chỉ được lưu trong database.
+
+- `DICTATION_WORKBOOK_STORAGE=local` lưu workbook vào thư mục `workbooks/` trong volume dictation.
+- `DICTATION_WORKBOOK_STORAGE=s3` cùng `DICTATION_S3_IMPORT_ENABLED=true` lưu và cập nhật trực tiếp workbook trong `DICTATION_S3_PREFIX` (ví dụ `documents/transcripts/`) trên S3. Quyền AWS cần `s3:ListBucket`, `s3:GetObject`, `s3:PutObject` và `s3:DeleteObject` cho prefix này.
+
+Bài mới tạo trực tiếp trên web admin sẽ tự đặt tên dạng `<tên-bài>-<mã-ngắn>.xlsx` trong `documents/transcripts/`. Nếu lưu tệp thất bại, Learning Service ghi lỗi và thử lại trong lượt đồng bộ sau.
+
 ### Nhập và kiểm tra mốc
 
 Admin có thể nhập từng câu trực tiếp, lấy mốc bắt đầu/kết thúc từ vị trí đang phát hoặc nhập tệp `.xlsx` theo mẫu tải từ trang quản lý. Khi nhập qua admin, hệ thống đọc bảng transcript và dùng tên bài, chủ đề, trình độ cùng video từ form. Bạn có thể để trống phần thông tin trên. Các mẫu cũ có tiêu đề bảng ở dòng đầu vẫn dùng được.
