@@ -88,7 +88,7 @@ public class DictationAudioService {
     }
 
     public Resource resource(String key) {
-        metadata(key);
+        if (metadata(key) == null) throw new AppException(ErrorCode.NOT_FOUND);
         Path path = "sample-ets-2024-test-1".equals(key)
             ? samples.resolve("Audio 1.mp3")
             : root.resolve(key).normalize();

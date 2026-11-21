@@ -23,6 +23,7 @@ import {
   HeadphonesOutlined,
   ListAltOutlined,
   LightbulbOutlined,
+  PlayArrowRounded,
   ReplayRounded,
   VisibilityOutlined,
 } from '@mui/icons-material';
@@ -31,7 +32,8 @@ import useLocale from '../../../shared/i18n/useLocale';
 import ErrorState from '../../../shared/components/ErrorState';
 import { dictationApi } from '../api/dictationApi';
 import { useDictationAudio } from '../hooks/useDictationQuery';
-import SegmentAudio from '../components/SegmentAudio';
+import SegmentPlayer from '../components/SegmentPlayer';
+import YouTubeSegmentPlayer from '../components/YouTubeSegmentPlayer';
 import DictationScore from '../components/DictationScore';
 import {
   formatTime,
@@ -41,6 +43,7 @@ import {
   scoreFeedback,
   sentenceState,
   wordFeedback,
+  youtubeVideoId,
 } from '../utils/dictation';
 import '../styles/dictation.css';
 
@@ -80,7 +83,9 @@ function Practice({ exerciseId, attemptId }) {
   const confirmCancel = useRef(null);
   const composing = useRef(false);
   const timer = useRef(null);
-  const audio = useDictationAudio(attempt?.id);
+  const video = attempt?.video;
+  const youtubeId = youtubeVideoId(video?.url);
+  const audio = useDictationAudio(video ? null : attempt?.id);
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       (currentLocation.pathname !== nextLocation.pathname ||
@@ -261,7 +266,8 @@ function Practice({ exerciseId, attemptId }) {
     });
   }
 
-  const accessError = initialError ?? (audio.error?.code === 'DICTATION_ARCHIVED' ? audio.error : null);
+  const accessError =
+    initialError ?? (!video && audio.error?.code === 'DICTATION_ARCHIVED' ? audio.error : null);
   if (accessError)
     return (
       <section className="dictation-page">
@@ -467,23 +473,35 @@ function Practice({ exerciseId, attemptId }) {
             </Button>
           </DialogActions>
         </Dialog>
-        <div className="dictation-studio" id="dictation-studio">
+        <div className={`dictation-studio${video ? ' has-video' : ''}`} id="dictation-studio">
           <aside className="dictation-media">
             <div className="dictation-panel-heading">
-              <HeadphonesOutlined fontSize="small" />
-              <h2>Audio</h2>
+              {video ? <PlayArrowRounded fontSize="small" /> : <HeadphonesOutlined fontSize="small" />}
+              <h2>{video ? 'Video' : 'Audio'}</h2>
               <span>{formatTime(attempt.duration)}</span>
             </div>
-            {audio.error ? (
+            {youtubeId ? (
+              <YouTubeSegmentPlayer
+                key={youtubeId}
+                videoId={youtubeId}
+                title={attempt.title}
+                start={segment.start}
+                end={segment.end}
+                busy={busy}
+                seekRequest={seekRequest}
+                onNext={index < attempt.sentences.length - 1 ? () => select(index + 1, true) : undefined}
+              />
+            ) : !video && audio.error ? (
               <ErrorState title="Không tải được audio" error={audio.error} onRetry={audio.reload} />
             ) : (
-              <SegmentAudio
-                key={audio.src}
-                src={audio.src}
+              <SegmentPlayer
+                key={video?.url ?? audio.src}
+                src={video?.url ?? audio.src}
+                video={Boolean(video)}
                 start={segment.start}
                 end={segment.end}
                 duration={attempt.duration}
-                disabled={audio.loading}
+                disabled={!video && audio.loading}
                 busy={busy}
                 seekRequest={seekRequest}
                 onNext={index < attempt.sentences.length - 1 ? () => select(index + 1, true) : undefined}

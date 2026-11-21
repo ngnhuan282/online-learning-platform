@@ -12,6 +12,7 @@ import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import ToeicQuestion from '../components/ToeicQuestion';
 import StudyTextAssistant from '../components/StudyTextAssistant';
+import { isListeningPart } from '../utils/toeicSections';
 
 export default function ToeicResultPage() {
   useLocale();
@@ -85,6 +86,11 @@ export default function ToeicResultPage() {
       </div>
     );
   const answered = questions.filter(item => answers[item.id]).length;
+  const listening = isListeningPart(questions[0]?.part);
+  const parts = [...new Set(questions.map(item => item.part))].sort((a, b) => a - b);
+  const questionCard = question && (
+    <ToeicQuestion question={question} selected={answers[question.id]} review groupQuestions={questions} />
+  );
   return (
     <>
       <div className="toeic-reader-back">
@@ -102,7 +108,7 @@ export default function ToeicResultPage() {
       </div>
       <header className="toeic-page-heading">
         <div>
-          <h1>{t('Kết quả Reading')}</h1>
+          <h1>{t(listening ? 'Kết quả Listening' : 'Kết quả Reading')}</h1>
           <p>{result.title}</p>
         </div>
         <span className="toeic-pill">
@@ -127,7 +133,7 @@ export default function ToeicResultPage() {
         </div>
         <div>
           <strong>{result.mode === 'EXAM' ? t('Thi thực chiến') : t('Luyện tập')}</strong>
-          <span>TOEIC Reading</span>
+          <span>{listening ? 'TOEIC Listening' : 'TOEIC Reading'}</span>
         </div>
       </section>
       <p className="toeic-result-note">
@@ -135,22 +141,20 @@ export default function ToeicResultPage() {
           'Kết quả thể hiện số câu đúng và tỷ lệ phần trăm; không quy đổi sang thang điểm TOEIC chính thức.',
         )}
       </p>
-      <div className="toeic-result-parts">
-        {[5, 6, 7]
-          .filter(part => questions.some(item => item.part === part))
-          .map(part => {
-            const items = questions.filter(item => item.part === part);
-            const correct = items.filter(item => answers[item.id] === item.correctOptionId).length;
-            return (
-              <div key={part}>
-                <strong>Part {part}</strong>
-                <span>
-                  {correct}/{items.length} {t('câu đúng')}
-                </span>
-                <progress max={items.length} value={correct} />
-              </div>
-            );
-          })}
+      <div className={'toeic-result-parts' + (listening ? ' is-listening' : '')}>
+        {parts.map(part => {
+          const items = questions.filter(item => item.part === part);
+          const correct = items.filter(item => answers[item.id] === item.correctOptionId).length;
+          return (
+            <div key={part}>
+              <strong>Part {part}</strong>
+              <span>
+                {correct}/{items.length} {t('câu đúng')}
+              </span>
+              <progress max={items.length} value={correct} />
+            </div>
+          );
+        })}
       </div>
       {actionError && <ErrorState error={actionError} />}
       <div className="toeic-result-actions">
@@ -189,15 +193,19 @@ export default function ToeicResultPage() {
         <div>
           {question ? (
             <>
-              <StudyTextAssistant
-                allowNotes
-                examId={result.examId}
-                attemptId={result.id}
-                questionNumber={question.number}
-                part={question.part}
-              >
-                <ToeicQuestion question={question} selected={answers[question.id]} review />
-              </StudyTextAssistant>
+              {listening ? (
+                questionCard
+              ) : (
+                <StudyTextAssistant
+                  allowNotes
+                  examId={result.examId}
+                  attemptId={result.id}
+                  questionNumber={question.number}
+                  part={question.part}
+                >
+                  {questionCard}
+                </StudyTextAssistant>
+              )}
               <nav className="toeic-question-navigation" aria-label={t('Điều hướng lời giải')}>
                 <button
                   className="toeic-button toeic-button-outline"

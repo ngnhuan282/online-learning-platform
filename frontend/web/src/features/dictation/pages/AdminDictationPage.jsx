@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -44,6 +44,7 @@ import ErrorState from '../../../shared/components/ErrorState';
 import EmptyState from '../../../shared/components/EmptyState';
 import { dictationApi, downloadWorkbook } from '../api/dictationApi';
 import { useDictationAudio, useDictationQuery } from '../hooks/useDictationQuery';
+import YouTubeEmbed from '../components/YouTubeEmbed';
 import {
   definitionPayload,
   draftError,
@@ -51,6 +52,7 @@ import {
   LEVELS,
   parseTime,
   transcriptImportBase,
+  youtubeVideoId,
 } from '../utils/dictation';
 import '../styles/dictation.css';
 
@@ -61,6 +63,7 @@ const blankDefinition = () => ({
   topic: '',
   level: 'B1',
   audioKey: '',
+  video: null,
   sentences: [blankSentence()],
 });
 const inputTime = (value, duration) =>
@@ -75,14 +78,14 @@ const timingFields = [
     label: 'Bắt đầu',
     inputLabel: 'Bắt đầu câu',
     captureLabel: 'Lấy mốc bắt đầu câu',
-    tooltip: 'Lấy vị trí audio hiện tại làm mốc bắt đầu',
+    tooltip: 'Lấy vị trí phát hiện tại làm mốc bắt đầu',
   },
   {
     field: 'end',
     label: 'Kết thúc',
     inputLabel: 'Kết thúc câu',
     captureLabel: 'Lấy mốc kết thúc câu',
-    tooltip: 'Lấy vị trí audio hiện tại làm mốc kết thúc',
+    tooltip: 'Lấy vị trí phát hiện tại làm mốc kết thúc',
   },
 ];
 
@@ -100,6 +103,9 @@ export default function AdminDictationPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(blankDefinition);
   const [audioInfo, setAudioInfo] = useState(null);
+  const [videoSrc, setVideoSrc] = useState('');
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [youtubeReadySrc, setYoutubeReadySrc] = useState('');
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -110,9 +116,19 @@ export default function AdminDictationPage() {
   const [playingRow, setPlayingRow] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [audioClock, setAudioClock] = useState({ source: '', time: null });
-  const audio = useDictationAudio(form.audioKey, true);
-  const audioPosition = audioClock.source === audio.src ? audioClock.time : null;
+  const videoUrl = form.video?.url ?? '';
+  const hasVideo = Boolean(videoUrl.trim());
+  const youtubeId = youtubeVideoId(videoSrc);
+  const youtubeReady = Boolean(youtubeId && youtubeReadySrc === videoSrc);
+  const invalidVideo =
+    hasVideo && !youtubeVideoId(videoUrl.trim()) && videoUrl.trim() !== selected?.definition.video?.url;
+  const audio = useDictationAudio(hasVideo ? null : form.audioKey, true);
+  const mediaSrc = hasVideo ? videoSrc : audio.src;
+  const mediaDuration = hasVideo ? form.video.duration : audioInfo?.duration;
+  const Preview = hasVideo ? 'video' : 'audio';
+  const audioPosition = audioClock.source === mediaSrc ? audioClock.time : null;
   const player = useRef(null);
+  const youtubePlayer = useRef(null);
   const editorContent = useRef(null);
   const previewEnd = useRef(null);
   const previewKey = useRef(null);
@@ -166,6 +182,22 @@ export default function AdminDictationPage() {
     setParams(next, { replace: true });
   }, [open, list.loading, list.error, list.data, page, size, params, setParams]);
 
+  const readYouTube = useEffectEvent(() => {
+    const current = youtubePlayer.current;
+    if (!current) return;
+    const duration = current.getDuration();
+    if (Number.isFinite(duration) && duration > 0 && duration !== mediaDuration) {
+      change('video', { url: videoSrc, duration });
+    }
+    const time = current.getCurrentTime();
+    if (Number.isFinite(time)) trackPosition(time);
+  });
+  useEffect(() => {
+    if (!open || !youtubeReady) return;
+    const interval = setInterval(() => readYouTube(), 250);
+    return () => clearInterval(interval);
+  }, [open, youtubeReady]);
+
   function filter(values) {
     const next = new URLSearchParams(params);
     Object.entries({ page: '', ...values }).forEach(([key, value]) =>
@@ -195,6 +227,11 @@ export default function AdminDictationPage() {
   }
   function accept(detail) {
     stopPreview();
+    const nextVideoSrc = detail.definition.video?.url ?? '';
+    if (videoSrc !== nextVideoSrc) {
+      youtubePlayer.current = null;
+      setYoutubeReadySrc('');
+    }
     setSelected(detail);
     setForm({
       ...detail.definition,
@@ -202,6 +239,8 @@ export default function AdminDictationPage() {
       sentences: detail.definition.sentences.map(row => ({ ...row, key: crypto.randomUUID() })),
     });
     setAudioInfo(detail.audio);
+    setVideoSrc(nextVideoSrc);
+    setVideoFailed(false);
     setDirty(false);
   }
   function change(field, value) {
@@ -215,23 +254,27 @@ export default function AdminDictationPage() {
     }));
     setDirty(true);
   }
+  function trackPosition(time) {
+    setAudioClock(previous =>
+      previous.source === mediaSrc &&
+      Math.floor(previous.time) === Math.floor(time) &&
+      (previous.time === 0) === (time === 0)
+        ? previous
+        : { source: mediaSrc, time },
+    );
+  }
   function trackAudioPosition() {
     const element = player.current;
-    if (element?.readyState >= 1) {
-      const time = element.currentTime;
-      setAudioClock(previous =>
-        previous.source === audio.src &&
-        Math.floor(previous.time) === Math.floor(time) &&
-        (previous.time === 0) === (time === 0)
-          ? previous
-          : { source: audio.src, time },
-      );
-    }
+    if (element?.readyState >= 1) trackPosition(element.currentTime);
   }
   function captureTime(index, field) {
     const element = player.current;
-    if (!element || element.readyState < 1 || !Number.isFinite(element.currentTime)) return;
-    sentence(index, field, Math.round(element.currentTime * 1000) / 1000);
+    const time = youtubeReady
+      ? youtubePlayer.current?.getCurrentTime()
+      : element?.readyState >= 1
+        ? element.currentTime
+        : undefined;
+    if (Number.isFinite(time)) sentence(index, field, Math.round(time * 1000) / 1000);
   }
   function stopPreview() {
     playRequest.current++;
@@ -239,6 +282,7 @@ export default function AdminDictationPage() {
     previewKey.current = null;
     cancelAnimationFrame(frame.current);
     player.current?.pause();
+    youtubePlayer.current?.pauseVideo();
     setPlayingRow(null);
   }
   function trackPreviewPlayback() {
@@ -282,13 +326,20 @@ export default function AdminDictationPage() {
     setSelected(null);
     setForm(blankDefinition());
     setAudioInfo(null);
+    setVideoSrc('');
+    setVideoFailed(false);
+    setYoutubeReadySrc('');
+    youtubePlayer.current = null;
     setDirty(false);
     setError(null);
     setMessage('');
     setOpen(true);
   }
+  function validateEditor() {
+    return invalidVideo ? 'Vui lòng nhập liên kết YouTube hợp lệ.' : draftError(form);
+  }
   async function save() {
-    const validation = draftError(form);
+    const validation = validateEditor();
     if (validation) {
       setError(new Error(t(validation)));
       return;
@@ -307,7 +358,19 @@ export default function AdminDictationPage() {
   }
   async function publish() {
     if (pending.current) return;
-    const validation = draftError(form);
+    const validation =
+      validateEditor() ??
+      (hasVideo
+        ? videoFailed
+          ? youtubeId
+            ? 'Không phát được video nhúng YouTube.'
+            : 'Không phát được video. Kiểm tra liên kết cloud.'
+          : !mediaDuration
+            ? 'Chờ tải thời lượng video trước khi xuất bản.'
+            : null
+        : !form.audioKey
+          ? 'Vui lòng nhập liên kết YouTube hợp lệ.'
+          : null);
     if (validation) {
       setError(new Error(t(validation)));
       editorContent.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -341,9 +404,14 @@ export default function AdminDictationPage() {
     change('sentences', rows);
   }
   async function preview(row) {
-    if (previewKey.current === row.key && !player.current?.paused) {
+    const youtube = youtubeReady ? youtubePlayer.current : null;
+    if (
+      previewKey.current === row.key &&
+      (youtube ? youtube.getPlayerState() === 1 : !player.current?.paused)
+    ) {
       playRequest.current++;
-      player.current?.pause();
+      if (youtube) youtube.pauseVideo();
+      else player.current?.pause();
       return;
     }
     let request;
@@ -352,15 +420,21 @@ export default function AdminDictationPage() {
         enteredEnd = parseTime(row.end),
         duration = Number.isFinite(player.current?.duration)
           ? player.current.duration
-          : (audioInfo?.duration ?? Infinity),
+          : (mediaDuration ?? Infinity),
         end =
           enteredEnd === null
             ? null
-            : enteredEnd >= (audioInfo?.duration ?? duration)
+            : enteredEnd >= (mediaDuration ?? duration)
               ? duration
               : Math.min(enteredEnd, duration);
-      if (!player.current || start === null || end === null || start >= end)
+      if ((!player.current && !youtube) || start === null || end === null || start >= end)
         throw new Error(t('Câu chưa có mốc thời gian hợp lệ.'));
+      if (youtube) {
+        stopPreview();
+        previewKey.current = row.key;
+        youtube.loadVideoById({ videoId: youtubeId, startSeconds: start, endSeconds: end });
+        return;
+      }
       const resume =
         previewKey.current === row.key &&
         player.current.currentTime >= start &&
@@ -584,6 +658,7 @@ export default function AdminDictationPage() {
             />
             <TextField
               label={t('Chủ đề')}
+              placeholder="Test 1"
               required
               value={form.topic}
               onChange={event => change('topic', event.target.value)}
@@ -617,18 +692,46 @@ export default function AdminDictationPage() {
           <section className="dictation-editor-audio">
             <div className="dictation-section-heading">
               <h3>
-                <HeadphonesOutlined />
-                {t('Audio')}
+                {hasVideo || !form.audioKey ? <PlayArrowRounded /> : <HeadphonesOutlined />}
+                {hasVideo || !form.audioKey ? 'Video' : 'Audio'}
               </h3>
-              <Button
-                variant="outlined"
-                startIcon={<UploadFileOutlined />}
-                disabled={busy}
-                onClick={() => fileInput.current.click()}
-              >
-                {t(form.audioKey ? 'Đổi audio' : 'Tải audio')}
-              </Button>
+              {form.audioKey && !hasVideo && (
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileOutlined />}
+                  disabled={busy}
+                  onClick={() => fileInput.current.click()}
+                >
+                  {t('Đổi audio')}
+                </Button>
+              )}
             </div>
+            <TextField
+              fullWidth
+              type="url"
+              label={t('Liên kết YouTube')}
+              value={videoUrl}
+              helperText={t(
+                invalidVideo
+                  ? 'Vui lòng nhập liên kết YouTube hợp lệ.'
+                  : 'Dán link YouTube gốc. Bấm phát video nếu thời lượng chưa hiện.',
+              )}
+              error={invalidVideo}
+              disabled={busy}
+              slotProps={{ htmlInput: { maxLength: 2048 } }}
+              onChange={event => {
+                stopPreview();
+                const url = event.target.value;
+                change('video', url ? { url, duration: null } : null);
+                setVideoSrc('');
+                setVideoFailed(false);
+                setYoutubeReadySrc('');
+                youtubePlayer.current = null;
+              }}
+              onBlur={() => {
+                if (hasVideo && !invalidVideo) setVideoSrc(videoUrl.trim());
+              }}
+            />
             <input
               ref={fileInput}
               hidden
@@ -648,21 +751,77 @@ export default function AdminDictationPage() {
                 });
               }}
             />
-            {audioInfo && (
+            {audioInfo && !hasVideo && (
               <p className="dictation-audio-name">
                 {audioInfo.name} · {formatTime(audioInfo.duration)}
               </p>
             )}
-            {audio.error ? (
+            {hasVideo && mediaDuration > 0 && (
+              <p className="dictation-audio-name" role="status">
+                {t('Thời lượng video: {duration}', { duration: formatTime(mediaDuration) })}
+              </p>
+            )}
+            {videoFailed && (
+              <Alert
+                severity="error"
+                action={
+                  !youtubeId && (
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => {
+                        setVideoFailed(false);
+                        player.current?.load();
+                      }}
+                    >
+                      {t('Thử lại')}
+                    </Button>
+                  )
+                }
+              >
+                {t(
+                  youtubeId
+                    ? 'Không phát được video nhúng YouTube.'
+                    : 'Không phát được video. Kiểm tra liên kết cloud.',
+                )}
+              </Alert>
+            )}
+            {youtubeId ? (
+              <YouTubeEmbed
+                key={videoSrc}
+                title="YouTube"
+                videoId={youtubeId}
+                onReady={target => {
+                  youtubePlayer.current = target;
+                  setYoutubeReadySrc(videoSrc);
+                }}
+                onDispose={target => {
+                  if (youtubePlayer.current === target) youtubePlayer.current = null;
+                }}
+                onStateChange={state => {
+                  setPlayingRow(state === 1 ? previewKey.current : null);
+                  if (state === 1) setVideoFailed(false);
+                }}
+                onError={() => setVideoFailed(true)}
+              />
+            ) : !hasVideo && audio.error ? (
               <ErrorState error={audio.error} onRetry={audio.reload} />
             ) : (
-              audio.src && (
-                <audio
+              mediaSrc && (
+                <Preview
+                  key={mediaSrc}
                   ref={player}
                   controls
-                  src={audio.src}
+                  src={mediaSrc}
                   preload="metadata"
-                  onLoadedMetadata={trackAudioPosition}
+                  playsInline={hasVideo || undefined}
+                  onLoadedMetadata={event => {
+                    trackAudioPosition();
+                    const duration = event.currentTarget.duration;
+                    if (hasVideo && Number.isFinite(duration) && duration > 0 && duration !== mediaDuration) {
+                      change('video', { url: videoSrc, duration });
+                    }
+                  }}
                   onTimeUpdate={trackAudioPosition}
                   onPlay={trackPreviewPlayback}
                   onPause={() => {
@@ -670,7 +829,10 @@ export default function AdminDictationPage() {
                     setPlayingRow(null);
                   }}
                   onEnded={stopPreview}
-                  onError={stopPreview}
+                  onError={() => {
+                    stopPreview();
+                    if (hasVideo) setVideoFailed(true);
+                  }}
                   onSeeked={() => {
                     trackAudioPosition();
                     if (previewEnd.current && player.current.currentTime > previewEnd.current) stopPreview();
@@ -683,9 +845,7 @@ export default function AdminDictationPage() {
             <div className="dictation-section-heading">
               <h3>
                 {t('Transcript')}
-                <span>
-                  {t('{count} câu', { count: form.sentences.length })}
-                </span>
+                <span>{t('{count} câu', { count: form.sentences.length })}</span>
               </h3>
               <div className="dictation-toolbar">
                 <Button
@@ -745,7 +905,7 @@ export default function AdminDictationPage() {
                         size="small"
                         label={t(label)}
                         placeholder="00:00"
-                        value={inputTime(row[field], field === 'end' ? audioInfo?.duration : undefined)}
+                        value={inputTime(row[field], field === 'end' ? mediaDuration : undefined)}
                         disabled={busy}
                         onChange={event => sentence(index, field, event.target.value)}
                         slotProps={{
@@ -786,7 +946,7 @@ export default function AdminDictationPage() {
                           size="small"
                           aria-label={`${t(playingRow === row.key ? 'Tạm dừng câu' : 'Nghe thử câu')} ${index + 1}`}
                           color={playingRow === row.key ? 'primary' : 'default'}
-                          disabled={busy || !audio.src}
+                          disabled={busy || !mediaSrc || Boolean(youtubeId && !youtubeReady)}
                           onClick={() => preview(row)}
                         >
                           {playingRow === row.key ? <PauseRounded /> : <PlayArrowRounded />}

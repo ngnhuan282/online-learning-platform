@@ -23,6 +23,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest(
@@ -35,6 +36,10 @@ import tools.jackson.databind.json.JsonMapper;
     }
 )
 @ActiveProfiles("test")
+@Sql(
+    statements = "UPDATE dictation_exercises SET archived=FALSE WHERE id='ets-2024-company-picnic'",
+    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS
+)
 class DictationIntegrationTests {
 
     private static final String SECRET = "dictation-test-secret-with-more-than-thirty-two-bytes";
@@ -69,8 +74,8 @@ class DictationIntegrationTests {
     final HttpClient http = HttpClient.newHttpClient();
 
     @Test
-    void sampleMigrationAndCatalogAreAvailableWithoutEnrollment() {
-        var catalog = service.catalog(5001, "picnic", "B1", "Workplace", 0, 12, false);
+    void legacyAudioCatalogIsAvailableWithoutEnrollment() {
+        var catalog = service.catalog(5001, "picnic", "B1", "Test 1", 0, 12, false);
         assertThat(catalog.total()).isGreaterThanOrEqualTo(1);
         var item = catalog
             .items()
@@ -80,10 +85,185 @@ class DictationIntegrationTests {
             .orElseThrow();
         assertThat(item.sentenceCount()).isEqualTo(13);
         assertThat(item.duration()).isBetween(31.0, 32.0);
+        assertThat(item.topic()).isEqualTo("Test 1");
+        assertThat(service.adminDetail(SAMPLE).definition().topic()).isEqualTo("Test 1");
         assertThat(
             service.catalog(5001, "nothing-matches-this-query", "", "", 0, 12, false).items()
         ).isEmpty();
-        assertThat(service.catalog(5001, "", "C2", "", 0, 12, false).items()).isEmpty();
+        assertThat(service.catalog(5001, "picnic", "C2", "", 0, 12, false).items()).isEmpty();
+    }
+
+    @Test
+    void topicGroupsPreviewPublishedExercisesAndFilterFullResultsByLatestAttempt() throws Exception {
+        long learner = 5091;
+        String keyword = "TestGroupingFixture";
+        var sentences = List.of(new Sentence("Hello there.", 0.0, 3.0));
+        var ids = new ArrayList<String>();
+        for (int index = 0; index < 7; index++) {
+            String topic = index < 6 ? (index % 2 == 0 ? "  test  02  " : "Test 2") : "Travel & Food";
+            var definition = new Definition(
+                keyword + " " + index, "", topic, "B1", "sample-ets-2024-test-1", sentences
+            );
+            var lesson = service.saveAndPublish(null, new SaveRequest(definition, 0));
+            ids.add(lesson.id());
+        }
+        service.visibility(ids.get(5), true);
+        var groups = service.topicGroups(learner, keyword, "B1", "", "").groups();
+        assertThat(groups).extracting(TopicGroup::topic).containsExactly("Test 2", "Travel & Food");
+        assertThat(groups.getFirst().total()).isEqualTo(5);
+        assertThat(groups.getFirst().items()).hasSize(4).allMatch(item -> item.topic().equals("Test 2"));
+        assertThat(groups.getLast().items()).extracting(Item::id).containsExactly(ids.getLast());
+
+        var response = request(learner, false, "GET", USER + "/topic-groups?keyword=" + keyword, null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(json.readTree(response.body()).path("data").path("groups").size()).isEqualTo(2);
+        response = request(learner, false, "GET", USER + "?keyword=" + keyword + "&topic=TEST%202&page=1&size=4", null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        var page = json.readTree(response.body()).path("data");
+        assertThat(page.path("items").size()).isEqualTo(1);
+        assertThat(page.path("total").asLong()).isEqualTo(5);
+
+        var attempt = start(learner, ids.getFirst());
+        assertThat(service.catalog(learner, keyword, "", "Test 2", 0, 12, false, "IN_PROGRESS").items())
+            .extracting(Item::attemptId)
+            .containsExactly(attempt.id());
+        service.progress(learner, attempt.id(), new AnswerRequest(0, "Hello there"));
+        service.finish(learner, attempt.id());
+        assertThat(service.topicGroups(learner, keyword, "", "", "COMPLETED").groups().getFirst().total())
+            .isEqualTo(1);
+        assertThat(service.catalog(learner + 1, keyword, "", "Test 2", 0, 12, false, "NOT_STARTED").total())
+            .isEqualTo(5);
+        var restarted = service.start(learner, ids.getFirst(), new StartRequest(UUID.randomUUID().toString(), true));
+        assertThat(service.topicGroups(learner, keyword, "", "", "COMPLETED").groups()).isEmpty();
+        assertThat(service.catalog(learner, keyword, "", "Test 2", 0, 12, false, "IN_PROGRESS").items())
+            .extracting(Item::attemptId)
+            .containsExactly(restarted.id());
+
+        var old = service.adminDetail(ids.getFirst());
+        var reclassified = new Definition(
+            old.definition().title(), "", "travel & food", "B1", old.definition().audioKey(), sentences
+        );
+        var draft = service.save(old.id(), new SaveRequest(reclassified, old.version()));
+        assertThat(service.catalog(learner, keyword, "", "Travel & Food", 0, 12, false).total()).isEqualTo(1);
+        service.publish(draft.id(), draft.version());
+        assertThat(service.catalog(learner, keyword, "", "Travel & Food", 0, 12, false).items())
+            .extracting(Item::id)
+            .containsExactlyInAnyOrder(old.id(), ids.getLast());
+        assertThat(service.topicGroups(learner, keyword, "", "", "").groups().getLast().total())
+            .isEqualTo(2);
+    }
+
+    @Test
+    void youtubeThumbnailsFollowPublishedLessonsInCaseInsensitiveTopicGroups() throws Exception {
+        long learner = 5096;
+        String keyword = "YoutubeCoverFixture";
+        String id = "_R7nrvhNmrI";
+        String shortId = "7lCDEYXw3mM";
+        var sentences = List.of(new Sentence("Hello there.", 7.0, 10.0));
+        var first = service.saveAndPublish(
+            null,
+            new SaveRequest(
+                new Definition(
+                    keyword + " one", "", "Daily English Conversation", "A1", null, sentences,
+                    new Video("https://www.youtube.com/watch?t=7&v=%5F" + id.substring(1), 91.9)
+                ),
+                0
+            )
+        );
+        var second = service.saveAndPublish(
+            null,
+            new SaveRequest(
+                new Definition(
+                    keyword + " two", "", "daily english Conversation", "B1", null, sentences,
+                    new Video("https://youtu.be/" + shortId + "?si=share", 75.0)
+                ),
+                0
+            )
+        );
+        var groups = service.topicGroups(learner, keyword, "", "", "").groups();
+        assertThat(groups).hasSize(1);
+        assertThat(groups.getFirst().total()).isEqualTo(2);
+        assertThat(groups.getFirst().items()).extracting(Item::thumbnailUrl).containsExactlyInAnyOrder(
+            "https://i.ytimg.com/vi/" + id + "/mqdefault.jpg",
+            "https://i.ytimg.com/vi/" + shortId + "/mqdefault.jpg"
+        );
+        assertThat(second.definition().topic()).isEqualTo("daily english Conversation");
+        service.visibility(first.id(), true);
+        assertThat(service.topicGroups(learner, keyword, "", "", "").groups().getFirst().items())
+            .extracting(Item::id)
+            .containsExactly(second.id());
+        service.visibility(first.id(), false);
+        var response = request(
+            learner, false, "GET", USER + "?keyword=" + keyword + "&topic=DAILY%20ENGLISH%20CONVERSATION", null
+        );
+        assertThat(response.statusCode()).isEqualTo(200);
+        var catalog = json.readTree(response.body()).path("data");
+        assertThat(catalog.path("total").asLong()).isEqualTo(2);
+        assertThat(catalog.path("items").get(0).path("thumbnailUrl").asText())
+            .startsWith("https://i.ytimg.com/vi/");
+    }
+
+    @Test
+    void cloudVideoUsesItsRevisionDurationAndTranscriptWithoutAnAudioUpload() throws Exception {
+        var video = new Video("https://media.example.test/videos/sample.mp4", 34.8);
+        var sentences = List.of(new Sentence("Sounds good.", 30.0, 35.0));
+        var definition = new Definition("Cloud video", "", "Conversation", "A1", null, sentences, video);
+        var lesson = service.saveAndPublish(null, new SaveRequest(definition, 0));
+        assertThat(lesson.audio()).isNull();
+        assertThat(lesson.definition().video()).isEqualTo(video);
+        assertThat(lesson.definition().sentences().getFirst().end()).isEqualTo(34.8);
+        var item = service.catalog(5093, "Cloud video", "", "Conversation", 0, 12, false).items().getFirst();
+        assertThat(item.video()).isTrue();
+        assertThat(item.thumbnailUrl()).isNull();
+        assertThat(item.duration()).isEqualTo(34.8);
+        var attempt = start(5093, lesson.id());
+        assertThat(attempt.video()).isEqualTo(video);
+        assertThat(attempt.duration()).isEqualTo(34.8);
+        assertThat(attempt.sentences().getFirst().end()).isEqualTo(34.8);
+        assertThat(request(5093L, false, "GET", USER + "/attempts/" + attempt.id() + "/audio", null).statusCode())
+            .isEqualTo(404);
+        service.visibility(lesson.id(), true);
+        assertThat(service.history(5093, "", "", "", "", 0, 20).items().getFirst().video()).isNull();
+
+        var unfinished = new Definition(
+            "Unverified video", "", "Conversation", "A1", null, sentences, new Video(video.url(), null)
+        );
+        var draft = service.save(null, new SaveRequest(unfinished, 0));
+        assertThatThrownBy(() -> service.publish(draft.id(), draft.version()))
+            .hasMessage("Chờ tải thời lượng video trước khi xuất bản.");
+        var invalid = new Definition(
+            "Insecure video", "", "Conversation", "A1", null, sentences, new Video("http://example.test/video.mp4", 40.0)
+        );
+        assertThatThrownBy(() -> service.save(null, new SaveRequest(invalid, 0)))
+            .hasMessage("Vui lòng nhập URL HTTPS trực tiếp của video.");
+    }
+
+    @Test
+    void levelGroupsFilterBothThePreviewsAndThePaginatedTestCatalog() throws Exception {
+        String keyword = "LevelGroupFixture";
+        var sentences = List.of(new Sentence("Hello there.", 0.0, 3.0));
+        for (String level : List.of("A1", "A2", "B1", "C2")) {
+            var definition = new Definition(
+                keyword + " " + level, "", "Test 4", level, "sample-ets-2024-test-1", sentences
+            );
+            service.saveAndPublish(null, new SaveRequest(definition, 0));
+        }
+
+        long learner = 5092;
+        var beginner = request(learner, false, "GET", USER + "/topic-groups?keyword=" + keyword + "&level=BEGINNER", null);
+        assertThat(beginner.statusCode()).isEqualTo(200);
+        var group = json.readTree(beginner.body()).path("data").path("groups").get(0);
+        assertThat(group.path("topic").asText()).isEqualTo("Test 4");
+        assertThat(group.path("total").asLong()).isEqualTo(2);
+        assertThat(group.path("items")).extracting(item -> item.path("level").asText())
+            .containsExactlyInAnyOrder("A1", "A2");
+
+        var first = service.catalog(learner, keyword, "ADVANCED", "Test 4", 0, 1, false, "NOT_STARTED");
+        var second = service.catalog(learner, keyword, "ADVANCED", "Test 4", 1, 1, false, "NOT_STARTED");
+        assertThat(first.total()).isEqualTo(2);
+        assertThat(second.total()).isEqualTo(2);
+        assertThat(List.of(first.items().getFirst().level(), second.items().getFirst().level()))
+            .containsExactlyInAnyOrder("B1", "C2");
     }
 
     @Test

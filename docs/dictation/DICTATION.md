@@ -5,19 +5,22 @@
 - Mục `Luyện nghe` trong menu hiển thị với mọi người; trang `/dictation` yêu cầu đăng nhập và hoạt động độc lập với khóa học, đăng ký học và gói PRO.
 - Hỗ trợ thanh thời gian cho toàn bộ audio, nghe và phát lại từng câu, gợi ý từng từ, phản hồi chấm từ trực tiếp từ backend, lưu để luyện tiếp và xem tiến độ mới nhất của mỗi bài.
 - Trang quản lý `/admin/dictation` chỉ dành cho vai trò `ADMIN`, được kiểm tra ở cả frontend và backend.
-- Chỉ hỗ trợ MP3 với tốc độ phát bình thường. Không bao gồm video, tự động tạo transcript bằng AI, XP hoặc kim cương.
+- Bài mới dùng video YouTube có thể nhúng. Các bài MP3 và MP4 đã có vẫn dùng trình phát tương ứng.
 
 ## Dữ liệu và tệp
 
 Learning Service quản lý năm bảng `dictation_*` trong `learning_db`:
 
-- Flyway V14 tạo các bảng và tự động thêm một bài nghe mẫu đã xuất bản.
+- Flyway V14 tạo các bảng và bài audio mẫu **The company picnic**.
 - Flyway V15 bổ sung chỉ số các từ đã dùng gợi ý, không thay đổi điểm hiện có hoặc checksum của V14.
 - Flyway V16 bổ sung chấm điểm trực tiếp và lưu riêng các từ người học tự nhập đúng. Các lượt luyện cũ đã hoàn thành vẫn giữ nguyên điểm đã lưu.
+- Flyway V21 thêm bài YouTube **What day is it today?**, trình độ A1, chủ đề **Daily English Conversation**. Bài mẫu có 7 câu và được xuất bản sẵn trên database mới.
 
 V10-V13 thuộc các migration thương mại, danh mục và TOEIC hiện có trên `main`, không được sửa. Database local từng chạy migration luyện nghe dưới tên V10-V12 cần được sao lưu rồi đối chiếu, điều chỉnh lịch sử migration. Chỉ đổi tên tệp nguồn không tự cập nhật lịch sử trong database đã chạy.
 
-Bài mẫu sử dụng `docs/resources/audio/Audio 1.mp3` cùng transcript về buổi dã ngoại công ty trong PDF được cung cấp. Nội dung đã làm sạch nằm ở `docs/resources/transcripts/Transcript 1.txt`; các câu kèm mốc thời gian được khởi tạo trong V14. Audio dài khoảng 31 giây, gồm 13 câu luyện tập.
+Bài YouTube mẫu được khởi tạo từ link video, thời lượng và các câu kèm mốc thời gian trong V21. File Excel gốc có thể lưu trên VPS hoặc Drive chung.
+
+V21 ẩn bài audio mẫu khi bài còn ở phiên bản gốc và chưa có lượt luyện. File `docs/resources/audio/Audio 1.mp3` phục vụ các database đã sử dụng bài này.
 
 Lệnh khởi động backend vẫn là:
 
@@ -31,9 +34,20 @@ Khi chạy Maven từ `backend/learning-service`, đường dẫn mặc định 
 
 ## Biên tập transcript
 
-Admin có thể nhập từng câu trực tiếp, lấy mốc bắt đầu/kết thúc từ vị trí audio đang phát hoặc nhập tệp `.xlsx` theo mẫu tải từ trang quản lý. Sheet `Transcript` có sẵn hai dòng ví dụ; cần thay hoặc xóa chúng trước khi nhập bài riêng. Hệ thống chỉ đọc sheet này, không lấy nội dung sheet `Hướng dẫn` làm câu luyện nghe.
+### Tạo bài từ YouTube và Excel
 
-Nhập Excel cần xem trước, xác nhận và lưu hoặc xuất bản thì nội dung bài mới được cập nhật. Nút lấy mốc chỉ sao chép vị trí audio hiện tại, không tự nhận diện ranh giới câu; cần phát hoặc tua audio đến vị trí mong muốn trước.
+1. Mở video gốc trên YouTube và sao chép liên kết chia sẻ. Lưu file Excel vào thư mục của nhóm trên VPS hoặc Drive chung. Lưu link YouTube cạnh Excel, chẳng hạn trong file `youtube-links.csv` có tên file, link và chủ đề.
+2. Vào **Quản lý bài nghe → Thêm bài nghe**, nhập tên và chủ đề, rồi dán link vào **Liên kết YouTube**. Bấm phát trong khung xem trước nếu thời lượng chưa hiện.
+3. Chọn **Nhập từ Excel** và chọn tệp `.xlsx`. Nếu mở trình duyệt trong Remote Desktop, có thể chọn trực tiếp file trên VPS. Nếu mở ở máy cá nhân, chép hoặc tải Excel về máy trước khi chọn.
+4. Kiểm tra mốc thời gian theo video YouTube gốc rồi **Xuất bản**. Database lưu link YouTube, chủ đề, các câu và mốc thời gian. Khi luyện, ChitChatGo phát video từ YouTube theo mốc của câu được chọn.
+
+Các bài seed có thể dùng cùng cấu trúc dữ liệu với `video.url` là link YouTube gốc, `video.duration` là thời lượng tính bằng giây và `sentences` chứa các câu có mốc bắt đầu/kết thúc.
+
+### Nhập và kiểm tra mốc
+
+Admin có thể nhập từng câu trực tiếp, lấy mốc bắt đầu/kết thúc từ vị trí đang phát hoặc nhập tệp `.xlsx` theo mẫu tải từ trang quản lý. Thay hoặc xóa hai dòng ví dụ trong sheet `Transcript` trước khi nhập bài riêng. Hệ thống chỉ đọc sheet này.
+
+Nhập Excel cần xem trước, xác nhận và lưu hoặc xuất bản thì nội dung bài mới được cập nhật. Phát hoặc tua đến vị trí mong muốn rồi bấm nút lấy mốc để điền thời gian hiện tại vào câu.
 
 Các cột gồm `Thứ tự`, `Transcript`, `Bắt đầu`, `Kết thúc`. Mốc thời gian trong Excel phải là văn bản theo định dạng `mm:ss`. Mốc lấy trực tiếp từ trình phát vẫn giữ phần giây lẻ trong dữ liệu nội bộ. Bản nháp cho phép để trống mốc thời gian.
 

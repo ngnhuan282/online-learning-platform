@@ -49,7 +49,9 @@ const icons = [
   'FilterListRounded',
   'AssignmentTurnedInOutlined',
   'PlayCircleOutlineRounded',
+  'RocketLaunchOutlined',
   'SearchOutlined',
+  'SpaOutlined',
   'SubjectOutlined',
   'PauseRounded',
   'PlayArrowRounded',
@@ -233,7 +235,11 @@ beforeEach(() => {
   dictationApi.query = async path => {
     if (path === dictationApi.attemptPath('run')) return snapshot();
     if (path === dictationApi.attemptPath('new-run')) return { data: structuredClone(restarted) };
-    if (path === dictationApi.catalogPath || path === dictationApi.historyPath)
+    if (
+      path === dictationApi.catalogPath ||
+      path === dictationApi.historyPath ||
+      path === dictationApi.topicGroupsPath
+    )
       return { data: { items: [], total: 0, topics: ['Workplace', 'Travel'] } };
     assert.fail(`Unexpected query: ${path}`);
   };
@@ -288,6 +294,7 @@ afterEach(async () => {
     globalThis.setTimeout = realSetTimeout;
     globalThis.clearTimeout = realClearTimeout;
     timers.clear();
+    delete window.YT;
     if (!Object.hasOwn(original, 'check')) delete dictationApi.check;
     Object.assign(dictationApi, original);
   }
@@ -762,6 +769,93 @@ test('Start advances after a sentence ends while Replay stays on it and pending 
   assertNoCheck();
 });
 
+test('YouTube seeks within one iframe and pauses at the selected sentence end', async () => {
+  const videoId = '_R7nrvhNmrI';
+  run.video = { url: `https://www.youtube.com/watch?v=${videoId}`, duration: 10 };
+  dictationApi.audio = async () => assert.fail('YouTube lessons use the iframe player');
+  const seeks = [];
+  const cued = [];
+  const pauses = [];
+  let callbacks;
+  let player;
+  let position = 0;
+  let playerState = -1;
+  function reportState(value) {
+    playerState = value;
+    callbacks.onStateChange({ data: value });
+  }
+  const tick = () => act(async () => new Promise(resolve => realSetTimeout(resolve, 65)));
+  window.YT = {
+    Player: class {
+      constructor(iframe, { events }) {
+        assert.equal(new URL(iframe.src).pathname, `/embed/${videoId}`);
+        callbacks = events;
+        player = this;
+      }
+      cueVideoById(clip) {
+        cued.push(clip);
+      }
+      seekTo(seconds, allowSeekAhead) {
+        seeks.push([seconds, allowSeekAhead]);
+      }
+      getCurrentTime() {
+        return position;
+      }
+      getPlayerState() {
+        return playerState;
+      }
+      playVideo() {
+        reportState(1);
+      }
+      pauseVideo() {
+        pauses.push(position);
+        reportState(2);
+      }
+      destroy() {}
+    },
+  };
+  await render();
+  await act(async () => callbacks.onReady({ target: player }));
+  const initialCue = { videoId, startSeconds: run.sentences[0].start };
+  assert.deepEqual(cued, [initialCue]);
+  const iframe = document.querySelector('.dictation-youtube iframe');
+  const controls = document.querySelector('.dictation-player-row');
+  const rows = document.querySelectorAll('.dictation-sentence');
+  await clickElement(rows[1]);
+  await clickElement(rows[0]);
+  await clickElement(rows[1]);
+  assert.deepEqual(seeks, []);
+  await act(async () => reportState(5));
+  const { start, end } = run.sentences[1];
+  assert.deepEqual(seeks, [[start, true]]);
+  position = end - 0.1;
+  await tick();
+  assert.deepEqual(pauses, []);
+  position = end + 0.02;
+  await tick();
+  assert.deepEqual(pauses, [position]);
+  assert.equal(playerState, 2);
+  assert.deepEqual(seeks, [[start, true]]);
+
+  await click('Phát lại', controls);
+  assert.deepEqual(seeks, [
+    [start, true],
+    [start, true],
+  ]);
+  await clickElement(rows[0]);
+  assert.deepEqual(seeks.at(-1), [run.sentences[0].start, true]);
+  await tick();
+  assert.equal(pauses.length, 1, 'The old clock must not stop the new sentence.');
+  position = run.sentences[0].start + 0.1;
+  await tick();
+  position = run.sentences[0].end + 0.01;
+  await tick();
+  assert.equal(pauses.at(-1), position);
+  assert.equal(pauses.length, 2);
+  assert.deepEqual(cued, [initialCue]);
+  assert.equal(document.querySelector('.dictation-youtube iframe'), iframe);
+});
+
 test('rapid transcript seeks play only the latest target after the native seek completes', async () => {
   await render();
   const player = document.querySelector('audio');
@@ -1008,14 +1102,14 @@ async function select(label, value) {
   await clickElement(option);
 }
 
-function installLibraryFixture() {
+function installLibraryFixture(levels = [], catalogTopics = []) {
   const queries = [];
   // The server returns only the latest attempt per lesson; do not simulate client-side deduplication.
   const items = Array.from({ length: 41 }, (_, index) => ({
     ...attempt(`latest-${index}`),
     exerciseId: `lesson-${index}`,
     title: `Company picnic ${index + 1}`,
-    level: index % 2 ? 'B2' : 'B1',
+    level: levels[index] ?? (index % 2 ? 'B2' : 'B1'),
     topic: index % 2 ? 'Travel' : 'Workplace',
     completed: index < 21 ? 1 : 2,
     completedAt: index < 21 ? null : '2026-11-16T10:30:00Z',
@@ -1023,35 +1117,47 @@ function installLibraryFixture() {
     scoringMode: index === 21 ? 'LEGACY' : 'LIVE',
   }));
   assert.equal(new Set(items.map(item => item.exerciseId)).size, items.length);
+  const catalog = items.map((item, index) => ({ ...item, topic: catalogTopics[index] ?? 'Test 1' }));
   dictationApi.query = async (path, params) => {
     queries.push({ path, ...params });
-    const filtered = items.filter(
+    const presets = { BEGINNER: ['A1', 'A2'], ADVANCED: ['B1', 'B2', 'C1', 'C2'] };
+    const matchingLevels = presets[params.level] ?? [params.level];
+    const filtered = (path === dictationApi.historyPath ? items : catalog).filter(
       item =>
         (!params.keyword || item.title.toLowerCase().includes(params.keyword.toLowerCase())) &&
-        (!params.level || item.level === params.level) &&
+        (!params.level || matchingLevels.includes(item.level)) &&
         (!params.topic || item.topic === params.topic) &&
         (path !== dictationApi.historyPath ||
           (params.status === 'COMPLETED' ? Boolean(item.completedAt) : !item.completedAt)),
     );
+    const lesson = item => ({
+      id: item.exerciseId,
+      title: item.title,
+      topic: item.topic,
+      level: item.level,
+      duration: item.duration,
+      sentenceCount: item.sentences.length,
+      attemptId: item.id,
+      completed: item.completed,
+      progressTotal: item.sentences.length,
+      attemptCompleted: Boolean(item.completedAt),
+      description: '',
+    });
+    if (path === dictationApi.topicGroupsPath) {
+      return {
+        data: {
+          groups: Object.entries(Object.groupBy(filtered, item => item.topic)).map(([topic, entries]) => ({
+            topic,
+            total: entries.length,
+            items: entries.slice(0, 4).map(lesson),
+          })),
+        },
+      };
+    }
     const page = filtered.slice(params.page * params.size, (params.page + 1) * params.size);
     return {
       data: {
-        items:
-          path === dictationApi.catalogPath
-            ? page.map(item => ({
-                id: item.exerciseId,
-                title: item.title,
-                topic: item.topic,
-                level: item.level,
-                duration: item.duration,
-                sentenceCount: item.sentences.length,
-                attemptId: item.id,
-                completed: item.completed,
-                progressTotal: item.sentences.length,
-                attemptCompleted: Boolean(item.completedAt),
-                description: '',
-              }))
-            : structuredClone(page),
+        items: path === dictationApi.catalogPath ? page.map(lesson) : structuredClone(page),
         total: filtered.length,
         page: params.page,
         size: params.size,
@@ -1062,11 +1168,124 @@ function installLibraryFixture() {
   return { queries, items };
 }
 
+test('the TOEIC group preview opens its own paginated catalog and keeps the latest attempt link', async () => {
+  const { queries } = installLibraryFixture();
+  await render('/dictation');
+  assert.equal(queries.at(-1).path, dictationApi.topicGroupsPath);
+  assert.equal(document.querySelector('.dictation-filters'), null);
+  assert.equal(document.querySelector('[role="combobox"][aria-label="Chủ đề"]'), null);
+  assert.ok(!Object.hasOwn(queries.at(-1), 'topic'));
+  assert.equal(document.querySelectorAll('.dictation-lesson-card').length, 4);
+  const openAll = document.querySelector('.dictation-topic-heading a');
+  assert.equal(openAll.getAttribute('href'), '/dictation?topic=Test+1');
+  await clickElement(openAll);
+  assert.equal(document.querySelector('h1').textContent, 'Test 1');
+  assert.equal(document.querySelector('.dictation-tier-pills'), null);
+  assert.ok(document.querySelector('.dictation-filters.is-catalog'));
+  assert.match(document.querySelector('.dictation-heading [role="status"]').textContent, /41 bài nghe/);
+  assert.equal(document.querySelector('[role="combobox"][aria-label="Chủ đề"]'), null);
+  assert.equal(queries.at(-1).path, dictationApi.catalogPath);
+  assert.equal(queries.at(-1).topic, 'Test 1');
+  assert.equal(document.querySelectorAll('.dictation-lesson-card').length, 12);
+  assert.equal(
+    document.querySelector('.dictation-lesson-card a').getAttribute('href'),
+    '/dictation/lesson-0?attempt=latest-0',
+  );
+  await clickElement(document.querySelector('button[aria-label="Go to page 2"]'));
+  assert.equal(queries.at(-1).page, 1);
+  await select('Trạng thái bài nghe', 'Đang luyện');
+  assert.equal(queries.at(-1).status, 'IN_PROGRESS');
+  assert.equal(queries.at(-1).page, 0);
+  assert.equal(queries.at(-1).topic, 'Test 1');
+  await clickElement(document.querySelector('.dictation-library-back'));
+  assert.equal(queries.at(-1).path, dictationApi.topicGroupsPath);
+});
+
+test('level pills filter previews while topic links always open the full topic', async () => {
+  const conversation = 'Daily English Conversation';
+  const { queries } = installLibraryFixture(['A1', 'A2'], [conversation, conversation]);
+  const pills = () => [...document.querySelectorAll('.dictation-topic-pills a')];
+  await render('/dictation?tier=beginner');
+  assert.equal(button('Người mới').getAttribute('aria-pressed'), 'true');
+  assert.equal(queries.at(-1).level, 'BEGINNER');
+  assert.deepEqual(
+    pills().map(link => link.textContent),
+    [conversation, 'Test 1'],
+  );
+  assert.equal(document.querySelectorAll('.dictation-lesson-card').length, 2);
+  const seeAll = document.querySelector('.dictation-topic-heading a');
+  assert.equal(pills()[0].getAttribute('href'), seeAll.getAttribute('href'));
+  await click('Nâng cao');
+  assert.equal(queries.at(-1).level, 'ADVANCED');
+  assert.deepEqual(
+    pills().map(link => link.textContent),
+    [conversation, 'Test 1'],
+  );
+  assert.equal(document.querySelector('.dictation-topic-heading h2').textContent, 'Test 1');
+  assert.equal(pills()[0].getAttribute('href'), '/dictation?topic=Daily+English+Conversation&tier=advanced');
+  await clickElement(pills()[0]);
+  assert.equal(document.querySelector('h1').textContent, conversation);
+  assert.equal(document.querySelector('.dictation-tier-pills'), null);
+  assert.equal(queries.at(-1).level, '');
+  assert.equal(queries.at(-1).topic, conversation);
+  assert.equal(document.querySelectorAll('.dictation-lesson-card').length, 2);
+  await select('Trình độ', 'A2');
+  assert.equal(queries.at(-1).level, 'A2');
+  const back = document.querySelector('.dictation-library-back');
+  assert.equal(back.getAttribute('href'), '/dictation?tier=advanced');
+  await clickElement(back);
+  assert.equal(queries.at(-1).level, 'ADVANCED');
+  assert.equal(button('Nâng cao').getAttribute('aria-pressed'), 'true');
+  const requestCount = queries.length;
+  await click('Tất cả');
+  assert.equal(queries.length, requestCount);
+  assert.deepEqual(
+    [...document.querySelectorAll('.dictation-topic-heading h2')].map(heading => heading.textContent),
+    [conversation, 'Test 1'],
+  );
+  assert.equal(button('Tất cả').getAttribute('aria-pressed'), 'true');
+});
+
+test('topic labels use title case and video cards show a thumbnail with a fallback', async () => {
+  const topic = 'daily english Conversation';
+  const displayName = 'Daily English Conversation';
+  const thumbnailUrl = 'https://i.ytimg.com/vi/_R7nrvhNmrI/mqdefault.jpg';
+  const lesson = {
+    id: 'video-lesson',
+    title: 'What day is it today?',
+    topic,
+    level: 'A1',
+    duration: 92,
+    sentenceCount: 7,
+    video: true,
+    thumbnailUrl,
+  };
+  dictationApi.query = async path => ({
+    data:
+      path === dictationApi.topicGroupsPath
+        ? { groups: [{ topic, total: 1, items: [lesson] }] }
+        : { items: [lesson], total: 1, topics: [topic] },
+  });
+  await render('/dictation');
+  const pill = document.querySelector('.dictation-topic-pills a');
+  assert.equal(pill.textContent, displayName);
+  assert.equal(document.querySelector('.dictation-topic-heading h2').textContent, displayName);
+  assert.equal(document.querySelector('.dictation-lesson-topic span').textContent, displayName);
+  const artwork = document.querySelector('.dictation-lesson-art');
+  assert.equal(artwork.querySelector('img').getAttribute('src'), thumbnailUrl);
+  await act(async () => artwork.querySelector('img').dispatchEvent(new Event('error')));
+  assert.equal(artwork.querySelector('img'), null);
+  assert.ok(artwork.querySelector('.dictation-cover-icon'));
+  await clickElement(pill);
+  assert.equal(document.querySelector('h1').textContent, displayName);
+  assert.equal(document.querySelector('.dictation-lesson-art img').getAttribute('src'), thumbnailUrl);
+});
+
 test('My Lessons uses exclusive status toggles, true 20-item pages and resets pagination on status change', async () => {
   const { queries } = installLibraryFixture();
   await render('/dictation');
   assert.equal(document.querySelector('.dictation-back-row'), null);
-  assert.equal(queries.at(-1).size, 12);
+  assert.equal(queries.at(-1).path, dictationApi.topicGroupsPath);
   await click('Tiến độ bài học');
   assert.equal(button('Tất cả').getAttribute('aria-pressed'), 'true');
   assert.equal(queries.at(-1).status, '');
@@ -1131,8 +1350,8 @@ test('My Lessons search, level and topic filters are sent to the server and rese
     status: '',
   });
   await click('Thư viện bài nghe');
-  assert.equal(queries.at(-1).size, 12);
-  assert.equal(Object.hasOwn(queries.at(-1), 'status'), false);
+  assert.equal(queries.at(-1).path, dictationApi.topicGroupsPath);
+  assert.equal(queries.at(-1).status, '');
   assert.ok(document.querySelector('.dictation-lesson-card'));
   assert.equal(document.querySelector('.dictation-filters.is-history'), null);
 });

@@ -295,6 +295,26 @@
   gap: 12px;
   margin-bottom: 22px;
 }
+.toeic-section-tabs {
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--toeic-line);
+  border-radius: 9px;
+  background: var(--toeic-surface);
+}
+.toeic-section-tabs > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  border-bottom: 0;
+}
+.toeic-section-tabs > button.is-active {
+  background: var(--toeic-blue-soft);
+}
 .toeic-library-search {
   display: flex;
   align-items: center;
@@ -1493,6 +1513,45 @@
   overflow-wrap: anywhere;
   margin-bottom: 24px;
 }
+.toeic-question.is-listening legend,
+.toeic-question.is-listening .toeic-question-prompt {
+  margin-bottom: 12px;
+}
+.toeic-listening-player {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  border: 1px solid var(--toeic-line);
+  border-radius: 10px;
+  background: var(--toeic-blue-soft);
+}
+.toeic-listening-heading,
+.toeic-listening-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.toeic-listening-heading {
+  color: var(--toeic-primary);
+}
+.toeic-listening-player audio {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.toeic-transcript p {
+  margin: 12px 0 0;
+  padding: 14px;
+  border-radius: 6px;
+  background: var(--toeic-surface);
+  color: var(--toeic-ink);
+  font-size: 15px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 .toeic-passage {
   padding: 22px;
   margin-bottom: 28px;
@@ -1514,6 +1573,11 @@
   height: auto;
   margin: 20px auto;
   border-radius: 5px;
+}
+.toeic-question.is-listening .toeic-question-image {
+  max-height: min(32vh, 280px);
+  object-fit: contain;
+  margin: 12px auto;
 }
 .toeic-question-source {
   margin: 12px 0 18px;
@@ -1552,6 +1616,22 @@
   flex-direction: column;
   gap: 12px;
   margin-top: 20px;
+}
+.toeic-options.is-spoken {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.toeic-options.is-spoken .toeic-option {
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 48px;
+  padding: 8px 4px;
+}
+.toeic-options.is-spoken .toeic-option > input {
+  margin: 0;
 }
 .toeic-option {
   display: flex;
@@ -1763,6 +1843,9 @@
   border-radius: 10px;
   background: white;
 }
+.toeic-result-parts.is-listening {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
 .toeic-result-parts span {
   color: var(--toeic-muted);
   font-size: 12px;
@@ -1794,10 +1877,20 @@
   position: sticky;
   top: 86px;
 }
+.toeic-answer-toggle {
+  margin-top: 16px;
+}
 .toeic-explanation {
   border-top: 1px solid var(--toeic-line);
   padding-top: 24px;
   margin-top: 28px;
+}
+.toeic-explanation.is-inline {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--toeic-line);
+  border-radius: 8px;
+  background: var(--toeic-blue-soft);
 }
 .toeic-explanation h3 {
   color: var(--toeic-primary);
@@ -1810,6 +1903,9 @@
   margin-top: 12px;
   line-height: 1.9;
   font-size: 14px;
+}
+.toeic-explanation.is-inline p {
+  margin: 0;
 }
 .toeic-explanation small {
   display: block;
@@ -2688,6 +2784,9 @@
 
 .toeic-practice-grid.is-four {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.toeic-practice-grid.is-listening {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
 }
 
 .toeic-scope-card {

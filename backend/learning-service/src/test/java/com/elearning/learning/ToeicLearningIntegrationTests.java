@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,10 +35,12 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -258,6 +261,100 @@ class ToeicLearningIntegrationTests {
             assertThat(question.has("explanation")).isFalse();
         }
         assertThat(learner("GET", "/exams/" + id + "/progress", 22, null).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void seededListeningPlaysEveryPartAndRevealsTranscriptWhenPermitted() throws Exception {
+        long user = USERS.incrementAndGet();
+        try (var input = new ClassPathResource("toeic/ets2024-listening.json").getInputStream()) {
+            List<Definition> definitions = mapper.readValue(input, new TypeReference<List<Definition>>() {});
+            assertThat(definitions).hasSize(9);
+            for (Definition definition : definitions) toeic.seed(definition);
+        }
+        JsonNode catalogs = data(send("GET", BASE + "/exams", null, null, null), 200);
+        List<JsonNode> listening = StreamSupport.stream(catalogs.spliterator(), false)
+            .filter(item -> "LISTENING".equals(item.path("section").asText()))
+            .filter(item -> item.path("slug").asText().startsWith("ets-2024-test-"))
+            .toList();
+        assertThat(listening).hasSize(9);
+        JsonNode test = listening.getFirst();
+        assertThat(test.path("questionCount").asInt()).isEqualTo(100);
+        String exam = "/exams/" + test.path("id").asLong();
+        JsonNode detail = data(learner("GET", exam, user, null), 200);
+        assertThat(detail.path("questions").get(0).path("imageUrl").asText()).endsWith("question-001.webp");
+        assertThat(detail.toString()).doesNotContain("\"transcript\"", "\"correctOptionId\"");
+        int[] expectedCounts = { 6, 25, 39, 30 };
+        for (int part = 1; part <= 4; part++) {
+            JsonNode practice = data(
+                learner("POST", exam + "/attempts", user, Map.of("mode", "PRACTICE", "part", part)),
+                200
+            );
+            assertThat(practice.path("totalQuestions").asInt()).isEqualTo(expectedCounts[part - 1]);
+            JsonNode first = practice.path("questions").get(0);
+            assertThat(first.path("options").size()).isEqualTo(part == 2 ? 3 : 4);
+            assertThat(first.path("correctOptionId").asText()).isNotBlank();
+            assertThat(first.path("listening").path("transcript").asText()).isNotBlank();
+            if (part >= 3) {
+                assertThat(first.path("listening")).isEqualTo(
+                    practice.path("questions").get(2).path("listening")
+                );
+                assertThat(first.path("listening")).isNotEqualTo(
+                    practice.path("questions").get(3).path("listening")
+                );
+            }
+        }
+        JsonNode attempt = data(learner("POST", exam + "/attempts", user, Map.of("mode", "EXAM")), 200);
+        String path = "/attempts/" + attempt.path("id").asLong();
+        assertThat(attempt.path("durationMinutes").asInt()).isEqualTo(45);
+        assertThat(attempt.path("totalQuestions").asInt()).isEqualTo(100);
+        assertThat(attempt.path("questions").get(0).path("listening").path("audioUrl").asText()).endsWith(
+            ".mp3"
+        );
+        assertThat(attempt.toString()).doesNotContain("\"transcript\"", "\"correctOptionId\"");
+        assertThat(learner("GET", path, user + 1000, null).statusCode()).isEqualTo(404);
+        assertThat(
+            learner("PUT", path + "/answers", user, Map.of("answers", Map.of("q7", "D"))).statusCode()
+        ).isEqualTo(400);
+        var answers = Map.of("answers", Map.of("q1", "A", "q7", "B"));
+        JsonNode saved = data(learner("PUT", path + "/answers", user, answers), 200);
+        assertThat(saved.path("answers").path("q7").asText()).isEqualTo("B");
+        assertThat(saved.toString()).doesNotContain("\"transcript\"", "\"correctOptionId\"");
+        JsonNode graded = data(learner("POST", path + "/submit", user, answers), 200);
+        assertThat(graded.path("correctCount").asInt()).isEqualTo(2);
+        assertThat(graded.path("questions").get(0).path("correctOptionId").asText()).isEqualTo("A");
+        assertThat(
+            graded.path("questions").get(0).path("listening").path("transcript").asText()
+        ).isNotBlank();
+    }
+
+    @Test
+    void listeningDraftRequiresMediaAndMatchingGroupTranscriptToPublish() throws Exception {
+        var draft = new LinkedHashMap<>(definition(false));
+        var first = new LinkedHashMap<>(question("q32", 32, 3, "A"));
+        var second = new LinkedHashMap<>(question("q33", 33, 3, "A"));
+        draft.put("lessons", List.of());
+        draft.put("questions", List.of(first, second));
+        JsonNode created = data(send("POST", ADMIN, 1L, "ADMIN", draft), 201);
+        String path = ADMIN + "/" + created.path("id").asLong();
+        assertThat(
+            send("PATCH", path + "/publish", 1L, "ADMIN", Map.of("published", true)).statusCode()
+        ).isEqualTo(400);
+        String clip = "/toeic-assets/test/audio-032-034.mp3";
+        draft.put("version", created.path("version").asLong());
+        first.put("listening", Map.of("audioUrl", clip, "transcript", "First transcript"));
+        second.put("listening", Map.of("audioUrl", clip, "transcript", "Different transcript"));
+        JsonNode updated = data(send("PUT", path, 1L, "ADMIN", draft), 200);
+        assertThat(
+            send("PATCH", path + "/publish", 1L, "ADMIN", Map.of("published", true)).statusCode()
+        ).isEqualTo(400);
+        draft.put("version", updated.path("version").asLong());
+        second.put("listening", first.get("listening"));
+        data(send("PUT", path, 1L, "ADMIN", draft), 200);
+        JsonNode published = data(
+            send("PATCH", path + "/publish", 1L, "ADMIN", Map.of("published", true)),
+            200
+        );
+        assertThat(published.path("published").asBoolean()).isTrue();
     }
 
     @Test

@@ -1,4 +1,22 @@
+import { youtubeEmbedUrl } from '../../learning/utils/lessonMedia.js';
+
 export const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+export const youtubeVideoId = value => youtubeEmbedUrl(value)?.split('/').at(-1) ?? '';
+
+export const isToeicTopic = topic => /^test\s+0*[1-9][0-9]{0,8}$/i.test(topic);
+
+const TOPIC_ABBREVIATIONS = new Set(['AI', 'CEFR', 'ETS', 'IELTS', 'TOEFL', 'TOEIC']);
+
+export function formatTopicName(topic) {
+  return topic.replace(/\S+/g, word => {
+    const upper = word.toUpperCase();
+    return TOPIC_ABBREVIATIONS.has(upper)
+      ? upper
+      : word.toLowerCase().replace(/^\p{L}/u, letter => letter.toUpperCase());
+  });
+}
+
 export const SCORE_DESCRIPTION =
   'Điểm dựa trên số từ bạn tự điền đúng trước khi mở gợi ý hoặc đáp án. Gõ sai rồi tự sửa đúng vẫn được tính điểm.';
 export const scoreDescription = attempt =>
@@ -77,18 +95,37 @@ export function parseTime(value) {
   return minutes * 60 + seconds;
 }
 
+export function directVideoUrl(value) {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol === 'https:' && !url.username && !url.password) return url.href;
+  } catch {
+    // An incomplete address is expected while editing.
+  }
+  return '';
+}
+
 export function definitionPayload(form) {
+  const enteredUrl = form.video?.url.trim();
+  const videoId = youtubeVideoId(enteredUrl);
+  const url = videoId
+    ? `https://www.youtube.com/watch?v=${videoId}`
+    : enteredUrl
+      ? directVideoUrl(enteredUrl)
+      : '';
+  if (enteredUrl && !url) throw new Error('Vui lòng nhập URL HTTPS trực tiếp của video.');
   return {
     title: form.title.trim(),
     description: form.description.trim(),
     topic: form.topic.trim(),
     level: form.level,
-    audioKey: form.audioKey || null,
+    audioKey: url ? null : form.audioKey || null,
     sentences: form.sentences.map(row => ({
       text: row.text.trim(),
       start: parseTime(row.start),
       end: parseTime(row.end),
     })),
+    ...(url ? { video: { url, duration: form.video.duration ?? null } } : {}),
   };
 }
 

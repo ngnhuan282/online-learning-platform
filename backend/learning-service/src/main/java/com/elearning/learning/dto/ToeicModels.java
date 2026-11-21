@@ -14,6 +14,9 @@ public final class ToeicModels {
 
     public record Option(String id, String text) {}
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record Listening(String audioUrl, String transcript) {}
+
     public record Question(
         String id,
         Integer number,
@@ -25,7 +28,8 @@ public final class ToeicModels {
         List<Option> options,
         String correctOptionId,
         String explanation,
-        String source
+        String source,
+        Listening listening
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -52,7 +56,8 @@ public final class ToeicModels {
         int lessonCount,
         String sourceLabel,
         long version,
-        boolean published
+        boolean published,
+        String section
     ) {}
 
     public record AdminDetail(
@@ -80,7 +85,8 @@ public final class ToeicModels {
         List<Option> options,
         String correctOptionId,
         String explanation,
-        String source
+        String source,
+        Listening listening
     ) {}
 
     public record Detail(
@@ -92,7 +98,8 @@ public final class ToeicModels {
         String sourceLabel,
         List<Lesson> lessons,
         List<QuestionView> questions,
-        long version
+        long version,
+        Long companionExamId
     ) {}
 
     public record StartRequest(String mode, Integer part, Integer durationMinutes) {}
