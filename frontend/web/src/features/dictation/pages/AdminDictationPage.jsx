@@ -678,16 +678,6 @@ export default function AdminDictationPage() {
                 </MenuItem>
               ))}
             </TextField>
-            <TextField
-              className="dictation-editor-description"
-              label={t('Mô tả')}
-              multiline
-              minRows={2}
-              value={form.description}
-              onChange={event => change('description', event.target.value)}
-              disabled={busy}
-              slotProps={{ htmlInput: { maxLength: 1500 } }}
-            />
           </div>
           <section className="dictation-editor-audio">
             <div className="dictation-section-heading">
@@ -707,6 +697,7 @@ export default function AdminDictationPage() {
               )}
             </div>
             <TextField
+              className="dictation-youtube-url-field"
               fullWidth
               type="url"
               label={t('Liên kết YouTube')}
@@ -849,6 +840,7 @@ export default function AdminDictationPage() {
               </h3>
               <div className="dictation-toolbar">
                 <Button
+                  variant="outlined"
                   startIcon={<DownloadOutlined />}
                   disabled={busy}
                   onClick={() => act(async () => downloadWorkbook(await dictationApi.template()))}
@@ -1085,6 +1077,7 @@ export default function AdminDictationPage() {
                   : 'Giữ nguyên {count} câu hiện tại và nối các câu mới xuống dưới.',
                 { count: importMode === 'replace' ? form.sentences.length : importBase.length },
               )}{' '}
+              {t('Tên bài, chủ đề, trình độ và video lấy từ form.')}{' '}
               {t('Mốc thời gian được giữ nguyên. Thay đổi chưa được lưu.')}
             </Alert>
           )}

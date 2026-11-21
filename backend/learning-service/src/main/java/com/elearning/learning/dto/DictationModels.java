@@ -8,6 +8,8 @@ import java.util.List;
 
 public final class DictationModels {
 
+    public static final String LEVEL_PATTERN = "A1|A2|B1|B2|C1|C2";
+
     private DictationModels() {}
 
     public record Sentence(@NotBlank @Size(max = 1500) String text, Double start, Double end) {}
@@ -19,7 +21,7 @@ public final class DictationModels {
         @NotBlank @Size(max = 180) String title,
         @Size(max = 1500) String description,
         @NotBlank @Size(max = 60) String topic,
-        @Pattern(regexp = "A1|A2|B1|B2|C1|C2") @NotNull String level,
+        @Pattern(regexp = LEVEL_PATTERN) @NotNull String level,
         @Size(max = 80) String audioKey,
         @NotNull @Size(min = 1, max = 200) List<@NotNull @Valid Sentence> sentences,
         @Valid Video video

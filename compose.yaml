@@ -151,10 +151,10 @@ services:
       LEARNING_DB_PASSWORD: ${LEARNING_DB_PASSWORD}
       NOTIFICATION_EVENT_API_KEY: ${NOTIFICATION_EVENT_API_KEY:-}
       DICTATION_STORAGE_DIR: /app/uploads/dictation
-      DICTATION_SAMPLE_DIR: /app/dictation-samples
+      DICTATION_IMPORT_DIR: /app/dictation-inbox
     volumes:
       - dictation_uploads:/app/uploads
-      - ./docs/resources/audio:/app/dictation-samples:ro
+      - ${DICTATION_IMPORT_HOST_DIR:-./dictation-inbox.local}:/app/dictation-inbox:ro
     depends_on:
       mysql:
         condition: service_healthy
