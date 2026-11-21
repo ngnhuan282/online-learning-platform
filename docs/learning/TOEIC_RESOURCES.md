@@ -73,8 +73,9 @@ docker compose --profile backend up --build -d --no-deps learning-service
 Nếu Gateway chưa có thay đổi cho thư viện TOEIC công khai, build lại riêng `api-gateway`.
 Với frontend dev, chạy `npm run dev` trong `frontend/web`. Nếu dùng image web thì build lại image web sau thay đổi giao diện.
 Các PDF/Word gốc không còn được đóng gói trong image web hoặc được Vite phục vụ cho học viên.
-Ảnh nội dung được commit thành 10 gói trong `frontend/web/resources/toeic`. Frontend
-tự giải nén trước khi chạy dev/build/test; không cần commit các ảnh sinh trong `public`.
+Ảnh nội dung Reading nằm trong 10 gói ở thư mục con `toeic` của `TOEIC_ARCHIVES_DIR`.
+Frontend giải nén chúng vào `public` khi có bộ gói. Xem
+[cách cung cấp dữ liệu TOEIC](TOEIC_CONTENT_CREATION.md#4-các-file-đầu-ra).
 
 ### Máy đã chạy migration TOEIC V10 trước khi gộp main
 

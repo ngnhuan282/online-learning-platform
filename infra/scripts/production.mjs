@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadProductionEnv, validateProductionEnv } from './production-env.mjs';
+import { stageToeicArchives, verifyToeicArchives } from '../../frontend/web/scripts/prepare-toeic-assets.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const command = process.argv[2];
@@ -79,8 +80,14 @@ try {
   if (['check', 'up'].includes(command)) {
     const errors = validateProductionEnv(env);
     if (errors.length) throw new Error(errors.join('\n'));
+    const toeicArchiveDirectory = resolve(
+      root,
+      process.env.TOEIC_ARCHIVES_DIR || env.TOEIC_ARCHIVES_DIR || '.tmp/toeic-data',
+    );
+    const toeicArchives = verifyToeicArchives(toeicArchiveDirectory);
     await docker('config', '-q');
     if (command === 'up') {
+      stageToeicArchives(toeicArchives);
       await docker('build');
       await docker('up', '-d', '--wait', '--wait-timeout', '300');
     }
