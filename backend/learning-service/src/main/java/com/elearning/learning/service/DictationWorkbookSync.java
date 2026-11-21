@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -33,6 +34,7 @@ public class DictationWorkbookSync {
     ) {
         this.jdbc = jdbc;
         this.transaction = new TransactionTemplate(transactions);
+        this.transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.json = json;
         this.workbooks = workbooks;
         this.storage = storage;
@@ -44,7 +46,7 @@ public class DictationWorkbookSync {
 
     void request(String id, Integer version) {
         if (version == null) {
-            jdbc.update("UPDATE dictation_workbook_sync SET version=NULL, pending=TRUE WHERE exercise_id=?", id);
+            jdbc.update("UPDATE dictation_workbook_sync SET version=NULL, pending=FALSE WHERE exercise_id=?", id);
             return;
         }
         jdbc.update(
@@ -83,19 +85,13 @@ public class DictationWorkbookSync {
         );
         if (desired.isEmpty()) return;
         Integer version = desired.getFirst();
-        String activeStorage = storage.storageType();
-        String existingKey = findSourceKey(id, activeStorage);
         if (version == null) {
-            if (existingKey != null) {
-                try {
-                    storage.delete(existingKey);
-                } catch (IOException ex) {
-                    throw new UncheckedIOException(ex);
-                }
-            }
+            // Older versions may have queued a workbook deletion when hiding a lesson.
             jdbc.update("UPDATE dictation_workbook_sync SET pending=FALSE WHERE exercise_id=?", id);
             return;
         }
+        String activeStorage = storage.storageType();
+        String existingKey = findSourceKey(id, activeStorage);
         Definition definition = definition(id, version);
         byte[] bytes = workbooks.writeLesson(definition);
         String objectKey = existingKey != null ? existingKey : resolveUniqueKey(activeStorage, id, definition.title());
@@ -112,7 +108,12 @@ public class DictationWorkbookSync {
 
     byte[] download(String id, int version) {
         boolean synchronizedFile = !jdbc.queryForList(
-            "SELECT exercise_id FROM dictation_workbook_sync WHERE exercise_id=? AND version=? AND pending=FALSE",
+            """
+            SELECT s.exercise_id FROM dictation_workbook_sync s
+            JOIN dictation_exercises e ON e.id=s.exercise_id
+            WHERE s.exercise_id=? AND s.version=? AND s.pending=FALSE
+                AND e.current_version=e.published_version
+            """,
             String.class, id, version
         ).isEmpty();
         if (synchronizedFile) {

@@ -66,10 +66,6 @@ public class DictationWorkbookStorage {
     }
 
     void write(String objectKey, byte[] workbook) throws IOException {
-        if (workbook == null) {
-            delete(objectKey);
-            return;
-        }
         if (cloud != null) {
             cloud.putObject(
                 request -> request.bucket(bucket).key(objectKey).contentType(CONTENT_TYPE),
@@ -86,14 +82,6 @@ public class DictationWorkbookStorage {
         } finally {
             Files.deleteIfExists(temporary);
         }
-    }
-
-    void delete(String objectKey) throws IOException {
-        if (cloud != null) {
-            cloud.deleteObject(request -> request.bucket(bucket).key(objectKey));
-            return;
-        }
-        Files.deleteIfExists(resolveLocalPath(objectKey));
     }
 
     byte[] read(String objectKey) throws IOException {

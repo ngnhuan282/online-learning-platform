@@ -78,7 +78,7 @@ public class DictationS3WorkbookImporter {
             if (contents.length != object.size()) {
                 throw new IOException("S3 workbook size changed");
             }
-            workbooks.importWorkbook(DictationWorkbookImporter.S3_STORAGE, key, contents);
+            if (!workbooks.importWorkbook(DictationWorkbookImporter.S3_STORAGE, key, contents)) return;
         } catch (DictationValidationException invalid) {
             log.warn("Rejected dictation workbook in S3 key={} reason={}", key, invalid.getMessage());
         } catch (IOException | RuntimeException ex) {

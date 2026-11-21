@@ -100,6 +100,11 @@ public class DictationWorkbookImporter {
 
     private record SourceRecord(String exerciseId, String contentSha256) {}
 
+    private record ImportResult(String updatedExerciseId, boolean retry) {
+        private static final ImportResult UNCHANGED = new ImportResult(null, false);
+        private static final ImportResult DEFERRED = new ImportResult(null, true);
+    }
+
     @Scheduled(fixedDelay = 15_000)
     public void scan() {
         if (directory == null) return;
@@ -129,7 +134,7 @@ public class DictationWorkbookImporter {
                 }
                 // A file that changed while being read will be checked on the next scan.
                 if (!stamp.equals(stamp(file))) return;
-                importWorkbook(LOCAL_INBOX_STORAGE, filename, contents);
+                if (!importWorkbook(LOCAL_INBOX_STORAGE, filename, contents)) return;
             } catch (DictationValidationException invalid) {
                 log.warn("Rejected dictation workbook file={} reason={}", filename, invalid.getMessage());
             }
@@ -143,7 +148,8 @@ public class DictationWorkbookImporter {
         return !name.startsWith("~$") && name.toLowerCase(Locale.ROOT).endsWith(".xlsx");
     }
 
-    void importWorkbook(String storageType, String objectKey, byte[] contents) {
+    // A deferred workbook must be checked again even if its contents have not changed.
+    boolean importWorkbook(String storageType, String objectKey, byte[] contents) {
         Definition definition = workbooks.parseLesson(contents);
         var violations = validator.validate(definition);
         if (!violations.isEmpty()) {
@@ -152,13 +158,15 @@ public class DictationWorkbookImporter {
             );
         }
         String digest = fingerprint(json, definition);
-        String updatedOrPublished = applyImport(storageType, objectKey, definition, digest);
+        ImportResult result = applyImport(storageType, objectKey, definition, digest);
+        String updatedOrPublished = result.updatedExerciseId();
         if (updatedOrPublished != null) {
             if (sync != null && !storageType.equals(sync.storageType())) {
                 sync.syncNow(updatedOrPublished);
             }
             log.info("Synchronized dictation workbook storage={} key={} exerciseId={}", storageType, objectKey, updatedOrPublished);
         }
+        return !result.retry();
     }
 
     private FileStamp stamp(Path file) throws IOException {
@@ -177,15 +185,18 @@ public class DictationWorkbookImporter {
         }
     }
 
-    private String applyImport(String storageType, String objectKey, Definition definition, String digest) {
+    private ImportResult applyImport(String storageType, String objectKey, Definition definition, String digest) {
         try {
             return transaction.execute(status -> {
                 SourceRecord existing = findSource(storageType, objectKey);
                 if (existing != null) {
-                    if (digest.equals(existing.contentSha256()) || isSyncPending(existing.exerciseId())) {
-                        return null;
+                    if (digest.equals(existing.contentSha256())) {
+                        return ImportResult.UNCHANGED;
                     }
-                    var detail = dictation.adminDetail(existing.exerciseId());
+                    var detail = dictation.adminDetailForUpdate(existing.exerciseId());
+                    if (detail.hasDraft() || isSyncPending(existing.exerciseId())) {
+                        return ImportResult.DEFERRED;
+                    }
                     var updated = dictation.saveAndPublish(
                         existing.exerciseId(),
                         new SaveRequest(definition, detail.version())
@@ -201,13 +212,13 @@ public class DictationWorkbookImporter {
                     if (!detail.archived() && sync != null && !storageType.equals(sync.storageType())) {
                         sync.request(existing.exerciseId(), updated.version());
                     }
-                    return existing.exerciseId();
+                    return new ImportResult(existing.exerciseId(), false);
                 }
 
                 String existingByDigest = findExerciseByDigest(digest);
                 if (existingByDigest != null) {
                     attachSourceIfAbsent(existingByDigest, storageType, objectKey, digest);
-                    return null;
+                    return ImportResult.UNCHANGED;
                 }
 
                 var lesson = dictation.saveAndPublish(null, new SaveRequest(definition, 0));
@@ -220,10 +231,12 @@ public class DictationWorkbookImporter {
                     "INSERT INTO dictation_workbook_sources (exercise_id, storage, object_key, content_sha256) VALUES (?, ?, ?, ?)",
                     lesson.id(), storageType, objectKey, digest
                 );
-                return lesson.id();
+                return new ImportResult(lesson.id(), false);
             });
         } catch (DuplicateKeyException ex) {
-            if (findSource(storageType, objectKey) != null || findExerciseByDigest(digest) != null) return null;
+            if (findSource(storageType, objectKey) != null || findExerciseByDigest(digest) != null) {
+                return ImportResult.DEFERRED;
+            }
             throw ex;
         }
     }

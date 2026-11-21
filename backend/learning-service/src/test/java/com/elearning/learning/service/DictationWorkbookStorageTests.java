@@ -23,7 +23,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 class DictationWorkbookStorageTests {
 
     @Test
-    void cloudCreatesReadsReplacesAndRemovesSingleWorkbookDirectlyInConfiguredPrefix(@TempDir Path local) throws Exception {
+    void cloudCreatesReadsAndReplacesSingleWorkbookDirectlyInConfiguredPrefix(@TempDir Path local) throws Exception {
         String key = "documents/transcripts/bai-nghe-so-1-12345678.xlsx";
         var saved = new AtomicReference<byte[]>();
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -52,10 +52,6 @@ class DictationWorkbookStorageTests {
                         exchange.sendResponseHeaders(200, contents.length);
                         exchange.getResponseBody().write(contents);
                     }
-                    case "DELETE" -> {
-                        saved.set(null);
-                        exchange.sendResponseHeaders(204, -1);
-                    }
                     default -> exchange.sendResponseHeaders(405, -1);
                 }
             }
@@ -82,8 +78,6 @@ class DictationWorkbookStorageTests {
             assertThat(storage.read(generated)).containsExactly(1);
             storage.write(generated, new byte[] {2, 3});
             assertThat(storage.read(generated)).containsExactly(2, 3);
-            storage.write(generated, null);
-            assertThat(saved.get()).isNull();
             assertThat(storage.read("documents/transcripts/missing.xlsx")).isNull();
             assertThatThrownBy(() -> storage.read("documents/transcripts/oversized.xlsx"))
                 .isInstanceOf(IOException.class);

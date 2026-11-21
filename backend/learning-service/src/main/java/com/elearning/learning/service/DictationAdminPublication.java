@@ -33,13 +33,7 @@ public class DictationAdminPublication {
 
     @Transactional
     public AdminDetail visibility(String id, boolean archived) {
-        AdminDetail result = dictation.visibility(id, archived);
-        Integer version = dictation.publishedVideoVersion(id);
-        if (version != null) {
-            workbooks.request(id, archived ? null : version);
-            syncAfterCommit(id);
-        }
-        return result;
+        return dictation.visibility(id, archived);
     }
 
     @Transactional(readOnly = true)

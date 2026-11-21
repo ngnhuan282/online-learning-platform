@@ -1408,7 +1408,7 @@ class DictationIntegrationTests {
     }
 
     @Test
-    void adminSyncsPublishedWorkbooksAndRestoresThePublishedVersionAfterHide() throws Exception {
+    void adminSyncsPublishedWorkbooksAndPreservesThemOnHideAndShow() throws Exception {
         long admin = 5110L;
         var definition = new Definition(
             "Admin synchronized workbook", "", "Daily English Conversation", "A1", null,
@@ -1419,7 +1419,9 @@ class DictationIntegrationTests {
         assertThat(created.statusCode()).isEqualTo(201);
         String id = json.readTree(created.body()).path("data").path("id").asString();
         String path = ADMIN + "/" + id;
-        workbookSync.sync();
+        assertThat(jdbc.queryForObject(
+            "SELECT pending FROM dictation_workbook_sync WHERE exercise_id=?", Boolean.class, id
+        )).isFalse();
         String key = jdbc.queryForObject(
             "SELECT object_key FROM dictation_workbook_sources WHERE exercise_id=? AND storage='local'",
             String.class, id
@@ -1453,15 +1455,22 @@ class DictationIntegrationTests {
 
             assertThat(request(admin, true, "PUT", path, json.writeValueAsString(new SaveRequest(definition, 2)))
                 .statusCode()).isEqualTo(200);
+            byte[] publishedWorkbook = Files.readAllBytes(stored);
             assertThat(request(admin, true, "PUT", path + "/visibility", "{\"archived\":true}").statusCode()).isEqualTo(200);
-            workbookSync.sync();
-            assertThat(stored).doesNotExist();
+            assertThat(Files.readAllBytes(stored)).isEqualTo(publishedWorkbook);
             assertThat(request(admin, true, "GET", path + "/workbook", null).statusCode()).isEqualTo(404);
             assertThat(service.catalog(0, definition.title(), "", "", 0, 12, false).items()).isEmpty();
 
-            assertThat(request(admin, true, "PUT", path + "/visibility", "{\"archived\":false}").statusCode()).isEqualTo(200);
+            // A deletion left in the queue by an earlier release must not remove the workbook.
+            jdbc.update("UPDATE dictation_workbook_sync SET version=NULL, pending=TRUE WHERE exercise_id=?", id);
             workbookSync.sync();
-            assertThat(workbooks.parseLesson(Files.readAllBytes(stored))).isEqualTo(updated);
+            assertThat(Files.readAllBytes(stored)).isEqualTo(publishedWorkbook);
+            assertThat(jdbc.queryForObject(
+                "SELECT pending FROM dictation_workbook_sync WHERE exercise_id=?", Boolean.class, id
+            )).isFalse();
+
+            assertThat(request(admin, true, "PUT", path + "/visibility", "{\"archived\":false}").statusCode()).isEqualTo(200);
+            assertThat(Files.readAllBytes(stored)).isEqualTo(publishedWorkbook);
             assertThat(service.catalog(0, definition.title(), "", "", 0, 12, false).items()).extracting(Item::id)
                 .containsExactly(id);
         } finally {
@@ -1770,11 +1779,6 @@ class DictationIntegrationTests {
                         exchange.sendResponseHeaders(200, body.length);
                         exchange.getResponseBody().write(body);
                     }
-                    case "DELETE" -> {
-                        bucket.remove(key);
-                        etags.remove(key);
-                        exchange.sendResponseHeaders(204, -1);
-                    }
                     default -> exchange.sendResponseHeaders(405, -1);
                 }
             }
@@ -1804,6 +1808,12 @@ class DictationIntegrationTests {
             assertThat(catalog.items()).hasSize(1);
             String importedId = catalog.items().getFirst().id();
             var attempt = start(5120, importedId);
+            byte[] originalWorkbook = bucket.get(importedKey);
+            s3Admin.visibility(importedId, true);
+            assertThat(bucket.get(importedKey)).isEqualTo(originalWorkbook);
+            assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items()).isEmpty();
+            s3Admin.visibility(importedId, false);
+            assertThat(bucket.get(importedKey)).isEqualTo(originalWorkbook);
 
             // 2. Admin edits and publishes -> overwrites the SAME S3 key (no _admin/ file created).
             var adminEdited = new Definition(
@@ -1815,6 +1825,25 @@ class DictationIntegrationTests {
             assertThat(bucket.keySet()).containsExactly(importedKey);
             assertThat(workbooks.parseLesson(bucket.get(importedKey))).isEqualTo(adminEdited);
             assertThat(workbooks.parseLesson(s3Admin.download(importedId))).isEqualTo(adminEdited);
+
+            var draft = new Definition(
+                keyword + " saved draft", "", "US UK songs", "B1", null,
+                List.of(new Sentence("Keep this draft.", 1.0, 5.0)), adminEdited.video()
+            );
+            var savedDraft = service.save(importedId, new SaveRequest(draft, 2));
+            byte[] deferredWorkbook = lessonWorkbook(keyword + " waiting on S3", "US UK songs", "A2", url, "01:32");
+            bucket.put(importedKey, deferredWorkbook);
+            etags.put(importedKey, "\"etag-" + seq.getAndIncrement() + "\"");
+            reader.scan();
+            reader.scan();
+            assertThat(service.adminDetail(importedId)).isEqualTo(savedDraft);
+            assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items())
+                .extracting(Item::title).containsExactly(adminEdited.title());
+            assertThat(workbooks.parseLesson(s3Admin.download(importedId))).isEqualTo(adminEdited);
+            assertThat(bucket.get(importedKey)).isEqualTo(deferredWorkbook);
+
+            s3Admin.publish(importedId, new PublishRequest(savedDraft.version(), null));
+            assertThat(workbooks.parseLesson(bucket.get(importedKey))).isEqualTo(draft);
 
             // 3. Re-scanning the updated S3 object recognizes the digest and creates no duplicate.
             reader.scan();
@@ -1844,20 +1873,22 @@ class DictationIntegrationTests {
             reader.scan();
             assertThat(service.catalog(0, keyword, "", "", 0, 12, true).items()).hasSize(2);
 
-            // 6. Hiding removes the file from S3 and catalog; unhiding restores the exact same S3 key.
+            // 6. Hiding and showing only change catalog visibility.
+            byte[] workbookBeforeHide = bucket.get(importedKey);
             s3Admin.visibility(importedId, true);
-            assertThat(bucket).doesNotContainKey(importedKey);
+            assertThat(bucket.get(importedKey)).isEqualTo(workbookBeforeHide);
             assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items())
                 .extracting(Item::id).containsExactly(createdId);
             // Editing an archived S3 file updates its revision while keeping it archived until unhidden.
-            bucket.put(importedKey, lessonWorkbook(keyword + " edited while hidden", "US UK songs", "C2", url, "01:32"));
+            byte[] workbookWhileHidden = lessonWorkbook(keyword + " edited while hidden", "US UK songs", "C2", url, "01:32");
+            bucket.put(importedKey, workbookWhileHidden);
             etags.put(importedKey, "\"etag-" + seq.getAndIncrement() + "\"");
             reader.scan();
             assertThat(service.adminDetail(importedId).archived()).isTrue();
             assertThat(service.adminDetail(importedId).definition().title()).isEqualTo(keyword + " edited while hidden");
 
             s3Admin.visibility(importedId, false);
-            assertThat(bucket).containsKey(importedKey);
+            assertThat(bucket.get(importedKey)).isEqualTo(workbookWhileHidden);
             assertThat(workbooks.parseLesson(bucket.get(importedKey)).title()).isEqualTo(keyword + " edited while hidden");
             assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items())
                 .extracting(Item::id).containsExactlyInAnyOrder(importedId, createdId);
@@ -1910,6 +1941,38 @@ class DictationIntegrationTests {
         Files.setLastModifiedTime(localFile, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
         importer.scan();
         assertThat(service.adminDetail(id).definition().title()).isEqualTo("Local sync v2");
+    }
+
+    @Test
+    void scan_whenWorkbookChangesDuringADraft_shouldRetryTheSameFileAfterPublication(@TempDir Path inbox) throws Exception {
+        String keyword = "Deferred local workbook";
+        String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
+        Path file = inbox.resolve("draft-conflict.xlsx");
+        Files.write(file, lessonWorkbook(keyword + " initial", url, "01:32"));
+        var importer = workbookImporter(inbox);
+        importer.scan();
+        String id = service.catalog(0, keyword, "", "", 0, 12, false).items().getFirst().id();
+        var initial = service.adminDetail(id);
+        var draft = new Definition(
+            keyword + " admin draft", "", initial.definition().topic(), initial.definition().level(), null,
+            initial.definition().sentences(), initial.definition().video()
+        );
+        var saved = service.save(id, new SaveRequest(draft, initial.version()));
+        Files.write(file, lessonWorkbook(keyword + " changed", url, "01:32"));
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
+
+        importer.scan();
+        assertThat(service.adminDetail(id)).isEqualTo(saved);
+        assertThat(service.catalog(0, keyword, "", "", 0, 12, false).items())
+            .extracting(Item::title).containsExactly(initial.definition().title());
+
+        service.publish(id, saved.version());
+        importer.scan();
+        assertThat(service.catalog(0, keyword, "", "", 0, 12, false).items()).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo(id);
+            assertThat(item.title()).isEqualTo(keyword + " changed");
+        });
+        assertThat(service.adminDetail(id).hasDraft()).isFalse();
     }
 
     @Test

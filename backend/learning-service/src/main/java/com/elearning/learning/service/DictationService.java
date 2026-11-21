@@ -335,10 +335,17 @@ public class DictationService {
 
     @Transactional(readOnly = true)
     public AdminDetail adminDetail(String id) {
-        Exercise exercise = exercise(id, false);
-        Definition definition = definition(id, exercise.version());
+        return adminDetail(exercise(id, false));
+    }
+
+    AdminDetail adminDetailForUpdate(String id) {
+        return adminDetail(exercise(id, true));
+    }
+
+    private AdminDetail adminDetail(Exercise exercise) {
+        Definition definition = definition(exercise.id(), exercise.version());
         return new AdminDetail(
-            id,
+            exercise.id(),
             exercise.version(),
             exercise.archived(),
             exercise.published() != null,
