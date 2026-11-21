@@ -51,6 +51,7 @@ public class SecurityConfig {
                         org.springframework.http.HttpMethod.GET,
                         "/api/v1/learning/toeic/exams",
                         "/api/v1/learning/toeic/dictionary",
+                        "/api/v1/learning/toeic/media/*",
                         "/api/v1/learning/dictation",
                         "/api/v1/learning/dictation/topic-groups",
                         "/api/v1/learning/shop",
@@ -58,6 +59,8 @@ public class SecurityConfig {
                         "/api/v1/learning/community/topics",
                         "/api/v1/learning/community/posts"
                     )
+                    .permitAll()
+                    .requestMatchers(org.springframework.http.HttpMethod.HEAD, "/api/v1/learning/toeic/media/*")
                     .permitAll()
                     .requestMatchers("/internal/v1/learning/enrollments")
                     .permitAll()

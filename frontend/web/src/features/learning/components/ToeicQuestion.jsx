@@ -5,10 +5,14 @@ import DialogContent from '@mui/material/DialogContent';
 import Button from '@mui/material/Button';
 import { t } from '../../../shared/i18n/locale';
 import { isListeningPart } from '../utils/toeicSections';
+import { resolveToeicMediaUrl } from '../utils/toeicMedia';
 import ToeicListeningPlayer from './ToeicListeningPlayer';
 
 function SourceImage({ src, alt, className }) {
   const [open, setOpen] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const url = resolveToeicMediaUrl(src);
+  if (unavailable) return <p role="status">{t('Chưa có hình minh họa.')}</p>;
   return (
     <>
       <button
@@ -17,7 +21,7 @@ function SourceImage({ src, alt, className }) {
         aria-label={t('Phóng to {name}', { name: alt })}
         onClick={() => setOpen(true)}
       >
-        <img src={src} alt={alt} className={className} loading="lazy" />
+        <img src={url} alt={alt} className={className} loading="lazy" onError={() => setUnavailable(true)} />
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xl" fullWidth>
         <DialogTitle className="toeic-image-title">
@@ -25,7 +29,7 @@ function SourceImage({ src, alt, className }) {
           <Button onClick={() => setOpen(false)}>{t('Đóng')}</Button>
         </DialogTitle>
         <DialogContent dividers className="toeic-image-dialog">
-          <img src={src} alt={alt} />
+          <img src={url} alt={alt} />
         </DialogContent>
       </Dialog>
     </>
@@ -76,9 +80,9 @@ export default function ToeicQuestion({
           ))}
         </section>
       )}
-      {clip?.audioUrl && (
+      {listening && (
         <ToeicListeningPlayer
-          key={clip.audioUrl}
+          key={clip?.audioUrl || question.id}
           clip={clip}
           first={first}
           last={last}
@@ -104,6 +108,7 @@ export default function ToeicQuestion({
           <details className="toeic-question-source">
             <summary>{t('Xem hình câu hỏi gốc')}</summary>
             <SourceImage
+              key={question.imageUrl}
               className="toeic-question-image"
               src={question.imageUrl}
               alt={t('Nội dung câu {number}', { number: question.number })}
@@ -112,6 +117,7 @@ export default function ToeicQuestion({
         )}
         {question.imageUrl && (listening || !question.prompt) && (
           <SourceImage
+            key={question.imageUrl}
             className="toeic-question-image"
             src={question.imageUrl}
             alt={t('Nội dung câu {number}', { number: question.number })}

@@ -39,6 +39,13 @@ services:
   learning-service:
     <<: *production-backend
     image: ${IMAGE_REGISTRY:-sgsphere}/learning-service:${RELEASE_TAG}
+    environment:
+      <<: *production-environment
+      TOEIC_MEDIA_S3_BUCKET: ${TOEIC_MEDIA_S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+      AWS_ACCESS_KEY_ID: ${TOEIC_MEDIA_AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${TOEIC_MEDIA_AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${TOEIC_MEDIA_AWS_SESSION_TOKEN:-}
 
   payment-service:
     <<: *production-backend

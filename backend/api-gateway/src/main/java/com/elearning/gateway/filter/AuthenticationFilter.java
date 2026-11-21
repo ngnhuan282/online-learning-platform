@@ -57,6 +57,8 @@ public class AuthenticationFilter implements WebFilter, Ordered {
             path.equals("/swagger-ui.html") ||
             path.startsWith("/swagger-ui/") ||
             publicAuth ||
+            ((method == HttpMethod.GET || method == HttpMethod.HEAD) &&
+                path.matches("/api/v1/learning/toeic/media/[0-9a-f-]{36}")) ||
             (method == HttpMethod.GET &&
                 Set.of("/api/v1/payments/vnpay/return", "/api/v1/payments/vnpay/ipn").contains(path)) ||
             (method == HttpMethod.GET &&
