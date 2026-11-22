@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import software.amazon.awssdk.core.exception.SdkException;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
@@ -122,8 +123,13 @@ public class DictationWorkbookSync {
                 try {
                     byte[] contents = storage.read(key);
                     if (contents != null) return contents;
-                } catch (IOException ex) {
-                    throw new UncheckedIOException(ex);
+                } catch (IOException | SdkException ex) {
+                    log.warn(
+                        "Cannot read synced dictation workbook exerciseId={} key={} error={}; falling back to database copy",
+                        id,
+                        key,
+                        ex.getClass().getSimpleName()
+                    );
                 }
             }
         }

@@ -1903,6 +1903,7 @@ class DictationIntegrationTests {
             assertThat(s3Admin.download(mp4Id)).isNotEmpty();
 
             s3Server.stop(0);
+            assertThat(workbooks.parseLesson(s3Admin.download(createdId))).isEqualTo(brandNew);
             var failedAttempt = new Definition(
                 keyword + " retry", "", "US UK songs", "A1", null,
                 List.of(new Sentence("Retry sync.", 0.0, 3.0)),
