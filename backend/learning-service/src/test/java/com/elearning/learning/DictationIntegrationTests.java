@@ -5,17 +5,21 @@ import static org.assertj.core.api.Assertions.*;
 import com.elearning.learning.common.exception.AppException;
 import com.elearning.learning.dto.DictationModels.*;
 import com.elearning.learning.service.*;
+import com.sun.net.httpserver.HttpServer;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.validation.Validator;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -29,6 +33,11 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest(
@@ -59,6 +68,9 @@ class DictationIntegrationTests {
 
     @Autowired
     DictationWorkbookService workbooks;
+
+    @Autowired
+    DictationWorkbookSync workbookSync;
 
     @Autowired
     Validator validator;
@@ -1396,6 +1408,77 @@ class DictationIntegrationTests {
     }
 
     @Test
+    void adminSyncsPublishedWorkbooksAndPreservesThemOnHideAndShow() throws Exception {
+        long admin = 5110L;
+        var definition = new Definition(
+            "Admin synchronized workbook", "", "Daily English Conversation", "A1", null,
+            List.of(new Sentence("Original words.", 0.25, 3.75)),
+            new Video("https://www.youtube.com/watch?v=_R7nrvhNmrI", 92.5)
+        );
+        var created = request(admin, true, "POST", ADMIN + "/publish", json.writeValueAsString(new SaveRequest(definition, 0)));
+        assertThat(created.statusCode()).isEqualTo(201);
+        String id = json.readTree(created.body()).path("data").path("id").asString();
+        String path = ADMIN + "/" + id;
+        assertThat(jdbc.queryForObject(
+            "SELECT pending FROM dictation_workbook_sync WHERE exercise_id=?", Boolean.class, id
+        )).isFalse();
+        String key = jdbc.queryForObject(
+            "SELECT object_key FROM dictation_workbook_sources WHERE exercise_id=? AND storage='local'",
+            String.class, id
+        );
+        assertThat(key).startsWith("admin-synchronized-workbook-").endsWith(".xlsx");
+        Path stored = Path.of("./target/dictation-test-uploads", "workbooks", key);
+        try {
+            assertThat(stored).exists();
+            assertThat(workbooks.parseLesson(Files.readAllBytes(stored))).isEqualTo(definition);
+            var download = request(admin, true, "GET", path + "/workbook", null);
+            assertThat(download.statusCode()).isEqualTo(200);
+            assertThat(download.body()).isEqualTo(Files.readAllBytes(stored));
+            Files.deleteIfExists(stored);
+            var fallbackDownload = request(admin, true, "GET", path + "/workbook", null);
+            assertThat(fallbackDownload.statusCode()).isEqualTo(200);
+            assertThat(workbooks.parseLesson(fallbackDownload.body())).isEqualTo(definition);
+            assertThat(request(admin, false, "GET", path + "/workbook", null).statusCode()).isEqualTo(403);
+
+            var updated = new Definition(
+                definition.title(), "", definition.topic(), definition.level(), null,
+                List.of(new Sentence("Updated words.", 4.25, 8.75)), definition.video()
+            );
+            assertThat(request(admin, true, "POST", path + "/publish",
+                json.writeValueAsString(new PublishRequest(1, updated))).statusCode()).isEqualTo(200);
+            workbookSync.sync();
+            assertThat(workbooks.parseLesson(Files.readAllBytes(stored))).isEqualTo(updated);
+            assertThat(jdbc.queryForObject(
+                "SELECT object_key FROM dictation_workbook_sources WHERE exercise_id=? AND storage='local'",
+                String.class, id
+            )).isEqualTo(key);
+
+            assertThat(request(admin, true, "PUT", path, json.writeValueAsString(new SaveRequest(definition, 2)))
+                .statusCode()).isEqualTo(200);
+            byte[] publishedWorkbook = Files.readAllBytes(stored);
+            assertThat(request(admin, true, "PUT", path + "/visibility", "{\"archived\":true}").statusCode()).isEqualTo(200);
+            assertThat(Files.readAllBytes(stored)).isEqualTo(publishedWorkbook);
+            assertThat(request(admin, true, "GET", path + "/workbook", null).statusCode()).isEqualTo(404);
+            assertThat(service.catalog(0, definition.title(), "", "", 0, 12, false).items()).isEmpty();
+
+            // A deletion left in the queue by an earlier release must not remove the workbook.
+            jdbc.update("UPDATE dictation_workbook_sync SET version=NULL, pending=TRUE WHERE exercise_id=?", id);
+            workbookSync.sync();
+            assertThat(Files.readAllBytes(stored)).isEqualTo(publishedWorkbook);
+            assertThat(jdbc.queryForObject(
+                "SELECT pending FROM dictation_workbook_sync WHERE exercise_id=?", Boolean.class, id
+            )).isFalse();
+
+            assertThat(request(admin, true, "PUT", path + "/visibility", "{\"archived\":false}").statusCode()).isEqualTo(200);
+            assertThat(Files.readAllBytes(stored)).isEqualTo(publishedWorkbook);
+            assertThat(service.catalog(0, definition.title(), "", "", 0, 12, false).items()).extracting(Item::id)
+                .containsExactly(id);
+        } finally {
+            Files.deleteIfExists(stored);
+        }
+    }
+
+    @Test
     void importWorkbook_whenWorkbookHasMetadataOrTranscriptOnly_shouldReturnAvailableFields() throws Exception {
         // Arrange
         byte[] template = workbooks.template();
@@ -1550,6 +1633,350 @@ class DictationIntegrationTests {
     }
 
     @Test
+    void s3PublishesLaterPagesRetriesFailedDownloadsAndRecognizesVpsImports(@TempDir Path inbox) throws Exception {
+        String keyword = "S3 workbook import";
+        String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
+        byte[] duplicate = lessonWorkbook(keyword + " from VPS", url, "01:32");
+        byte[] cloudOnly = lessonWorkbook(keyword + " from cloud", url, "01:32");
+        Files.write(inbox.resolve("vps.xlsx"), duplicate);
+        var importer = workbookImporter(inbox);
+        importer.scan();
+
+        String duplicateKey = "documents/transcripts/vps-copy.xlsx";
+        String cloudKey = "documents/transcripts/daily/cloud.XLSX";
+        String invalidKey = "documents/transcripts/invalid.xlsx";
+        String firstPage = """
+            <ListBucketResult>
+              <IsTruncated>true</IsTruncated>
+              <NextContinuationToken>page-two</NextContinuationToken>
+              %s
+            </ListBucketResult>
+            """.formatted(
+                s3WorkbookObject(duplicateKey, duplicate.length)
+                    + s3WorkbookObject("documents/transcripts/~$editing.xlsx", duplicate.length)
+                    + s3WorkbookObject("documents/transcripts/big.xlsx", 6 * 1024 * 1024)
+                    + s3WorkbookObject("documents/transcripts/_admin/workbook.xlsx", duplicate.length)
+            );
+        String secondPage = """
+            <ListBucketResult>
+              <IsTruncated>false</IsTruncated>
+              %s
+            </ListBucketResult>
+            """.formatted(s3WorkbookObject(cloudKey, cloudOnly.length) + s3WorkbookObject(invalidKey, 1));
+        var listings = new CopyOnWriteArrayList<String>();
+        var downloads = new ConcurrentHashMap<String, Integer>();
+        var s3Server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        s3Server.createContext("/dictation-test", exchange -> {
+            try (exchange) {
+                String query = exchange.getRequestURI().getQuery();
+                if (query != null && query.contains("list-type=2")) {
+                    listings.add(query);
+                    exchange.getResponseHeaders().set("Content-Type", "application/xml");
+                    String page = query.contains("continuation-token=page-two") ? secondPage : firstPage;
+                    byte[] body = page.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    return;
+                }
+
+                String key = exchange.getRequestURI().getPath().substring("/dictation-test/".length());
+                int requests = downloads.merge(key, 1, Integer::sum);
+                if (!"\"workbook\"".equals(exchange.getRequestHeaders().getFirst("If-Match"))) {
+                    exchange.sendResponseHeaders(412, -1);
+                    return;
+                }
+                if (key.equals(cloudKey) && requests == 1) {
+                    exchange.sendResponseHeaders(403, -1);
+                    return;
+                }
+                byte[] body = switch (key) {
+                    case String name when name.equals(duplicateKey) -> duplicate;
+                    case String name when name.equals(cloudKey) -> cloudOnly;
+                    default -> new byte[] {0};
+                };
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+            }
+        });
+        s3Server.start();
+        try (S3Client s3 = S3Client.builder()
+            .region(Region.US_EAST_1)
+            .endpointOverride(URI.create("http://127.0.0.1:" + s3Server.getAddress().getPort()))
+            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test-key", "test-secret")))
+            .build()) {
+            var reader = new DictationS3WorkbookImporter(importer, s3, "dictation-test", "documents/transcripts");
+            reader.scan();
+            assertThat(service.catalog(5099, keyword, "", "", 0, 12, false).items())
+                .extracting(Item::title).containsExactly(keyword + " from VPS");
+
+            reader.scan();
+            reader.scan();
+
+            assertThat(listings).hasSize(6).allSatisfy(query -> assertThat(query).contains("prefix=documents/transcripts/"));
+            assertThat(downloads).containsExactlyInAnyOrderEntriesOf(Map.of(duplicateKey, 1, cloudKey, 2, invalidKey, 1));
+            assertThat(service.catalog(5099, keyword, "A1", "Daily English Conversation", 0, 12, false).items())
+                .extracting(Item::title).containsExactlyInAnyOrder(keyword + " from VPS", keyword + " from cloud");
+        } finally {
+            s3Server.stop(0);
+        }
+    }
+
+    private static String s3WorkbookObject(String key, int bytes) {
+        return s3WorkbookObject(key, bytes, "\"workbook\"");
+    }
+
+    private static String s3WorkbookObject(String key, int bytes, String eTag) {
+        return """
+            <Contents>
+              <Key>%s</Key><Size>%d</Size><ETag>%s</ETag>
+              <LastModified>2025-01-01T00:00:00Z</LastModified>
+            </Contents>
+            """.formatted(key, bytes, eTag);
+    }
+
+    @Test
+    void s3SyncsAdminEditsAndCloudEditsThroughOneWorkbookPerLesson(@TempDir Path local) throws Exception {
+        String keyword = "S3 single file sync";
+        String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
+        String importedKey = "documents/transcripts/s3-single-file-lesson.xlsx";
+        var bucket = new ConcurrentHashMap<String, byte[]>();
+        var etags = new ConcurrentHashMap<String, String>();
+        var seq = new java.util.concurrent.atomic.AtomicInteger(1);
+        bucket.put(importedKey, lessonWorkbook(keyword + " initial", "US UK songs", "B1", url, "01:32"));
+        etags.put(importedKey, "\"etag-" + seq.getAndIncrement() + "\"");
+
+        var s3Server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        s3Server.createContext("/dictation-sync", exchange -> {
+            try (exchange) {
+                String query = exchange.getRequestURI().getQuery();
+                if (query != null && query.contains("list-type=2")) {
+                    String contents = bucket.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(e -> s3WorkbookObject(e.getKey(), e.getValue().length, etags.get(e.getKey())))
+                        .collect(java.util.stream.Collectors.joining());
+                    String xml = "<ListBucketResult><IsTruncated>false</IsTruncated>" + contents + "</ListBucketResult>";
+                    byte[] body = xml.getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/xml");
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    return;
+                }
+                String key = exchange.getRequestURI().getPath().substring("/dictation-sync/".length());
+                switch (exchange.getRequestMethod()) {
+                    case "PUT" -> {
+                        bucket.put(key, exchange.getRequestBody().readAllBytes());
+                        etags.put(key, "\"etag-" + seq.getAndIncrement() + "\"");
+                        exchange.sendResponseHeaders(200, -1);
+                    }
+                    case "GET" -> {
+                        byte[] body = bucket.get(key);
+                        if (body == null) {
+                            exchange.sendResponseHeaders(404, -1);
+                            return;
+                        }
+                        exchange.getResponseHeaders().set("ETag", etags.get(key));
+                        exchange.sendResponseHeaders(200, body.length);
+                        exchange.getResponseBody().write(body);
+                    }
+                    default -> exchange.sendResponseHeaders(405, -1);
+                }
+            }
+        });
+        s3Server.start();
+        try (S3Client s3 = S3Client.builder()
+            .region(Region.US_EAST_1)
+            .endpointOverride(URI.create("http://127.0.0.1:" + s3Server.getAddress().getPort()))
+            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).chunkedEncodingEnabled(false).build())
+            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test-key", "test-secret")))
+            .build()) {
+            var provider = new org.springframework.beans.factory.support.StaticListableBeanFactory(Map.of("s3", s3))
+                .getBeanProvider(S3Client.class);
+            var s3Storage = new DictationWorkbookStorage(
+                provider, "s3", local.toString(), "dictation-sync", "documents/transcripts/"
+            );
+            var s3Sync = new DictationWorkbookSync(jdbc, transactions, json, workbooks, s3Storage);
+            var s3Admin = new DictationAdminPublication(service, s3Sync);
+            var importer = new DictationWorkbookImporter(
+                workbooks, service, validator, jdbc, json, transactions, ""
+            );
+            var reader = new DictationS3WorkbookImporter(importer, s3, "dictation-sync", "documents/transcripts/");
+
+            // 1. Cloud file is imported and visible to learners and admin.
+            reader.scan();
+            var catalog = service.catalog(5120, keyword, "", "", 0, 12, false);
+            assertThat(catalog.items()).hasSize(1);
+            String importedId = catalog.items().getFirst().id();
+            var attempt = start(5120, importedId);
+            byte[] originalWorkbook = bucket.get(importedKey);
+            s3Admin.visibility(importedId, true);
+            assertThat(bucket.get(importedKey)).isEqualTo(originalWorkbook);
+            assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items()).isEmpty();
+            s3Admin.visibility(importedId, false);
+            assertThat(bucket.get(importedKey)).isEqualTo(originalWorkbook);
+
+            // 2. Admin edits and publishes -> overwrites the SAME S3 key (no _admin/ file created).
+            var adminEdited = new Definition(
+                keyword + " edited in admin", "", "US UK songs", "B2", null,
+                List.of(new Sentence("Updated in admin.", 1.0, 5.0)),
+                new Video(url, 92.0)
+            );
+            s3Admin.publish(importedId, new PublishRequest(1, adminEdited));
+            assertThat(bucket.keySet()).containsExactly(importedKey);
+            assertThat(workbooks.parseLesson(bucket.get(importedKey))).isEqualTo(adminEdited);
+            assertThat(workbooks.parseLesson(s3Admin.download(importedId))).isEqualTo(adminEdited);
+
+            var draft = new Definition(
+                keyword + " saved draft", "", "US UK songs", "B1", null,
+                List.of(new Sentence("Keep this draft.", 1.0, 5.0)), adminEdited.video()
+            );
+            var savedDraft = service.save(importedId, new SaveRequest(draft, 2));
+            byte[] deferredWorkbook = lessonWorkbook(keyword + " waiting on S3", "US UK songs", "A2", url, "01:32");
+            bucket.put(importedKey, deferredWorkbook);
+            etags.put(importedKey, "\"etag-" + seq.getAndIncrement() + "\"");
+            reader.scan();
+            reader.scan();
+            assertThat(service.adminDetail(importedId)).isEqualTo(savedDraft);
+            assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items())
+                .extracting(Item::title).containsExactly(adminEdited.title());
+            assertThat(workbooks.parseLesson(s3Admin.download(importedId))).isEqualTo(adminEdited);
+            assertThat(bucket.get(importedKey)).isEqualTo(deferredWorkbook);
+
+            s3Admin.publish(importedId, new PublishRequest(savedDraft.version(), null));
+            assertThat(workbooks.parseLesson(bucket.get(importedKey))).isEqualTo(draft);
+
+            // 3. Re-scanning the updated S3 object recognizes the digest and creates no duplicate.
+            reader.scan();
+            assertThat(service.catalog(0, keyword, "", "", 0, 12, true).items()).hasSize(1);
+
+            // 4. Direct edit to the same S3 file updates the existing lesson and preserves old attempts.
+            bucket.put(importedKey, lessonWorkbook(keyword + " edited on S3", "US UK songs", "C1", url, "01:32"));
+            etags.put(importedKey, "\"etag-" + seq.getAndIncrement() + "\"");
+            reader.scan();
+            var afterCloudEdit = service.catalog(5121, keyword, "", "", 0, 12, false).items();
+            assertThat(afterCloudEdit).hasSize(1);
+            assertThat(afterCloudEdit.getFirst().id()).isEqualTo(importedId);
+            assertThat(afterCloudEdit.getFirst().title()).isEqualTo(keyword + " edited on S3");
+            assertThat(afterCloudEdit.getFirst().level()).isEqualTo("C1");
+            assertThat(service.attempt(5120, attempt.id()).title()).isEqualTo(keyword + " initial");
+
+            // 5. Admin creates a brand-new lesson -> writes one readable key directly in documents/transcripts/.
+            var brandNew = new Definition(
+                keyword + " brand new", "", "US UK songs", "A2", null,
+                List.of(new Sentence("Created in admin.", 0.0, 4.0)),
+                new Video(url, 60.0)
+            );
+            String createdId = s3Admin.publish(null, new PublishRequest(0, brandNew)).id();
+            assertThat(bucket.keySet()).hasSize(2).noneMatch(k -> k.contains("_admin/"));
+            String createdKey = bucket.keySet().stream().filter(k -> !k.equals(importedKey)).findFirst().orElseThrow();
+            assertThat(createdKey).startsWith("documents/transcripts/s3-single-file-sync-brand-new-").endsWith(".xlsx");
+            reader.scan();
+            assertThat(service.catalog(0, keyword, "", "", 0, 12, true).items()).hasSize(2);
+
+            // 6. Hiding and showing only change catalog visibility.
+            byte[] workbookBeforeHide = bucket.get(importedKey);
+            s3Admin.visibility(importedId, true);
+            assertThat(bucket.get(importedKey)).isEqualTo(workbookBeforeHide);
+            assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items())
+                .extracting(Item::id).containsExactly(createdId);
+            // Editing an archived S3 file updates its revision while keeping it archived until unhidden.
+            byte[] workbookWhileHidden = lessonWorkbook(keyword + " edited while hidden", "US UK songs", "C2", url, "01:32");
+            bucket.put(importedKey, workbookWhileHidden);
+            etags.put(importedKey, "\"etag-" + seq.getAndIncrement() + "\"");
+            reader.scan();
+            assertThat(service.adminDetail(importedId).archived()).isTrue();
+            assertThat(service.adminDetail(importedId).definition().title()).isEqualTo(keyword + " edited while hidden");
+
+            s3Admin.visibility(importedId, false);
+            assertThat(bucket.get(importedKey)).isEqualTo(workbookWhileHidden);
+            assertThat(workbooks.parseLesson(bucket.get(importedKey)).title()).isEqualTo(keyword + " edited while hidden");
+            assertThat(service.catalog(5121, keyword, "", "", 0, 12, false).items())
+                .extracting(Item::id).containsExactlyInAnyOrder(importedId, createdId);
+
+            // 7. Non-YouTube cloud video syncs via fallback digest and transient S3 failures retry cleanly.
+            var mp4 = new Definition(
+                keyword + " mp4", "", "US UK songs", "A1", null,
+                List.of(new Sentence("Direct video.", 0.0, 3.0)),
+                new Video("https://media.example.test/videos/clip.mp4", 40.0)
+            );
+            String mp4Id = s3Admin.publish(null, new PublishRequest(0, mp4)).id();
+            assertThat(s3Admin.download(mp4Id)).isNotEmpty();
+
+            s3Server.stop(0);
+            assertThat(workbooks.parseLesson(s3Admin.download(createdId))).isEqualTo(brandNew);
+            var failedAttempt = new Definition(
+                keyword + " retry", "", "US UK songs", "A1", null,
+                List.of(new Sentence("Retry sync.", 0.0, 3.0)),
+                new Video(url, 40.0)
+            );
+            String retryId = s3Admin.publish(null, new PublishRequest(0, failedAttempt)).id();
+            assertThat(s3Admin.download(retryId)).isNotEmpty();
+        } finally {
+            s3Server.stop(0);
+        }
+    }
+
+    @Test
+    void inboxRejectsOversizedTitlesHandlesMissingDirsAndPropagatesLocalEdits(@TempDir Path inbox) throws Exception {
+        var missingDirImporter = workbookImporter(inbox.resolve("missing-dir"));
+        missingDirImporter.scan();
+
+        String longTitle = "A".repeat(181);
+        Files.write(inbox.resolve("too-long.xlsx"), lessonWorkbook(longTitle, "https://www.youtube.com/watch?v=_R7nrvhNmrI", "01:32"));
+        var importer = new DictationWorkbookImporter(
+            workbooks, service, validator, jdbc, json, transactions,
+            new org.springframework.beans.factory.support.StaticListableBeanFactory(Map.of("sync", workbookSync))
+                .getBeanProvider(DictationWorkbookSync.class),
+            inbox.toString()
+        );
+        importer.scan();
+        assertThat(service.catalog(0, longTitle, "", "", 0, 12, true).items()).isEmpty();
+
+        String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
+        Path localFile = inbox.resolve("local-sync-lesson.xlsx");
+        Files.write(localFile, lessonWorkbook("Local sync v1", url, "01:32"));
+        importer.scan();
+        String id = service.catalog(0, "Local sync v1", "", "", 0, 12, true).items().getFirst().id();
+        Files.setLastModifiedTime(localFile, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 5000));
+        Files.write(localFile, lessonWorkbook("Local sync v2", url, "01:32"));
+        Files.setLastModifiedTime(localFile, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
+        importer.scan();
+        assertThat(service.adminDetail(id).definition().title()).isEqualTo("Local sync v2");
+    }
+
+    @Test
+    void scan_whenWorkbookChangesDuringADraft_shouldRetryTheSameFileAfterPublication(@TempDir Path inbox) throws Exception {
+        String keyword = "Deferred local workbook";
+        String url = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
+        Path file = inbox.resolve("draft-conflict.xlsx");
+        Files.write(file, lessonWorkbook(keyword + " initial", url, "01:32"));
+        var importer = workbookImporter(inbox);
+        importer.scan();
+        String id = service.catalog(0, keyword, "", "", 0, 12, false).items().getFirst().id();
+        var initial = service.adminDetail(id);
+        var draft = new Definition(
+            keyword + " admin draft", "", initial.definition().topic(), initial.definition().level(), null,
+            initial.definition().sentences(), initial.definition().video()
+        );
+        var saved = service.save(id, new SaveRequest(draft, initial.version()));
+        Files.write(file, lessonWorkbook(keyword + " changed", url, "01:32"));
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
+
+        importer.scan();
+        assertThat(service.adminDetail(id)).isEqualTo(saved);
+        assertThat(service.catalog(0, keyword, "", "", 0, 12, false).items())
+            .extracting(Item::title).containsExactly(initial.definition().title());
+
+        service.publish(id, saved.version());
+        importer.scan();
+        assertThat(service.catalog(0, keyword, "", "", 0, 12, false).items()).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo(id);
+            assertThat(item.title()).isEqualTo(keyword + " changed");
+        });
+        assertThat(service.adminDetail(id).hasDraft()).isFalse();
+    }
+
+    @Test
     void scan_whenInboxScansAreConcurrent_shouldPublishOneLesson(@TempDir Path inbox) throws Exception {
         // Arrange
         String title = "VPS workbook concurrent import";
@@ -1620,6 +2047,8 @@ class DictationIntegrationTests {
     void handleRequest_whenDictationRoutesReceiveForbiddenOrInvalidCalls_shouldEnforceRoleAndServeAuthorizedAudio() throws Exception {
         // Arrange
         // Act
+        assertThat(request(null, false, "GET", USER, null).statusCode()).isEqualTo(200);
+        assertThat(request(null, false, "GET", USER + "/topic-groups", null).statusCode()).isEqualTo(200);
         for (String path : List.of(ADMIN, ADMIN + "/template", ADMIN + "/audio/" + sampleAudioKey))
             assertThat(request(5010L, false, "GET", path, null).statusCode()).isEqualTo(403);
         var template = request(5010L, true, "GET", ADMIN + "/template", null);

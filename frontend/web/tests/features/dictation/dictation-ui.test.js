@@ -843,7 +843,7 @@ test('YouTube seeks within one iframe and pauses at the selected sentence end', 
         pauses.push(position);
         reportState(2);
       }
-      destroy() {}
+      destroy() { }
     },
   };
   await render();
@@ -1199,6 +1199,22 @@ function installLibraryFixture(levels = [], catalogTopics = []) {
   };
   return { queries, items };
 }
+
+test('guests see an empty library and are asked to sign in for private progress', async () => {
+  const queries = [];
+  dictationApi.query = async path => {
+    queries.push(path);
+    return { data: { groups: [] } };
+  };
+  await render('/dictation', null);
+  assert.match(document.body.textContent, /Chưa có bài nghe/);
+  assert.doesNotMatch(document.body.textContent, /Chưa có bài nghe phù hợp/);
+  assert.equal(document.querySelector('.dictation-lesson-card'), null);
+
+  await click('Tiến độ bài học');
+  assert.match(document.body.textContent, /Đăng nhập để xem tiến độ bài học/);
+  assert.deepEqual(queries, [dictationApi.topicGroupsPath]);
+});
 
 test('the TOEIC group preview opens its own paginated catalog and keeps the latest attempt link', async () => {
   const { queries } = installLibraryFixture();

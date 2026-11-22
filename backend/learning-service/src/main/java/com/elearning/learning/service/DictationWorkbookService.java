@@ -5,6 +5,7 @@ import static com.elearning.learning.dto.DictationModels.LEVEL_PATTERN;
 import com.elearning.learning.common.exception.DictationValidationException;
 import com.elearning.learning.dto.DictationModels.*;
 import java.io.*;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.regex.Pattern;
 import org.apache.poi.ss.usermodel.*;
@@ -25,6 +26,7 @@ public class DictationWorkbookService {
         "Tên bài nghe", "Chủ đề", "Trình độ", "Link YouTube", DURATION_LABEL
     );
     private static final Pattern DURATION_CLOCK = Pattern.compile("([0-9]+):([0-5][0-9](?:\\.[0-9]+)?)");
+    private static final Pattern TRANSCRIPT_CLOCK = Pattern.compile("([0-9]{2,3}):([0-5][0-9](?:\\.[0-9]+)?)");
     private static final int TRANSCRIPT_HEADER_ROW = LESSON_HEADERS.size() + 2;
     private static final String UNREADABLE_WORKBOOK =
         "Không đọc được file. Hãy dùng file Excel mẫu và không nhập công thức.";
@@ -34,6 +36,48 @@ public class DictationWorkbookService {
             return input.readAllBytes();
         } catch (IOException ex) {
             throw new IllegalStateException("Cannot read transcript template", ex);
+        }
+    }
+
+    byte[] writeLesson(Definition definition) {
+        try (var workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("Transcript");
+            sheet.setColumnWidth(0, 24 * 256);
+            sheet.setColumnWidth(1, 72 * 256);
+            sheet.setColumnWidth(2, 14 * 256);
+            sheet.setColumnWidth(3, 14 * 256);
+            writeRow(sheet.createRow(0), "Thông tin bài nghe", "Nội dung");
+            var video = definition.video();
+            var values = List.of(
+                definition.title(), definition.topic(), definition.level(), video.url(), workbookTime(video.duration())
+            );
+            for (int i = 0; i < LESSON_HEADERS.size(); i++) {
+                writeRow(sheet.createRow(i + 1), LESSON_HEADERS.get(i), values.get(i));
+            }
+            writeRow(sheet.createRow(TRANSCRIPT_HEADER_ROW), HEADERS.toArray(String[]::new));
+            for (int i = 0; i < definition.sentences().size(); i++) {
+                Sentence sentence = definition.sentences().get(i);
+                writeRow(
+                    sheet.createRow(TRANSCRIPT_HEADER_ROW + i + 1),
+                    String.valueOf(i + 1), sentence.text(), workbookTime(sentence.start()), workbookTime(sentence.end())
+                );
+            }
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new UncheckedIOException("Cannot write dictation workbook", ex);
+        }
+    }
+
+    private static String workbookTime(double seconds) {
+        var parts = BigDecimal.valueOf(seconds).divideAndRemainder(BigDecimal.valueOf(60));
+        return String.format(Locale.ROOT, "%02d:%s%s", parts[0].intValueExact(),
+            parts[1].compareTo(BigDecimal.TEN) < 0 ? "0" : "", parts[1].stripTrailingZeros().toPlainString());
+    }
+
+    private static void writeRow(Row row, String... values) {
+        for (int i = 0; i < values.length; i++) {
+            row.createCell(i).setCellValue(values[i]);
         }
     }
 
@@ -206,11 +250,12 @@ public class DictationWorkbookService {
 
     private Double time(String text, int row, List<ImportIssue> errors) {
         if (text.isBlank()) return null;
-        if (!text.matches("[0-9]{2,3}:[0-5][0-9]")) {
+        var clock = TRANSCRIPT_CLOCK.matcher(text);
+        if (!clock.matches()) {
             errors.add(new ImportIssue(row, "Thời gian dùng mm:ss, ví dụ 00:02; định dạng ô là văn bản."));
             return null;
         }
-        String[] parts = text.split(":");
-        return Double.parseDouble(parts[0]) * 60 + Double.parseDouble(parts[1]);
+        return BigDecimal.valueOf(Long.parseLong(clock.group(1)) * 60)
+            .add(new BigDecimal(clock.group(2))).doubleValue();
     }
 }
