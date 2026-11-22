@@ -850,7 +850,7 @@ Email đã tồn tại trong `auth_db`. Hãy sử dụng email khác.
 Chạy lại script cấp quyền user ứng dụng trong container `mysql`:
 
 ```powershell
-docker compose exec mysql sh /docker-entrypoint-initdb.d/02-users.sh
+docker compose exec mysql bash /docker-entrypoint-initdb.d/02-users.sh
 ```
 
 Sau đó khởi động lại service bị lỗi (ví dụ `auth-service`):
