@@ -89,14 +89,14 @@ jobs:
           fi
           chmod 600 "$ENV_FILE"
 
-          node infra/scripts/production.mjs check --env-file "$ENV_FILE" --project "$PROJECT_NAME"
+          node infra/scripts/production.mjs check --env-file "$ENV_FILE" --project "$PROJECT_NAME" </dev/null
 
           echo "==> [3/5] Backing up MySQL databases before deployment..."
           mkdir -p backups
           chmod 700 backups
-          if docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" ps --status running 2>/dev/null | grep -q mysql; then
+          if docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" ps --status running </dev/null 2>/dev/null | grep -q mysql; then
             BACKUP_FILE="backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ)-${NEW_TAG}.sql.gz"
-            node infra/scripts/production.mjs backup --env-file "$ENV_FILE" --project "$PROJECT_NAME" --file "$BACKUP_FILE"
+            node infra/scripts/production.mjs backup --env-file "$ENV_FILE" --project "$PROJECT_NAME" --file "$BACKUP_FILE" </dev/null
             ls -1t backups/pre-deploy-*.sql.gz 2>/dev/null | tail -n +6 | while read -r old_backup; do
               rm -f "$old_backup" "${old_backup}.json"
             done
@@ -106,14 +106,14 @@ jobs:
 
           echo "==> [3.5/5] Checking if MySQL needs fresh consolidated V1 schema & seed-data.sql..."
           COMPOSE_CMD=(docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" -f compose.yaml -f compose.production.yaml --profile backend)
-          "${COMPOSE_CMD[@]}" up -d --wait --wait-timeout 120 mysql
+          "${COMPOSE_CMD[@]}" up -d --wait --wait-timeout 120 mysql </dev/null
           NEEDS_FRESH_SEED="0"
           if [ "${FORCE_RESET_SEED:-false}" = "true" ]; then
             NEEDS_FRESH_SEED="1"
           else
             HAS_SEED_TOEIC="$("${COMPOSE_CMD[@]}" exec -T mysql sh -c '
               MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT COUNT(*) FROM learning_db.toeic_exams WHERE id = 910001;" 2>/dev/null || echo 0
-            ' | tr -d '\r\n')"
+            ' </dev/null | tr -d '\r\n')"
             if [ "${HAS_SEED_TOEIC:-0}" = "0" ]; then
               NEEDS_FRESH_SEED="1"
             fi
@@ -124,7 +124,7 @@ jobs:
                     SELECT COUNT(*) FROM ${svc}_db.flyway_schema_history
                     WHERE version <> '1' OR (type = 'SQL' AND script <> 'V1__init_${svc}_schema.sql');
                   \" 2>/dev/null || echo 0
-                " | tr -d '\r\n')"
+                " </dev/null | tr -d '\r\n')"
                 if [ "${LEGACY_ROWS:-0}" != "0" ]; then
                   NEEDS_FRESH_SEED="1"
                   break
@@ -135,7 +135,7 @@ jobs:
 
           if [ "$NEEDS_FRESH_SEED" = "1" ]; then
             echo "Resetting legacy databases and loading fresh schema + sample data from infra/mysql/seed-data.sql..."
-            "${COMPOSE_CMD[@]}" stop web api-gateway auth-service course-service learning-service payment-service ai-service 2>/dev/null || true
+            "${COMPOSE_CMD[@]}" stop web api-gateway auth-service course-service learning-service payment-service ai-service </dev/null 2>/dev/null || true
             "${COMPOSE_CMD[@]}" exec -T mysql sh -c '
               MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 -uroot -e "
                 DROP DATABASE IF EXISTS auth_db;
@@ -144,21 +144,21 @@ jobs:
                 DROP DATABASE IF EXISTS payment_db;
                 DROP DATABASE IF EXISTS ai_db;
               "
-            '
+            ' </dev/null
             "${COMPOSE_CMD[@]}" exec -T mysql sh -c '
               MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot
             ' < infra/mysql/seed-data.sql
-            "${COMPOSE_CMD[@]}" exec -T mysql bash /docker-entrypoint-initdb.d/02-users.sh
+            "${COMPOSE_CMD[@]}" exec -T mysql bash /docker-entrypoint-initdb.d/02-users.sh </dev/null
             echo "Fresh schema and seed-data.sql loaded successfully."
           else
             echo "Consolidated V1 schema and seed-data.sql are already present; preserving existing databases."
           fi
 
           echo "==> [4/5] Building and starting production services..."
-          node infra/scripts/production.mjs up --env-file "$ENV_FILE" --project "$PROJECT_NAME"
+          node infra/scripts/production.mjs up --env-file "$ENV_FILE" --project "$PROJECT_NAME" </dev/null
 
           echo "==> [5/5] Verifying status and cleaning up unused Docker build cache..."
-          node infra/scripts/production.mjs status --env-file "$ENV_FILE" --project "$PROJECT_NAME"
+          node infra/scripts/production.mjs status --env-file "$ENV_FILE" --project "$PROJECT_NAME" </dev/null
           docker image prune -f >/dev/null 2>&1 || true
           docker builder prune -f --keep-storage 3GB >/dev/null 2>&1 || true
 
