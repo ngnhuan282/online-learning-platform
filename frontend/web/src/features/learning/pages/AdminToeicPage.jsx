@@ -13,8 +13,10 @@ import useAuth from '../../auth/hooks/useAuth';
 import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import ToeicQuestion from '../components/ToeicQuestion';
+import ToeicMediaDialog from '../components/ToeicMediaDialog';
 import ToeicQuestionImportDialog from '../components/ToeicQuestionImportDialog';
 import { isListeningPart, LISTENING_PARTS, READING_PARTS } from '../utils/toeicSections';
+import { isToeicMediaPath } from '../utils/toeicMedia';
 import '../styles/toeic.css';
 
 const EMPTY = [];
@@ -22,6 +24,7 @@ const LETTERS = ['A', 'B', 'C', 'D'];
 const optionIds = part => (part === 2 ? LETTERS.slice(0, 3) : LETTERS);
 let sequence = 0;
 const uniqueId = prefix => `${prefix}-${Date.now().toString(36)}-${++sequence}`;
+const isImagePath = path => path.startsWith('/toeic-assets/') || isToeicMediaPath(path);
 const blankDefinition = () => ({
   slug: '',
   title: '',
@@ -91,6 +94,7 @@ export default function AdminToeicPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [mediaTarget, setMediaTarget] = useState(null);
   const discardAction = useRef(null);
   const pending = useRef(false);
   const generation = useRef(0);
@@ -216,6 +220,15 @@ export default function AdminToeicPage() {
     }));
     setMessage('');
   }
+  function attachMedia(url) {
+    if (mediaTarget === 'AUDIO') editAudioUrl(url);
+    if (mediaTarget === 'IMAGE') editQuestion('imageUrl', url);
+    if (mediaTarget === 'PASSAGE') {
+      const images = selectedQuestion.passageImageUrls;
+      if (images.length < 8 && !images.includes(url)) editQuestion('passageImageUrls', [...images, url]);
+    }
+    setMediaTarget(null);
+  }
   function addQuestion(addListening) {
     const firstNumber = addListening ? 1 : 101;
     const number =
@@ -269,6 +282,8 @@ export default function AdminToeicPage() {
       Number(form.durationMinutes) > 180
     )
       return 'Thời gian thi phải là số nguyên từ 1 đến 180 phút.';
+    const scorable = form.published || publishing;
+    if (scorable && !form.questions.length) return 'Thêm ít nhất một câu hỏi trước khi xuất bản.';
     const numbers = new Set();
     for (const question of form.questions) {
       if (
@@ -287,19 +302,23 @@ export default function AdminToeicPage() {
         return t('Câu {number} cần nội dung câu hỏi và đủ bốn lựa chọn A–D.', { number: question.number });
       if (isListeningPart(question.part)) {
         const audioUrl = question.listening?.audioUrl?.trim() ?? '';
-        if (audioUrl && !/^\/toeic-assets\/[\w/-]+\.mp3$/.test(audioUrl))
-          return t('Câu {number} cần đường dẫn MP3 dưới /toeic-assets/.', { number: question.number });
-        if (form.published || publishing) {
+        if (audioUrl && !isToeicMediaPath(audioUrl) && !/^\/toeic-assets\/[\w/-]+\.mp3$/.test(audioUrl))
+          return t('Câu {number} cần audio từ kho TOEIC hoặc đường dẫn MP3 dưới /toeic-assets/.', {
+            number: question.number,
+          });
+        if (scorable) {
           if (!audioUrl || !question.listening?.transcript?.trim())
             return t('Câu {number} cần audio và transcript để xuất bản.', { number: question.number });
           if (question.part === 1 && !question.imageUrl?.trim())
             return t('Câu {number} Part 1 cần hình ảnh.', { number: question.number });
         }
       }
-      if (question.imageUrl && !question.imageUrl.startsWith('/toeic-assets/'))
-        return 'Hình câu hỏi phải dùng đường dẫn nội bộ /toeic-assets/.';
-      if (question.passageImageUrls.some(url => !url.startsWith('/toeic-assets/')))
-        return 'Hình đoạn đọc phải dùng đường dẫn nội bộ /toeic-assets/.';
+      if (scorable && !isListeningPart(question.part) && !question.explanation.trim())
+        return t('Câu {number} cần lời giải trước khi xuất bản.', { number: question.number });
+      if (question.imageUrl && !isImagePath(question.imageUrl))
+        return 'Hình câu hỏi phải dùng tệp từ kho TOEIC hoặc đường dẫn nội bộ /toeic-assets/.';
+      if (question.passageImageUrls.some(url => !isImagePath(url)))
+        return 'Hình đoạn đọc phải dùng tệp từ kho TOEIC hoặc đường dẫn nội bộ /toeic-assets/.';
     }
     return null;
   }
@@ -323,7 +342,7 @@ export default function AdminToeicPage() {
     });
   }
   function togglePublished() {
-    if (listening && !form.published) {
+    if (!form.published) {
       const validation = validate(true);
       if (validation) {
         setError({ message: t(validation) });
@@ -357,20 +376,30 @@ export default function AdminToeicPage() {
           <h1>{t('Quản lý bộ đề TOEIC')}</h1>
           <p>{t('Tạo và xuất bản bộ đề Reading hoặc Listening cho học viên.')}</p>
         </div>
-        <button
-          type="button"
-          className="toeic-button button-primary"
-          disabled={busy}
-          onClick={() =>
-            whenClean(() => {
-              apply(blankDefinition());
-              setMessage('');
-            })
-          }
-        >
-          <AddRounded fontSize="small" />
-          {t('Thêm bộ đề')}
-        </button>
+        <div className="toeic-admin-heading-actions">
+          <button
+            type="button"
+            className="toeic-button toeic-button-outline"
+            disabled={busy}
+            onClick={() => setMediaTarget('LIBRARY')}
+          >
+            {t('Kho ảnh và audio')}
+          </button>
+          <button
+            type="button"
+            className="toeic-button button-primary"
+            disabled={busy}
+            onClick={() =>
+              whenClean(() => {
+                apply(blankDefinition());
+                setMessage('');
+              })
+            }
+          >
+            <AddRounded fontSize="small" />
+            {t('Thêm bộ đề')}
+          </button>
+        </div>
       </header>
       <div className="toeic-admin-layout">
         <aside className="toeic-admin-list">
@@ -579,6 +608,13 @@ export default function AdminToeicPage() {
                           onChange={event => editAudioUrl(event.target.value)}
                         />
                       </label>
+                      <button
+                        type="button"
+                        className="toeic-button toeic-button-outline toeic-media-picker"
+                        onClick={() => setMediaTarget('AUDIO')}
+                      >
+                        {t('Chọn audio từ kho')}
+                      </button>
                       <label>
                         Transcript
                         <textarea
@@ -667,6 +703,13 @@ export default function AdminToeicPage() {
                         onChange={event => editQuestion('imageUrl', event.target.value)}
                       />
                     </label>
+                    <button
+                      type="button"
+                      className="toeic-button toeic-button-outline toeic-media-picker"
+                      onClick={() => setMediaTarget('IMAGE')}
+                    >
+                      {t('Chọn hình câu hỏi')}
+                    </button>
                     <label>
                       {t(
                         listening
@@ -687,6 +730,14 @@ export default function AdminToeicPage() {
                         }
                       />
                     </label>
+                    <button
+                      type="button"
+                      className="toeic-button toeic-button-outline toeic-media-picker"
+                      disabled={selectedQuestion.passageImageUrls.length >= 8}
+                      onClick={() => setMediaTarget('PASSAGE')}
+                    >
+                      {t('Thêm ảnh minh họa từ kho')}
+                    </button>
                   </details>
                   <details className="toeic-admin-preview">
                     <summary>{t('Xem trước câu hỏi')}</summary>
@@ -750,6 +801,23 @@ export default function AdminToeicPage() {
           </div>
         </form>
       </div>
+      {mediaTarget && (
+        <ToeicMediaDialog
+          key={`${user?.id}:${mediaTarget}`}
+          kind={mediaTarget === 'LIBRARY' ? undefined : mediaTarget === 'AUDIO' ? 'AUDIO' : 'IMAGE'}
+          attachedUrls={
+            new Set(
+              form.questions.flatMap(question => [
+                question.listening?.audioUrl,
+                question.imageUrl,
+                ...question.passageImageUrls,
+              ]),
+            )
+          }
+          onPick={mediaTarget === 'LIBRARY' ? undefined : attachMedia}
+          onClose={() => setMediaTarget(null)}
+        />
+      )}
       {importOpen && (
         <ToeicQuestionImportDialog
           key={`${user?.id}:${editingId ?? 'new'}`}

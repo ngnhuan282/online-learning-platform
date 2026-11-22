@@ -139,12 +139,14 @@ function ToeicReaderWorkspace({ testId }) {
       : Number.isNaN(practiceDuration)
         ? t('Thời gian chưa hợp lệ')
         : t('{minutes} phút', { minutes: practiceDuration });
-  const selectedQuestionsCount =
-    selectedMode === 'EXAM' || selectedPart == null
-      ? exam.questions.length
-      : exam.questions.filter(question => question.part === selectedPart).length;
   const parts = [...new Set(exam.questions.map(question => question.part))].sort((a, b) => a - b);
   const listening = isListeningPart(parts[0]);
+  const activePart = parts.includes(selectedPart) ? selectedPart : null;
+  const practicePartLabel = activePart ?? (parts.length === 1 ? parts[0] : null);
+  const selectedQuestionsCount =
+    selectedMode === 'EXAM' || activePart == null
+      ? exam.questions.length
+      : exam.questions.filter(question => question.part === activePart).length;
 
   return (
     <>
@@ -153,7 +155,7 @@ function ToeicReaderWorkspace({ testId }) {
           <ArrowBackRounded fontSize="small" />
           {t('Tất cả bộ đề')}
         </Link>
-        <span>{exam.sourceLabel}</span>
+        {exam.sourceLabel && <span>{exam.sourceLabel}</span>}
       </div>
       <header className="toeic-page-heading">
         <div>
@@ -180,10 +182,8 @@ function ToeicReaderWorkspace({ testId }) {
           )}
           <span className="toeic-pill">
             <FactCheckOutlined fontSize="small" />
-            {t('{count} câu · Chuẩn {minutes} phút', {
-              count: exam.questions.length,
-              minutes: exam.durationMinutes,
-            })}
+            {t('{count} câu hỏi', { count: exam.questions.length })} ·{' '}
+            {t('{minutes} phút', { minutes: exam.durationMinutes })}
           </span>
         </div>
       </header>
@@ -288,22 +288,22 @@ function ToeicReaderWorkspace({ testId }) {
             </div>
             <h3>
               {t(
-                listening ? 'Thi thử Listening có giới hạn thời gian' : 'Thi thực chiến chuẩn phòng thi thật',
+                listening
+                  ? 'Thi thử Listening có giới hạn thời gian'
+                  : 'Thi thử Reading có giới hạn thời gian',
               )}
             </h3>
             <ul className="toeic-mode-points">
               <li>
                 {t(
-                  listening
-                    ? 'Làm trọn bộ {count} câu hỏi Listening'
-                    : 'Làm trọn bộ {count} câu hỏi Reading (Part 5, 6, 7)',
+                  listening ? 'Làm trọn bộ {count} câu hỏi Listening' : 'Làm trọn bộ {count} câu hỏi Reading',
                   {
                     count: exam.questions.length,
                   },
                 )}
               </li>
               <li>
-                {t('Thời gian thực tế cố định {minutes} phút, tự động nộp khi hết giờ', {
+                {t('Giới hạn {minutes} phút, tự động nộp khi hết giờ', {
                   minutes: exam.durationMinutes,
                 })}
               </li>
@@ -374,70 +374,74 @@ function ToeicReaderWorkspace({ testId }) {
             </div>
           </div>
 
-          <div className="toeic-section-title toeic-scope-heading">
-            <PlayArrowRounded />
-            <h2>{t('3. Chọn phần thi muốn luyện')}</h2>
-          </div>
+          {parts.length > 1 && (
+            <>
+              <div className="toeic-section-title toeic-scope-heading">
+                <PlayArrowRounded />
+                <h2>{t('3. Chọn phần thi muốn luyện')}</h2>
+              </div>
 
-          <div className={`toeic-practice-grid ${listening ? 'is-listening' : 'is-four'}`}>
-            <article
-              className={`toeic-scope-card ${selectedPart === null ? 'is-selected' : ''}`}
-              onClick={event => {
-                if (event.target.closest('button')) return;
-                setSelectedPart(null);
-              }}
-            >
-              <span className="toeic-test-edition">{t('Trọn bộ')}</span>
-              <h3>{t(listening ? 'Toàn bộ Listening' : 'Toàn bộ Reading')}</h3>
-              <p>
-                {t('{count} câu hỏi · {time}', {
-                  count: exam.questions.length,
-                  time: practiceTimeSummary,
-                })}
-              </p>
-              <button
-                type="button"
-                className={`toeic-button ${selectedPart === null ? 'button-primary' : 'toeic-button-outline'}`}
-                disabled={busy || !exam.questions.length}
-                onClick={() => start('PRACTICE', null)}
-              >
-                {t('Luyện trọn bộ')}
-              </button>
-            </article>
-
-            {parts.map(part => {
-              const count = exam.questions.filter(question => question.part === part).length;
-              const isChosen = selectedPart === part;
-              return (
+              <div className={`toeic-practice-grid ${listening ? 'is-listening' : 'is-four'}`}>
                 <article
-                  key={part}
-                  className={`toeic-scope-card ${isChosen ? 'is-selected' : ''}`}
+                  className={`toeic-scope-card ${activePart === null ? 'is-selected' : ''}`}
                   onClick={event => {
                     if (event.target.closest('button')) return;
-                    setSelectedPart(part);
+                    setSelectedPart(null);
                   }}
                 >
-                  <span className="toeic-test-edition">Part {part}</span>
-                  <h3>{t(PART_TITLES[part])}</h3>
-                  <p>{t('{count} câu hỏi · {time}', { count, time: practiceTimeSummary })}</p>
+                  <span className="toeic-test-edition">{t('Trọn bộ')}</span>
+                  <h3>{t(listening ? 'Toàn bộ Listening' : 'Toàn bộ Reading')}</h3>
+                  <p>
+                    {t('{count} câu hỏi · {time}', {
+                      count: exam.questions.length,
+                      time: practiceTimeSummary,
+                    })}
+                  </p>
                   <button
                     type="button"
-                    className={`toeic-button ${isChosen ? 'button-primary' : 'toeic-button-outline'}`}
-                    disabled={busy || !count}
-                    onClick={() => start('PRACTICE', part)}
+                    className={`toeic-button ${activePart === null ? 'button-primary' : 'toeic-button-outline'}`}
+                    disabled={busy || !exam.questions.length}
+                    onClick={() => start('PRACTICE', null)}
                   >
-                    {t('Luyện Part {part}', { part })}
+                    {t('Luyện trọn bộ')}
                   </button>
                 </article>
-              );
-            })}
-          </div>
+
+                {parts.map(part => {
+                  const count = exam.questions.filter(question => question.part === part).length;
+                  const isChosen = activePart === part;
+                  return (
+                    <article
+                      key={part}
+                      className={`toeic-scope-card ${isChosen ? 'is-selected' : ''}`}
+                      onClick={event => {
+                        if (event.target.closest('button')) return;
+                        setSelectedPart(part);
+                      }}
+                    >
+                      <span className="toeic-test-edition">Part {part}</span>
+                      <h3>{t(PART_TITLES[part])}</h3>
+                      <p>{t('{count} câu hỏi · {time}', { count, time: practiceTimeSummary })}</p>
+                      <button
+                        type="button"
+                        className={`toeic-button ${isChosen ? 'button-primary' : 'toeic-button-outline'}`}
+                        disabled={busy || !count}
+                        onClick={() => start('PRACTICE', part)}
+                      >
+                        {t('Luyện Part {part}', { part })}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           <div className="toeic-exam-start">
             <div>
               <h3>
-                {selectedPart
-                  ? t('Sẵn sàng luyện Part {part}', { part: selectedPart })
+                {practicePartLabel
+                  ? t('Sẵn sàng luyện Part {part}', { part: practicePartLabel })
                   : t(listening ? 'Sẵn sàng luyện trọn bộ Listening' : 'Sẵn sàng luyện trọn bộ Reading')}
               </h3>
               <p>
@@ -456,7 +460,7 @@ function ToeicReaderWorkspace({ testId }) {
               type="button"
               className="toeic-button button-primary"
               disabled={busy || !selectedQuestionsCount}
-              onClick={() => start('PRACTICE', selectedPart)}
+              onClick={() => start('PRACTICE', activePart)}
             >
               {busy ? t('Đang chuẩn bị...') : t('Bắt đầu luyện tập')}
               <PlayArrowRounded fontSize="small" />
@@ -470,19 +474,19 @@ function ToeicReaderWorkspace({ testId }) {
               <div className="toeic-real-exam-badges">
                 <span>
                   <AccessTimeRounded fontSize="small" />
-                  {t('Thời gian thực tế: {minutes} phút', { minutes: exam.durationMinutes })}
+                  {t('Thời gian thi {minutes} phút', { minutes: exam.durationMinutes })}
                 </span>
                 <span>
                   <VisibilityOffOutlined fontSize="small" />
                   {t('Khóa đáp án giữa chừng')}
                 </span>
               </div>
-              <h3>{t(listening ? 'Thi thử TOEIC Listening' : 'Thi thực chiến TOEIC Reading đầy đủ')}</h3>
+              <h3>{t(listening ? 'Thi thử TOEIC Listening' : 'Thi thử TOEIC Reading')}</h3>
               <p>
                 {t(
                   listening
                     ? '{count} câu hỏi · {minutes} phút · Phát audio theo từng nhóm câu. Đáp án và transcript mở sau khi nộp.'
-                    : '{count} câu hỏi (Part 5, 6, 7) · Đồng hồ đếm ngược {minutes} phút chuẩn đề thật · Điểm số và lời giải chỉ mở sau khi nộp bài.',
+                    : '{count} câu hỏi · {minutes} phút · tự động chấm điểm',
                   {
                     count: exam.questions.length,
                     minutes: exam.durationMinutes,

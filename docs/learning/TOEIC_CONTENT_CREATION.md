@@ -1,9 +1,9 @@
 # Cách tạo bài học và bài tập từ tài liệu TOEIC
 
-Tài liệu là **nguồn để biên soạn nội dung**, không phải file được đưa vào trình đọc trên website.
-Đã tạo 10 bộ Reading ETS 2024, mỗi bộ có 100 câu và 4 bài học. Người học học bài,
-chọn đáp án A–D, nộp bài, xem lời giải và tiếp tục bài đang làm ngay trong web.
-Reading được triển khai trước; không sử dụng thư mục `AUDIO` hoặc nhập đề Listening.
+Tài liệu là **nguồn để biên soạn nội dung luyện đề trực tiếp trên website**.
+Bộ mẫu ETS 2024 gồm 10 đề Reading và 9 đề Listening. Học viên chọn bài luyện hoặc
+thi thử, làm và nộp bài, rồi xem kết quả ngay trên web. Các mục dưới đây ghi lại cách
+biên soạn Reading và chuẩn bị media Listening từ tài liệu nguồn.
 
 ## 1. Nguồn dùng cho từng loại nội dung
 
@@ -73,7 +73,7 @@ Chi tiết nguồn và các hiệu chỉnh đã ghi nhận: [Ghi chú dữ liệ
 | --- | --- |
 | `backend/learning-service/src/main/resources/toeic/ets2024-reading.json` | 10 bộ đề, 40 bản ghi bài học, 1.000 câu, đáp án và lời giải; chỉ đóng gói ở backend |
 | `frontend/web/public/toeic-assets/ets2024-reading/` | Hình câu hỏi và đoạn đọc từ đề không có đáp án |
-| `$TOEIC_ARCHIVES_DIR/toeic/test01.tar.gz` … `test10.tar.gz` | Mười gói ảnh Reading lưu ngoài Git. Frontend giải nén chúng vào `public` |
+| `$TOEIC_ARCHIVES_DIR/toeic-reading/test01.tar.gz` … `test10.tar.gz` | Mười gói ảnh Reading lưu ngoài Git. Frontend giải nén chúng vào `public` |
 | `docs/learning/TOEIC_SOURCE_AUDIT.json` | Tham chiếu nguồn, SHA-256, kết quả đối chiếu và hiệu chỉnh |
 | `infra/scripts/toeic/source-overrides/` | Bằng chứng đối chiếu và hiệu chỉnh nguồn; không dùng khi ứng dụng chạy |
 
@@ -81,7 +81,7 @@ Không chép JSON chứa đáp án vào `public` hoặc import nó từ frontend
 nạp seed khi khởi động; Admin có thể chỉnh nội dung đã nạp trong database.
 
 Lấy 19 gói từ thư mục dữ liệu trên VPS và đặt `TOEIC_ARCHIVES_DIR` trỏ tới thư mục
-chứa `toeic` và `toeic-listening`. Ví dụ khi chạy local trên PowerShell trong `frontend/web`:
+chứa `toeic-reading` và `toeic-listening`. Ví dụ khi chạy local trên PowerShell trong `frontend/web`:
 
 ```powershell
 $env:TOEIC_ARCHIVES_DIR = 'D:\toeic-data'
@@ -97,13 +97,20 @@ Xem [cách cấu hình production](../deployment/PRODUCTION.md#2-kiểm-tra-cấ
 
 ## 5. Tạo và sửa nội dung tiếp theo bằng Admin
 
+Mở **Kho ảnh và audio** để tải lên, xem trước, thay hoặc xóa file MP3, PNG, JPEG và
+WebP. Trong khi sửa câu hỏi, dùng nút chọn tệp cạnh trường audio hoặc hình minh họa
+để gắn tệp vào câu hỏi rồi bấm **Lưu bộ đề**. Mỗi lần upload lưu local và thêm bản S3
+khi môi trường đã bật kho S3. Để đổi tệp đang được đề hoặc bài làm sử dụng, tải một
+tệp mới và chọn nó cho câu hỏi. Khi thiếu media ở máy local, trang luyện đề vẫn hiển
+thị nội dung và báo tệp chưa có.
+
 1. Đăng nhập tài khoản ADMIN, mở **Quản lý TOEIC** → **Thêm bộ đề**.
 2. Nhập tên, mã bộ đề và thời gian thi.
-3. Trong **Bài học**, nhập bốn bài theo cấu trúc ở trên; dùng ví dụ từ nguồn mới.
-4. Trong **Ngân hàng câu hỏi**, thêm số câu, Part, đoạn đọc, nội dung câu hỏi,
-   bốn lựa chọn, đáp án đúng và lời giải. Có thể nhập từng câu hoặc chọn
-   **Import Excel/CSV** theo hướng dẫn dưới đây. Ghi lại tham chiếu nguồn.
-5. Xem trước, lưu bản nháp, kiểm tra nội dung rồi xuất bản.
+3. Trong **Ngân hàng câu hỏi**, thêm số câu, Part, nội dung câu hỏi và đáp án đúng.
+   Với Reading, thêm các lựa chọn và lời giải hoặc dùng **Import Excel/CSV**.
+   Với Listening, gắn audio và nhập transcript. Part 1 cần ảnh minh họa.
+4. Xem trước câu hỏi, lưu bản nháp rồi xuất bản. Học viên có thể chọn luyện tập
+   hoặc thi thử ngay khi mở bộ đề đã xuất bản.
 
 ### Import câu hỏi từ Excel hoặc CSV
 
@@ -147,8 +154,7 @@ import, lưu và xuất bản lại khi sẵn sàng.
 
 Importer này nhận `.xlsx` và `.csv`, không nhận `.xls`, PDF hay Word trực tiếp.
 Với PDF/Word trong `docs/resources`, trích xuất và đối chiếu theo mục 3, sau đó đưa
-câu hỏi vào mẫu nếu muốn nhập qua Admin. Import không tự tạo bài học; nội dung bài
-học vẫn được biên soạn trong tab **Bài học**.
+câu hỏi vào mẫu nếu muốn nhập qua Admin. Biểu mẫu hiện dùng để nhập câu hỏi Reading.
 
 Cập nhật bộ đề đã tồn tại bằng Admin/API. Sửa JSON seed rồi khởi động lại **không**
 ghi đè dữ liệu Admin đã sửa; seed cũng không phục hồi bộ đề Admin đã xóa.

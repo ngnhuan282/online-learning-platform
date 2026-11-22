@@ -138,6 +138,6 @@ Tiền tố API quản trị: `/api/v1/learning/admin/dictation`
 ## Kiểm thử
 
 - Learning Service: `DictationIntegrationTests`, `DictationGraderTests`, `DictationMigrationTests`.
-- Frontend: `frontend/web/tests/dictation.test.js` và `dictation-ui.test.js` kiểm tra logic và các thao tác React.
+- Frontend: `frontend/web/tests/features/dictation/dictation.test.js` và `dictation-ui.test.js` kiểm tra logic và các thao tác React.
 
 Các bộ kiểm thử này bổ sung, không thay thế các bộ kiểm thử service và frontend hiện có.

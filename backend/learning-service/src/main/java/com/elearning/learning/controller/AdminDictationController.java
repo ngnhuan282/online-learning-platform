@@ -21,7 +21,7 @@ public class AdminDictationController {
     private final DictationAdminPublication publication;
 
     public AdminDictationController(
-        DictationService service,
+        DictationService service,   
         DictationAudioService audio,
         DictationWorkbookService workbooks,
         DictationAdminPublication publication

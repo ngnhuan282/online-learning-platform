@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import HeadphonesOutlined from '@mui/icons-material/HeadphonesOutlined';
 import { t } from '../../../shared/i18n/locale';
+import { resolveToeicMediaUrl } from '../utils/toeicMedia';
 
 export default function ToeicListeningPlayer({ clip, first, last, showTranscript }) {
   const [expanded, setExpanded] = useState(false);
@@ -30,23 +31,27 @@ export default function ToeicListeningPlayer({ clip, first, last, showTranscript
         <HeadphonesOutlined fontSize="small" aria-hidden="true" />
         <strong>{label}</strong>
       </div>
-      <audio
-        ref={audio}
-        src={clip.audioUrl}
-        controls
-        preload="metadata"
-        aria-label={label}
-        onError={() => setFailed(true)}
-      />
+      {clip?.audioUrl && (
+        <audio
+          ref={audio}
+          src={resolveToeicMediaUrl(clip.audioUrl)}
+          controls
+          preload="metadata"
+          aria-label={label}
+          hidden={failed}
+          onError={() => setFailed(true)}
+        />
+      )}
+      {!clip?.audioUrl && <p role="status">{t('Chưa có audio cho đoạn nghe này.')}</p>}
       {failed && (
         <div className="toeic-listening-error" role="alert">
-          <span>{t('Không tải được đoạn nghe.')}</span>
+          <span>{t('Không tải được đoạn nghe. Audio có thể chưa có trên máy này.')}</span>
           <button type="button" className="toeic-text-link" onClick={retry}>
             {t('Thử lại')}
           </button>
         </div>
       )}
-      {showTranscript && clip.transcript && (
+      {showTranscript && clip?.transcript && (
         <div className="toeic-transcript">
           <button
             type="button"

@@ -16,18 +16,21 @@ const tar = args =>
   execFileSync('tar', args, { encoding: 'utf8', windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
 const resources = fileURLToPath(new URL('../resources/', import.meta.url));
 const release = JSON.parse(readFileSync(join(resources, 'toeic-archives.json'), 'utf8'));
+const releaseArchives = Object.entries(release).flatMap(([collection, hashes]) =>
+  Object.entries(hashes).map(([name, sha256]) => ({ collection, name, sha256 })),
+);
 const sha256Of = file => createHash('sha256').update(readFileSync(file)).digest('hex');
+
+export function toeicArchivePaths() {
+  return releaseArchives.map(({ collection, name }) => `${collection}/${name}`);
+}
 
 export function verifyToeicArchives(directory = process.env.TOEIC_ARCHIVES_DIR, { optional = false } = {}) {
   const root = resolve(directory || resources);
-  const archives = Object.entries(release).flatMap(([collection, hashes]) =>
-    Object.entries(hashes).map(([name, sha256]) => ({
-      collection,
-      name,
-      sha256,
-      source: join(root, collection, name),
-    })),
-  );
+  const archives = releaseArchives.map(archive => ({
+    ...archive,
+    source: join(root, archive.collection, archive.name),
+  }));
   if (optional && !directory && !archives.some(({ source }) => existsSync(source))) return null;
 
   for (const { source, sha256 } of archives) {
@@ -49,7 +52,7 @@ export function stageToeicArchives(archives) {
 }
 
 export function prepareToeicAssets({
-  archiveDirectory = join(resources, 'toeic'),
+  archiveDirectory = join(resources, 'toeic-reading'),
   outputDirectory = fileURLToPath(new URL('../public/toeic-assets/ets2024-reading/', import.meta.url)),
   archiveNames,
 } = {}) {
@@ -159,7 +162,7 @@ export function prepareToeicRelease({ optional = false } = {}) {
     };
   };
   return {
-    reading: prepareToeicAssets(prepareOptions('toeic')),
+    reading: prepareToeicAssets(prepareOptions('toeic-reading')),
     listening: prepareToeicListeningAssets(prepareOptions('toeic-listening')),
   };
 }

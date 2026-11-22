@@ -9,7 +9,7 @@
 **/dist/
 frontend/web/public/toeic-assets/ets2024-reading/
 frontend/web/public/toeic-assets/ets2024-listening/
-frontend/web/resources/toeic/*.tar.gz
+frontend/web/resources/toeic-reading/*.tar.gz
 frontend/web/resources/toeic-listening/*.tar.gz
 infra/scripts/toeic/__pycache__/
 **/target/
