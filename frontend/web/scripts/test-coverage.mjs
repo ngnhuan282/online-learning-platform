@@ -14,7 +14,7 @@ const raw = await mkdtemp(join(tmpdir(), 'learning-frontend-coverage-'));
 try {
   const run = spawnSync(
     process.execPath,
-    ['--import', './scripts/collect-test-coverage.mjs', '--test', '--test-concurrency=1', 'tests/*.test.js'],
+    ['--import', './scripts/collect-test-coverage.mjs', '--test', '--test-concurrency=1', 'tests/**/*.test.js'],
     {
       cwd: root,
       env: { ...process.env, FRONTEND_TEST_COVERAGE: raw },

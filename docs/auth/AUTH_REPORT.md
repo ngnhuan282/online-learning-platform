@@ -19,7 +19,7 @@ Other new files:
 - `backend/auth-service/src/main/resources/db/migration/V2__seed_roles.sql`
 - `backend/auth-service/src/test/java/com/elearning/auth/AuthFlowTests.java`
 - `frontend/web/src/features/auth/pages/AccountPage.jsx`
-- `frontend/web/tests/auth.test.js`
+- `frontend/web/tests/features/auth/auth.test.js`
 - `frontend/web/scripts/auth-e2e.mjs`
 - `infra/mysql/03-auth-migrations.sql`
 - `docs/AUTH_AUDIT.md`, `docs/AUTH_REPORT.md`
