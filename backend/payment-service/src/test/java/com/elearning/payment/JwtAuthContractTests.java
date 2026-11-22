@@ -56,11 +56,14 @@ class JwtAuthContractTests {
     }
 
     @Test
-    void preservesAuthCustomRolesAndPermissionsWithoutInventingUserRole() throws Exception {
+    void authenticate_whenJwtHasCustomRoleAndPermissions_shouldPreserveClaimsWithoutAddingUserRole() throws Exception {
+        // Arrange
+        // Act
         assertThat(
             authenticate(token("USER", List.of("COURSE_EDITOR"), List.of("COURSE_UPDATE"))).getStatus()
         ).isEqualTo(200);
         var authentication = SecurityContextHolder.getContext().getAuthentication();
+        // Assert
         assertThat(authentication.getName()).isEqualTo("42");
         assertThat(authentication.getAuthorities())
             .extracting("authority")
@@ -68,19 +71,24 @@ class JwtAuthContractTests {
     }
 
     @Test
-    void acceptsLegacySingleRoleAndAuthMultiRoleTokens() throws Exception {
+    void authenticate_whenJwtUsesLegacyOrMultiRoleClaims_shouldAcceptValidRoles() throws Exception {
+        // Arrange
+        // Act
         authenticate(token("USER", null, null));
         assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
             .extracting("authority")
             .containsExactly("ROLE_USER");
         authenticate(token("ADMIN", List.of("ADMIN", "USER"), List.of("PAYMENT_REPORT_VIEW")));
+        // Assert
         assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
             .extracting("authority")
             .containsExactly("ROLE_ADMIN", "ROLE_USER", "PAYMENT_REPORT_VIEW");
     }
 
     @Test
-    void rejectsConflictingOrMalformedRolesAndPermissionsBeforeAuthentication() throws Exception {
+    void authenticate_whenRolesOrPermissionsAreMalformed_shouldRejectToken() throws Exception {
+        // Arrange
+
         for (String token : List.of(
             token("USER", List.of("ADMIN"), List.of()),
             token("ADMIN", List.of("USER"), List.of()),
@@ -90,7 +98,12 @@ class JwtAuthContractTests {
             token("USER", List.of("USER"), List.of("ROLE_ADMIN:invalid")),
             token("USER", List.of("USER"), "PAYMENT_REPORT_VIEW")
         )) {
-            assertThat(authenticate(token).getStatus()).isEqualTo(401);
+            // Act
+
+            var response = authenticate(token).getStatus();
+
+            // Assert
+            assertThat(response).isEqualTo(401);
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
     }

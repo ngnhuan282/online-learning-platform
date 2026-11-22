@@ -321,10 +321,12 @@ class GoogleLoginTests {
     }
 
     @Test
-    void createsUserAndReusesIdentityWithInternalJwtRefreshMeAndLogout() throws Exception {
+    void completeGoogleLogin_whenVerifiedGoogleIdentitySignsIn_shouldCreateAccountAndReuseIdentity() throws Exception {
+        // Arrange
         String email = email(),
             subject = UUID.randomUUID().toString();
         var response = exchange(loginCode(subject, email), VERIFIER);
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         var user = data(response).get("user");
         long id = user.get("id").asLong();
@@ -367,14 +369,17 @@ class GoogleLoginTests {
         var refresh = request("/api/v1/auth/refresh", Map.of(), cookie, null);
         assertThat(refresh.statusCode()).isEqualTo(200);
         String rotated = refresh.headers().firstValue("Set-Cookie").orElseThrow().split(";", 2)[0];
+        // Assert
         assertThat(request("/api/v1/auth/refresh", Map.of(), cookie, null).statusCode()).isEqualTo(401);
         assertThat(request("/api/v1/auth/logout", Map.of(), rotated, null).statusCode()).isEqualTo(200);
         assertThat(request("/api/v1/auth/refresh", Map.of(), rotated, null).statusCode()).isEqualTo(401);
     }
 
     @Test
-    void localEmailConflictNeverLinksOrChangesPassword() throws Exception {
+    void completeGoogleLogin_whenEmailBelongsToLocalAccount_shouldPreserveExistingAuthentication() throws Exception {
+        // Arrange
         String email = email();
+        // Act
         assertThat(
             request(
                 "/api/v1/auth/register",
@@ -385,6 +390,7 @@ class GoogleLoginTests {
         ).isEqualTo(201);
         var before = users.findByEmailIgnoreCase(email).orElseThrow();
         String location = callback(begin(), UUID.randomUUID().toString(), email, Map.of());
+        // Assert
         assertThat(location).endsWith("error=GOOGLE_EMAIL_CONFLICT");
         assertThat(users.findById(before.getId()).orElseThrow().getPasswordHash()).isEqualTo(
             before.getPasswordHash()
@@ -395,7 +401,9 @@ class GoogleLoginTests {
     }
 
     @Test
-    void lockedDisabledAndDeletedUsersCannotLoginOrExchangePreviouslyIssuedCode() throws Exception {
+    void exchangeGoogleLogin_whenAccountBecomesInactive_shouldRejectLoginAndExistingCode() throws Exception {
+        // Arrange
+
         for (String status : List.of("LOCKED", "DISABLED", "DELETED")) {
             String email = email(),
                 subject = UUID.randomUUID().toString();
@@ -407,15 +415,21 @@ class GoogleLoginTests {
                 email
             );
             String expected = status.equals("LOCKED") ? "ACCOUNT_LOCKED" : "ACCOUNT_DISABLED";
-            assertThat(callback(begin(), subject, email, Map.of())).endsWith("error=" + expected);
+
+            // Act
+            var callbackLocation = callback(begin(), subject, email, Map.of());
             var response = exchange(code, VERIFIER);
+
+            // Assert
+            assertThat(callbackLocation).endsWith("error=" + expected);
             assertThat(response.statusCode()).isEqualTo(403);
             assertThat(response.body()).contains(expected);
         }
     }
 
     @Test
-    void requiresVerifiedValidEmailAndRejectsInvalidOidcTokens() throws Exception {
+    void completeGoogleLogin_whenOidcTokenOrVerifiedEmailIsInvalid_shouldRejectLogin() throws Exception {
+        // Arrange
         for (Map<String, Object> override : List.of(
             Map.<String, Object>of("email_verified", false),
             Map.<String, Object>of("email", "bad-email"),
@@ -426,14 +440,18 @@ class GoogleLoginTests {
             Map.<String, Object>of("badSignature", true)
         )) {
             String email = email();
+            // Act
             String location = callback(begin(), UUID.randomUUID().toString(), email, override);
+            // Assert
             assertThat(location).contains("?error=");
             assertThat(users.existsByEmailIgnoreCase(email)).isFalse();
         }
     }
 
     @Test
-    void rejectsWrongStateMissingBrowserSessionAndCancellationWithoutTokenRequest() throws Exception {
+    void completeGoogleLogin_whenBrowserStateIsInvalidOrCancelled_shouldRejectWithoutRequestingProviderToken() throws Exception {
+        // Arrange
+        // Act
         var start = begin();
         int before = TOKEN_REQUESTS.get();
         for (String cookie : Arrays.asList(start.cookie(), null)) {
@@ -449,6 +467,7 @@ class GoogleLoginTests {
             cancelled.cookie(),
             null
         );
+        // Assert
         assertThat(response.headers().firstValue("Location")).hasValue(
             "http://localhost:5173/auth/google/callback?error=GOOGLE_LOGIN_CANCELLED"
         );
@@ -456,8 +475,10 @@ class GoogleLoginTests {
     }
 
     @Test
-    void exchangeIsBrowserBoundExpiringAndConsumedOnceEvenConcurrently() throws Exception {
+    void exchangeGoogleLogin_whenLoginCodeIsExpiredReplayedOrFromAnotherBrowser_shouldRejectInvalidExchange() throws Exception {
+        // Arrange
         String code = loginCode(UUID.randomUUID().toString(), email());
+        // Act
         assertThat(exchange(code, "x".repeat(43)).statusCode()).isEqualTo(401);
         var first = CompletableFuture.supplyAsync(() -> exchangeUnchecked(code));
         var second = CompletableFuture.supplyAsync(() -> exchangeUnchecked(code));
@@ -468,6 +489,7 @@ class GoogleLoginTests {
             "UPDATE oauth_login_codes SET expires_at = ?",
             Timestamp.from(Instant.now().minusSeconds(120))
         );
+        // Assert
         assertThat(exchange(expired, VERIFIER).statusCode()).isEqualTo(401);
     }
 
@@ -480,7 +502,9 @@ class GoogleLoginTests {
     }
 
     @Test
-    void concurrentFirstLoginsResolveOneInternalUser() throws Exception {
+    void completeGoogleLogin_whenFirstLoginsAreConcurrent_shouldResolveSingleInternalUser() throws Exception {
+        // Arrange
+        // Act
         String subject = UUID.randomUUID().toString(),
             email = email();
         var start1 = begin();
@@ -498,6 +522,7 @@ class GoogleLoginTests {
             )
             .toList();
         for (var call : calls) assertThat(call.join()).contains("?code=");
+        // Assert
         assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM user_external_identities WHERE provider = 'GOOGLE' AND provider_subject = ?",
@@ -508,10 +533,14 @@ class GoogleLoginTests {
     }
 
     @Test
-    void providerSubjectsAreCaseSensitiveOnEveryDatabase() throws Exception {
+    void findGoogleIdentity_whenProviderSubjectsDifferByCase_shouldKeepIdentitiesDistinct() throws Exception {
+        // Arrange
         String subject = "CaseSensitive-" + UUID.randomUUID();
         var upper = exchange(loginCode(subject, email()), VERIFIER);
+        // Act
         var lower = exchange(loginCode(subject.toLowerCase(Locale.ROOT), email()), VERIFIER);
+
+        // Assert
         assertThat(upper.statusCode()).isEqualTo(200);
         assertThat(lower.statusCode()).isEqualTo(200);
         assertThat(data(upper).get("user").get("id").asLong()).isNotEqualTo(
@@ -607,13 +636,15 @@ class GoogleLoginTests {
     }
 
     @Test
-    void localLinksWithoutChangingUserPasswordProfileRolesOrIssuingAnotherSession() throws Exception {
+    void completeGoogleLink_whenLocalUserConfirmsVerifiedIdentity_shouldLinkWithoutChangingAccountOrSession() throws Exception {
+        // Arrange
         var local = localSession();
         String subject = UUID.randomUUID().toString();
         var before = users.findById(local.id()).orElseThrow();
         var profileBefore = data(request("/api/v1/users/me", null, null, local.access()));
         long count = users.count();
         String code = linkCode(local, subject);
+        // Act
         assertThat(identities.findByUserIdAndProvider(local.id(), "GOOGLE")).isEmpty();
         assertThat(users.count()).isEqualTo(count);
         var completed = completeLink(local, code, VERIFIER);
@@ -640,6 +671,7 @@ class GoogleLoginTests {
         assertThat(data(googleLogin).get("user").get("id").asLong()).isEqualTo(local.id());
         assertThat(data(googleLogin).get("user").get("roles").toString()).isEqualTo("[\"USER\"]");
         var repeated = completeLink(local, linkCode(local, subject), VERIFIER);
+        // Assert
         assertThat(repeated.statusCode()).isEqualTo(200);
         assertThat(data(repeated).get("alreadyLinked").asBoolean()).isTrue();
         assertThat(
@@ -654,7 +686,9 @@ class GoogleLoginTests {
     // Optional integration against disposable Course/Learning/Payment databases through a real Gateway.
     @Test
     @EnabledIfEnvironmentVariable(named = "GOOGLE_BUSINESS_GATEWAY_URL", matches = ".+")
-    void linkedLoginRetainsRealCoursesEnrollmentsProgressAndPaymentHistory() throws Exception {
+    void completeGoogleLogin_whenLinkedIdentitySignsIn_shouldPreserveLearningAndCommerceHistory() throws Exception {
+        // Arrange
+        // Act
         var adminSession = localSession();
         jdbc.update(
             "INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE name = 'ADMIN'",
@@ -759,6 +793,7 @@ class GoogleLoginTests {
         );
         Map<String, JsonNode> before = new LinkedHashMap<>();
         for (String path : paths) before.put(path, business("GET", path, null, local.access()));
+        // Assert
         assertThat(before.get(paths.get(0)).size()).isEqualTo(2);
         assertThat(before.get(progressPath).get(0).get("status").asString()).isEqualTo("COMPLETED");
         assertThat(before.get("/api/v1/payments/history").toString()).contains(
@@ -823,10 +858,12 @@ class GoogleLoginTests {
     }
 
     @Test
-    void linkEndpointsRequireJwtPasswordAndTheMatchingRefreshSession() throws Exception {
+    void startGoogleLink_whenJwtPasswordOrRefreshSessionIsInvalid_shouldDenyLinkRequest() throws Exception {
+        // Arrange
         var local = localSession();
         var other = localSession();
         var input = Map.of("currentPassword", PASSWORD, "challenge", challenge());
+        // Act
         assertThat(request(PREFIX + "/link/start", input, local.cookie(), null).statusCode()).isEqualTo(401);
         assertThat(
             request(
@@ -850,14 +887,17 @@ class GoogleLoginTests {
             assertThat(missing.statusCode()).isEqualTo(409);
             assertThat(missing.body()).contains("GOOGLE_LINK_SESSION_INVALID");
         }
+        // Assert
         assertThat(request("/api/v1/users/me", null, null, local.access()).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void linkRequiresMatchingVerifiedEmailAndNeverCreatesUsersAtCallback() throws Exception {
+    void completeGoogleLink_whenProviderEmailIsWrongOrUnverified_shouldRejectWithoutCreatingUser() throws Exception {
+        // Arrange
         var local = localSession();
         long count = users.count();
         String mismatch = callback(beginLink(local), UUID.randomUUID().toString(), email(), Map.of());
+        // Act
         assertThat(mismatch).contains("error=GOOGLE_LINK_EMAIL_MISMATCH", "flow=link");
         String unverified = callback(
             beginLink(local),
@@ -865,6 +905,7 @@ class GoogleLoginTests {
             local.email(),
             Map.of("email_verified", false)
         );
+        // Assert
         assertThat(unverified).contains("error=GOOGLE_IDENTITY_INVALID", "flow=link");
         assertThat(users.count()).isEqualTo(count);
         assertThat(identities.findByUserIdAndProvider(local.id(), "GOOGLE")).isEmpty();
@@ -872,12 +913,14 @@ class GoogleLoginTests {
     }
 
     @Test
-    void identityCannotMoveBetweenUsersAndEachUserHasAtMostOneGoogle() throws Exception {
+    void completeGoogleLink_whenIdentityOrAccountIsAlreadyLinked_shouldPreventConflictingAssociation() throws Exception {
+        // Arrange
         String ownedSubject = UUID.randomUUID().toString();
         var googleOwner = exchange(loginCode(ownedSubject, email()), VERIFIER);
         long ownerId = data(googleOwner).get("user").get("id").asLong();
         var local = localSession();
         var conflict = completeLink(local, linkCode(local, ownedSubject), VERIFIER);
+        // Act
         assertThat(conflict.statusCode()).isEqualTo(409);
         assertThat(conflict.body()).contains("GOOGLE_IDENTITY_IN_USE");
         assertThat(
@@ -890,6 +933,7 @@ class GoogleLoginTests {
         String first = UUID.randomUUID().toString();
         assertThat(completeLink(local, linkCode(local, first), VERIFIER).statusCode()).isEqualTo(200);
         var second = completeLink(local, linkCode(local, UUID.randomUUID().toString()), VERIFIER);
+        // Assert
         assertThat(second.statusCode()).isEqualTo(409);
         assertThat(second.body()).contains("GOOGLE_ACCOUNT_ALREADY_LINKED");
         assertThat(
@@ -898,13 +942,16 @@ class GoogleLoginTests {
     }
 
     @Test
-    void loginAndLinkCodesCannotBeUsedAcrossPurposesOrAccounts() throws Exception {
+    void exchangeGoogleCode_whenCodeUsesDifferentPurposeOrAccount_shouldDenyExchange() throws Exception {
+        // Arrange
         var local = localSession();
         var other = localSession();
         String login = loginCode(UUID.randomUUID().toString(), email());
+        // Act
         assertThat(completeLink(local, login, VERIFIER).statusCode()).isEqualTo(400);
         assertThat(exchange(login, VERIFIER).statusCode()).isEqualTo(200);
         String link = linkCode(local, UUID.randomUUID().toString());
+        // Assert
         assertThat(exchange(link, VERIFIER).statusCode()).isEqualTo(401);
         assertThat(completeLink(other, link, VERIFIER).statusCode()).isEqualTo(409);
         assertThat(completeLink(localLogin(local.email(), PASSWORD), link, VERIFIER).statusCode()).isEqualTo(
@@ -915,10 +962,12 @@ class GoogleLoginTests {
     }
 
     @Test
-    void normalRotationPreservesTheInitiatingLinkSession() throws Exception {
+    void refresh_whenLinkIsPending_shouldPreserveLinkSessionDuringRotation() throws Exception {
+        // Arrange
         var local = localSession();
         var started = beginLink(local);
         var rotated = request("/api/v1/auth/refresh", Map.of(), local.cookie(), null);
+        // Act
         assertThat(rotated.statusCode()).isEqualTo(200);
         String cookie = rotated.headers().firstValue("Set-Cookie").orElseThrow().split(";", 2)[0];
         var active = new LocalSession(
@@ -934,13 +983,16 @@ class GoogleLoginTests {
         );
         String location = callback(afterRotation, UUID.randomUUID().toString(), local.email(), Map.of());
         String code = parameters(URI.create(location).getRawQuery()).get("code");
+        // Assert
         assertThat(completeLink(active, code, VERIFIER).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void logoutAndPasswordChangesInvalidatePendingLinkWithoutCreatingAnotherSession() throws Exception {
+    void completeGoogleLink_whenSessionIsRevokedByLogoutOrPasswordChange_shouldRejectPendingLink() throws Exception {
+        // Arrange
         var local = localSession();
         String code = linkCode(local, UUID.randomUUID().toString());
+        // Act
         assertThat(request("/api/v1/auth/logout", Map.of(), local.cookie(), null).statusCode()).isEqualTo(
             200
         );
@@ -948,6 +1000,7 @@ class GoogleLoginTests {
         var signedInAgain = localLogin(local.email(), PASSWORD);
         assertThat(completeLink(signedInAgain, code, VERIFIER).statusCode()).isEqualTo(400);
         String beforePasswordChange = linkCode(signedInAgain, UUID.randomUUID().toString());
+        // Assert
         assertThat(
             request(
                 "/api/v1/users/change-password",
@@ -964,7 +1017,8 @@ class GoogleLoginTests {
     }
 
     @Test
-    void cancelledOrInvalidLinkOidcDoesNotEndTheLocalSession() throws Exception {
+    void completeGoogleLink_whenOidcFlowIsCancelledOrInvalid_shouldKeepLocalSession() throws Exception {
+        // Arrange
         var local = localSession();
         var cancel = beginLink(local);
         var response = request(
@@ -973,6 +1027,7 @@ class GoogleLoginTests {
             cancel.cookie(),
             null
         );
+        // Act
         assertThat(response.headers().firstValue("Location").orElseThrow()).contains(
             "GOOGLE_LOGIN_CANCELLED",
             "flow=link"
@@ -982,6 +1037,7 @@ class GoogleLoginTests {
         ).contains("GOOGLE_LOGIN_FAILED", "flow=link");
         var state = beginLink(local);
         var wrong = request(PREFIX + "/callback/google?state=wrong&code=unused", null, state.cookie(), null);
+        // Assert
         assertThat(wrong.headers().firstValue("Location").orElseThrow()).contains(
             "GOOGLE_LOGIN_FAILED",
             "flow=link"
@@ -994,7 +1050,9 @@ class GoogleLoginTests {
     }
 
     @Test
-    void linkChecksStatusAgainBeforeCallbackAndCompletion() throws Exception {
+    void completeGoogleLink_whenAccountStatusChanges_shouldRecheckStatusBeforeLinking() throws Exception {
+        // Arrange
+
         for (String status : List.of("LOCKED", "DISABLED", "DELETED")) {
             var local = localSession();
             String code = linkCode(local, UUID.randomUUID().toString());
@@ -1005,7 +1063,10 @@ class GoogleLoginTests {
                 status.equals("DELETED") ? Timestamp.from(Instant.now()) : null,
                 local.id()
             );
+            // Act
             var response = completeLink(local, code, VERIFIER);
+
+            // Assert
             assertThat(response.statusCode()).isEqualTo(403);
             assertThat(callback(start, UUID.randomUUID().toString(), local.email(), Map.of())).contains(
                 status.equals("LOCKED") ? "ACCOUNT_LOCKED" : "ACCOUNT_DISABLED"
@@ -1015,9 +1076,11 @@ class GoogleLoginTests {
     }
 
     @Test
-    void linkRejectsWrongVerifierExpiredConfirmationAndExpiredCode() throws Exception {
+    void completeGoogleLink_whenVerifierConfirmationOrCodeIsInvalid_shouldRejectCompletion() throws Exception {
+        // Arrange
         var local = localSession();
         String code = linkCode(local, UUID.randomUUID().toString());
+        // Act
         assertThat(completeLink(local, code, "x".repeat(43)).statusCode()).isEqualTo(400);
         jdbc.update(
             "UPDATE oauth_login_codes SET expires_at = ? WHERE user_id = ? AND purpose = 'LINK'",
@@ -1031,6 +1094,7 @@ class GoogleLoginTests {
             Timestamp.from(Instant.now().minusSeconds(1)),
             local.id()
         );
+        // Assert
         assertThat(callback(start, UUID.randomUUID().toString(), local.email(), Map.of())).contains(
             "GOOGLE_LINK_EXPIRED",
             "flow=link"
@@ -1039,11 +1103,13 @@ class GoogleLoginTests {
     }
 
     @Test
-    void concurrentLinkCompletionIsAtomicAndCannotCreateTwoIdentities() throws Exception {
+    void completeGoogleLink_whenCompletionIsConcurrent_shouldCreateOnlyOneIdentity() throws Exception {
+        // Arrange
         var local = localSession();
         String code = linkCode(local, UUID.randomUUID().toString());
         var first = CompletableFuture.supplyAsync(() -> completeUnchecked(local, code));
         var second = CompletableFuture.supplyAsync(() -> completeUnchecked(local, code));
+        // Act
         assertThat(List.of(first.join(), second.join())).containsExactlyInAnyOrder(200, 400);
         assertThat(completeLink(local, code, VERIFIER).statusCode()).isEqualTo(400);
         var another = localSession();
@@ -1051,6 +1117,7 @@ class GoogleLoginTests {
         String code2 = linkCode(another, UUID.randomUUID().toString());
         var one = CompletableFuture.supplyAsync(() -> completeUnchecked(another, code1));
         var two = CompletableFuture.supplyAsync(() -> completeUnchecked(another, code2));
+        // Assert
         assertThat(List.of(one.join(), two.join())).containsExactlyInAnyOrder(200, 409);
         assertThat(
             jdbc.queryForObject(

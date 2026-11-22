@@ -11,6 +11,7 @@ import {
   PaymentsOutlined,
   ShoppingBagOutlined,
   StickyNote2Outlined,
+  WorkspacePremiumOutlined,
 } from '@mui/icons-material';
 import useAuth from '../../features/auth/hooks/useAuth';
 import { ROUTES } from '../constants/routes';
@@ -29,9 +30,9 @@ export default function HeaderUtilities() {
   const items = [
     ...(user
       ? [
-          { to: '/my-courses', label: 'Khóa của tôi', icon: MenuBookOutlined },
-          { to: ROUTES.MY_NOTES, label: 'Ghi chú của tôi', icon: StickyNote2Outlined },
-        ]
+        { to: '/my-courses', label: 'Khóa của tôi', icon: MenuBookOutlined },
+        { to: ROUTES.MY_NOTES, label: 'Ghi chú của tôi', icon: StickyNote2Outlined },
+      ]
       : []),
     { to: ROUTES.DICTATION, label: 'Luyện nghe', icon: HeadphonesOutlined },
     { to: ROUTES.COMMUNITY, label: 'Diễn đàn', icon: ForumOutlined },
@@ -39,10 +40,10 @@ export default function HeaderUtilities() {
     { to: ROUTES.SHOP, label: 'Cửa hàng', icon: ShoppingBagOutlined },
     ...(user
       ? [
-          { to: ROUTES.PAYMENT_HISTORY, label: 'Thanh toán', icon: PaymentsOutlined },
-          { to: ROUTES.AI_ASSISTANT, label: 'Trợ lý AI', icon: AutoAwesomeOutlined },
-        ]
-      : []),
+        { to: ROUTES.PAYMENT_HISTORY, label: 'Thanh toán', icon: PaymentsOutlined },
+        { to: ROUTES.AI_ASSISTANT, label: 'Trợ lý AI', icon: AutoAwesomeOutlined },
+      ]
+      : [{ to: ROUTES.PRO, label: 'ChitChatGo Pro', icon: WorkspacePremiumOutlined }]),
   ];
   const isCurrent = item => pathname === item.to || pathname.startsWith(`${item.to}/`);
 

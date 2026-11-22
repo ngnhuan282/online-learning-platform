@@ -69,7 +69,8 @@ class LessonPlayControllerTest {
     }
 
     @Test
-    void getPlayUrl_preview_guestAllowed_returns200() throws Exception {
+    void getPlayUrl_whenGuestRequestsPreview_shouldReturnPlayableUrl() throws Exception {
+        // Arrange
         LessonPlayResponse expected = new LessonPlayResponse(
             10L, "Preview Lesson", LessonType.VIDEO, "https://cdn.example.com/preview.mp4", 1800, true, null, 300
         );
@@ -81,16 +82,19 @@ class LessonPlayControllerTest {
             .build();
 
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+        // Act
         assertThat(resp.statusCode()).isEqualTo(200);
 
         JsonNode root = mapper.readTree(resp.body());
+        // Assert
         assertThat(root.get("success").asBoolean()).isTrue();
         assertThat(root.get("data").get("playUrl").asString()).isEqualTo("https://cdn.example.com/preview.mp4");
         assertThat(root.get("data").get("preview").asBoolean()).isTrue();
     }
 
     @Test
-    void getPlayUrl_private_guest_returns401() throws Exception {
+    void getPlayUrl_whenGuestRequestsPrivateLesson_shouldReturnUnauthorized() throws Exception {
+        // Arrange
         when(lessonService.getPlayUrl(eq(1L), eq(20L), any(), anyBoolean()))
             .thenThrow(new AppException(ErrorCode.UNAUTHORIZED, "Vui lòng đăng nhập"));
 
@@ -99,12 +103,16 @@ class LessonPlayControllerTest {
             .GET()
             .build();
 
+        // Act
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+
+        // Assert
         assertThat(resp.statusCode()).isEqualTo(401);
     }
 
     @Test
-    void getPlayUrl_private_notEnrolled_returns403() throws Exception {
+    void getPlayUrl_whenCallerIsNotEnrolled_shouldReturnForbidden() throws Exception {
+        // Arrange
         String token = generateToken("123", "USER");
 
         when(lessonService.getPlayUrl(eq(1L), eq(20L), eq(123L), eq(false)))
@@ -116,12 +124,16 @@ class LessonPlayControllerTest {
             .GET()
             .build();
 
+        // Act
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+
+        // Assert
         assertThat(resp.statusCode()).isEqualTo(403);
     }
 
     @Test
-    void getPlayUrl_private_enrolled_returns200() throws Exception {
+    void getPlayUrl_whenCallerIsEnrolled_shouldReturnPlayableUrl() throws Exception {
+        // Arrange
         String token = generateToken("123", "USER");
         LessonPlayResponse expected = new LessonPlayResponse(
             20L, "Private Lesson", LessonType.VIDEO, "https://s3.amazonaws.com/presigned-stream.mp4", 1800, false, null, 600
@@ -136,9 +148,11 @@ class LessonPlayControllerTest {
             .build();
 
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+        // Act
         assertThat(resp.statusCode()).isEqualTo(200);
 
         JsonNode root = mapper.readTree(resp.body());
+        // Assert
         assertThat(root.get("success").asBoolean()).isTrue();
         assertThat(root.get("data").get("playUrl").asString()).isEqualTo("https://s3.amazonaws.com/presigned-stream.mp4");
         assertThat(root.get("data").get("preview").asBoolean()).isFalse();

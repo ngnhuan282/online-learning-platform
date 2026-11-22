@@ -58,15 +58,18 @@ class CourseControllerTest {
     }
 
     @Test
-    void getCourses_public_returns200AndPagination() throws Exception {
+    void getCourses_whenRequestIsPublic_shouldReturnPageAndPagination() throws Exception {
+        // Arrange
         HttpRequest req = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/courses"))
             .GET()
             .build();
 
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
 
+        // Act
         assertThat(resp.statusCode()).isEqualTo(200);
         JsonNode json = mapper.readTree(resp.body());
+        // Assert
         assertThat(json.get("success").asBoolean()).isTrue();
         assertThat(json.get("data").has("content")).isTrue();
         assertThat(json.get("data").has("totalElements")).isTrue();
@@ -74,7 +77,8 @@ class CourseControllerTest {
     }
 
     @Test
-    void createCourse_withoutAuth_returns401() throws Exception {
+    void createCourse_whenCallerIsUnauthenticated_shouldReturnUnauthorized() throws Exception {
+        // Arrange
         String payload = """
             {
               "title": "Unauthorized Course",
@@ -89,13 +93,17 @@ class CourseControllerTest {
             .POST(HttpRequest.BodyPublishers.ofString(payload))
             .build();
 
+        // Act
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
 
+
+        // Assert
         assertThat(resp.statusCode()).isEqualTo(401);
     }
 
     @Test
-    void createCourse_userRoleWithoutPermission_returns403() throws Exception {
+    void createCourse_whenCallerLacksPermission_shouldReturnForbidden() throws Exception {
+        // Arrange
         String token = generateToken("USER", List.of());
         String payload = """
             {
@@ -112,13 +120,17 @@ class CourseControllerTest {
             .POST(HttpRequest.BodyPublishers.ofString(payload))
             .build();
 
+        // Act
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
 
+
+        // Assert
         assertThat(resp.statusCode()).isEqualTo(403);
     }
 
     @Test
-    void createCourse_invalidPayload_returns400Validation() throws Exception {
+    void createCourse_whenPayloadIsInvalid_shouldReturnValidationError() throws Exception {
+        // Arrange
         String token = generateToken("ADMIN", List.of("COURSE_CREATE"));
         // Empty title and invalid price (-50)
         String invalidPayload = """
@@ -138,8 +150,10 @@ class CourseControllerTest {
 
         HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
 
+        // Act
         assertThat(resp.statusCode()).isEqualTo(400);
         JsonNode json = mapper.readTree(resp.body());
+        // Assert
         assertThat(json.get("success").asBoolean()).isFalse();
         assertThat(json.get("code").asText()).isEqualTo("VALIDATION_ERROR");
     }

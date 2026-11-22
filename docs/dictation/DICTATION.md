@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-- Mục `Luyện nghe` trong menu hiển thị với mọi người; trang `/dictation` yêu cầu đăng nhập và hoạt động độc lập với khóa học, đăng ký học và gói PRO.
+- Khách có thể xem các chủ đề và bài đã xuất bản tại `/dictation`. Bắt đầu luyện, tiếp tục bài và xem tiến độ yêu cầu đăng nhập. Luyện nghe hoạt động độc lập với khóa học, đăng ký học và gói PRO.
 - Hỗ trợ thanh thời gian cho toàn bộ audio, nghe và phát lại từng câu, gợi ý từng từ, phản hồi chấm từ trực tiếp từ backend, lưu để luyện tiếp và xem tiến độ mới nhất của mỗi bài.
 - Trang quản lý `/admin/dictation` chỉ dành cho vai trò `ADMIN`, được kiểm tra ở cả frontend và backend.
 - Bài mới dùng video YouTube có thể nhúng. Các bài MP3 và MP4 đã có vẫn dùng trình phát tương ứng.
@@ -49,7 +49,27 @@ Các bài seed có thể dùng cùng cấu trúc dữ liệu với `video.url` l
 2. Trên web, vào **Quản lý bài nghe → Thêm bài nghe → Tải Excel mẫu** để tải `transcript-template.xlsx`. Mẫu có một sheet **Transcript**. Thay dữ liệu minh họa trong phần **Nội dung** bằng tên bài, chủ đề, trình độ, link YouTube HTTPS và thời lượng của bài. Dùng dạng `mm:ss` cho thời lượng, ví dụ `01:32`. Các file cũ ghi thời lượng bằng số giây vẫn nhập được. Bảng transcript bắt đầu ở dòng 8. Thay hai câu ví dụ và điền mốc theo dạng `mm:ss`. Mỗi file `.xlsx` chứa một bài và có dung lượng tối đa 5 MB.
 3. Nếu nhận một file ZIP, giải nén rồi chép từng file `.xlsx` trực tiếp vào thư mục ở bước 1. Dịch vụ quét cấp thư mục đó và lấy chủ đề từ ô **Chủ đề** trong Excel. Có thể dùng đuôi `.xlsx.part` trong lúc tải lên rồi đổi thành `.xlsx` khi xong. Dịch vụ đợi 15 giây giữa các lượt quét, kiểm tra và xuất bản bài hợp lệ. Tải lại thư viện để thấy bài. Nếu file lỗi, tìm tên file và lý do trong log `learning-service`, sửa nội dung rồi thay file.
 
-Thư mục này dành cho quản trị viên VPS vì workbook hợp lệ được xuất bản tự động. Mỗi nội dung workbook được nhập một lần, kể cả khi chép lại dưới tên khác hoặc khởi động lại dịch vụ. Workbook có nội dung khác được tạo thành bài riêng. Web đọc các bài đã nhập từ database, nên bạn có thể dời file nguồn ra khỏi thư mục nhận bài sau khi xác nhận đã xuất bản. Để chỉnh bài hoặc gỡ bài khỏi thư viện, dùng trang quản lý bài nghe.
+Thư mục này dành cho quản trị viên VPS vì workbook hợp lệ được xuất bản tự động. Mỗi nội dung workbook được nhập một lần, kể cả khi chép lại dưới tên khác hoặc khởi động lại dịch vụ. Thay nội dung của file đã liên kết sẽ cập nhật bài hiện có. Web đọc các bài đã nhập từ database, nên bạn có thể dời file nguồn ra khỏi thư mục nhận bài sau khi xác nhận đã xuất bản. Để chỉnh bài hoặc gỡ bài khỏi thư viện, dùng trang quản lý bài nghe.
+
+### Tự nhập bài từ Amazon S3
+
+1. Trong `.env.production` trên VPS, đặt `DICTATION_S3_IMPORT_ENABLED=true` và `DICTATION_S3_PREFIX=documents/transcripts/`. Learning Service dùng `AWS_S3_BUCKET`, `AWS_REGION` và thông tin xác thực AWS hiện có. Cấp quyền `s3:ListBucket` cho prefix này và `s3:GetObject` cho các file bên trong. Sau đó deploy để container nhận cấu hình.
+2. Trong S3, tải từng file `.xlsx` theo mẫu vào `documents/transcripts/` của bucket. Có thể đặt file trong các thư mục con. Dịch vụ đợi 15 giây giữa các lượt quét, lấy chủ đề từ Excel và xuất bản bài hợp lệ. Nếu bài chưa hiện, kiểm tra log `learning-service` theo tên file.
+
+Có thể dùng S3 và thư mục VPS cùng lúc. Cả hai nguồn dùng chung cơ chế chống nhập trùng nội dung. Bài đã xuất bản được lưu trong database và vẫn hiển thị nếu file nguồn bị xóa khỏi S3.
+
+### Lưu Excel khi quản lý bài nghe
+
+Khi admin xuất bản bài YouTube, Learning Service lưu bài trong database và đồng bộ một tệp `.xlsx` vào nơi lưu đã cấu hình. Với bài liên kết S3 và chế độ lưu S3, xuất bản bản chỉnh sửa sẽ cập nhật đúng tệp nguồn. Nút **Tải Excel bài nghe** tải bản đã xuất bản.
+
+Khi tải đè một workbook đã liên kết, lượt quét cập nhật bài nghe hiện có. Nếu bài đang có bản nháp, lượt quét giữ cả bản nháp lẫn bản đang hiển thị và thử lại ở các lượt sau. Khi admin xuất bản bản nháp vào đúng tệp S3 đã liên kết, tệp đó nhận nội dung vừa xuất bản.
+
+**Ẩn bài nghe** và **Hiện bài nghe** chỉ đổi trạng thái trong thư viện. Tệp Excel và lịch sử luyện tập được giữ nguyên.
+
+- `DICTATION_WORKBOOK_STORAGE=local` lưu workbook vào thư mục `workbooks/` trong volume dictation.
+- `DICTATION_WORKBOOK_STORAGE=s3` cùng `DICTATION_S3_IMPORT_ENABLED=true` lưu và cập nhật trực tiếp workbook trong `DICTATION_S3_PREFIX` (ví dụ `documents/transcripts/`) trên S3. Quyền AWS cần `s3:ListBucket`, `s3:GetObject` và `s3:PutObject` cho prefix này.
+
+Bài mới tạo trực tiếp trên web admin sẽ tự đặt tên dạng `<tên-bài>-<mã-ngắn>.xlsx` trong `documents/transcripts/`. Nếu lưu tệp thất bại, Learning Service ghi lỗi và thử lại trong lượt đồng bộ sau.
 
 ### Nhập và kiểm tra mốc
 
@@ -118,6 +138,6 @@ Tiền tố API quản trị: `/api/v1/learning/admin/dictation`
 ## Kiểm thử
 
 - Learning Service: `DictationIntegrationTests`, `DictationGraderTests`, `DictationMigrationTests`.
-- Frontend: `frontend/web/tests/dictation.test.js` và `dictation-ui.test.js` kiểm tra logic và các thao tác React.
+- Frontend: `frontend/web/tests/features/dictation/dictation.test.js` và `dictation-ui.test.js` kiểm tra logic và các thao tác React.
 
 Các bộ kiểm thử này bổ sung, không thay thế các bộ kiểm thử service và frontend hiện có.

@@ -34,11 +34,13 @@ public class ToeicService {
     private final JdbcTemplate jdbc;
     private final JsonMapper mapper;
     private final Clock clock;
+    private final ToeicMediaService media;
 
-    public ToeicService(JdbcTemplate jdbc, JsonMapper mapper, Clock clock) {
+    public ToeicService(JdbcTemplate jdbc, JsonMapper mapper, Clock clock, ToeicMediaService media) {
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.clock = clock;
+        this.media = media;
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +88,7 @@ public class ToeicService {
         Definition definition = normalize(input);
         boolean published = Boolean.TRUE.equals(input.published());
         validate(definition, published);
+        media.lockReferences(definition.questions());
         long id = insert(definition, published, null);
         return adminView(exam(id, false, false));
     }
@@ -97,6 +100,7 @@ public class ToeicService {
         Definition definition = normalize(input);
         // Publication is a separate explicit operation; ordinary edits cannot accidentally unpublish an exam.
         validate(definition, current.published());
+        media.lockReferences(definition.questions());
         jdbc.update(
             """
             UPDATE toeic_exams SET slug = ?, title = ?, description = ?, duration_minutes = ?,
@@ -617,7 +621,8 @@ public class ToeicService {
             length(listening.audioUrl()) > 2048 ||
             length(listening.transcript()) > 20000 ||
             (!blank(listening.audioUrl()) &&
-                !listening.audioUrl().matches("/toeic-assets/[a-zA-Z0-9_/-]+\\.mp3"))
+                !listening.audioUrl().matches("/toeic-assets/[a-zA-Z0-9_/-]+\\.mp3") &&
+                !ToeicMediaService.isManagedPath(listening.audioUrl()))
         ) throw badRequest();
         if (scorable) {
             String previous = transcriptsByClip.putIfAbsent(listening.audioUrl(), listening.transcript());
@@ -654,6 +659,7 @@ public class ToeicService {
     private boolean validImage(String value) {
         return (
             blank(value) ||
+            ToeicMediaService.isManagedPath(value) ||
             (!value.contains("..") && value.matches("/toeic-assets/[a-zA-Z0-9_./-]+\\.(png|webp|jpg|jpeg)"))
         );
     }

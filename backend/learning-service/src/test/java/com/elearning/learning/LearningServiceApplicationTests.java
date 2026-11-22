@@ -186,9 +186,13 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void granularReportPermissionIsRequiredAndSignedClaimsAreValidated() throws Exception {
+    void authorize_whenReportIsRequested_shouldRequireGranularPermissionAndValidClaims() throws Exception {
+        // Arrange
         String path = "/api/v1/learning/admin/overview";
+
+        // Act
         assertThat(request(path, token("USER", 60), null).statusCode()).isEqualTo(403);
+        // Assert
         for (Object claim : List.of(
             List.of("LEARNING_REPORT_VIEW"),
             List.of("USER_VIEW"),
@@ -215,12 +219,20 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void startsIndependentlyAndExposesHealth() throws Exception {
-        assertThat(request("/actuator/health", null, null).statusCode()).isEqualTo(200);
+    void health_whenServiceStarts_shouldReportUp() throws Exception {
+        // Arrange
+        // Act
+
+        var actualStatusCode = request("/actuator/health", null, null).statusCode();
+
+        // Assert
+        assertThat(actualStatusCode).isEqualTo(200);
     }
 
     @Test
-    void authenticatesWithoutTrustingIdentityHeaders() throws Exception {
+    void authenticate_whenIdentityHeadersAreSupplied_shouldUseVerifiedToken() throws Exception {
+        // Arrange
+        // Act
         error(request(BASE, null, null), 401, "UNAUTHORIZED", BASE);
         error(request(BASE, "malformed", null), 401, "UNAUTHORIZED", BASE);
         error(request(BASE, token("USER", -60), null), 401, "UNAUTHORIZED", BASE);
@@ -229,6 +241,7 @@ class LearningServiceApplicationTests {
         var success = request(BASE, token("USER", 60), null);
         assertThat(success.statusCode()).isEqualTo(200);
         JsonNode json = mapper.readTree(success.body());
+        // Assert
         assertThat(json.get("success").asBoolean()).isTrue();
         assertThat(json.get("message").asString()).isEqualTo("Success");
         assertThat(json.get("data").get("ready").asBoolean()).isTrue();
@@ -236,34 +249,47 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void enforcesAdminAuthority() throws Exception {
+    void authorize_whenAdminAuthorityIsRequired_shouldRejectRegularUser() throws Exception {
+        // Arrange
+        // Act
         error(request(BASE + "/admin", token("USER", 60), null), 403, "FORBIDDEN", BASE + "/admin");
+        // Assert
         assertThat(request(BASE + "/admin", token("ADMIN", 60), null).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void normalizesValidationAndMalformedBodies() throws Exception {
+    void handleRequest_whenBodyIsInvalid_shouldReturnValidationError() throws Exception {
+        // Arrange
+        // Act
         var invalid = request(BASE, token("USER", 60), "{}");
         error(invalid, 400, "VALIDATION_ERROR", BASE);
+        // Assert
         assertThat(mapper.readTree(invalid.body()).get("errors").get("name").isArray()).isTrue();
         error(request(BASE, token("USER", 60), "{"), 400, "MALFORMED_REQUEST", BASE);
     }
 
     @Test
-    void normalizesDomainFallbackAndNotFound() throws Exception {
+    void handleException_whenDomainErrorOccurs_shouldReturnSafeError() throws Exception {
+        // Arrange
+        // Act
         error(request(BASE + "/conflict", token("USER", 60), null), 409, "CONFLICT", BASE + "/conflict");
+        // Assert
         error(request(BASE + "/failure", token("USER", 60), null), 500, "INTERNAL_ERROR", BASE + "/failure");
         error(request(BASE + "/missing", token("USER", 60), null), 404, "NOT_FOUND", BASE + "/missing");
     }
 
     @Test
-    void notificationReceiverIsDisabledWithoutAConfiguredKey() throws Exception {
+    void receiveNotification_whenInternalKeyIsMissing_shouldDisableReceiver() throws Exception {
+        // Arrange
+        // Act
         String path = "/internal/v1/notifications/events";
+        // Assert
         error(request(path, tokenFor("ADMIN", 912L), "{}"), 503, "SERVICE_UNAVAILABLE", path);
     }
 
     @Test
-    void freeEnrollmentIsIdempotentForMyCourses() throws Exception {
+    void enroll_whenFreeEnrollmentIsReplayed_shouldKeepOneCourseEntry() throws Exception {
+        // Arrange
         String access = Jwts.builder()
             .subject("123")
             .issuer("sgedu")
@@ -277,26 +303,31 @@ class LearningServiceApplicationTests {
         var first = request("/api/v1/learning/enrollments", access, "{\"courseId\":777}");
         var second = request("/api/v1/learning/enrollments", access, "{\"courseId\":777}");
 
+        // Act
         assertThat(first.statusCode()).withFailMessage(first.body()).isEqualTo(200);
         assertThat(second.statusCode()).withFailMessage(second.body()).isEqualTo(200);
         JsonNode firstData = mapper.readTree(first.body()).get("data");
         JsonNode secondData = mapper.readTree(second.body()).get("data");
+        // Assert
         assertThat(secondData.get("id").asLong()).isEqualTo(firstData.get("id").asLong());
         assertThat(enrollments.findByUserIdAndCourseId(123L, 777L)).isPresent();
         assertThat(enrollments.findByUserIdOrderByLastAccessedAtDescEnrolledAtDesc(123L)).hasSize(1);
     }
 
     @Test
-    void paymentEnrollmentRequiresInternalTokenAndIsIdempotentByOrder() throws Exception {
+    void enrollPaid_whenOrderIsReplayedOrInternalTokenMissing_shouldEnforceCredentialAndPerOrderIdempotency() throws Exception {
+        // Arrange
         String path = "/internal/v1/learning/enrollments";
         String body = "{\"orderCode\":\"LS-PAY-INTEGRATION-001\",\"userId\":5001,\"courseId\":7001}";
 
+        // Act
         error(internalEnrollment(null, body), 401, "UNAUTHORIZED", path);
         error(internalEnrollment("wrong-internal-token-that-is-long-enough", body), 401, "UNAUTHORIZED", path);
 
         var first = internalEnrollment(INTERNAL_TOKEN, body);
         var repeated = internalEnrollment(INTERNAL_TOKEN, body);
 
+        // Assert
         assertThat(first.statusCode()).withFailMessage(first.body()).isEqualTo(200);
         assertThat(repeated.statusCode()).withFailMessage(repeated.body()).isEqualTo(200);
         JsonNode firstData = mapper.readTree(first.body()).get("data");
@@ -317,7 +348,8 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void lessonAccessAndCompletionUpdateCourseProgressForEnrolledUser() throws Exception {
+    void completeLesson_whenEnrolledUserCompletesLesson_shouldUpdateCourseProgress() throws Exception {
+        // Arrange
         String access = Jwts.builder()
             .subject("124")
             .issuer("sgedu")
@@ -328,6 +360,7 @@ class LearningServiceApplicationTests {
             .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
             .compact();
 
+        // Act
         assertThat(
             request("/api/v1/learning/enrollments", access, "{\"courseId\":888}").statusCode()
         ).isEqualTo(200);
@@ -337,6 +370,7 @@ class LearningServiceApplicationTests {
             access,
             "{}"
         );
+        // Assert
         assertThat(accessLesson.statusCode()).withFailMessage(accessLesson.body()).isEqualTo(200);
         JsonNode accessed = mapper.readTree(accessLesson.body()).get("data");
         assertThat(accessed.get("status").asString()).isEqualTo("IN_PROGRESS");
@@ -376,7 +410,9 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void adminCanPublishQuizAndEnrolledUserCanSubmitGradedAttempt() throws Exception {
+    void submit_whenQuizIsPublishedAndLearnerIsEnrolled_shouldGradeAttempt() throws Exception {
+        // Arrange
+        // Act
         String admin = tokenFor("ADMIN", 200L);
         String learner = tokenFor("USER", 201L);
         String stranger = tokenFor("USER", 202L);
@@ -472,13 +508,16 @@ class LearningServiceApplicationTests {
         assertThat(send("GET", quizPath + "/result", learner, null).body()).contains("\"score\":100");
         long retakeId = mapper.readTree(send("POST", startPath, learner, null).body())
             .get("data").get("attemptId").asLong();
+        // Assert
         assertThat(retakeId).isNotEqualTo(attemptId);
         assertThat(send("GET", quizPath + "/result", learner, null).body()).contains("\"score\":100");
         assertThat(send("GET", reviewPath, learner, null).body()).contains("\"score\":100");
     }
 
     @Test
-    void quizDefinitionAndAnswersRejectInvalidChoices() throws Exception {
+    void submit_whenChoiceIdsAreInvalid_shouldRejectInvalidDefinitionOrAnswers() throws Exception {
+        // Arrange
+        // Act
         String admin = tokenFor("ADMIN", 210L);
         String learner = tokenFor("USER", 211L);
         String path = "/api/v1/learning/admin/quizzes";
@@ -514,6 +553,7 @@ class LearningServiceApplicationTests {
         JsonNode unanswered = mapper.readTree(send("GET",
             "/api/v1/learning/quizzes/attempts/" + attemptId + "/review", learner, null).body())
             .get("data").get("questions").get(0);
+        // Assert
         assertThat(unanswered.get("correct").asBoolean()).isFalse();
         assertThat(unanswered.get("pointsAwarded").asInt()).isZero();
         assertThat(unanswered.get("options").get(1).get("correct").asBoolean()).isTrue();
@@ -521,7 +561,9 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void reviewShowsWrongPartialAndUnansweredQuestionsWithWeightedScore() throws Exception {
+    void getReview_whenAttemptContainsWrongPartialAndUnansweredQuestions_shouldReturnWeightedScore() throws Exception {
+        // Arrange
+        // Act
         String admin = tokenFor("ADMIN", 230L);
         String learner = tokenFor("USER", 231L);
         String definition = """
@@ -568,6 +610,7 @@ class LearningServiceApplicationTests {
         assertThat(partial.get("options").get(1).get("correct").asBoolean()).isTrue();
         assertThat(partial.get("options").get(1).get("selected").asBoolean()).isFalse();
         JsonNode unanswered = review.get("questions").get(2);
+        // Assert
         assertThat(unanswered.get("correct").asBoolean()).isFalse();
         assertThat(unanswered.get("answered").asBoolean()).isFalse();
         assertThat(unanswered.get("pointsAwarded").asInt()).isZero();
@@ -576,10 +619,13 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void quizCreationRejectsUnknownCourse() throws Exception {
+    void createQuiz_whenCourseDoesNotExist_shouldRejectDefinition() throws Exception {
+        // Arrange
         doThrow(new AppException(ErrorCode.NOT_FOUND))
             .when(courseCatalog).requireExistingCourse(99004L);
+        // Act
         String path = "/api/v1/learning/admin/quizzes";
+        // Assert
         String definition = """
             {"courseId":99004,"title":"Orphan","passingScore":70,"questions":[
              {"questionText":"Pick one","questionType":"SINGLE_CHOICE","points":1,
@@ -598,7 +644,8 @@ class LearningServiceApplicationTests {
     }
 
     @Test
-    void simultaneousStartsShareAttemptAndOnlyOneSubmissionIsGraded() throws Exception {
+    void start_whenQuizStartsAndSubmissionsAreConcurrent_shouldShareAttemptAndGradeOnce() throws Exception {
+        // Arrange
         String admin = tokenFor("ADMIN", 230L);
         String learner = tokenFor("USER", 231L);
         String definition = """
@@ -616,6 +663,7 @@ class LearningServiceApplicationTests {
         long optionId = quiz.get("questions").get(0).get("options").get(0).get("id").asLong();
 
         try (var executor = Executors.newFixedThreadPool(2)) {
+            // Act
             CountDownLatch begin = new CountDownLatch(1);
             String startPath = "/api/v1/learning/quizzes/" + quizId + "/attempts";
             var firstStart = executor.submit(() -> {
@@ -653,20 +701,26 @@ class LearningServiceApplicationTests {
                 firstSubmit.get(10, TimeUnit.SECONDS).statusCode(),
                 secondSubmit.get(10, TimeUnit.SECONDS).statusCode()
             );
+            // Assert
             assertThat(statuses).containsExactlyInAnyOrder(200, 409);
         }
     }
 
     @Test
-    void preservesPaginationMetadata() {
+    void list_whenResultsArePaginated_shouldPreserveMetadata() {
+        // Arrange
+        // Act
         var page = PageResponse.from(new PageImpl<>(List.of("item"), PageRequest.of(1, 2), 3));
+
+        // Assert
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.totalPages()).isEqualTo(2);
         assertThat(page.last()).isTrue();
     }
 
     @Test
-    void rejectsWrongSignatureIssuerTypeAndMissingExpiry() {
+    void authenticate_whenTokenClaimsOrSignatureAreInvalid_shouldRejectToken() {
+        // Arrange
         var key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         String noExpiry = Jwts.builder()
             .subject("u")
@@ -676,6 +730,7 @@ class LearningServiceApplicationTests {
             .issuedAt(new Date())
             .signWith(key)
             .compact();
+        // Act
         assertThatThrownBy(() -> tokens.validate(noExpiry)).isInstanceOf(JwtException.class);
         String wrongIssuer = Jwts.builder().subject("u").issuer("other").signWith(key).compact();
         assertThatThrownBy(() -> tokens.validate(wrongIssuer)).isInstanceOf(JwtException.class);
@@ -688,6 +743,7 @@ class LearningServiceApplicationTests {
         assertThatThrownBy(() -> tokens.validate(wrongType)).isInstanceOf(JwtException.class);
         var otherKey = Jwts.SIG.HS256.key().build();
         String wrongSignature = Jwts.builder().subject("u").signWith(otherKey).compact();
+        // Assert
         assertThatThrownBy(() -> tokens.validate(wrongSignature)).isInstanceOf(JwtException.class);
     }
 

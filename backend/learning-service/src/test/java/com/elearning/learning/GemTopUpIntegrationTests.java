@@ -38,9 +38,12 @@ class GemTopUpIntegrationTests {
     }
 
     @Test
-    void sameOrderIsCreditedOnceAndConflictingReplaysAreRejected() {
+    void credit_whenPaymentOrderIsReplayed_shouldCreditOnceAndRejectConflict() {
+        // Arrange
+        // Act
         shop.grantGems("GEM_ORDER_1", 701, 200);
         shop.grantGems("GEM_ORDER_1", 701, 200);
+        // Assert
         assertThat(balance(701)).isEqualTo(200);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM gem_topup_receipts", Long.class)).isEqualTo(1);
         assertThatThrownBy(() -> shop.grantGems("GEM_ORDER_1", 701, 500))
@@ -52,7 +55,9 @@ class GemTopUpIntegrationTests {
     }
 
     @Test
-    void concurrentRetriesAndDifferentOrdersPreserveExactBalance() throws Exception {
+    void credit_whenConcurrentOrdersAndRetriesArrive_shouldPreserveExactBalance() throws Exception {
+        // Arrange
+        // Act
         try (var executor = Executors.newFixedThreadPool(6)) {
             List<Callable<Void>> tasks = new ArrayList<>();
             for (int i = 0; i < 8; i++) {
@@ -64,13 +69,16 @@ class GemTopUpIntegrationTests {
             }
             for (var result : executor.invokeAll(tasks)) result.get(20, TimeUnit.SECONDS);
         }
+        // Assert
         assertThat(balance(703)).isEqualTo(2700);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM gem_topup_receipts", Long.class)).isEqualTo(6);
     }
 
     @Test
-    void internalControllerAuthenticatesAndValidatesBeforeCrediting() throws Exception {
+    void credit_whenRequestIsUnauthenticatedOrInvalid_shouldRejectBeforeCrediting() throws Exception {
+        // Arrange
         String payload = "{\"orderCode\":\"GEM_HTTP\",\"userId\":704,\"gems\":200}";
+        // Act
         assertThat(post(payload, null).statusCode()).isEqualTo(401);
         assertThat(post(payload, "wrong-internal-token").statusCode()).isEqualTo(401);
         assertThat(post(payload, internalToken()).statusCode()).isEqualTo(200);
@@ -83,15 +91,19 @@ class GemTopUpIntegrationTests {
             "{\"orderCode\":\"BAD\",\"userId\":0,\"gems\":200}",
             "{\"orderCode\":\"BAD\",\"userId\":704,\"gems\":0}"
         )) assertThat(post(invalid, internalToken()).statusCode()).isEqualTo(400);
+        // Assert
         assertThat(balance(704)).isEqualTo(200);
     }
 
     @Test
-    void invalidServiceCallsDoNotCreateWalletsOrReceipts() {
+    void credit_whenServiceInputIsInvalid_shouldAvoidCreatingWalletOrReceipt() {
+        // Arrange
+        // Act
         for (String order : Arrays.asList(null, "", "../bad", "x".repeat(65))) {
             assertThatThrownBy(() -> shop.grantGems(order, 705, 200))
                 .isInstanceOf(AppException.class).extracting("errorCode").isEqualTo(ErrorCode.BAD_REQUEST);
         }
+        // Assert
         assertThatThrownBy(() -> shop.grantGems("INVALID", 0, 200)).isInstanceOf(AppException.class);
         assertThatThrownBy(() -> shop.grantGems("INVALID", 705, -1)).isInstanceOf(AppException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM gem_topup_receipts", Long.class)).isZero();
@@ -99,12 +111,15 @@ class GemTopUpIntegrationTests {
     }
 
     @Test
-    void failedWalletUpdateRollsBackReceiptSoTheOrderCanBeRetried() {
+    void credit_whenWalletUpdateFails_shouldRollBackReceiptAndAllowRetry() {
+        // Arrange
+        // Act
         shop.grantGems("FULL_WALLET", 706, Integer.MAX_VALUE);
         assertThatThrownBy(() -> shop.grantGems("OVERFLOW", 706, 1)).isInstanceOf(RuntimeException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM gem_topup_receipts WHERE order_code='OVERFLOW'", Long.class)).isZero();
         jdbc.update("UPDATE learner_profiles SET gems=0 WHERE user_id=706");
         shop.grantGems("OVERFLOW", 706, 1);
+        // Assert
         assertThat(balance(706)).isEqualTo(1);
     }
 

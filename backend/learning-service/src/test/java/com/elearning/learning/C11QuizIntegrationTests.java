@@ -182,7 +182,9 @@ class C11QuizIntegrationTests {
     }
 
     @Test
-    void weightedScoringRequiresTheExactChoiceSetAndPersistsEachAttempt() throws Exception {
+    void submit_whenQuestionHasWeightedMultipleChoices_shouldRequireExactChoiceSetAndPersistScore() throws Exception {
+        // Arrange
+        // Act
         long user = enrolledUser();
         var quiz = publishedQuiz(null);
         long quizId = quiz.get("id").asLong();
@@ -212,6 +214,7 @@ class C11QuizIntegrationTests {
             assertThat((int) Math.round(awarded * 100.0 / 6)).isEqualTo(scenario.score());
             previous = attempt;
         }
+        // Assert
         assertThat(count("quiz_attempts", user)).isEqualTo(scenarios.size());
         assertThat(count("notifications", user)).isEqualTo(scenarios.size());
         assertThat(data(learner("GET", "/quizzes/" + quizId + "/result", user, null), 200)
@@ -219,7 +222,8 @@ class C11QuizIntegrationTests {
     }
 
     @Test
-    void forgedIdsDuplicatesAndOtherOwnersCannotChangeAnAttempt() throws Exception {
+    void submit_whenAnswersAreForgedRepeatedOrFromAnotherOwner_shouldProtectAttempt() throws Exception {
+        // Arrange
         long user = enrolledUser();
         long other = enrolledUser();
         var quiz = publishedQuiz(null);
@@ -227,6 +231,7 @@ class C11QuizIntegrationTests {
         long quizId = quiz.get("id").asLong();
         long attempt = start(user, quizId);
         String path = "/quizzes/attempts/" + attempt;
+        // Act
         assertThat(learner("POST", path + "/submit", other, completeAnswers(quiz)).statusCode()).isEqualTo(404);
         assertThat(learner("GET", path + "/review", other, null).statusCode()).isEqualTo(404);
         assertThat(learner("GET", "/quizzes/" + quizId, USERS.incrementAndGet(), null).statusCode()).isEqualTo(403);
@@ -251,16 +256,19 @@ class C11QuizIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM quiz_answers WHERE attempt_id = ?", Long.class,
             attempt)).isZero();
         data(learner("POST", path + "/submit", user, completeAnswers(quiz)), 200);
+        // Assert
         assertThat(learner("GET", path + "/review", other, null).statusCode()).isEqualTo(404);
     }
 
     @Test
-    void concurrentStartReusesOneAttemptAndConcurrentSubmitGradesExactlyOnce() throws Exception {
+    void start_whenRequestsAndSubmissionsAreConcurrent_shouldReuseAttemptAndGradeOnce() throws Exception {
+        // Arrange
         long user = enrolledUser();
         var quiz = publishedQuiz(null);
         long quizId = quiz.get("id").asLong();
         try (var executor = Executors.newFixedThreadPool(4)) {
             CountDownLatch begin = new CountDownLatch(1);
+            // Act
             var starts = java.util.stream.IntStream.range(0, 4).mapToObj(index -> executor.submit(() -> {
                 begin.await();
                 return start(user, quizId);
@@ -278,6 +286,7 @@ class C11QuizIntegrationTests {
             submit.countDown();
             var statuses = new java.util.ArrayList<Integer>();
             for (var result : submits) statuses.add(result.get(15, TimeUnit.SECONDS));
+            // Assert
             assertThat(statuses).containsExactlyInAnyOrder(200, 409, 409, 409);
             assertThat(count("notifications", user)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM quiz_answers WHERE attempt_id = ?",
@@ -288,11 +297,13 @@ class C11QuizIntegrationTests {
     }
 
     @Test
-    void serverDeadlineRejectsLateSubmissionAndRetryStartsAFreshAttempt() throws Exception {
+    void submit_whenDeadlineHasPassed_shouldRejectSubmissionAndAllowFreshAttempt() throws Exception {
+        // Arrange
         long user = enrolledUser();
         var quiz = publishedQuiz(1);
         long quizId = quiz.get("id").asLong();
         long attempt = start(user, quizId);
+        // Act
         assertThat(start(user, quizId)).isEqualTo(attempt);
         jdbc.update("UPDATE quiz_attempts SET started_at = ? WHERE id = ?",
             java.sql.Timestamp.from(Instant.now().minusSeconds(120)), attempt);
@@ -303,14 +314,17 @@ class C11QuizIntegrationTests {
         assertThat(retry).isNotEqualTo(attempt);
         assertThat(start(user, quizId)).isEqualTo(retry);
         data(learner("POST", "/quizzes/attempts/" + retry + "/submit", user, completeAnswers(quiz)), 200);
+        // Assert
         assertThat(count("notifications", user)).isEqualTo(1);
         assertThat(data(learner("GET", "/quizzes/" + quizId + "/result", user, null), 200)
             .get("attemptId").asLong()).isEqualTo(retry);
     }
 
     @Test
-    void adminValidatesLessonMembershipAndFreezesPublishedDefinitions() throws Exception {
+    void publish_whenQuizReferencesLesson_shouldValidateCourseMembershipAndFreezeDefinition() throws Exception {
+        // Arrange
         String body = definition("Lesson quiz", LESSON, null);
+        // Act
         assertThat(send("POST", ADMIN, 1, "USER", body).statusCode()).isEqualTo(403);
         assertThat(send("POST", ADMIN, 1, "ADMIN", definition("Wrong lesson", LESSON + 1, null))
             .statusCode()).isEqualTo(404);
@@ -327,23 +341,30 @@ class C11QuizIntegrationTests {
         var draft = create(body);
         long draftId = draft.get("id").asLong();
         data(send("DELETE", ADMIN + "/" + draftId, 1, "ADMIN", null), 200);
+        // Assert
         assertThat(send("GET", ADMIN + "/" + draftId, 1, "ADMIN", null).statusCode()).isEqualTo(404);
     }
 
     @Test
-    void publishRejectsLegacyDefinitionsThatCannotBeScored() throws Exception {
+    void publish_whenLegacyDefinitionCannotBeScored_shouldRejectPublication() throws Exception {
+        // Arrange
         var quiz = create(definition("Legacy draft", null, null));
         long id = quiz.get("id").asLong();
+        // Act
         jdbc.update("UPDATE quiz_options SET correct = false WHERE question_id = ?",
             quiz.get("questions").get(0).get("id").asLong());
+
+        // Assert
         assertThat(send("PATCH", ADMIN + "/" + id + "/publish", 1, "ADMIN", null).statusCode()).isEqualTo(409);
         assertThat(data(send("GET", ADMIN + "/" + id, 1, "ADMIN", null), 200)
             .get("published").asBoolean()).isFalse();
     }
 
     @Test
-    void publishWaitsForAnInFlightDraftUpdateAndPublishesItsFinalDefinition() throws Exception {
+    void publish_whenDraftUpdateIsInFlight_shouldPublishFinalDefinitionAfterUpdate() throws Exception {
+        // Arrange
         var quiz = create(definition("Before update", null, null));
+        // Act
         long id = quiz.get("id").asLong();
         CountDownLatch updating = new CountDownLatch(1);
         CountDownLatch finishUpdate = new CountDownLatch(1);
@@ -374,6 +395,7 @@ class C11QuizIntegrationTests {
             finishUpdate.countDown();
         }
         var published = data(send("GET", ADMIN + "/" + id, 1, "ADMIN", null), 200);
+        // Assert
         assertThat(published.get("published").asBoolean()).isTrue();
         assertThat(published.get("title").asString()).isEqualTo("Final definition");
     }

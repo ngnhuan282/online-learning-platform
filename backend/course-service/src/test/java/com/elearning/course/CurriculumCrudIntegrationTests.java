@@ -33,7 +33,9 @@ class CurriculumCrudIntegrationTests {
     final HttpClient client = HttpClient.newHttpClient();
 
     @Test
-    void curriculumAndAttachmentLifecyclePersistsThroughControllersAndRepositories() throws Exception {
+    void updateCurriculum_whenSectionsLessonsAndAttachmentsChange_shouldPersistChanges() throws Exception {
+        // Arrange
+        // Act
         long category = createCategory();
         long course = createCourse(category);
         long section = ok("POST", "/admin/courses/" + course + "/sections", Map.of("title", "Section", "orderIndex", 0)).get("id").asLong();
@@ -62,14 +64,17 @@ class CurriculumCrudIntegrationTests {
         assertThat(request("GET", "/categories/" + category, null, null).statusCode()).isEqualTo(404);
         ok("DELETE", "/admin/categories/" + category, null);
         ok("DELETE", "/admin/courses/" + course, null);
+        // Assert
         assertThat(ok("GET", "/admin/courses/" + course, null).get("status").asString()).isEqualTo("ARCHIVED");
     }
 
     @Test
-    void reviewOwnershipVisibilityAndRepositoryAggregatesStayConsistent() throws Exception {
+    void updateReview_whenOwnerAndModeratorsChangeReview_shouldKeepVisibilityAndAggregatesConsistent() throws Exception {
+        // Arrange
         long course = createCourse(createCategory());
         String base = "/courses/" + course + "/reviews";
         long id = ok("POST", base, Map.of("rating", 5, "comment", "Useful", "userFullName", "Learner")).get("id").asLong();
+        // Act
         assertThat(reviews.existsByCourseIdAndUserId(course, 7L)).isTrue();
         assertThat(reviews.avgRatingByCourseId(course)).isEqualTo(5);
         assertThat(ok("GET", base + "/me", null).get("id").asLong()).isEqualTo(id);
@@ -89,12 +94,15 @@ class CurriculumCrudIntegrationTests {
         assertThat(reviews.countByCourseId(course)).isEqualTo(1);
         assertThat(ok("GET", base, null).get("content").size()).isEqualTo(1);
         ok("DELETE", base + "/" + id, null);
+        // Assert
         assertThat(reviews.findByCourseIdAndUserId(course, 7L)).isEmpty();
         assertThat(ok("GET", base + "/me", null).isNull()).isTrue();
     }
 
     @Test
-    void publishedCatalogAppliesRatingPriceAndStableSortWithoutLeakingDrafts() throws Exception {
+    void getCourses_whenRatingPriceAndSortFiltersAreApplied_shouldExcludeDraftsAndKeepStableOrder() throws Exception {
+        // Arrange
+        // Act
         long category = createCategory();
         String admin = token(7, "ADMIN");
         String marker = "Catalog-" + UUID.randomUUID();
@@ -124,13 +132,20 @@ class CurriculumCrudIntegrationTests {
         }
         assertThat(ok("GET", "/admin/courses?page=0&size=1", null).path("totalElements").asLong()).isGreaterThanOrEqualTo(3);
         values.put("title", marker + " Alpha");
+        // Assert
         assertThat(request("PUT", "/admin/courses/" + second, values, admin).statusCode()).isEqualTo(409);
         assertThat(request("GET", "/courses/" + first, null, null).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void controllersRejectInvalidPayloadsAndUnauthorizedWrites() throws Exception {
-        assertThat(request("POST", "/admin/categories", Map.of("name", ""), token(7, "ADMIN")).statusCode()).isEqualTo(400);
+    void updateCurriculum_whenPayloadIsInvalidOrUserIsUnauthorized_shouldRejectWrite() throws Exception {
+        // Arrange
+        // Act
+
+        var actualStatusCode = request("POST", "/admin/categories", Map.of("name", ""), token(7, "ADMIN")).statusCode();
+
+        // Assert
+        assertThat(actualStatusCode).isEqualTo(400);
         assertThat(request("POST", "/admin/categories", Map.of("name", "Denied"), token(8, "USER")).statusCode()).isEqualTo(403);
         assertThat(request("GET", "/courses?level=invalid", null, null).statusCode()).isEqualTo(400);
         assertThat(request("GET", "/courses?minPrice=invalid", null, null).statusCode()).isEqualTo(400);

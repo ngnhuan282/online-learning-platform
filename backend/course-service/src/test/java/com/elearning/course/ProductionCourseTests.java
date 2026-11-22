@@ -95,7 +95,9 @@ class ProductionCourseTests {
     }
 
     @Test
-    void searchFiltersInDatabaseAndReturnsCorrectTotalsAndPages() throws Exception {
+    void search_whenFiltersAndPaginationAreProvided_shouldReturnCorrectTotalsAndRows() throws Exception {
+        // Arrange
+        // Act
         var category = category();
         String marker = UUID.randomUUID().toString();
         course(category, marker + " A", 100, 4.5);
@@ -111,6 +113,7 @@ class ProductionCourseTests {
         );
         assertThat(response.statusCode()).isEqualTo(200);
         var data = mapper.readTree(response.body()).get("data");
+        // Assert
         assertThat(data.get("totalElements").asLong()).isEqualTo(2);
         assertThat(data.get("totalPages").asInt()).isEqualTo(2);
         assertThat(data.get("content").get(0).get("title").asString()).isEqualTo(marker + " B");
@@ -119,9 +122,13 @@ class ProductionCourseTests {
     }
 
     @Test
-    void archiveAndCategoryHideKeepCourseRowsAndAdminCanReadDrafts() throws Exception {
+    void archive_whenCourseOrCategoryIsHidden_shouldPreserveRowsAndAllowAdminRead() throws Exception {
+        // Arrange
         var category = category();
+        // Act
         var course = course(category, "Preserved course", 100, 0);
+
+        // Assert
         assertThat(
             request("/admin/categories/" + category.getId(), "DELETE", "ADMIN").statusCode()
         ).isEqualTo(200);

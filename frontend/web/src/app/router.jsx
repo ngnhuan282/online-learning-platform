@@ -340,14 +340,34 @@ const router = createBrowserRouter([
         }),
       },
       {
+        path: 'dictation',
+        lazy: async () => ({
+          Component: (await import('../features/dictation/pages/DictationLibraryPage')).default,
+        }),
+      },
+      {
+        path: 'pro',
+        lazy: async () => ({ Component: (await import('../features/pro/pages/ProPage')).default }),
+      },
+      {
+        path: 'shop',
+        lazy: async () => ({ Component: (await import('../features/shop/pages/ShopPage')).default }),
+      },
+      {
+        path: 'leaderboard',
+        lazy: async () => ({
+          Component: (await import('../features/engagement/pages/LeaderboardPage')).default,
+        }),
+      },
+      {
+        path: 'community',
+        lazy: async () => ({
+          Component: (await import('../features/community/pages/CommunityPage')).default,
+        }),
+      },
+      {
         element: <ProtectedRoute />,
         children: [
-          {
-            path: 'dictation',
-            lazy: async () => ({
-              Component: (await import('../features/dictation/pages/DictationLibraryPage')).default,
-            }),
-          },
           {
             path: 'dictation/:id',
             lazy: async () => ({
@@ -358,26 +378,6 @@ const router = createBrowserRouter([
             path: 'achievements',
             lazy: async () => ({
               Component: (await import('../features/engagement/pages/AchievementsPage')).default,
-            }),
-          },
-          {
-            path: 'pro',
-            lazy: async () => ({ Component: (await import('../features/pro/pages/ProPage')).default }),
-          },
-          {
-            path: 'shop',
-            lazy: async () => ({ Component: (await import('../features/shop/pages/ShopPage')).default }),
-          },
-          {
-            path: 'leaderboard',
-            lazy: async () => ({
-              Component: (await import('../features/engagement/pages/LeaderboardPage')).default,
-            }),
-          },
-          {
-            path: 'community',
-            lazy: async () => ({
-              Component: (await import('../features/community/pages/CommunityPage')).default,
             }),
           },
           {

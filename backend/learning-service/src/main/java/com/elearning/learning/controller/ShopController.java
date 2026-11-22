@@ -19,7 +19,8 @@ public class ShopController {
 
     @GetMapping
     public ApiResponse<State> state(Principal principal) {
-        return ApiResponse.success(shop.state(Long.parseLong(principal.getName())));
+        Long userId = principal == null ? null : Long.parseLong(principal.getName());
+        return ApiResponse.success(shop.state(userId));
     }
 
     @PostMapping("/purchases")

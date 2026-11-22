@@ -10,6 +10,7 @@ import {
 import { proApi } from '../api/proApi';
 import usePro from '../hooks/usePro';
 import ProMembershipCard from '../components/ProMembershipCard';
+import useAuth from '../../auth/hooks/useAuth';
 import useLearningResource from '../../learning/hooks/useLearningResource';
 import useWorkspaceMutation from '../../engagement/hooks/useWorkspaceMutation';
 import { WorkspaceState } from '../../engagement/components/WorkspaceUi';
@@ -53,6 +54,7 @@ const codeMessages = {
 export default function ProPage() {
   useLocale();
   const navigate = useNavigate();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { membership, refresh } = usePro();
   const load = useCallback(async options => {
     const plans = await proApi.plans(options);
@@ -71,7 +73,7 @@ export default function ProPage() {
     }
     return { data: { plans: plans.data } };
   }, []);
-  const resource = useLearningResource(load, null);
+  const resource = useLearningResource(load, null, 0, !isAuthLoading);
   const [selected, setSelected] = useState('PRO_YEAR');
   const [code, setCode] = useState('');
   const [notice, setNotice] = useState('');
@@ -84,6 +86,10 @@ export default function ProPage() {
 
   function redeem(event) {
     event.preventDefault();
+    if (!user) {
+      navigate(ROUTES.LOGIN, { state: { from: ROUTES.PRO } });
+      return;
+    }
     setNotice('');
     activation.run(
       () => proApi.redeem(code.trim()),
@@ -102,7 +108,7 @@ export default function ProPage() {
         <h1>{t('Chọn gói phù hợp với bạn')}</h1>
         <p>{t('Học tiếng Anh theo cách của bạn, mở rộng quyền học cùng Pro.')}</p>
       </header>
-      <ProMembershipCard />
+      {user && <ProMembershipCard />}
       <WorkspaceState loading={resource.loading} error={resource.error} retry={resource.reload} />
       {resource.data && !resource.error && (
         <div className="pro-pricing-grid">
@@ -121,8 +127,8 @@ export default function ProPage() {
                 </li>
               ))}
             </ul>
-            <Link className="pro-primary-action free-action" to="/my-courses">
-              {t('Tiếp tục học')}
+            <Link className="pro-primary-action free-action" to={user ? '/my-courses' : ROUTES.COURSES}>
+              {t(user ? 'Tiếp tục học' : 'Khám phá khóa học')}
             </Link>
           </article>
           <article className="pro-plan-card premium-plan">
@@ -197,7 +203,13 @@ export default function ProPage() {
                   placeholder={t('Nhập mã kích hoạt của bạn')}
                   disabled={busy}
                 />
-                <button type="submit" disabled={busy || !code.trim() || membership?.suspended}>
+                <button
+                  type={user ? 'submit' : 'button'}
+                  disabled={busy || (Boolean(user) && !code.trim()) || membership?.suspended}
+                  onClick={
+                    !user ? () => navigate(ROUTES.LOGIN, { state: { from: ROUTES.PRO } }) : undefined
+                  }
+                >
                   {activation.busy ? t('Đang xử lý…') : t('Kích hoạt')}
                 </button>
               </div>

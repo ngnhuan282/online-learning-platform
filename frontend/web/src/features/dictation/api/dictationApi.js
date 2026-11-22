@@ -37,15 +37,16 @@ export const dictationApi = {
       ...(definition ? { definition } : {}),
     }),
   visibility: (id, archived) => axiosClient.put(`${admin}/${part(id)}/visibility`, { archived }),
+  workbook: id => axiosClient.get(`${admin}/${part(id)}/workbook`, { responseType: 'blob' }),
   template: () => axiosClient.get(`${admin}/template`, { responseType: 'blob' }),
   import: file => axiosClient.post(`${admin}/import`, multipart(file)),
 };
 
-export function downloadWorkbook(blob) {
+export function downloadWorkbook(blob, filename = 'transcript-template.xlsx') {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'transcript-template.xlsx';
+  link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

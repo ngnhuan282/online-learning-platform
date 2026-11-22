@@ -91,7 +91,9 @@ class ProMembershipIntegrationTests {
     }
 
     @Test
-    void calendarRenewalsIdempotencyAndRefundsPreserveOtherGrants() {
+    void grant_whenMembershipIsRenewedOrRefunded_shouldPreserveIndependentGrants() {
+        // Arrange
+        // Act
         var first = pro.grant(new GrantRequest("LS-PAY-PRO-FIRST", 1L, "PRO_MONTH", 1));
         assertThat(first.expiresAt()).isEqualTo(Instant.parse("2030-02-28T03:00:00Z"));
         assertThat(pro.grant(new GrantRequest("LS-PAY-PRO-FIRST", 1L, "PRO_MONTH", 1)).expiresAt()).isEqualTo(
@@ -111,6 +113,7 @@ class ProMembershipIntegrationTests {
             pro.grant(new GrantRequest("LS-PAY-PRO-SECOND", 1L, "PRO_QUARTER", 3)).expiresAt()
         ).isEqualTo(first.expiresAt());
         now.set(Instant.parse("2030-03-01T03:00:00Z"));
+        // Assert
         assertThat(pro.membership(1).active()).isFalse();
         assertThat(pro.grant(new GrantRequest("LS-PAY-PRO-THIRD", 1L, "PRO_YEAR", 12)).expiresAt()).isEqualTo(
             Instant.parse("2031-03-01T03:00:00Z")
@@ -118,7 +121,9 @@ class ProMembershipIntegrationTests {
     }
 
     @Test
-    void concurrentDuplicatePaymentGrantsExtendExactlyOnce() throws Exception {
+    void grant_whenSamePaymentArrivesConcurrently_shouldExtendMembershipOnce() throws Exception {
+        // Arrange
+        // Act
         try (var pool = Executors.newFixedThreadPool(6)) {
             var tasks = java.util.stream.IntStream.range(0, 12)
                 .mapToObj(i ->
@@ -127,6 +132,7 @@ class ProMembershipIntegrationTests {
                 .toList();
             for (var task : tasks) task.get(15, TimeUnit.SECONDS);
         }
+        // Assert
         assertThat(pro.membership(3).expiresAt()).isEqualTo(Instant.parse("2030-02-28T03:00:00Z"));
         assertThat(
             jdbc.queryForObject("SELECT COUNT(*) FROM pro_grants WHERE user_id=3", Long.class)
@@ -134,7 +140,9 @@ class ProMembershipIntegrationTests {
     }
 
     @Test
-    void activationCodesAreAdminOnlySecretOnceAndRedeemedOnce() throws Exception {
+    void redeem_whenAdminIssuesActivationCode_shouldExposeSecretOnceAndPreventReuse() throws Exception {
+        // Arrange
+        // Act
         assertThat(
             request(
                 1L,
@@ -165,6 +173,7 @@ class ProMembershipIntegrationTests {
         var first = request(2L, false, "POST", "/api/v1/learning/pro/redeem", redeem, null);
         assertThat(first.statusCode()).isEqualTo(200);
         Instant expiry = pro.membership(2).expiresAt();
+        // Assert
         assertThat(
             request(2L, false, "POST", "/api/v1/learning/pro/redeem", redeem, null).statusCode()
         ).isEqualTo(200);
@@ -176,8 +185,10 @@ class ProMembershipIntegrationTests {
     }
 
     @Test
-    void concurrentCodeRedemptionHasOneWinnerAndInvalidAttemptsAreLimited() throws Exception {
+    void redeem_whenAttemptsAreConcurrentOrInvalid_shouldAllowOneWinnerAndRateLimitFailures() throws Exception {
+        // Arrange
         String code = pro.createCode(1L, new CreateCodeRequest("PRO_YEAR", null)).code();
+        // Act
         try (var pool = Executors.newFixedThreadPool(2)) {
             var tasks = List.of(21L, 22L)
                 .stream()
@@ -217,6 +228,7 @@ class ProMembershipIntegrationTests {
             ).statusCode()
         ).isEqualTo(429);
         now.set(now.get().plusSeconds(901));
+        // Assert
         assertThat(
             request(
                 9L,
@@ -230,19 +242,25 @@ class ProMembershipIntegrationTests {
     }
 
     @Test
-    void expiredAndRevokedCodesCannotActivatePro() {
+    void redeem_whenCodeIsExpiredOrRevoked_shouldDenyActivation() {
+        // Arrange
+        // Act
         var revoked = pro.createCode(1L, new CreateCodeRequest("PRO_MONTH", null));
         pro.revokeCode(revoked.info().id());
         assertThatThrownBy(() -> pro.redeem(2L, revoked.code())).isInstanceOf(AppException.class);
         var expired = pro.createCode(1L, new CreateCodeRequest("PRO_MONTH", now.get().plusSeconds(60)));
         now.set(now.get().plusSeconds(60));
+        // Assert
         assertThatThrownBy(() -> pro.redeem(2L, expired.code())).isInstanceOf(AppException.class);
         assertThat(pro.membership(2).active()).isFalse();
     }
 
     @Test
-    void proExpiryBlocksLessonsAndQuizzesButPreservesPermanentPurchases() {
+    void authorize_whenProMembershipExpires_shouldBlockProOnlyContentAndKeepPermanentPurchases() {
+        // Arrange
+        // Act
         pro.grant(new GrantRequest("LS-PAY-PRO-ACCESS", 5L, "PRO_MONTH", 1));
+        // Assert
         assertThat(learning.enroll(5L, new EnrollRequest(10L)).accessSource()).isEqualTo("PRO");
         assertThat(learning.enroll(5L, new EnrollRequest(11L)).accessSource()).isEqualTo("COURSE");
         assertThat(learning.checkEnrollment(5L, 10L).enrolled()).isTrue();
@@ -267,10 +285,14 @@ class ProMembershipIntegrationTests {
     }
 
     @Test
-    void internalGrantRequiresServiceCredentialAndValidSnapshot() throws Exception {
+    void grant_whenInternalCredentialOrSnapshotIsInvalid_shouldRejectGrant() throws Exception {
+        // Arrange
         String body =
             "{\"orderCode\":\"LS-PAY-INTERNAL\",\"userId\":4,\"planCode\":\"PRO_YEAR\",\"durationMonths\":12}";
+        // Act
         String path = "/internal/v1/learning/pro/grants";
+
+        // Assert
         assertThat(request(4L, true, "POST", path, body, null).statusCode()).isEqualTo(401);
         assertThat(request(null, false, "POST", path, body, "incorrect").statusCode()).isEqualTo(401);
         assertThat(request(null, false, "POST", path, body, INTERNAL).statusCode()).isEqualTo(200);

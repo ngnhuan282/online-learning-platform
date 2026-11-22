@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 export default defineConfig([
   globalIgnores(['dist', '**/*.local/**']),
   {
-    files: ['scripts/prepare-toeic-assets.mjs'],
+    files: ['scripts/prepare-toeic-assets.mjs', 'scripts/*coverage*.mjs'],
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
   },
@@ -20,4 +20,5 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  { files: ['vite.config.js'], languageOptions: { globals: globals.node } },
 ]);

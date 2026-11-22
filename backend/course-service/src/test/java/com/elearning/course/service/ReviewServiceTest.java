@@ -1,6 +1,7 @@
 package com.elearning.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -63,7 +64,8 @@ class ReviewServiceTest {
     }
 
     @Test
-    void create_success_recalculatesRating() {
+    void create_whenEligibleLearnerSubmitsReview_shouldRecalculateRating() {
+        // Arrange
         Long courseId = 10L;
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(5, "Tuyệt vời!");
@@ -74,8 +76,10 @@ class ReviewServiceTest {
         when(reviewRepository.avgRatingByCourseId(courseId)).thenReturn(5.0);
         when(reviewRepository.countByCourseId(courseId)).thenReturn(1);
 
+        // Act
         ReviewResponse response = reviewService.create(courseId, userId, request);
 
+        // Assert
         assertThat(response).isNotNull();
         assertThat(response.courseId()).isEqualTo(10L);
         assertThat(response.userId()).isEqualTo(42L);
@@ -89,7 +93,8 @@ class ReviewServiceTest {
     }
 
     @Test
-    void create_notEnrolled_throwsForbidden() {
+    void create_whenCallerIsNotEnrolled_shouldThrowForbidden() {
+        // Arrange
         Long courseId = 10L;
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(5, "Tuyệt vời!");
@@ -97,13 +102,18 @@ class ReviewServiceTest {
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
         when(access.canReadPrivate(sampleCourse)).thenReturn(false);
 
-        assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
+        // Act
+        var thrown = catchThrowable(() -> reviewService.create(courseId, userId, request));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
     }
 
     @Test
-    void create_duplicateReview_throwsConflict() {
+    void create_whenReviewAlreadyExists_shouldThrowConflict() {
+        // Arrange
         Long courseId = 10L;
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(4, "Khóa học hay");
@@ -112,7 +122,11 @@ class ReviewServiceTest {
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
         when(access.canReadPrivate(sampleCourse)).thenReturn(true);
 
-        assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
+        // Act
+        var thrown = catchThrowable(() -> reviewService.create(courseId, userId, request));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT);
 
@@ -120,20 +134,26 @@ class ReviewServiceTest {
     }
 
     @Test
-    void create_courseNotFound_throwsNotFound() {
+    void create_whenCourseDoesNotExist_shouldThrowNotFound() {
+        // Arrange
         Long courseId = 999L;
         Long userId = 42L;
         ReviewRequest request = new ReviewRequest(4, "Good");
 
         when(courseRepository.findById(courseId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> reviewService.create(courseId, userId, request))
+        // Act
+        var thrown = catchThrowable(() -> reviewService.create(courseId, userId, request));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
     }
 
     @Test
-    void update_success_recalculatesRating() {
+    void update_whenOwnerEditsReview_shouldRecalculateRating() {
+        // Arrange
         Long courseId = 10L;
         Long reviewId = 100L;
         Long userId = 42L;
@@ -150,8 +170,10 @@ class ReviewServiceTest {
         when(reviewRepository.avgRatingByCourseId(courseId)).thenReturn(4.0);
         when(reviewRepository.countByCourseId(courseId)).thenReturn(1);
 
+        // Act
         ReviewResponse response = reviewService.update(courseId, reviewId, userId, request);
 
+        // Assert
         assertThat(response.rating()).isEqualTo(4);
         assertThat(response.comment()).isEqualTo("Nội dung cập nhật");
         verify(reviewRepository).save(existing);
@@ -159,7 +181,8 @@ class ReviewServiceTest {
     }
 
     @Test
-    void update_notOwner_throwsForbidden() {
+    void update_whenCallerDoesNotOwnReview_shouldThrowForbidden() {
+        // Arrange
         Long courseId = 10L;
         Long reviewId = 100L;
         Long otherUserId = 99L;
@@ -172,13 +195,18 @@ class ReviewServiceTest {
 
         when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> reviewService.update(courseId, reviewId, otherUserId, request))
+        // Act
+        var thrown = catchThrowable(() -> reviewService.update(courseId, reviewId, otherUserId, request));
+
+        // Assert
+        assertThat(thrown)
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
     }
 
     @Test
-    void delete_success_recalculatesRating() {
+    void delete_whenReviewIsRemoved_shouldRecalculateRating() {
+        // Arrange
         Long courseId = 10L;
         Long reviewId = 100L;
         Long userId = 42L;
@@ -192,8 +220,10 @@ class ReviewServiceTest {
         when(reviewRepository.avgRatingByCourseId(courseId)).thenReturn(0.0);
         when(reviewRepository.countByCourseId(courseId)).thenReturn(0);
 
+        // Act
         reviewService.delete(courseId, reviewId, userId);
 
+        // Assert
         verify(reviewRepository).delete(existing);
         verify(courseRepository).save(sampleCourse);
         assertThat(sampleCourse.getAvgRating()).isEqualTo(0.0);
@@ -201,7 +231,8 @@ class ReviewServiceTest {
     }
 
     @Test
-    void hide_and_show_adminOperations() {
+    void setVisibility_whenAdministratorHidesAndShowsReview_shouldUpdatePublicVisibility() {
+        // Arrange
         Long courseId = 10L;
         Long reviewId = 100L;
 
@@ -215,18 +246,21 @@ class ReviewServiceTest {
         when(reviewRepository.countByCourseId(courseId)).thenReturn(2);
 
         ReviewResponse hiddenRes = reviewService.hide(courseId, reviewId);
+        // Act
         assertThat(hiddenRes.hidden()).isTrue();
         assertThat(existing.isHidden()).isTrue();
         verify(courseRepository, times(1)).save(sampleCourse);
 
         ReviewResponse shownRes = reviewService.show(courseId, reviewId);
+        // Assert
         assertThat(shownRes.hidden()).isFalse();
         assertThat(existing.isHidden()).isFalse();
         verify(courseRepository, times(2)).save(sampleCourse);
     }
 
     @Test
-    void setVisibility_success() {
+    void setVisibility_whenReviewExists_shouldChangeVisibility() {
+        // Arrange
         Long reviewId = 100L;
         Review existing = new Review();
         existing.setId(reviewId);
@@ -237,17 +271,20 @@ class ReviewServiceTest {
         when(reviewRepository.avgRatingByCourseId(sampleCourse.getId())).thenReturn(4.0);
         when(reviewRepository.countByCourseId(sampleCourse.getId())).thenReturn(1);
 
+        // Act
         ReviewResponse res = reviewService.setVisibility(reviewId, true);
         assertThat(res.hidden()).isTrue();
         assertThat(existing.isHidden()).isTrue();
 
         ReviewResponse res2 = reviewService.setVisibility(reviewId, false);
+        // Assert
         assertThat(res2.hidden()).isFalse();
         assertThat(existing.isHidden()).isFalse();
     }
 
     @Test
-    void listAll_allCourses_success() {
+    void listAll_whenNoCourseFilterIsSpecified_shouldIncludeReviewsAcrossCourses() {
+        // Arrange
         Review rev = new Review();
         rev.setId(1L);
         rev.setCourse(sampleCourse);
@@ -258,13 +295,16 @@ class ReviewServiceTest {
         when(reviewRepository.findAll(any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(rev)));
 
+        // Act
         Page<ReviewResponse> page = reviewService.listAll(0, 10);
+        // Assert
         assertThat(page.getTotalElements()).isEqualTo(1);
         assertThat(page.getContent().get(0).courseTitle()).isEqualTo("Spring Boot Masterclass");
     }
 
     @Test
-    void listPublic_returnsNonHiddenReviews() {
+    void listPublic_whenSomeReviewsAreHidden_shouldReturnVisibleReviews() {
+        // Arrange
         Long courseId = 10L;
         Review rev = new Review();
         rev.setId(1L);
@@ -277,7 +317,9 @@ class ReviewServiceTest {
             .thenReturn(new PageImpl<>(List.of(rev)));
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(sampleCourse));
 
+        // Act
         Page<ReviewResponse> page = reviewService.listPublic(courseId, 0, 10);
+        // Assert
         assertThat(page.getTotalElements()).isEqualTo(1);
         assertThat(page.getContent().get(0).rating()).isEqualTo(5);
     }

@@ -21,6 +21,8 @@ import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,6 +35,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class DictationWorkbookImporter {
 
+    static final String LOCAL_INBOX_STORAGE = "local-inbox";
+    static final String S3_STORAGE = "s3";
+
     private static final Logger log = LoggerFactory.getLogger(DictationWorkbookImporter.class);
 
     private final DictationWorkbookService workbooks;
@@ -41,6 +46,7 @@ public class DictationWorkbookImporter {
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
     private final TransactionTemplate transaction;
+    private final DictationWorkbookSync sync;
     private final Path directory;
     private final Map<Path, FileStamp> inspected = new HashMap<>();
 
@@ -53,26 +59,58 @@ public class DictationWorkbookImporter {
         PlatformTransactionManager transactions,
         @Value("${dictation.import-dir:}") String directory
     ) {
+        this(workbooks, dictation, validator, jdbc, json, transactions, (DictationWorkbookSync) null, directory);
+    }
+
+    @Autowired
+    public DictationWorkbookImporter(
+        DictationWorkbookService workbooks,
+        DictationService dictation,
+        Validator validator,
+        JdbcTemplate jdbc,
+        JsonMapper json,
+        PlatformTransactionManager transactions,
+        ObjectProvider<DictationWorkbookSync> sync,
+        @Value("${dictation.import-dir:}") String directory
+    ) {
+        this(workbooks, dictation, validator, jdbc, json, transactions, sync.getIfAvailable(), directory);
+    }
+
+    private DictationWorkbookImporter(
+        DictationWorkbookService workbooks,
+        DictationService dictation,
+        Validator validator,
+        JdbcTemplate jdbc,
+        JsonMapper json,
+        PlatformTransactionManager transactions,
+        DictationWorkbookSync sync,
+        String directory
+    ) {
         this.workbooks = workbooks;
         this.dictation = dictation;
         this.validator = validator;
         this.jdbc = jdbc;
         this.json = json;
         this.transaction = new TransactionTemplate(transactions);
+        this.sync = sync;
         this.directory = directory.isBlank() ? null : Path.of(directory);
     }
 
     private record FileStamp(long size, FileTime lastModified, Object key) {}
+
+    private record SourceRecord(String exerciseId, String contentSha256) {}
+
+    private record ImportResult(String updatedExerciseId, boolean retry) {
+        private static final ImportResult UNCHANGED = new ImportResult(null, false);
+        private static final ImportResult DEFERRED = new ImportResult(null, true);
+    }
 
     @Scheduled(fixedDelay = 15_000)
     public void scan() {
         if (directory == null) return;
         List<Path> files;
         try (var entries = Files.list(directory)) {
-            files = entries.filter(path -> {
-                String name = path.getFileName().toString();
-                return !name.startsWith("~$") && name.toLowerCase(Locale.ROOT).endsWith(".xlsx");
-            }).toList();
+            files = entries.filter(path -> isWorkbookName(path.getFileName().toString())).toList();
         } catch (IOException | UncheckedIOException ex) {
             log.warn("Cannot scan dictation workbook directory errorType={}", ex.getClass().getSimpleName());
             return;
@@ -96,18 +134,7 @@ public class DictationWorkbookImporter {
                 }
                 // A file that changed while being read will be checked on the next scan.
                 if (!stamp.equals(stamp(file))) return;
-                Definition definition = workbooks.parseLesson(contents);
-                var violations = validator.validate(definition);
-                if (!violations.isEmpty()) {
-                    throw new DictationValidationException(
-                        "Thông tin bài nghe không hợp lệ ở trường " + violations.iterator().next().getPropertyPath()
-                    );
-                }
-                String digest = fingerprint(definition);
-                String exerciseId = publish(definition, digest);
-                if (exerciseId != null) {
-                    log.info("Published dictation workbook file={} exerciseId={}", filename, exerciseId);
-                }
+                if (!importWorkbook(LOCAL_INBOX_STORAGE, filename, contents)) return;
             } catch (DictationValidationException invalid) {
                 log.warn("Rejected dictation workbook file={} reason={}", filename, invalid.getMessage());
             }
@@ -117,6 +144,31 @@ public class DictationWorkbookImporter {
         }
     }
 
+    static boolean isWorkbookName(String name) {
+        return !name.startsWith("~$") && name.toLowerCase(Locale.ROOT).endsWith(".xlsx");
+    }
+
+    // A deferred workbook must be checked again even if its contents have not changed.
+    boolean importWorkbook(String storageType, String objectKey, byte[] contents) {
+        Definition definition = workbooks.parseLesson(contents);
+        var violations = validator.validate(definition);
+        if (!violations.isEmpty()) {
+            throw new DictationValidationException(
+                "Thông tin bài nghe không hợp lệ ở trường " + violations.iterator().next().getPropertyPath()
+            );
+        }
+        String digest = fingerprint(json, definition);
+        ImportResult result = applyImport(storageType, objectKey, definition, digest);
+        String updatedOrPublished = result.updatedExerciseId();
+        if (updatedOrPublished != null) {
+            if (sync != null && !storageType.equals(sync.storageType())) {
+                sync.syncNow(updatedOrPublished);
+            }
+            log.info("Synchronized dictation workbook storage={} key={} exerciseId={}", storageType, objectKey, updatedOrPublished);
+        }
+        return !result.retry();
+    }
+
     private FileStamp stamp(Path file) throws IOException {
         var attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         return attributes.isRegularFile()
@@ -124,7 +176,7 @@ public class DictationWorkbookImporter {
             : null;
     }
 
-    private String fingerprint(Definition definition) {
+    static String fingerprint(JsonMapper json, Definition definition) {
         try {
             var sha256 = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(sha256.digest(json.writeValueAsBytes(definition)));
@@ -133,28 +185,107 @@ public class DictationWorkbookImporter {
         }
     }
 
-    private String publish(Definition definition, String digest) {
+    private ImportResult applyImport(String storageType, String objectKey, Definition definition, String digest) {
         try {
             return transaction.execute(status -> {
-                if (imported(digest)) return null;
+                SourceRecord existing = findSource(storageType, objectKey);
+                if (existing != null) {
+                    if (digest.equals(existing.contentSha256())) {
+                        return ImportResult.UNCHANGED;
+                    }
+                    var detail = dictation.adminDetailForUpdate(existing.exerciseId());
+                    if (detail.hasDraft() || isSyncPending(existing.exerciseId())) {
+                        return ImportResult.DEFERRED;
+                    }
+                    var updated = dictation.saveAndPublish(
+                        existing.exerciseId(),
+                        new SaveRequest(definition, detail.version())
+                    );
+                    if (detail.archived()) {
+                        dictation.visibility(existing.exerciseId(), true);
+                    }
+                    jdbc.update(
+                        "UPDATE dictation_workbook_sources SET content_sha256=? WHERE exercise_id=? AND storage=?",
+                        digest, existing.exerciseId(), storageType
+                    );
+                    recordImportDigest(jdbc, digest, existing.exerciseId());
+                    if (!detail.archived() && sync != null && !storageType.equals(sync.storageType())) {
+                        sync.request(existing.exerciseId(), updated.version());
+                    }
+                    return new ImportResult(existing.exerciseId(), false);
+                }
+
+                String existingByDigest = findExerciseByDigest(digest);
+                if (existingByDigest != null) {
+                    attachSourceIfAbsent(existingByDigest, storageType, objectKey, digest);
+                    return ImportResult.UNCHANGED;
+                }
+
                 var lesson = dictation.saveAndPublish(null, new SaveRequest(definition, 0));
-                // The receipt and the lesson share a transaction so concurrent scans cannot leave duplicates.
+                // The receipt, source binding and lesson share a transaction so concurrent scans cannot leave duplicates.
                 jdbc.update(
                     "INSERT INTO dictation_workbook_imports (content_sha256, exercise_id) VALUES (?, ?)",
-                    digest,
-                    lesson.id()
+                    digest, lesson.id()
                 );
-                return lesson.id();
+                jdbc.update(
+                    "INSERT INTO dictation_workbook_sources (exercise_id, storage, object_key, content_sha256) VALUES (?, ?, ?, ?)",
+                    lesson.id(), storageType, objectKey, digest
+                );
+                return new ImportResult(lesson.id(), false);
             });
         } catch (DuplicateKeyException ex) {
-            if (imported(digest)) return null;
+            if (findSource(storageType, objectKey) != null || findExerciseByDigest(digest) != null) {
+                return ImportResult.DEFERRED;
+            }
             throw ex;
         }
     }
 
-    private boolean imported(String digest) {
+    private SourceRecord findSource(String storageType, String objectKey) {
+        return jdbc.query(
+            "SELECT exercise_id, content_sha256 FROM dictation_workbook_sources WHERE storage=? AND object_key=?",
+            (rs, row) -> new SourceRecord(rs.getString("exercise_id"), rs.getString("content_sha256")),
+            storageType, objectKey
+        ).stream().findFirst().orElse(null);
+    }
+
+    private boolean isSyncPending(String exerciseId) {
         return !jdbc.queryForList(
-            "SELECT exercise_id FROM dictation_workbook_imports WHERE content_sha256=?", String.class, digest
+            "SELECT exercise_id FROM dictation_workbook_sync WHERE exercise_id=? AND pending=TRUE",
+            String.class, exerciseId
         ).isEmpty();
+    }
+
+    private void attachSourceIfAbsent(String exerciseId, String storageType, String objectKey, String digest) {
+        boolean hasSource = !jdbc.queryForList(
+            "SELECT object_key FROM dictation_workbook_sources WHERE exercise_id=? AND storage=?",
+            String.class, exerciseId, storageType
+        ).isEmpty();
+        if (!hasSource) {
+            jdbc.update(
+                "INSERT INTO dictation_workbook_sources (exercise_id, storage, object_key, content_sha256) VALUES (?, ?, ?, ?)",
+                exerciseId, storageType, objectKey, digest
+            );
+        }
+    }
+
+    private String findExerciseByDigest(String digest) {
+        return jdbc.queryForList(
+            "SELECT exercise_id FROM dictation_workbook_imports WHERE content_sha256=?",
+            String.class, digest
+        ).stream().findFirst().orElse(null);
+    }
+
+    static void recordImportDigest(JdbcTemplate jdbc, String digest, String exerciseId) {
+        int updated = jdbc.update(
+            "UPDATE dictation_workbook_imports SET exercise_id=? WHERE content_sha256=?",
+            exerciseId, digest
+        );
+        if (updated == 0) {
+            jdbc.update(
+                "INSERT INTO dictation_workbook_imports (content_sha256, exercise_id) VALUES (?, ?)",
+                digest, exerciseId
+            );
+        }
     }
 }

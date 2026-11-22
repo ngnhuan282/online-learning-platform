@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 
 class CurrentProfileClientTests {
     @Test
-    void forwardsCallerIdentityAndKeepsLearningAvailableWhenAuthCannotReturnAProfile() throws Exception {
+    void current_whenAuthIsUnavailable_shouldReturnNoProfileAndPreserveCallerIdentity() throws Exception {
+        // Arrange
         var body = new AtomicReference<>("{\"success\":true,\"data\":{\"id\":7,\"fullName\":\"Learner Seven\"}}");
         var received = new AtomicReference<String>();
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -25,9 +26,12 @@ class CurrentProfileClientTests {
             }
         });
         server.start();
+
         try {
             var client = new CurrentProfileClient("http://127.0.0.1:" + server.getAddress().getPort());
+            // Act
             assertThat(client.current(null)).isNull();
+            // Assert
             assertThat(received.get()).isNull();
             assertThat(client.current("Bearer caller")).isEqualTo(new CurrentProfileClient.Profile(7L, "Learner Seven"));
             assertThat(received.get()).isEqualTo("Bearer caller");

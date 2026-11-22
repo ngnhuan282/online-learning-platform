@@ -115,7 +115,9 @@ class RefreshTokenTests {
     }
 
     @Test
-    void loginCreatesHashOnlyAndHttpOnlySessionCookie() throws Exception {
+    void login_whenCredentialsAreValid_shouldStoreHashedRefreshTokenAndSetHttpOnlyCookie() throws Exception {
+        // Arrange
+        // Act
         var response = login(createUser());
         String raw = raw(response);
         assertThat(raw.matches("[A-Za-z0-9_-]{43}")).isTrue();
@@ -129,6 +131,7 @@ class RefreshTokenTests {
         assertThat(row.getRevokedAt()).isNull();
         assertThat(response.body()).doesNotContain(raw, "refreshToken", "tokenHash");
         String cookie = response.headers().firstValue("Set-Cookie").orElseThrow();
+        // Assert
         assertThat(cookie)
             .contains("HttpOnly", "SameSite=Lax", "Path=/api/v1/auth")
             .doesNotContain("Max-Age", "Expires", "Secure", "Domain=");
@@ -137,10 +140,12 @@ class RefreshTokenTests {
     }
 
     @Test
-    void refreshRotatesCookieRenewsAccessAndRejectsOldToken() throws Exception {
+    void refresh_whenCookieIsValid_shouldRotateCookieAndRejectPreviousToken() throws Exception {
+        // Arrange
         var login = login(createUser());
         String old = raw(login);
         var response = post("refresh", Map.of(), old);
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(raw(response).equals(old)).isFalse();
         assertThat(
@@ -157,13 +162,16 @@ class RefreshTokenTests {
                 .getRevokedAt()
         ).isNull();
         error(post("refresh", Map.of(), old), 401, "REFRESH_TOKEN_REVOKED", old);
+        // Assert
         assertThat(response.body().contains(raw(response))).isFalse();
     }
 
     @Test
-    void rememberedLoginPersistsOnlyHttpOnlyRefreshCookieAcrossRotationAndLogout() throws Exception {
+    void refresh_whenLoginIsRemembered_shouldKeepOnlyRefreshCookiePersistentThroughRotation() throws Exception {
+        // Arrange
         String email = createUser();
         var remembered = post("login", Map.of("email", email, "password", PASSWORD, "rememberMe", true), null);
+        // Act
         assertThat(remembered.statusCode()).isEqualTo(200);
         assertThat(remembered.headers().firstValue("Set-Cookie").orElseThrow()).contains("Max-Age=604800", "HttpOnly", "SameSite=Lax");
         assertThat(refreshTokens.findByTokenHash(hash(raw(remembered))).orElseThrow().isPersistent()).isTrue();
@@ -175,23 +183,30 @@ class RefreshTokenTests {
         assertThat(post("logout", Map.of(), raw(rotated)).statusCode()).isEqualTo(200);
         error(post("refresh", Map.of(), raw(rotated)), 401, "REFRESH_TOKEN_REVOKED", raw(rotated));
         var normal = login(email);
+        // Assert
         assertThat(normal.headers().firstValue("Set-Cookie").orElseThrow()).doesNotContain("Max-Age", "Expires");
     }
 
     @Test
-    void missingMalformedUnknownAndBodyTokensAreRejected() throws Exception {
+    void refresh_whenCookieIsMissingMalformedOrUnknown_shouldRejectWithoutUsingBodyToken() throws Exception {
+        // Arrange
+        // Act
         error(post("refresh", Map.of(), null), 401, "REFRESH_TOKEN_MISSING", null);
         error(post("refresh", Map.of(), "broken"), 401, "REFRESH_TOKEN_INVALID", "broken");
         String unknown = "A".repeat(43);
         error(post("refresh", Map.of(), unknown), 401, "REFRESH_TOKEN_INVALID", unknown);
         String valid = raw(login(createUser()));
         error(post("refresh", Map.of("refreshToken", valid), null), 401, "REFRESH_TOKEN_MISSING", valid);
+        // Assert
         assertThat(refreshService.validate(valid).getRevokedAt()).isNull();
     }
 
     @Test
-    void expiredAndRevokedTokensAreRejected() throws Exception {
+    void refresh_whenCookieIsExpiredOrRevoked_shouldRejectSession() throws Exception {
+        // Arrange
+        // Act
         String expired = raw(login(createUser()));
+        // Assert
         jdbc.update(
             "UPDATE refresh_tokens SET expires_at = ? WHERE token_hash = ?",
             Timestamp.from(Instant.now().minusSeconds(1)),
@@ -204,20 +219,29 @@ class RefreshTokenTests {
     }
 
     @Test
-    void disabledAndLockedUsersCannotRefresh() throws Exception {
+    void refresh_whenAccountIsDisabledOrLocked_shouldRejectSession() throws Exception {
+        // Arrange
+
         for (String status : List.of("DISABLED", "LOCKED")) {
             String email = createUser();
             String raw = raw(login(email));
             jdbc.update("UPDATE users SET status = ? WHERE email = ?", status, email);
             error(post("refresh", Map.of(), raw), 403, "ACCOUNT_" + status, raw);
-            assertThat(refreshTokens.findByTokenHash(hash(raw)).orElseThrow().getRevokedAt()).isNull();
+            // Act
+
+            var response = refreshTokens.findByTokenHash(hash(raw)).orElseThrow().getRevokedAt();
+
+            // Assert
+            assertThat(response).isNull();
         }
     }
 
     @Test
-    void logoutRevokesClearsCookieAndIsIdempotent() throws Exception {
+    void logout_whenSessionExistsOrWasAlreadyRevoked_shouldClearCookieAndRevokeIdempotently() throws Exception {
+        // Arrange
         String raw = raw(login(createUser()));
         var response = post("logout", Map.of(), raw);
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers().firstValue("Set-Cookie").orElseThrow()).contains(
             "refresh_token=;",
@@ -228,6 +252,7 @@ class RefreshTokenTests {
         );
         assertThat(refreshTokens.findByTokenHash(hash(raw)).orElseThrow().getRevokedAt()).isNotNull();
         error(post("refresh", Map.of(), raw), 401, "REFRESH_TOKEN_REVOKED", raw);
+        // Assert
         assertThat(post("logout", Map.of(), raw).statusCode()).isEqualTo(200);
         assertThat(post("logout", Map.of(), null).statusCode()).isEqualTo(200);
         assertThat(post("logout", Map.of(), "broken").statusCode()).isEqualTo(200);
@@ -235,17 +260,23 @@ class RefreshTokenTests {
     }
 
     @Test
-    void sessionsAreIndependent() throws Exception {
+    void logout_whenOtherSessionsExist_shouldRevokeOnlyCurrentSession() throws Exception {
+        // Arrange
         String email = createUser();
+        // Act
         String first = raw(login(email)),
             second = raw(login(email));
+
+        // Assert
         assertThat(first.equals(second)).isFalse();
         assertThat(post("logout", Map.of(), first).statusCode()).isEqualTo(200);
         assertThat(post("refresh", Map.of(), second).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void concurrentRotationHasExactlyOneWinner() throws Exception {
+    void refresh_whenSameCookieIsUsedConcurrently_shouldRotateExactlyOnce() throws Exception {
+        // Arrange
+        // Act
         String raw = raw(login(createUser()));
         var calls = new ArrayList<CompletableFuture<HttpResponse<String>>>();
         for (int i = 0; i < 2; i++) calls.add(
@@ -257,6 +288,7 @@ class RefreshTokenTests {
                 }
             })
         );
+        // Assert
         assertThat(
             calls
                 .stream()
@@ -266,9 +298,13 @@ class RefreshTokenTests {
     }
 
     @Test
-    void publicCookieEndpointsIgnoreExpiredOrMalformedAccessBearer() throws Exception {
+    void refresh_whenAccessBearerIsExpiredOrMalformed_shouldAuthenticateUsingCookie() throws Exception {
+        // Arrange
         String raw = raw(login(createUser()));
+        // Act
         var response = post("refresh", Map.of(), raw, "expired-or-malformed-access");
+
+        // Assert
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(
             post("logout", Map.of(), raw(response), "expired-or-malformed-access").statusCode()

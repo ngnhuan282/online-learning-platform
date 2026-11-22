@@ -18,7 +18,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class GoogleIdentityMigrationTests {
 
     @Test
-    void upgradesV7WithoutChangingLocalGoogleUsersRolesOrExistingRefreshCookies() throws Exception {
+    void migrate_whenDatabaseStartsAtVersionSeven_shouldPreserveExistingIdentitiesRolesAndRefreshSessions() throws Exception {
+        // Arrange
         String mysql = System.getenv("GOOGLE_MIGRATION_TEST_DB_URL");
         String url =
             mysql == null
@@ -70,12 +71,14 @@ class GoogleIdentityMigrationTests {
                 Timestamp.from(Instant.now())
             );
 
+            // Act
             Flyway.configure()
                 .dataSource(url, username, password)
                 .locations("classpath:db/migration")
                 .load()
                 .migrate();
 
+            // Assert
             assertThat(
                 jdbc.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, localEmail)
             ).isEqualTo(localId);

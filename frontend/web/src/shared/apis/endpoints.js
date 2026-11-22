@@ -24,6 +24,11 @@ export const ENDPOINTS = Object.freeze({
   courses: `${API_PREFIX}/courses`,
   adminCourses: `${API_PREFIX}/admin/courses`,
   categories: `${API_PREFIX}/categories`,
+  community: {
+    topics: `${API_PREFIX}/learning/community/topics`,
+    posts: `${API_PREFIX}/learning/community/posts`,
+  },
+  proPlans: `${API_PREFIX}/payments/pro/plans`,
   toeic: {
     exams: `${API_PREFIX}/learning/toeic/exams`,
     dictionary: `${API_PREFIX}/learning/toeic/dictionary`,
@@ -37,6 +42,8 @@ export const ENDPOINTS = Object.freeze({
     answers: id => `${API_PREFIX}/learning/toeic/attempts/${id}/answers`,
     submit: id => `${API_PREFIX}/learning/toeic/attempts/${id}/submit`,
     adminExams: `${API_PREFIX}/learning/admin/toeic/exams`,
+    adminMedia: `${API_PREFIX}/learning/admin/toeic/media`,
+    adminMediaItem: id => `${API_PREFIX}/learning/admin/toeic/media/${id}`,
     adminExam: id => `${API_PREFIX}/learning/admin/toeic/exams/${id}`,
     publish: id => `${API_PREFIX}/learning/admin/toeic/exams/${id}/publish`,
   },

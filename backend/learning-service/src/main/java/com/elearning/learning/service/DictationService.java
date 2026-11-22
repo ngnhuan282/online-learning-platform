@@ -88,7 +88,7 @@ public class DictationService {
 
     @Transactional(readOnly = true)
     public Catalog catalog(
-        long user,
+        Long user,
         String keyword,
         String level,
         String topic,
@@ -120,7 +120,7 @@ public class DictationService {
     }
 
     @Transactional(readOnly = true)
-    public GroupedCatalog topicGroups(long user, String keyword, String level, String topic, String status) {
+    public GroupedCatalog topicGroups(Long user, String keyword, String level, String topic, String status) {
         CatalogFilter filter = catalogFilter(user, keyword, level, topic, false, status);
         var groups = new LinkedHashMap<String, TopicGroup>();
         jdbc.query(
@@ -160,7 +160,7 @@ public class DictationService {
     private record CatalogFilter(String sql, List<Object> args) {}
 
     private CatalogFilter catalogFilter(
-        long user,
+        Long user,
         String keyword,
         String level,
         String topic,
@@ -235,10 +235,10 @@ public class DictationService {
         return jdbc.queryForList(sql + " ORDER BY r.topic", String.class);
     }
 
-    private Item catalogItem(ResultSet rs, long user) throws SQLException {
+    private Item catalogItem(ResultSet rs, Long user) throws SQLException {
         var definition = json.readValue(rs.getString("definition"), Definition.class);
         String attemptId = rs.getString("attempt_id");
-        Attempt progress = attemptId == null ? null : view(run(user, attemptId, false));
+        Attempt progress = user == null || attemptId == null ? null : view(run(user, attemptId, false));
         Integer published = rs.getObject("published_version", Integer.class);
         int current = rs.getInt("current_version");
         return new Item(
@@ -335,10 +335,17 @@ public class DictationService {
 
     @Transactional(readOnly = true)
     public AdminDetail adminDetail(String id) {
-        Exercise exercise = exercise(id, false);
-        Definition definition = definition(id, exercise.version());
+        return adminDetail(exercise(id, false));
+    }
+
+    AdminDetail adminDetailForUpdate(String id) {
+        return adminDetail(exercise(id, true));
+    }
+
+    private AdminDetail adminDetail(Exercise exercise) {
+        Definition definition = definition(exercise.id(), exercise.version());
         return new AdminDetail(
-            id,
+            exercise.id(),
             exercise.version(),
             exercise.archived(),
             exercise.published() != null,
@@ -370,6 +377,11 @@ public class DictationService {
             id
         );
         return adminDetail(id);
+    }
+
+    Integer publishedVideoVersion(String id) {
+        Integer version = exercise(id, false).published();
+        return version == null || definition(id, version).video() == null ? null : version;
     }
 
     public Attempt start(long user, String id, StartRequest request) {

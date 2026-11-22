@@ -25,11 +25,13 @@ class DictationMigrationTests {
     private static final String YOUTUBE_URL = "https://www.youtube.com/watch?v=_R7nrvhNmrI";
 
     @Test
-    void v14ToV16ExtendMainWithoutChangingItsHistoryOrExistingSettings() {
+    void migrate_whenDatabaseStartsAtVersionFourteen_shouldPreserveExistingHistoryAndSettings() {
+        // Arrange
         String url = "jdbc:h2:mem:dictation-main-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         var source = new DriverManagerDataSource(url, "sa", "");
         FluentConfiguration config = Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""));
+        // Act
         config.target("13").load().migrate();
         var jdbc = new JdbcTemplate(source);
         String mainHistory = "SELECT \"version\",\"script\",\"checksum\" FROM \"flyway_schema_history\" "
@@ -39,6 +41,7 @@ class DictationMigrationTests {
 
         var migrated = config.target("16").load().migrate();
 
+        // Assert
         assertThat(migrated.migrationsExecuted).isEqualTo(3);
         assertThat(jdbc.queryForList(mainHistory)).isEqualTo(before).hasSize(13);
         assertThat(jdbc.queryForObject("SELECT lesson_xp FROM engagement_settings WHERE id=1", Integer.class))
@@ -49,11 +52,13 @@ class DictationMigrationTests {
     }
 
     @Test
-    void v16PreservesCompletedLegacyScoresAndMovesUnfinishedChecksToLiveScoring() {
+    void migrate_whenLegacyAttemptsAreCompletedOrUnfinished_shouldPreserveScoresAndMoveUnfinishedToLiveScoring() {
+        // Arrange
         String url = "jdbc:h2:mem:dictation-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         var source = new DriverManagerDataSource(url, "sa", "");
         FluentConfiguration config = Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""));
+        // Act
         config.target("15").load().migrate();
         var jdbc = new JdbcTemplate(source);
         var grader = new DictationGrader();
@@ -108,6 +113,7 @@ class DictationMigrationTests {
             .allSatisfy(edit -> assertThat(edit.expected()).isNull());
         assertThat(unfinished.accuracy()).isEqualTo(66.7);
         var corrected = service.progress(7001, live, new AnswerRequest(0, "We enjoyed it"));
+        // Assert
         assertThat(corrected.completed()).isEqualTo(1);
         assertThat(corrected.accuracy()).isEqualTo(100);
         assertThat(corrected.responses().getFirst().firstAccuracy()).isEqualTo(100);
@@ -119,35 +125,46 @@ class DictationMigrationTests {
     }
 
     @Test
-    void latestMigrationsLeaveTheLibraryEmptyOnANewDatabase() {
+    void migrate_whenDatabaseIsNew_shouldLeaveDictationCatalogEmpty() {
+        // Arrange
         var source = new DriverManagerDataSource(
             "jdbc:h2:mem:dictation-empty-library-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
         );
-        Flyway.configure().dataSource(source).placeholders(Map.of(
+        var flyway = Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""
-        )).load().migrate();
+        )).load();
         var jdbc = new JdbcTemplate(source);
         var service = new DictationService(
             jdbc, JsonMapper.builder().build(), new DictationGrader(),
             mock(DictationAudioService.class), Clock.systemUTC()
         );
 
-        assertThat(service.catalog(7021, "", "", "", 0, 12, false).items()).isEmpty();
-        assertThat(service.topicGroups(7021, "", "", "", "").groups()).isEmpty();
-        assertThat(jdbc.queryForList("SELECT id FROM dictation_exercises", String.class)).isEmpty();
-        assertThat(jdbc.queryForList(
+        // Act
+        flyway.migrate();
+        var catalog = service.catalog(7021, "", "", "", 0, 12, false);
+        var topicGroups = service.topicGroups(7021L, "", "", "", "");
+        var exercises = jdbc.queryForList("SELECT id FROM dictation_exercises", String.class);
+        var starterAudio = jdbc.queryForList(
             "SELECT audio_key FROM dictation_audio WHERE audio_key=?", String.class, "sample-ets-2024-test-1"
-        )).isEmpty();
+        );
+
+        // Assert
+        assertThat(catalog.items()).isEmpty();
+        assertThat(topicGroups.groups()).isEmpty();
+        assertThat(exercises).isEmpty();
+        assertThat(starterAudio).isEmpty();
     }
 
     @Test
-    void v24DeletesTheYouTubeStarterWithItsExistingProgress() {
+    void migrate_whenYouTubeStarterExists_shouldRemoveStarterAndItsProgress() {
+        // Arrange
         var source = new DriverManagerDataSource(
             "jdbc:h2:mem:dictation-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
         );
         var config = Flyway.configure().dataSource(source).placeholders(Map.of(
             "notificationCheckKeyword", "CONSTRAINT", "notificationEventKeyCollation", ""
         ));
+        // Act
         config.target("23").load().migrate();
         var jdbc = new JdbcTemplate(source);
         var audio = mock(DictationAudioService.class);
@@ -179,6 +196,7 @@ class DictationMigrationTests {
         assertThat(config.target("24").load().migrate().migrationsExecuted).isEqualTo(1);
         config.load().validate();
 
+        // Assert
         assertThat(service.catalog(7021, "", "", "", 0, 12, false).items()).isEmpty();
         assertThat(service.history(7021, "", "", "", "", 0, 12).items()).isEmpty();
         assertThat(jdbc.queryForList("SELECT id FROM dictation_exercises WHERE id=?", String.class, YOUTUBE_STARTER))
@@ -190,7 +208,8 @@ class DictationMigrationTests {
     }
 
     @Test
-    void v24DeletesTheAudioStarterAndKeepsAnIndependentlyPublishedYouTubeLesson() {
+    void migrate_whenCustomLessonExists_shouldRemoveOnlyStarterAndItsProgress() {
+        // Arrange
         var source = new DriverManagerDataSource(
             "jdbc:h2:mem:dictation-existing-starter-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""
         );
@@ -216,27 +235,36 @@ class DictationMigrationTests {
         var videoAttempt = service.start(7022, lesson.id(), new StartRequest("video-starter-attempt", false));
         service.progress(7022, videoAttempt.id(), new AnswerRequest(0, "It's Wednesday."));
 
-        assertThat(config.target("21").load().migrate().migrationsExecuted).isEqualTo(1);
-
-        assertThat(service.catalog(7022, "", "", "", 0, 12, false).items())
-            .extracting(Item::id).containsExactlyInAnyOrder(LEGACY_STARTER, lesson.id());
-        assertThat(service.adminDetail(lesson.id()).definition()).isEqualTo(imported);
-        assertThat(service.attempt(7022, attempt.id()).responses().getFirst().text()).isEqualTo("Thank you so much");
-
+        // Act
+        var migration21 = config.target("21").load().migrate();
+        var previousCatalog = service.catalog(7022, "", "", "", 0, 12, false);
+        var previousLesson = service.adminDetail(lesson.id());
+        var previousProgress = service.attempt(7022, attempt.id());
         config.target("latest").load().migrate();
+        config.load().validate();
+        var topicGroups = service.topicGroups(7022L, "", "", "", "");
+        var history = service.history(7022, "", "", "", "", 0, 12);
+        var starterAnswers = jdbc.queryForList(
+            "SELECT answer_text FROM dictation_responses WHERE attempt_id=?", String.class, attempt.id()
+        );
+        var remainingProgress = service.attempt(7022, videoAttempt.id());
+        var remainingLesson = service.adminDetail(lesson.id());
 
-        assertThat(service.topicGroups(7022, "", "", "", "").groups()).singleElement().satisfies(group -> {
+        // Assert
+        assertThat(migration21.migrationsExecuted).isEqualTo(1);
+        assertThat(previousCatalog.items())
+            .extracting(Item::id).containsExactlyInAnyOrder(LEGACY_STARTER, lesson.id());
+        assertThat(previousLesson.definition()).isEqualTo(imported);
+        assertThat(previousProgress.responses().getFirst().text()).isEqualTo("Thank you so much");
+        assertThat(topicGroups.groups()).singleElement().satisfies(group -> {
             assertThat(group.topic()).isEqualTo("Daily English Conversation");
             assertThat(group.items()).extracting(Item::id).containsExactly(lesson.id());
         });
-        assertThat(service.history(7022, "", "", "", "", 0, 12).items()).singleElement().satisfies(saved -> {
+        assertThat(history.items()).singleElement().satisfies(saved -> {
             assertThat(saved.id()).isEqualTo(videoAttempt.id());
         });
-        assertThat(jdbc.queryForList(
-            "SELECT answer_text FROM dictation_responses WHERE attempt_id=?", String.class, attempt.id()
-        )).isEmpty();
-        assertThat(service.attempt(7022, videoAttempt.id()).responses().getFirst().text()).isEqualTo("It's Wednesday.");
-        assertThat(service.adminDetail(lesson.id()).definition()).isEqualTo(imported);
-        config.load().validate();
+        assertThat(starterAnswers).isEmpty();
+        assertThat(remainingProgress.responses().getFirst().text()).isEqualTo("It's Wednesday.");
+        assertThat(remainingLesson.definition()).isEqualTo(imported);
     }
 }

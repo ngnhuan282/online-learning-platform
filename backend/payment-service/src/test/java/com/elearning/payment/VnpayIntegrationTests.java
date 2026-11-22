@@ -140,15 +140,18 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void gemCheckoutUsesServerPriceAndCreditsWalletOnlyAfterSuccessfulActivation() throws Exception {
+    void checkout_whenGemPackageIsPurchased_shouldUseServerPriceAndCreditOnlyAfterSuccess() throws Exception {
+        // Arrange
         String key = UUID.randomUUID().toString();
         String body = mapper.writeValueAsString(Map.of(
             "packageCode", "GEM_500", "provider", "VNPAY", "idempotencyKey", key
         ));
         var checkout = request(BASE + "/gem/checkout", token(ownerId, "USER"), "POST", body);
+        // Act
         assertThat(checkout.statusCode()).isEqualTo(200);
         JsonNode data = mapper.readTree(checkout.body()).path("data");
         String orderCode = data.path("orderCode").asString();
+        // Assert
         assertThat(data.path("order").path("productType").asString()).isEqualTo("GEM_TOPUP");
         assertThat(data.path("order").path("totalAmount").asInt()).isEqualTo(45000);
         assertThat(data.path("order").path("items").get(0).path("courseId").isNull()).isTrue();
@@ -170,7 +173,8 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void signedProIpnUsesPlanAmountAndActivatesMembershipSnapshot() throws Exception {
+    void handleIpn_whenProPaymentIsSigned_shouldApplyPlanSnapshotAndActivateMembership() throws Exception {
+        // Arrange
         var response = request(
             BASE + "/pro/checkout",
             token(ownerId, "USER"),
@@ -179,6 +183,7 @@ class VnpayIntegrationTests {
                 UUID.randomUUID() +
                 "\"}"
         );
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         var data = mapper.readTree(response.body()).path("data");
         String orderCode = data.path("orderCode").asString();
@@ -192,6 +197,7 @@ class VnpayIntegrationTests {
         assertThat(ipn(valid)).isEqualTo("02");
         then(learning).should().grantPro(orderCode, ownerId, "PRO_YEAR", 12);
         then(learning).should(never()).enroll(anyString(), anyLong(), anyLong());
+        // Assert
         assertThat(core.getOrder(orderCode, ownerId, false).payment().enrollmentReady()).isTrue();
     }
 
@@ -315,7 +321,9 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void expiryWorkerClosesOnlyOverdueVnpayCheckoutsWithoutChangingProviderState() throws Exception {
+    void expire_whenPendingVnpayOrdersAreOverdue_shouldCloseOnlyEligibleOrders() throws Exception {
+        // Arrange
+        // Act
         String expiredCode = checkout().get("orderCode").asString();
         String activeCode = checkout().get("orderCode").asString();
         String mockCode = checkout(ownerId, "MOCK", UUID.randomUUID().toString()).get("orderCode").asString();
@@ -325,6 +333,7 @@ class VnpayIntegrationTests {
         var worker = new VnpayOrderExpiry(orders, core);
         worker.expirePendingOrders();
         worker.expirePendingOrders();
+        // Assert
         assertThat(order(expiredCode).get("status").asString()).isEqualTo("EXPIRED");
         assertThat(order(expiredCode).get("payment").get("status").asString()).isEqualTo("PENDING");
         assertThat(order(expiredCode).get("payment").get("paidAt").isNull()).isTrue();
@@ -337,8 +346,10 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void overdueOrdersHaveOwnedExpiredFiltersAndLeaveAwaitingAnalyticsEvenBeforeWorkerRuns()
+    void getHistory_whenOrderIsOverdue_shouldTreatAsExpiredBeforeWorkerRuns()
         throws Exception {
+        // Arrange
+        // Act
         String code = checkout().get("orderCode").asString();
         JsonNode before = analytics();
         pastCheckoutWindow(code);
@@ -385,6 +396,7 @@ class VnpayIntegrationTests {
             "GET",
             null
         );
+        // Assert
         assertThat(mapper.readTree(otherUser.body()).get("data").get("totalElements").asLong()).isZero();
         assertThat(
             request(BASE + "/admin/orders?expired=true", token(72L, "USER"), "GET", null).statusCode()
@@ -392,14 +404,17 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void validLateIpnRevivesExpiredOrderAndActivatesOnceWhenPaymentWasWithinWindow() throws Exception {
+    void handleIpn_whenValidPaymentArrivesAfterLocalExpiry_shouldRecoverExpiredOrderAndActivateOnce() throws Exception {
+        // Arrange
         String code = checkout().get("orderCode").asString();
         Instant expiry = pastCheckoutWindow(code);
+        // Act
         assertThat(core.expireVnpayOrder(code)).isTrue();
         long events = transactions.count();
         var fields = callback(code, "00", "00");
         fields.put("vnp_PayDate", DATE.format(expiry.minusSeconds(10)));
         String signed = signed(fields);
+        // Assert
         assertThat(ipn(signed)).isEqualTo("00");
         assertThat(ipn(signed)).isEqualTo("02");
         JsonNode confirmed = order(code);
@@ -412,12 +427,15 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void expiryAndLateIpnRaceCannotOverwriteConfirmedPayment() throws Exception {
+    void handleIpn_whenExpiryWorkerAndConfirmationRace_shouldPreserveConfirmedPayment() throws Exception {
+        // Arrange
+        // Act
         String code = checkout().get("orderCode").asString();
         Instant expiry = pastCheckoutWindow(code);
         var fields = callback(code, "00", "00");
         fields.put("vnp_PayDate", DATE.format(expiry.minusSeconds(10)));
         var expire = CompletableFuture.runAsync(() -> core.expireVnpayOrder(code));
+        // Assert
         assertThat(ipn(signed(fields))).isEqualTo("00");
         expire.join();
         assertThat(order(code).get("status").asString()).isEqualTo("PAID");
@@ -426,13 +444,16 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void invalidOrOutOfWindowIpnCannotReviveExpiredOrder() throws Exception {
+    void handleIpn_whenCallbackIsInvalidOrPaidOutsideWindow_shouldKeepOrderExpired() throws Exception {
+        // Arrange
         String code = checkout().get("orderCode").asString();
         Instant expiry = pastCheckoutWindow(code);
+        // Act
         assertThat(core.expireVnpayOrder(code)).isTrue();
         long events = transactions.count();
         var fields = callback(code, "00", "00");
         fields.put("vnp_PayDate", DATE.format(expiry.plusSeconds(1)));
+        // Assert
         assertThat(ipn(signed(fields))).isEqualTo("99");
         assertThat(ipn(signed(fields).replace("149000000", "100"))).isEqualTo("97");
         assertThat(order(code).get("status").asString()).isEqualTo("EXPIRED");
@@ -442,8 +463,10 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void expiredIdempotentCheckoutDoesNotCreateAnotherOrderOrReturnDeadPaymentLink() throws Exception {
+    void checkout_whenReplayTargetsExpiredOrder_shouldAvoidDuplicateOrderAndDeadRedirect() throws Exception {
+        // Arrange
         String key = UUID.randomUUID().toString();
+        // Act
         String code = checkout(ownerId, "VNPAY", key).get("orderCode").asString();
         pastCheckoutWindow(code);
         long count = orders.count();
@@ -459,15 +482,19 @@ class VnpayIntegrationTests {
         JsonNode methods = mapper
             .readTree(request(BASE + "/methods", token(ownerId, "USER"), "GET", null).body())
             .get("data");
+        // Assert
         assertThat(methods.get(1).get("label").asString()).isEqualTo("VNPay");
         assertThat(methods.get(1).get("description").asString()).isEqualTo("Thanh toán qua VNPay");
     }
 
     @Test
-    void signsServerPriceAndCallbacksAndReusesIdempotencyKey() throws Exception {
+    void checkout_whenVnpayRequestIsValid_shouldSignServerPriceAndReuseIdempotencyKey() throws Exception {
+        // Arrange
         String key = UUID.randomUUID().toString();
+        // Act
         JsonNode first = checkout(ownerId, "VNPAY", key);
         JsonNode duplicate = checkout(ownerId, "VNPAY", key);
+        // Assert
         assertThat(first.get("orderCode").asString()).isEqualTo(duplicate.get("orderCode").asString());
         assertThat(first.get("payment").get("status").asString()).isEqualTo("PENDING");
         assertThat(new BigDecimal(first.get("payment").get("amount").toString())).isEqualByComparingTo(PRICE);
@@ -493,12 +520,15 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void browserReturnVerifiesButNeverConfirmsOrEnrolls() throws Exception {
+    void handleReturn_whenBrowserCallbackIsSigned_shouldVerifyWithoutConfirmingOrEnrolling() throws Exception {
+        // Arrange
         String code = checkout().get("orderCode").asString();
         long count = transactions.count();
         String query = signed(callback(code, "00", "00"));
         var result = request(BASE + "/vnpay/return?" + query, null, "GET", null);
+        // Act
         assertThat(result.statusCode()).isEqualTo(303);
+        // Assert
         assertThat(result.headers().firstValue("Location")).contains(
             "http://localhost:5173/payment/result?orderCode=" + code
         );
@@ -515,12 +545,15 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void invalidSignatureDuplicatesMerchantAmountCurrencyAndMissingOrdersCannotWrite() throws Exception {
+    void handleIpn_whenSignedFieldsOrOrderReferenceAreInvalid_shouldLeaveOrderUnchanged() throws Exception {
+        // Arrange
         String code = checkout().get("orderCode").asString();
         long count = transactions.count();
         var fields = callback(code, "00", "00");
         String valid = signed(fields);
+        // Act
         assertThat(ipn(valid.replace("149000000", "100"))).isEqualTo("97");
+        // Assert
         assertThat(ipn(valid + "&vnp_Amount=149000000")).isEqualTo("97");
         fields.put("vnp_Amount", "100");
         assertThat(ipn(signed(fields))).isEqualTo("04");
@@ -539,7 +572,9 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void invalidSuccessTransactionNumbersCannotConfirmOrActivateCourse() throws Exception {
+    void handleIpn_whenSuccessTransactionNumberIsInvalid_shouldPreventConfirmationAndActivation() throws Exception {
+        // Arrange
+        // Act
         String code = checkout().get("orderCode").asString();
         long count = transactions.count();
         for (String transactionNumber : new String[] { null, "", "0", "-1", "abc", "1234567890123456" }) {
@@ -557,6 +592,7 @@ class VnpayIntegrationTests {
             assertThat(transactions.count()).isEqualTo(count);
         }
         then(learning).shouldHaveNoInteractions();
+        // Assert
         assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
         assertThat(order(code).get("payment").get("status").asString()).isEqualTo("SUCCESS");
         assertThat(transactions.count()).isEqualTo(count + 1);
@@ -564,7 +600,9 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void differentiatesFailureCancellationAndRequiresBothSuccessCodes() throws Exception {
+    void handleIpn_whenVnpayStatusCodesDiffer_shouldDistinguishFailureCancellationAndSuccess() throws Exception {
+        // Arrange
+
         for (var scenario : new String[][] {
             { "24", "02", "CANCELLED" },
             { "51", "02", "FAILED" },
@@ -593,7 +631,10 @@ class VnpayIntegrationTests {
             assertThat(confirmed.get("status").asString()).isEqualTo("CANCELLED");
             assertThat(confirmed.get("payment").get("status").asString()).isEqualTo(scenario[2]);
             assertThat(confirmed.get("payment").get("paidAt").isNull()).isTrue();
+            // Act
             var payment = payments.findById(confirmed.get("payment").get("id").asLong()).orElseThrow();
+
+            // Assert
             assertThat(payment.getFailureCode()).isEqualTo(scenario[0]);
             assertThat(payment.getEnrollmentActivatedAt()).isNull();
             assertThat(transactions.count()).isEqualTo(count + 1);
@@ -606,7 +647,9 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void repeatedAndConcurrentIpnsHaveOneEventAndOneActivation() throws Exception {
+    void handleIpn_whenCallbackIsRepeatedConcurrently_shouldRecordOneEventAndActivation() throws Exception {
+        // Arrange
+        // Act
         String code = checkout().get("orderCode").asString();
         String query = signed(callback(code, "00", "00"));
         long count = transactions.count();
@@ -628,6 +671,7 @@ class VnpayIntegrationTests {
             assertThat(result).isIn("00", "02");
             if ("00".equals(result)) confirmed++;
         }
+        // Assert
         assertThat(confirmed).isEqualTo(1);
         assertThat(ipn(query)).isEqualTo("02");
         assertThat(transactions.count()).isEqualTo(count + 1);
@@ -635,14 +679,17 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void confirmedSuccessCannotBeDowngradedByLaterFailureOrCancellation() throws Exception {
+    void handleIpn_whenFailureArrivesAfterSuccess_shouldPreserveConfirmedOrder() throws Exception {
+        // Arrange
         String code = checkout().get("orderCode").asString();
         long count = transactions.count();
+        // Act
         assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
         for (String response : new String[] { "51", "24" }) {
             assertThat(ipn(signed(callback(code, response, "02")))).isEqualTo("02");
         }
         JsonNode confirmed = order(code);
+        // Assert
         assertThat(confirmed.get("status").asString()).isEqualTo("PAID");
         assertThat(confirmed.get("payment").get("status").asString()).isEqualTo("SUCCESS");
         assertThat(confirmed.get("payment").get("enrollmentReady").asBoolean()).isTrue();
@@ -651,13 +698,16 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void paidStateSurvivesLearningFailureAndOwnedRetryRecoversWithoutDuplicateEvent() throws Exception {
+    void activate_whenLearningFailsAfterConfirmation_shouldRetainPaidStateAndRecoverOnOwnedRetry() throws Exception {
+        // Arrange
+        // Act
         String code = checkout().get("orderCode").asString();
         willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE))
             .given(learning)
             .enroll(code, ownerId, 101L);
         long count = transactions.count();
         String query = signed(callback(code, "00", "00"));
+        // Assert
         assertThat(ipn(query)).isEqualTo("00");
         assertThat(order(code).get("payment").get("status").asString()).isEqualTo("SUCCESS");
         assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isFalse();
@@ -674,11 +724,14 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void restartSafeRetryUsesDurablePaidActivationMarker() throws Exception {
+    void retryActivation_whenApplicationRestarts_shouldResumeFromDurablePaidMarker() throws Exception {
+        // Arrange
+        // Act
         String code = checkout().get("orderCode").asString();
         willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE))
             .given(learning)
             .enroll(code, ownerId, 101L);
+        // Assert
         assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
         willDoNothing().given(learning).enroll(code, ownerId, 101L);
         var retry = new PaidCourseActivationRetry(payments, activation);
@@ -689,12 +742,15 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void paidCourseCannotBeChargedAgainWhileEnrollmentIsStillPending() throws Exception {
+    void checkout_whenPaidOrderIsPendingEnrollment_shouldPreventAnotherCharge() throws Exception {
+        // Arrange
         String key = UUID.randomUUID().toString();
+        // Act
         String code = checkout(ownerId, "VNPAY", key).get("orderCode").asString();
         willThrow(new AppException(ErrorCode.SERVICE_UNAVAILABLE))
             .given(learning)
             .enroll(code, ownerId, 101L);
+        // Assert
         assertThat(ipn(signed(callback(code, "00", "00")))).isEqualTo("00");
         assertThat(order(code).get("payment").get("enrollmentReady").asBoolean()).isFalse();
         long count = orders.count();
@@ -717,9 +773,11 @@ class VnpayIntegrationTests {
     }
 
     @Test
-    void mockAdminAndAnonymousCallersCannotManufactureProviderStates() throws Exception {
+    void authorize_whenCallerAttemptsToForgeProviderState_shouldRejectUnauthorizedPayments() throws Exception {
+        // Arrange
         String code = checkout().get("orderCode").asString();
         String mock = BASE + "/mock/orders/" + code + "/complete";
+        // Act
         assertThat(
             request(mock, token(ownerId, "USER"), "POST", "{\"status\":\"SUCCESS\"}").statusCode()
         ).isEqualTo(409);
@@ -742,6 +800,7 @@ class VnpayIntegrationTests {
         for (String path : new String[] { BASE + "/history", BASE + "/admin/analytics", BASE + "/methods" }) {
             assertThat(request(path, null, "GET", null).statusCode()).isEqualTo(401);
         }
+        // Assert
         assertThat(request(BASE + "/vnpay/ipn", null, "POST", null).statusCode()).isEqualTo(401);
         assertThat(request(BASE + "/vnpay/ipn/private", null, "GET", null).statusCode()).isEqualTo(401);
         assertThat(order(code).get("payment").get("status").asString()).isEqualTo("PENDING");

@@ -87,7 +87,8 @@ class UserFlowTests {
     }
 
     @Test
-    void userCanUpdateProfile() throws Exception {
+    void updateProfile_whenCurrentUserSubmitsValidProfile_shouldPersistChanges() throws Exception {
+        // Arrange
         User user = createUser(
             "updateprofile_" + UUID.randomUUID() + "@test.com",
             "Password123!",
@@ -106,6 +107,7 @@ class UserFlowTests {
             .build();
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
 
         JsonNode json = mapper.readTree(response.body());
@@ -113,11 +115,13 @@ class UserFlowTests {
         assertThat(json.get("data").get("fullName").asText()).isEqualTo("New Beautiful Name");
 
         User updatedUser = users.findById(user.getId()).orElseThrow();
+        // Assert
         assertThat(updatedUser.getFullName()).isEqualTo("New Beautiful Name");
     }
 
     @Test
-    void profileDetailsPersistAndInvalidFieldsDoNotChangeStoredData() throws Exception {
+    void updateProfile_whenInputIsInvalid_shouldPreserveStoredProfile() throws Exception {
+        // Arrange
         User user = createUser("profile-" + UUID.randomUUID() + "@test.com", "ProfileTest123!", "Profile User", false);
         String token = tokenFor(user);
         String body = """
@@ -128,6 +132,7 @@ class UserFlowTests {
             .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(body)).build();
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
         var data = mapper.readTree(response.body()).get("data");
         assertThat(data.get("phone").asString()).isEqualTo("+84 912345678");
@@ -139,12 +144,14 @@ class UserFlowTests {
                 .header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString("{\"fullName\":\"Invalid Name\"," + invalid + "}")).build();
             assertThat(client.send(rejected, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(400);
         }
+        // Assert
         assertThat(users.findById(user.getId()).orElseThrow().getFullName()).isEqualTo("Updated Profile");
         assertThat(users.findById(user.getId()).orElseThrow().getDateOfBirth()).isEqualTo(java.time.LocalDate.of(2000, 1, 2));
     }
 
     @Test
-    void userCanChangePasswordAndFailsWithWrongOldPassword() throws Exception {
+    void changePassword_whenCurrentPasswordIsWrong_shouldRejectChangeAndAllowValidPassword() throws Exception {
+        // Arrange
         String oldPass = "OldPassword123!";
         String newPass = "NewPassword456!";
         User user = createUser("changepass_" + UUID.randomUUID() + "@test.com", oldPass, "User Pass", false);
@@ -163,6 +170,7 @@ class UserFlowTests {
             .build();
 
         HttpResponse<String> badResponse = client.send(badRequest, HttpResponse.BodyHandlers.ofString());
+        // Act
         assertThat(badResponse.statusCode()).isEqualTo(400);
         JsonNode badJson = mapper.readTree(badResponse.body());
         assertThat(badJson.get("code").asText()).isEqualTo("OLD_PASSWORD_INCORRECT");
@@ -183,11 +191,13 @@ class UserFlowTests {
         assertThat(goodResponse.statusCode()).isEqualTo(200);
 
         User updated = users.findById(user.getId()).orElseThrow();
+        // Assert
         assertThat(passwords.matches(newPass, updated.getPasswordHash())).isTrue();
     }
 
     @Test
-    void adminCanListUsersAndSearch() throws Exception {
+    void listUsers_whenAdminSearches_shouldReturnMatchingUsers() throws Exception {
+        // Arrange
         User admin = createUser(
             "admin_" + UUID.randomUUID() + "@test.com",
             "AdminPass123!",
@@ -211,17 +221,20 @@ class UserFlowTests {
             .build();
 
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        // Act
         assertThat(response.statusCode()).isEqualTo(200);
 
         JsonNode json = mapper.readTree(response.body());
         assertThat(json.get("success").asBoolean()).isTrue();
         JsonNode content = json.get("data").get("content");
+        // Assert
         assertThat(content.isArray()).isTrue();
         assertThat(content.size()).isGreaterThanOrEqualTo(1);
     }
 
     @Test
-    void regularUserCannotAccessAdminUsers() throws Exception {
+    void listUsers_whenCallerIsRegularUser_shouldDenyAdminAccess() throws Exception {
+        // Arrange
         User regular = createUser(
             "regular_" + UUID.randomUUID() + "@test.com",
             "RegularPass123!",
@@ -237,12 +250,16 @@ class UserFlowTests {
             .GET()
             .build();
 
+        // Act
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        // Assert
         assertThat(response.statusCode()).isEqualTo(403);
     }
 
     @Test
-    void userCannotReadAnotherProfileThroughAdminEndpoint() throws Exception {
+    void getUser_whenCallerRequestsAnotherAccountWithoutAdmin_shouldDenyAccess() throws Exception {
+        // Arrange
         User viewer = createUser("viewer_" + UUID.randomUUID() + "@test.com", "Password123!", "Viewer", false);
         User other = createUser("other_" + UUID.randomUUID() + "@test.com", "Password123!", "Other", false);
         HttpRequest request = HttpRequest.newBuilder(
@@ -251,14 +268,18 @@ class UserFlowTests {
             .header("Authorization", "Bearer " + tokenFor(viewer))
             .GET()
             .build();
+        // Act
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        // Assert
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(mapper.readTree(response.body()).get("code").asString()).isEqualTo("FORBIDDEN");
         assertThat(response.body()).doesNotContain(other.getEmail());
     }
 
     @Test
-    void adminCanLockOtherUserAndCannotLockSelf() throws Exception {
+    void updateStatus_whenAdminChangesLockState_shouldRejectLockingOwnAccount() throws Exception {
+        // Arrange
         User admin = createUser(
             "admin2_" + UUID.randomUUID() + "@test.com",
             "AdminPass123!",
@@ -285,6 +306,7 @@ class UserFlowTests {
             .build();
 
         HttpResponse<String> lockResponse = client.send(lockRequest, HttpResponse.BodyHandlers.ofString());
+        // Act
         assertThat(lockResponse.statusCode()).isEqualTo(200);
         User lockedUser = users.findById(victim.getId()).orElseThrow();
         assertThat(lockedUser.getStatus()).isEqualTo(UserStatus.LOCKED);
@@ -304,11 +326,13 @@ class UserFlowTests {
         );
         assertThat(selfResponse.statusCode()).isEqualTo(400);
         JsonNode selfJson = mapper.readTree(selfResponse.body());
+        // Assert
         assertThat(selfJson.get("code").asText()).isEqualTo("CANNOT_LOCK_SELF");
     }
 
     @Test
-    void adminCanUpdateRolesAndCannotDemoteSelf() throws Exception {
+    void updateRoles_whenAdminChangesRoles_shouldPreventSelfDemotion() throws Exception {
+        // Arrange
         User admin = createUser(
             "admin3_" + UUID.randomUUID() + "@test.com",
             "AdminPass123!",
@@ -338,6 +362,7 @@ class UserFlowTests {
             promoteRequest,
             HttpResponse.BodyHandlers.ofString()
         );
+        // Act
         assertThat(promoteResponse.statusCode()).isEqualTo(200);
         User promoted = users.findById(target.getId()).orElseThrow();
         assertThat(promoted.getRoles())
@@ -360,6 +385,7 @@ class UserFlowTests {
         );
         assertThat(demoteResponse.statusCode()).isEqualTo(400);
         JsonNode demoteJson = mapper.readTree(demoteResponse.body());
+        // Assert
         assertThat(demoteJson.get("code").asText()).isEqualTo("CANNOT_DEMOTE_SELF");
     }
 }

@@ -41,23 +41,67 @@ trình duyệt phải truy cập được endpoint public qua HTTPS.
 
 ### Chuẩn bị ảnh và audio TOEIC
 
-Trước khi merge bản bỏ các gói khỏi Git, sao chép 10 gói Reading và 9 gói Listening
-vào thư mục `.tmp/toeic-data` trong repo trên VPS. Nếu các gói vẫn nằm trong
-`frontend/web/resources`, chạy lệnh sau một lần.
+Để deploy từ Amazon S3, upload 10 gói Reading vào `documents/toeic/ets2024/toeic-reading/`
+và 9 gói Listening vào `documents/toeic/ets2024/toeic-listening/`. Giữ nguyên tên và
+nội dung các file `.tar.gz`. Đặt prefix chứa cả hai thư mục trong `.env.production`.
 
-```bash
-cd "$HOME/online-learning-platform"
-mkdir -p .tmp/toeic-data
-cp -an -- frontend/web/resources/toeic frontend/web/resources/toeic-listening .tmp/toeic-data/
+```dotenv
+TOEIC_ARCHIVES_S3_URI=s3://chitchatgo-media/documents/toeic/ets2024/
 ```
 
-Script mặc định đọc hai thư mục con `toeic` và `toeic-listening` từ `.tmp/toeic-data`.
-Git bỏ qua `.tmp`. Nếu tải các gói lên vị trí khác, đặt `TOEIC_ARCHIVES_DIR` bằng đường
-dẫn thư mục đó trong `.env.production`. `check` đối chiếu SHA-256 của từng gói với
-manifest. `up` đưa bộ gói đã xác minh vào build Docker để frontend tiếp tục phục vụ
-qua `/toeic-assets/`. Giữ một bản sao riêng để có thể khôi phục khi clone lại repo hoặc
-dọn các file Git bỏ qua. Có thể tìm tên và checksum các gói trong
+Cài AWS CLI v2 trên VPS. CLI lấy thông tin xác thực từ môi trường của tài khoản deploy,
+ví dụ IAM role gắn với EC2. Cấp `s3:ListBucket` cho prefix và `s3:GetObject` cho 19
+gói. `AWS_REGION` trong `.env.production` cần khớp region của bucket. Bucket có thể
+giữ private. Xem [AWS CLI và IAM role trên EC2](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-metadata.html).
+
+Khi đặt `TOEIC_ARCHIVES_S3_URI`, `check` kiểm tra đủ tên gói trên S3. `up` tải các gói
+theo danh sách phát hành vào thư mục tạm, kiểm tra SHA-256 rồi đưa chúng vào build
+Docker. Các yêu cầu ảnh và audio của trình duyệt tiếp tục đi qua `/toeic-assets/`.
+
+Với `TOEIC_ARCHIVES_S3_URI` để trống, script đọc hai thư mục con `toeic-reading` và
+`toeic-listening` từ `.tmp/toeic-data` hoặc đường dẫn `TOEIC_ARCHIVES_DIR` trong
+`.env.production`. Tên và checksum của các gói nằm trong
 [`toeic-archives.json`](../../frontend/web/resources/toeic-archives.json).
+
+Nếu dữ liệu local cũ còn dùng tên thư mục Reading là `toeic`, đổi tên thư mục đó
+thành `toeic-reading` trong thư mục chứa các gói. Giữ nguyên tên và nội dung từng
+file `.tar.gz`; thư mục S3 gốc `documents/toeic/ets2024/` giữ nguyên.
+
+### Lưu ảnh và audio từ Admin TOEIC
+
+Để mỗi lần upload trong Admin lưu cả trên VPS và S3, thêm dòng sau vào
+`.env.production`.
+
+```dotenv
+TOEIC_MEDIA_S3_BUCKET=chitchatgo-media
+TOEIC_MEDIA_S3_PREFIX=documents/toeic/uploads/
+```
+
+Learning Service lưu bản trên ổ đĩa tại `/app/uploads/toeic` trong volume Docker
+và bản S3 dưới `documents/toeic/uploads/`. Tài khoản AWS mà container dùng cần quyền
+`s3:PutObject`, `s3:GetObject` và `s3:DeleteObject` trong prefix này.
+Bạn có thể dùng IAM role của EC2 nếu container truy cập được IMDS, hoặc cấu hình
+`TOEIC_MEDIA_AWS_ACCESS_KEY_ID` và `TOEIC_MEDIA_AWS_SECRET_ACCESS_KEY` qua `.env.production`.
+Nếu dùng credentials tạm thời, thêm `TOEIC_MEDIA_AWS_SESSION_TOKEN`.
+`AWS_REGION` phải khớp region của bucket.
+
+Prefix phân biệt chữ hoa/thường: nếu dùng thư mục `documents/TOEIC`, đặt
+`TOEIC_MEDIA_S3_PREFIX=documents/TOEIC/uploads/` và cấp quyền IAM cho đúng prefix
+này. Giữ prefix ổn định sau khi đã upload vì database lưu tên object theo prefix
+đang cấu hình. Kho Admin liệt kê các tệp do Admin upload và đã ghi vào database;
+nó không tự quét hoặc quản lý các gói `.tar.gz` đã đưa lên S3 từ trước.
+
+Trong Admin → Ngân hàng đề TOEIC → Kho ảnh và audio, upload một ảnh/MP3 rồi kiểm
+tra nhãn `Local + S3`. Có thể xem trước, thay tệp và xóa tệp chưa gắn với đề hoặc
+bài làm. Tệp đang được đề/bài làm tham chiếu được bảo vệ khỏi thay/xóa. Sửa nội
+dung câu hỏi, đáp án hoặc transcript sẽ cập nhật database, không ghi lại file S3.
+Nếu bucket hoặc IAM chưa cấu hình đúng, API báo lỗi và không công bố tệp như đã
+lưu thành công trên cả hai nơi.
+
+Bản local được ưu tiên khi phát. Khi bản local thiếu và file có bản S3, Learning
+Service trả URL ký tạm thời. Docker local dùng ổ đĩa theo mặc định.
+`compose.production.yaml` truyền cấu hình S3 vào Learning Service khi deploy.
+`TOEIC_ARCHIVES_S3_URI` vẫn cấu hình riêng cho 19 gói bộ đề mẫu dùng khi build.
 
 ```powershell
 node infra/scripts/production.mjs check --env-file .env.production --project sgsphere-production

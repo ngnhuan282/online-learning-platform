@@ -15,7 +15,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 class ProPlanCatalogTests {
 
     @Test
-    void customCatalogForwardsCallerAuthorizationAndReadsDurationMetadata() throws Exception {
+    void plans_whenCatalogIsCustom_shouldForwardCallerAuthorizationAndReadDuration() throws Exception {
+        // Arrange
         var authorization = new AtomicReference<String>();
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/v1/payments/pro/plans", exchange -> {
@@ -33,11 +34,14 @@ class ProPlanCatalogTests {
             exchange.close();
         });
         server.start();
+
         try {
             var request = new MockHttpServletRequest();
             request.addHeader("Authorization", "Bearer catalog-test-caller");
             RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+            // Act
             var client = new ProPlanCatalog("http://127.0.0.1:" + server.getAddress().getPort());
+            // Assert
             assertThat(client.months("PRO_CUSTOM_TEST")).isEqualTo(3);
             assertThat(authorization.get()).isEqualTo("Bearer catalog-test-caller");
             assertThatThrownBy(() -> client.months("PRO_MISSING")).isInstanceOf(

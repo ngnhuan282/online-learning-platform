@@ -36,6 +36,20 @@ course:
 dictation:
   storage-dir: ${DICTATION_STORAGE_DIR:./uploads/dictation}
   import-dir: ${DICTATION_IMPORT_DIR:}
+  workbook-storage: ${DICTATION_WORKBOOK_STORAGE:local}
+  s3:
+    enabled: ${DICTATION_S3_IMPORT_ENABLED:false}
+    prefix: ${DICTATION_S3_PREFIX:documents/transcripts/}
+    bucket: ${AWS_S3_BUCKET:}
+    region: ${AWS_REGION:ap-southeast-1}
+    endpoint: ${AWS_ENDPOINT_URL:}
+    force-path-style: ${AWS_S3_FORCE_PATH_STYLE:false}
+toeic:
+  media:
+    local-dir: ${TOEIC_MEDIA_LOCAL_DIR:./uploads/toeic}
+    s3-bucket: ${TOEIC_MEDIA_S3_BUCKET:}
+    s3-prefix: ${TOEIC_MEDIA_S3_PREFIX:documents/toeic/uploads/}
+    s3-region: ${AWS_REGION:ap-southeast-1}
 auth:
   service-url: ${AUTH_SERVICE_URL:http://localhost:8081}
 integrations:

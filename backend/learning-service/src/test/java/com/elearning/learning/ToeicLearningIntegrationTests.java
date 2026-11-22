@@ -244,10 +244,12 @@ class ToeicLearningIntegrationTests {
     }
 
     @Test
-    void catalogIsPublicWhileLearningAndAdministrationRequireTheCorrectIdentity() throws Exception {
+    void catalog_whenCallerIsAnonymous_shouldAllowCatalogButProtectLearningAndAdministration() throws Exception {
+        // Arrange
         JsonNode exam = create(true);
         long id = exam.get("id").asLong();
         JsonNode catalog = data(send("GET", BASE + "/exams", null, null, null), 200);
+        // Act
         assertThat(catalog.toString()).contains(exam.get("title").asText());
         assertThat(catalog.toString()).doesNotContain("correctOptionId", "explanation");
         assertThat(send("GET", BASE + "/exams/" + id, null, null, null).statusCode()).isEqualTo(401);
@@ -260,11 +262,14 @@ class ToeicLearningIntegrationTests {
             assertThat(question.has("correctOptionId")).isFalse();
             assertThat(question.has("explanation")).isFalse();
         }
+        // Assert
         assertThat(learner("GET", "/exams/" + id + "/progress", 22, null).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void seededListeningPlaysEveryPartAndRevealsTranscriptWhenPermitted() throws Exception {
+    void start_whenSeededExamIsListening_shouldIncludeEveryPartAndRevealTranscriptWhenAuthorized() throws Exception {
+        // Arrange
+        // Act
         long user = USERS.incrementAndGet();
         try (var input = new ClassPathResource("toeic/ets2024-listening.json").getInputStream()) {
             List<Definition> definitions = mapper.readValue(input, new TypeReference<List<Definition>>() {});
@@ -320,6 +325,7 @@ class ToeicLearningIntegrationTests {
         assertThat(saved.path("answers").path("q7").asText()).isEqualTo("B");
         assertThat(saved.toString()).doesNotContain("\"transcript\"", "\"correctOptionId\"");
         JsonNode graded = data(learner("POST", path + "/submit", user, answers), 200);
+        // Assert
         assertThat(graded.path("correctCount").asInt()).isEqualTo(2);
         assertThat(graded.path("questions").get(0).path("correctOptionId").asText()).isEqualTo("A");
         assertThat(
@@ -328,8 +334,10 @@ class ToeicLearningIntegrationTests {
     }
 
     @Test
-    void listeningDraftRequiresMediaAndMatchingGroupTranscriptToPublish() throws Exception {
+    void publish_whenListeningMediaAndTranscriptDoNotMatch_shouldRejectDraft() throws Exception {
+        // Arrange
         var draft = new LinkedHashMap<>(definition(false));
+        // Act
         var first = new LinkedHashMap<>(question("q32", 32, 3, "A"));
         var second = new LinkedHashMap<>(question("q33", 33, 3, "A"));
         draft.put("lessons", List.of());
@@ -354,16 +362,19 @@ class ToeicLearningIntegrationTests {
             send("PATCH", path + "/publish", 1L, "ADMIN", Map.of("published", true)),
             200
         );
+        // Assert
         assertThat(published.path("published").asBoolean()).isTrue();
     }
 
     @Test
-    void lessonsAndAutosavedPracticeResumeAndGradeIdempotentlyWithPrivateHistory() throws Exception {
+    void complete_whenPracticeIsResumedOrSubmittedAgain_shouldPreserveAutosaveGradeAndPrivateHistory() throws Exception {
+        // Arrange
         long user = USERS.incrementAndGet();
         long examId = create(true).get("id").asLong();
         String completion = "/exams/" + examId + "/lessons/part-5/complete";
         JsonNode first = data(learner("PUT", completion, user, null), 200);
         JsonNode second = data(learner("PUT", completion, user, null), 200);
+        // Act
         assertThat(first.get("completedLessonIds").toString()).isEqualTo("[\"part-5\"]");
         assertThat(second.get("completedLessonIds")).isEqualTo(first.get("completedLessonIds"));
         assertThat(
@@ -430,6 +441,7 @@ class ToeicLearningIntegrationTests {
         assertThat(retried.get("score")).isEqualTo(graded.get("score"));
         JsonNode progress = data(learner("GET", "/exams/" + examId + "/progress", user, null), 200);
         List<JsonNode> history = StreamSupport.stream(progress.get("attempts").spliterator(), false).toList();
+        // Assert
         assertThat(history).hasSize(2);
         assertThat(history)
             .filteredOn(item -> item.get("id").asLong() == attemptId)
@@ -449,10 +461,12 @@ class ToeicLearningIntegrationTests {
     }
 
     @Test
-    void draftPublishEditDeletePreserveSnapshotsAndRejectStaleEdits() throws Exception {
+    void publish_whenDraftIsEditedOrDeleted_shouldPreserveSnapshotsAndRejectStaleEdits() throws Exception {
+        // Arrange
         long user = USERS.incrementAndGet();
         JsonNode created = create(false);
         long examId = created.get("id").asLong();
+        // Act
         assertThat(learner("GET", "/exams/" + examId, user, null).statusCode()).isEqualTo(404);
         JsonNode published = data(
             send("PATCH", ADMIN + "/" + examId + "/publish", 1L, "ADMIN", Map.of("published", true)),
@@ -490,6 +504,7 @@ class ToeicLearningIntegrationTests {
             ),
             200
         );
+        // Assert
         assertThat(result.get("title")).isEqualTo(attempt.get("title"));
         assertThat(result.get("part").asInt()).isEqualTo(5);
         assertThat(result.get("score").asInt()).isEqualTo(100);
@@ -506,13 +521,15 @@ class ToeicLearningIntegrationTests {
     }
 
     @Test
-    void deadlineGradesOnlyPreviouslySavedAnswersAndNeverAcceptsLateChanges() throws Exception {
+    void submit_whenDeadlineHasPassed_shouldGradeSavedAnswersAndRejectLateChanges() throws Exception {
+        // Arrange
         long user = USERS.incrementAndGet();
         long examId = create(true).get("id").asLong();
         JsonNode exam = data(
             learner("POST", "/exams/" + examId + "/attempts", user, Map.of("mode", "EXAM")),
             200
         );
+        // Act
         assertThat(exam.get("questions").get(0).has("correctOptionId")).isFalse();
         assertThat(exam.get("questions").get(0).has("explanation")).isFalse();
         long id = exam.get("id").asLong();
@@ -539,6 +556,7 @@ class ToeicLearningIntegrationTests {
             200
         );
         clock.set(Instant.parse(another.get("deadlineAt").asText()));
+        // Assert
         assertThat(
             data(learner("GET", "/attempts/" + another.get("id").asLong(), user, null), 200)
                 .get("status")
@@ -547,9 +565,11 @@ class ToeicLearningIntegrationTests {
     }
 
     @Test
-    void invalidAnswersPartsAndDefinitionsAreRejectedWithoutMutatingSavedAnswers() throws Exception {
+    void saveAnswers_whenAnswerPartOrDefinitionIsInvalid_shouldPreserveExistingAnswers() throws Exception {
+        // Arrange
         long user = USERS.incrementAndGet();
         long examId = create(true).get("id").asLong();
+        // Act
         assertThat(
             learner(
                 "POST",
@@ -610,6 +630,7 @@ class ToeicLearningIntegrationTests {
         long draftId = data(send("POST", ADMIN, 1L, "ADMIN", draft), 201)
             .get("id")
             .asLong();
+        // Assert
         assertThat(
             send(
                 "PATCH",
@@ -622,10 +643,12 @@ class ToeicLearningIntegrationTests {
     }
 
     @Test
-    void concurrentStartAndSubmitProduceOneActiveAttemptAndOneStableResult() throws Exception {
+    void start_whenStartAndSubmitAreConcurrent_shouldKeepOneActiveAttemptAndStableResult() throws Exception {
+        // Arrange
         long user = USERS.incrementAndGet();
         long examId = create(true).get("id").asLong();
         try (var executor = Executors.newFixedThreadPool(2)) {
+            // Act
             var ready = new CountDownLatch(1);
             var first = executor.submit(() -> {
                 ready.await();
@@ -674,6 +697,7 @@ class ToeicLearningIntegrationTests {
                     200
                 )
             );
+            // Assert
             assertThat(submitFirst.get(20, TimeUnit.SECONDS).get("submittedAt")).isEqualTo(
                 submitSecond.get(20, TimeUnit.SECONDS).get("submittedAt")
             );
@@ -681,8 +705,10 @@ class ToeicLearningIntegrationTests {
     }
 
     @Test
-    void seedIsIdempotentAndDoesNotOverwriteAnEditedOrArchivedExam() throws Exception {
+    void seed_whenExamWasEditedOrArchived_shouldKeepExistingVersion() throws Exception {
+        // Arrange
         Definition definition = mapper.convertValue(definition(true), Definition.class);
+        // Act
         toeic.seed(definition);
         toeic.seed(definition);
         long id = jdbc.queryForObject(
@@ -699,14 +725,17 @@ class ToeicLearningIntegrationTests {
         ).isEqualTo(1);
         toeic.delete(id);
         toeic.seed(definition);
+        // Assert
         assertThat(
             jdbc.queryForObject("SELECT deleted FROM toeic_exams WHERE id = ?", Boolean.class, id)
         ).isTrue();
     }
 
     @Test
-    void dictionaryIsPublicAndToeicNotesEnforceFreeHundredNoteLimitUntilProIsActive() throws Exception {
+    void addNote_whenFreeNoteLimitIsReached_shouldRequireProAndKeepDictionaryPublic() throws Exception {
+        // Arrange
         JsonNode lookup = data(send("GET", BASE + "/dictionary?term=appointments", null, null, null), 200);
+        // Act
         assertThat(lookup.get("found").asBoolean()).isTrue();
         assertThat(lookup.get("headword").asText()).isEqualTo("appointment");
 
@@ -763,6 +792,7 @@ class ToeicLearningIntegrationTests {
         assertThat(updated.get("note").get("color").asText()).isEqualTo("blue");
 
         JsonNode afterDelete = data(learner("DELETE", "/notes/" + firstId, user, null), 200);
+        // Assert
         assertThat(afterDelete.get("count").asInt()).isEqualTo(99);
     }
 }
