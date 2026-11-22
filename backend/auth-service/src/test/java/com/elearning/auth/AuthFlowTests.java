@@ -413,7 +413,7 @@ class AuthFlowTests {
         // Assert
         assertThat(
             response
-        ).isEqualTo(13);
+        ).isEqualTo(1);
         assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id=rp.role_id WHERE r.name='ADMIN'",

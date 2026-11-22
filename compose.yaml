@@ -31,17 +31,14 @@ services:
       - mysql_data:/var/lib/mysql
       - ./infra/mysql/init.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
       - ./infra/mysql/02-users.sh:/docker-entrypoint-initdb.d/02-users.sh:ro
-      - ./infra/mysql/03-auth-migrations.sql:/docker-entrypoint-initdb.d/03-auth-migrations.sql:ro
-      - ./infra/mysql/04-course-migrations.sql:/docker-entrypoint-initdb.d/04-course-migrations.sql:ro
-      - ./infra/mysql/04-learning-migrations.sql:/docker-entrypoint-initdb.d/04-learning-migrations.sql:ro
-      - ./infra/mysql/04-payment-migrations.sql:/docker-entrypoint-initdb.d/04-payment-migrations.sql:ro
-      - ./infra/mysql/04-ai-migrations.sql:/docker-entrypoint-initdb.d/04-ai-migrations.sql:ro
-      # Run explicitly after service migrations; demo accounts are opt-in.
-      - ./infra/mysql/seed-data.sql:/seed/seed-data.sql:ro
+      # Fresh volume only: creates 71 tables + demo data before services start.
+      # Flyway then baselines at V1 (baseline-on-migrate) and Hibernate validates.
+      - ./infra/mysql/seed-data.sql:/docker-entrypoint-initdb.d/03-seed-data.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -uroot -Nse "SELECT 1" >/dev/null 2>&1']
       interval: 10s
       timeout: 5s
+      start_period: 120s
       retries: 10
 
   auth-service:

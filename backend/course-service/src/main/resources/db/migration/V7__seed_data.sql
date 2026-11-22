@@ -1,4 +1,0 @@
--- Intentionally empty: application startup must preserve existing Course data
--- and the course IDs referenced by Learning and Payment.
--- Demo data is opt-in through infra/mysql/seed-data.sql, as documented.
--- Keep V7 reserved so later schema migrations can continue without renumbering.

@@ -15,7 +15,7 @@ import { readStorage, writeStorage, removeStorage } from '../../../shared/utils/
 import useAuth from '../../auth/hooks/useAuth';
 import { toeicApi } from '../api/toeicApi';
 import ToeicQuestion from '../components/ToeicQuestion';
-import { isListeningPart } from '../utils/toeicSections';
+import { formatToeicTitle, isListeningPart } from '../utils/toeicSections';
 import StudyTextAssistant from '../components/StudyTextAssistant';
 
 const timeLeft = (deadline, offset) =>
@@ -353,7 +353,7 @@ function AttemptWorkspace({ attemptId, userId }) {
                 ? `${t('CHẾ ĐỘ LUYỆN TẬP')} · Part ${session.attempt.part}`
                 : t(listening ? 'CHẾ ĐỘ LUYỆN TẬP · LISTENING' : 'CHẾ ĐỘ LUYỆN TẬP · READING')}
           </span>
-          <h1>{session.attempt.title}</h1>
+          <h1>{formatToeicTitle(session.attempt.title)}</h1>
           <p>{t('{answered}/{total} câu đã trả lời', { answered, total: questions.length })}</p>
         </div>
         <div

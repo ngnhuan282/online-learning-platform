@@ -1,3 +1,5 @@
+-- Consolidated initial schema for ai-service (merged from V1..V3).
+
 CREATE TABLE ai_conversations (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -17,6 +19,7 @@ CREATE TABLE ai_messages (
     conversation_id BIGINT NOT NULL,
     sender VARCHAR(10) NOT NULL,
     content TEXT NOT NULL,
+    truncated BOOLEAN NOT NULL DEFAULT FALSE,
     request_id VARCHAR(64) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     CONSTRAINT fk_ai_message_conversation FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id),
@@ -34,4 +37,11 @@ CREATE TABLE ai_usage_logs (
     output_tokens INT NOT NULL,
     created_at DATETIME(6) NOT NULL,
     INDEX idx_ai_usage_user_created (user_id, created_at)
+);
+
+CREATE TABLE ai_daily_usage (
+    user_id BIGINT NOT NULL,
+    usage_date DATE NOT NULL,
+    request_count INT NOT NULL,
+    PRIMARY KEY (user_id, usage_date)
 );

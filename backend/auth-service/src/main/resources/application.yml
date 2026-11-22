@@ -40,6 +40,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
 app:
   bootstrap-admin:
     enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
