@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "pretest": "node scripts/prepare-toeic-assets.mjs --if-present",
-    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\"",
     "pretest:coverage": "npm run pretest",
     "test:coverage": "node scripts/test-coverage.mjs",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"tests/**/*.js\" \"scripts/**/*.mjs\" eslint.config.js vite.config.js",

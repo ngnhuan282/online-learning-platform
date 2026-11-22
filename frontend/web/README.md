@@ -16,6 +16,14 @@ npm run lint
 npm run build
 ```
 
+## Test frontend
+
+Dùng Node.js 22 như trong CI. Từ `frontend/web`, chạy `npm test` cho toàn bộ suite và `npm run test:coverage` để đo line coverage trên `src`. Chạy riêng một file bằng `node --test tests/features/auth/auth.test.js`.
+
+Đặt file `*.test.js` trong `tests/features/<tính-năng>/`, `tests/app/`, `tests/shared/` hoặc `tests/integration/` theo phạm vi kiểm thử. Đặt helper dùng chung trong `tests/helpers/`. Runner tự tìm file test trong các thư mục con.
+
+Xem [kế hoạch nâng line coverage lên 95%](../../docs/testing/FRONTEND_COVERAGE_PLAN.md) để biết các file Agent cần bổ sung.
+
 ## Trang chủ
 
 - Trang chủ tiếng Anh gồm hero luyện phát âm, tìm kiếm, 8 danh mục (IELTS, TOEIC, giao tiếp, CNTT, phát âm, thương mại, ngữ pháp và mentor), 4 khóa học nổi bật, lợi ích, AI Speaking Coach và footer.

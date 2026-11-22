@@ -199,6 +199,6 @@ Never point this suite at a shared development or production database.
 `C11NotificationIntegrationTests` additionally checks ADMIN authorization,
 recipient/category/unread pagination, payload/filter validation, SYSTEM-only
 send, retry/conflict/read preservation, concurrent requests and rollback.
-`frontend/web/tests/notifications.test.js` checks split SSE frames and UTF-8,
+`frontend/web/tests/features/learning/notifications.test.js` checks split SSE frames and UTF-8,
 abort cleanup, safe links, StrictMode stream cleanup, logout/account isolation,
 summary/read races, user filters and stable admin-send retry identities.
