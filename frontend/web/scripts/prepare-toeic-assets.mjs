@@ -52,7 +52,7 @@ export function stageToeicArchives(archives) {
 }
 
 export function prepareToeicAssets({
-  archiveDirectory = join(resources, 'toeic'),
+  archiveDirectory = join(resources, 'toeic-reading'),
   outputDirectory = fileURLToPath(new URL('../public/toeic-assets/ets2024-reading/', import.meta.url)),
   archiveNames,
 } = {}) {
@@ -162,7 +162,7 @@ export function prepareToeicRelease({ optional = false } = {}) {
     };
   };
   return {
-    reading: prepareToeicAssets(prepareOptions('toeic')),
+    reading: prepareToeicAssets(prepareOptions('toeic-reading')),
     listening: prepareToeicListeningAssets(prepareOptions('toeic-listening')),
   };
 }

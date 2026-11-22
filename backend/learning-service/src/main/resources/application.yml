@@ -40,6 +40,7 @@ toeic:
   media:
     local-dir: ${TOEIC_MEDIA_LOCAL_DIR:./uploads/toeic}
     s3-bucket: ${TOEIC_MEDIA_S3_BUCKET:}
+    s3-prefix: ${TOEIC_MEDIA_S3_PREFIX:documents/toeic/uploads/}
     s3-region: ${AWS_REGION:ap-southeast-1}
 auth:
   service-url: ${AUTH_SERVICE_URL:http://localhost:8081}

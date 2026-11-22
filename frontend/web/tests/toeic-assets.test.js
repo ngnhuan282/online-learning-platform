@@ -73,8 +73,8 @@ test('cached preparation skips intact packs and restores a removed generated ima
 test('a configured release directory rejects missing archives and altered content', () => {
   const releasePath = join(temporary, 'release');
   assert.throws(() => verifyToeicArchives(releasePath, { optional: true }), /Missing TOEIC archive/);
-  mkdirSync(join(releasePath, 'toeic'), { recursive: true });
-  copyFileSync(join(archiveDirectory, 'test01.tar.gz'), join(releasePath, 'toeic/test01.tar.gz'));
+  mkdirSync(join(releasePath, 'toeic-reading'), { recursive: true });
+  copyFileSync(join(archiveDirectory, 'test01.tar.gz'), join(releasePath, 'toeic-reading/test01.tar.gz'));
   assert.throws(() => verifyToeicArchives(releasePath), /TOEIC archive checksum mismatch/);
 });
 

@@ -13,6 +13,14 @@ const paths = toeicArchivePaths();
 test('S3 preflight requires the exact Reading and Listening keys in the release', async () => {
   const list = JSON.stringify([...paths.map(path => `${prefix}${path}`), `${prefix}extra.pdf`]);
   assert.equal(paths.length, 19);
+  assert.deepEqual(
+    paths.filter(path => path.startsWith('toeic-reading/')),
+    Array.from(
+      { length: 10 },
+      (_, index) => `toeic-reading/test${String(index + 1).padStart(2, '0')}.tar.gz`,
+    ),
+  );
+  assert.equal(paths.filter(path => path.startsWith('toeic-listening/')).length, 9);
   await checkToeicS3({ ...source, uri: source.uri.slice(0, -1) }, async (args, region) => {
     assert.equal(region, source.region);
     assert.deepEqual(args, [
@@ -31,7 +39,13 @@ test('S3 preflight requires the exact Reading and Listening keys in the release'
   });
   await assert.rejects(
     checkToeicS3(source, async () => JSON.stringify(paths.slice(1).map(path => `${prefix}${path}`))),
-    /Missing TOEIC archives.*toeic\/test01\.tar\.gz/,
+    /Missing TOEIC archives.*toeic-reading\/test01\.tar\.gz/,
+  );
+  await assert.rejects(
+    checkToeicS3(source, async () =>
+      JSON.stringify(paths.map(path => `${prefix}${path.replace(/^toeic-reading\//, 'toeic/')}`)),
+    ),
+    /Missing TOEIC archives.*toeic-reading\/test01\.tar\.gz/,
   );
 });
 

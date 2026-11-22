@@ -41,7 +41,7 @@ trình duyệt phải truy cập được endpoint public qua HTTPS.
 
 ### Chuẩn bị ảnh và audio TOEIC
 
-Để deploy từ Amazon S3, upload 10 gói Reading vào `documents/toeic/ets2024/toeic/`
+Để deploy từ Amazon S3, upload 10 gói Reading vào `documents/toeic/ets2024/toeic-reading/`
 và 9 gói Listening vào `documents/toeic/ets2024/toeic-listening/`. Giữ nguyên tên và
 nội dung các file `.tar.gz`. Đặt prefix chứa cả hai thư mục trong `.env.production`.
 
@@ -58,10 +58,14 @@ Khi đặt `TOEIC_ARCHIVES_S3_URI`, `check` kiểm tra đủ tên gói trên S3.
 theo danh sách phát hành vào thư mục tạm, kiểm tra SHA-256 rồi đưa chúng vào build
 Docker. Các yêu cầu ảnh và audio của trình duyệt tiếp tục đi qua `/toeic-assets/`.
 
-Với `TOEIC_ARCHIVES_S3_URI` để trống, script đọc hai thư mục con `toeic` và
+Với `TOEIC_ARCHIVES_S3_URI` để trống, script đọc hai thư mục con `toeic-reading` và
 `toeic-listening` từ `.tmp/toeic-data` hoặc đường dẫn `TOEIC_ARCHIVES_DIR` trong
 `.env.production`. Tên và checksum của các gói nằm trong
 [`toeic-archives.json`](../../frontend/web/resources/toeic-archives.json).
+
+Nếu dữ liệu local cũ còn dùng tên thư mục Reading là `toeic`, đổi tên thư mục đó
+thành `toeic-reading` trong thư mục chứa các gói. Giữ nguyên tên và nội dung từng
+file `.tar.gz`; thư mục S3 gốc `documents/toeic/ets2024/` giữ nguyên.
 
 ### Lưu ảnh và audio từ Admin TOEIC
 
@@ -70,6 +74,7 @@ Với `TOEIC_ARCHIVES_S3_URI` để trống, script đọc hai thư mục con `t
 
 ```dotenv
 TOEIC_MEDIA_S3_BUCKET=chitchatgo-media
+TOEIC_MEDIA_S3_PREFIX=documents/toeic/uploads/
 ```
 
 Learning Service lưu bản trên ổ đĩa tại `/app/uploads/toeic` trong volume Docker
@@ -79,6 +84,19 @@ Bạn có thể dùng IAM role của EC2 nếu container truy cập được IMD
 `TOEIC_MEDIA_AWS_ACCESS_KEY_ID` và `TOEIC_MEDIA_AWS_SECRET_ACCESS_KEY` qua `.env.production`.
 Nếu dùng credentials tạm thời, thêm `TOEIC_MEDIA_AWS_SESSION_TOKEN`.
 `AWS_REGION` phải khớp region của bucket.
+
+Prefix phân biệt chữ hoa/thường: nếu dùng thư mục `documents/TOEIC`, đặt
+`TOEIC_MEDIA_S3_PREFIX=documents/TOEIC/uploads/` và cấp quyền IAM cho đúng prefix
+này. Giữ prefix ổn định sau khi đã upload vì database lưu tên object theo prefix
+đang cấu hình. Kho Admin liệt kê các tệp do Admin upload và đã ghi vào database;
+nó không tự quét hoặc quản lý các gói `.tar.gz` đã đưa lên S3 từ trước.
+
+Trong Admin → Ngân hàng đề TOEIC → Kho ảnh và audio, upload một ảnh/MP3 rồi kiểm
+tra nhãn `Local + S3`. Có thể xem trước, thay tệp và xóa tệp chưa gắn với đề hoặc
+bài làm. Tệp đang được đề/bài làm tham chiếu được bảo vệ khỏi thay/xóa. Sửa nội
+dung câu hỏi, đáp án hoặc transcript sẽ cập nhật database, không ghi lại file S3.
+Nếu bucket hoặc IAM chưa cấu hình đúng, API báo lỗi và không công bố tệp như đã
+lưu thành công trên cả hai nơi.
 
 Bản local được ưu tiên khi phát. Khi bản local thiếu và file có bản S3, Learning
 Service trả URL ký tạm thời. Docker local dùng ổ đĩa theo mặc định.

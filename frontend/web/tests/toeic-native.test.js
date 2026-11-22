@@ -754,6 +754,83 @@ test('Admin uploads an audio file to the media library and attaches its stable l
   );
 });
 
+test('Admin previews, replaces and deletes cloud media using the current version', async () => {
+  const url = '/api/v1/learning/toeic/media/6bad05a0-4da8-47e8-8915-597bd372ebab';
+  let asset = {
+    id: url.split('/').at(-1),
+    url,
+    kind: 'IMAGE',
+    cloudCopy: true,
+    originalName: 'photo.png',
+    version: 1,
+  };
+  let deleted = false;
+  toeicApi.mediaList = async () => ({
+    data: { cloudEnabled: true, assets: { content: deleted ? [] : [asset], totalPages: 1 } },
+  });
+  const file = new File(['new image'], 'updated.png', { type: 'image/png' });
+  toeicApi.replaceMedia = async (id, version, selected) => {
+    assert.equal(id, asset.id);
+    assert.equal(version, 1);
+    assert.equal(selected, file);
+    asset = { ...asset, version: 2, originalName: selected.name };
+    return { data: asset };
+  };
+  toeicApi.deleteMedia = async (id, version) => {
+    assert.equal(id, asset.id);
+    assert.equal(version, 2);
+    deleted = true;
+  };
+  await render('/admin/toeic');
+  await click('Kho ảnh và audio');
+  await click('Xem trước');
+  assert.ok(document.querySelector('[role="dialog"] img').src.endsWith(url));
+  await click('Thay tệp');
+  const input = document.querySelector('[role="dialog"] input[type="file"]');
+  await act(async () => {
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await click('Lưu tệp thay thế');
+  assert.match(document.querySelector('[role="dialog"]').textContent, /updated.png/);
+  await click('Xóa');
+  assert.equal(deleted, false);
+  const dialogs = document.querySelectorAll('[role="dialog"]');
+  const confirm = [...dialogs[dialogs.length - 1].querySelectorAll('button')].find(
+    button => button.textContent === 'Xóa',
+  );
+  await act(async () => confirm.click());
+  assert.equal(deleted, true);
+  assert.match(document.querySelector('[role="dialog"]').textContent, /Chưa có tệp trong kho TOEIC/);
+});
+
+test('Admin keeps cloud media visible when S3 rejects deletion', async () => {
+  const asset = {
+    id: 'cloud-image',
+    url: '/api/v1/learning/toeic/media/cloud-image',
+    kind: 'IMAGE',
+    cloudCopy: true,
+    originalName: 'keep.png',
+    version: 1,
+  };
+  toeicApi.mediaList = async () => ({
+    data: { cloudEnabled: true, assets: { content: [asset], totalPages: 1 } },
+  });
+  toeicApi.deleteMedia = async () => {
+    throw new Error('S3 unavailable');
+  };
+  await render('/admin/toeic');
+  await click('Kho ảnh và audio');
+  await click('Xóa');
+  const dialogs = document.querySelectorAll('[role="dialog"]');
+  const confirm = [...dialogs[dialogs.length - 1].querySelectorAll('button')].find(
+    button => button.textContent === 'Xóa',
+  );
+  await act(async () => confirm.click());
+  assert.match(document.querySelector('[role="dialog"]').textContent, /Không thể cập nhật tệp/);
+  assert.match(document.querySelector('[role="dialog"]').textContent, /keep.png/);
+});
+
 test('Listening still allows answering a question without audio', async () => {
   currentAttempt = freshAttempt({ part: 2, questions: [{ ...listeningQuestions[1], listening: null }] });
   await render('/exams/toeic/attempts/41');

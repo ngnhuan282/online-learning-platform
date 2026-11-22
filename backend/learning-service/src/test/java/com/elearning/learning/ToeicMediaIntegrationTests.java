@@ -12,6 +12,9 @@ import com.elearning.learning.service.ToeicS3MediaStorage;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -35,7 +39,10 @@ import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-@SpringBootTest(properties = { "toeic.seed.enabled=false", "logging.level.root=WARN" })
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = { "toeic.seed.enabled=false", "logging.level.root=WARN" }
+)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ToeicMediaIntegrationTests {
@@ -69,6 +76,79 @@ class ToeicMediaIntegrationTests {
 
     @MockitoBean
     ToeicS3MediaStorage cloud;
+
+    @LocalServerPort
+    int port;
+
+    @Test
+    void realHttpMultipartUploadsAndReplacementsReachTheCloudAndKeepAStableLink() throws Exception {
+        when(cloud.enabled()).thenReturn(true);
+        try (var browser = HttpClient.newHttpClient()) {
+            var uploaded = browser.send(
+                multipartRequest("POST", ADMIN, "wire.png"),
+                HttpResponse.BodyHandlers.ofString()
+            );
+            assertThat(uploaded.statusCode()).isEqualTo(201);
+            JsonNode first = mapper.readTree(uploaded.body()).path("data");
+            var replaced = browser.send(
+                multipartRequest("PUT", ADMIN + "/" + id(first) + "?version=1", "wire-v2.png"),
+                HttpResponse.BodyHandlers.ofString()
+            );
+            assertThat(replaced.statusCode()).isEqualTo(200);
+            JsonNode second = mapper.readTree(replaced.body()).path("data");
+            assertThat(second.path("url")).isEqualTo(first.path("url"));
+            assertThat(second.path("cloudCopy").asBoolean()).isTrue();
+            assertThat(second.path("version").asLong()).isEqualTo(2);
+            verify(cloud, times(2)).put(anyString(), any(), eq("image/png"));
+            remove(second).andExpect(status().isNoContent());
+        }
+    }
+
+    private HttpRequest multipartRequest(String method, String path, String filename) {
+        String boundary = "toeic-" + UUID.randomUUID();
+        var body = HttpRequest.BodyPublishers.concat(
+            HttpRequest.BodyPublishers.ofString(
+                "--" +
+                    boundary +
+                    "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" +
+                    filename +
+                    "\"\r\nContent-Type: image/png\r\n\r\n"
+            ),
+            HttpRequest.BodyPublishers.ofByteArray(PNG),
+            HttpRequest.BodyPublishers.ofString("\r\n--" + boundary + "--\r\n")
+        );
+        return HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+            .header("Authorization", auth("ADMIN"))
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .method(method, body)
+            .build();
+    }
+
+    @Test
+    void failedCloudReplacementAndDeletionPreserveTheExistingAsset() throws Exception {
+        when(cloud.enabled()).thenReturn(true);
+        JsonNode original = created("preserved.png", PNG, "IMAGE");
+        String originalKey = key(id(original));
+        doThrow(new AppException(ErrorCode.TOEIC_MEDIA_STORAGE_UNAVAILABLE))
+            .when(cloud)
+            .put(anyString(), any(), anyString());
+        mvc.perform(
+            multipart(HttpMethod.PUT, ADMIN + "/" + id(original))
+                .file(new MockMultipartFile("file", "failed.png", "image/png", PNG))
+                .param("version", "1")
+                .header("Authorization", auth("ADMIN"))
+        ).andExpect(status().isServiceUnavailable());
+        assertThat(key(id(original))).isEqualTo(originalKey);
+        assertThat(Files.readAllBytes(uploads.resolve(originalKey))).isEqualTo(PNG);
+        doThrow(new AppException(ErrorCode.TOEIC_MEDIA_STORAGE_UNAVAILABLE)).when(cloud).delete(originalKey);
+        remove(original).andExpect(status().isServiceUnavailable());
+        assertThat(key(id(original))).isEqualTo(originalKey);
+        mvc.perform(get(original.path("url").asText()))
+            .andExpect(status().isOk())
+            .andExpect(content().bytes(PNG));
+        doNothing().when(cloud).delete(originalKey);
+        remove(original).andExpect(status().isNoContent());
+    }
 
     @Test
     void adminsCanManageLocalAudioAndThePlaybackUrlSupportsRanges() throws Exception {

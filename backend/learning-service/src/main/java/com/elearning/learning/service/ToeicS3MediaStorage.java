@@ -6,6 +6,7 @@ import jakarta.annotation.PreDestroy;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.exception.SdkException;
@@ -19,16 +20,19 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 @Component
 public class ToeicS3MediaStorage {
 
-    private static final String PREFIX = "documents/toeic/uploads/";
     private final String bucket;
+    private final String prefix;
     private final S3Client client;
     private final S3Presigner presigner;
 
+    @Autowired
     public ToeicS3MediaStorage(
         @Value("${toeic.media.s3-bucket:}") String bucket,
-        @Value("${toeic.media.s3-region:ap-southeast-1}") String region
+        @Value("${toeic.media.s3-region:ap-southeast-1}") String region,
+        @Value("${toeic.media.s3-prefix:documents/toeic/uploads/}") String prefix
     ) {
         this.bucket = bucket.trim();
+        this.prefix = normalizePrefix(prefix);
         this.client = enabled()
             ? S3Client.builder()
                   .region(Region.of(region))
@@ -42,6 +46,19 @@ public class ToeicS3MediaStorage {
         this.presigner = enabled() ? S3Presigner.builder().region(Region.of(region)).build() : null;
     }
 
+    ToeicS3MediaStorage(String bucket, String prefix, S3Client client, S3Presigner presigner) {
+        this.bucket = bucket;
+        this.prefix = normalizePrefix(prefix);
+        this.client = client;
+        this.presigner = presigner;
+    }
+
+    private static String normalizePrefix(String prefix) {
+        String path = prefix.trim().replaceAll("^/+|/+$", "");
+        if (path.isEmpty()) throw new IllegalArgumentException("TOEIC media S3 prefix must not be empty");
+        return path + "/";
+    }
+
     public boolean enabled() {
         return !bucket.isEmpty();
     }
@@ -52,7 +69,7 @@ public class ToeicS3MediaStorage {
                 request ->
                     request
                         .bucket(bucket)
-                        .key(PREFIX + key)
+                        .key(prefix + key)
                         .contentType(contentType),
                 RequestBody.fromFile(file)
             );
@@ -63,7 +80,7 @@ public class ToeicS3MediaStorage {
 
     public long size(String key) {
         try {
-            return client.headObject(request -> request.bucket(bucket).key(PREFIX + key)).contentLength();
+            return client.headObject(request -> request.bucket(bucket).key(prefix + key)).contentLength();
         } catch (S3Exception ex) {
             throw new AppException(
                 ex.statusCode() == 404 ? ErrorCode.NOT_FOUND : ErrorCode.TOEIC_MEDIA_STORAGE_UNAVAILABLE,
@@ -78,7 +95,7 @@ public class ToeicS3MediaStorage {
         try {
             var get = GetObjectRequest.builder()
                 .bucket(bucket)
-                .key(PREFIX + key)
+                .key(prefix + key)
                 .build();
             return URI.create(
                 presigner
@@ -95,7 +112,7 @@ public class ToeicS3MediaStorage {
 
     public void delete(String key) {
         try {
-            client.deleteObject(request -> request.bucket(bucket).key(PREFIX + key));
+            client.deleteObject(request -> request.bucket(bucket).key(prefix + key));
         } catch (SdkException ex) {
             throw new AppException(ErrorCode.TOEIC_MEDIA_STORAGE_UNAVAILABLE, ex);
         }
