@@ -7,7 +7,7 @@ Completed 2026-09-16. Scope: Refresh Token support for existing Auth v1 only. Ex
 - `backend/auth-service/src/main/resources/db/migration/V3__create_refresh_tokens.sql`
 - Under `backend/auth-service/src/main/java/com/elearning/auth/`: `entity/RefreshToken.java`, `repository/RefreshTokenRepository.java`, `service/RefreshTokenService.java`, `service/impl/RefreshTokenServiceImpl.java`, `security/RefreshTokenCookie.java`
 - `backend/auth-service/src/test/java/com/elearning/auth/RefreshTokenTests.java`
-- `frontend/web/tests/refresh.test.js`
+- `frontend/web/tests/features/auth/refresh.test.js`
 - `frontend/web/scripts/refresh-scenarios.mjs`
 - `docs/REFRESH_TOKEN_REPORT.md`
 

@@ -26,6 +26,12 @@ const formatVND = amount => {
   );
 };
 
+const unwrapReviewPayload = value => {
+  if (!value || typeof value !== 'object') return value ?? null;
+  if ('data' in value) return unwrapReviewPayload(value.data);
+  return value;
+};
+
 const courseDefaults = {
   title: '',
   description: '',
@@ -174,8 +180,12 @@ function CourseDetail({ id }) {
     const version = getSessionVersion();
     try {
       const res = await reviewApi.myReview(id);
-      const data = res?.data?.data || res?.data || res;
-      if (version === getSessionVersion()) setMyReview(data || null);
+      const data = unwrapReviewPayload(res);
+      const validReview =
+        data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length > 0
+          ? data
+          : null;
+      if (version === getSessionVersion()) setMyReview(validReview);
     } catch {
       if (version === getSessionVersion()) setMyReview(null);
     }

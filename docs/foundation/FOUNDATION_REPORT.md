@@ -130,7 +130,7 @@ Frontend coverage: token decoding/expiry, Unicode subjects, blocked browser stor
 - `frontend/web/src/shared/utils/formatDate.js`
 - `frontend/web/src/shared/utils/tokenUtils.js`
 - `frontend/web/src/styles/theme.js`
-- `frontend/web/tests/foundation.test.js`
+- `frontend/web/tests/shared/foundation.test.js`
 - `infra/docker/service.Dockerfile`
 - `infra/mysql/02-users.sh`
 
