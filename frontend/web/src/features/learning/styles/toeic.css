@@ -145,26 +145,6 @@
   flex: 1;
   min-width: 0;
 }
-.toeic-featured-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.toeic-featured-tags span {
-  color: var(--toeic-muted);
-  background: var(--toeic-canvas);
-  border: 1px solid var(--toeic-line);
-  border-radius: 5px;
-  padding: 3px 6px;
-  font-size: 10px;
-  font-weight: 600;
-}
-.toeic-featured-tags span:first-child {
-  color: var(--toeic-primary);
-  background: var(--toeic-blue-soft);
-  border-color: #d9e6fd;
-}
 .toeic-featured h2 {
   font-size: 20px;
   line-height: 1.5;
@@ -448,19 +428,6 @@
 }
 .toeic-book-symbol > svg {
   font-size: 28px;
-}
-.toeic-test-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-bottom: 16px;
-}
-.toeic-test-tags > span {
-  padding: 3px 7px;
-  background: var(--toeic-canvas);
-  color: var(--toeic-muted);
-  font-size: 10px;
-  border-radius: 5px;
 }
 .toeic-test-meta {
   display: flex;
@@ -923,9 +890,6 @@
   }
   .toeic-featured h2 {
     font-size: 17px;
-  }
-  .toeic-featured-tags span:last-child {
-    display: none;
   }
   .toeic-featured > .toeic-button {
     width: 100%;
@@ -1932,6 +1896,17 @@
   font-size: 16px;
   margin-bottom: 16px;
 }
+.toeic-admin-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.toeic-media-picker {
+  justify-self: start;
+  align-self: flex-start;
+}
+
 .toeic-admin-list > button {
   display: flex;
   flex-direction: column;
@@ -2538,12 +2513,6 @@
 
 .toeic-test-card.is-clickable:hover .toeic-book-symbol {
   transform: scale(1.07) rotate(-2deg);
-}
-
-.toeic-test-tags > span.is-highlight {
-  background: var(--toeic-blue-soft);
-  color: var(--toeic-primary);
-  font-weight: 600;
 }
 
 .toeic-test-action {

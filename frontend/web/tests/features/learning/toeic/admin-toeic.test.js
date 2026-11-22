@@ -69,7 +69,7 @@ test('reading editor rejects invalid slugs, duplicate numbers and non-local imag
     'https://assets.example.test/outside.webp',
   );
   await save();
-  assert.match(document.body.textContent, /Hình câu hỏi phải dùng đường dẫn nội bộ/);
+  assert.match(document.body.textContent, /Hình câu hỏi phải dùng tệp từ kho TOEIC hoặc đường dẫn nội bộ/);
   assert.equal(update.mock.callCount(), 0);
   await env.setInputValue('input[placeholder="/toeic-assets/..."]', '/toeic-assets/test/image.webp');
   await env.setInputValue('textarea[name="description"]', ' Reading drill ');
@@ -145,7 +145,7 @@ test('listening drafts validate audio, transcript and picture requirements befor
   const audio = env.field('Đường dẫn đoạn nghe');
   await env.setInputValue(audio, 'https://example.test/audio.mp3');
   await save();
-  assert.match(document.body.textContent, /cần đường dẫn MP3 dưới/);
+  assert.match(document.body.textContent, /cần audio từ kho TOEIC hoặc đường dẫn MP3 dưới/);
   await env.setInputValue(audio, '/toeic-assets/test/audio-001.mp3');
   await env.setInputValue(env.field('Transcript'), 'A person is holding a book.');
   await save();

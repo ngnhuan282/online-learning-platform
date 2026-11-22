@@ -2,6 +2,13 @@ import axiosClient from '../../../shared/apis/axiosClient';
 import { ENDPOINTS } from '../../../shared/apis/endpoints';
 
 const paths = ENDPOINTS.toeic;
+const uploadTimeout = 120_000;
+
+function mediaForm(file) {
+  const form = new FormData();
+  form.append('file', file);
+  return form;
+}
 
 export const toeicApi = {
   list: options => axiosClient.get(paths.exams, { ...options, skipAuth: true }),
@@ -33,4 +40,14 @@ export const toeicApi = {
   update: (id, definition) => axiosClient.put(paths.adminExam(id), definition),
   publish: (id, published) => axiosClient.patch(paths.publish(id), { published }),
   remove: id => axiosClient.delete(paths.adminExam(id)),
+  mediaList: (kind, page, options) =>
+    axiosClient.get(paths.adminMedia, { ...options, params: { kind, page } }),
+  uploadMedia: (file, kind) =>
+    axiosClient.post(paths.adminMedia, mediaForm(file), { params: { kind }, timeout: uploadTimeout }),
+  replaceMedia: (id, version, file) =>
+    axiosClient.put(paths.adminMediaItem(id), mediaForm(file), {
+      params: { version },
+      timeout: uploadTimeout,
+    }),
+  deleteMedia: (id, version) => axiosClient.delete(paths.adminMediaItem(id), { params: { version } }),
 };
