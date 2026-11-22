@@ -845,22 +845,15 @@ Khi debug, hãy kiểm tra request thực sự liên quan:
 
 Email đã tồn tại trong `auth_db`. Hãy sử dụng email khác.
 
-## Flyway báo thiếu quyền
+## Flyway báo thiếu quyền trên volume cũ
 
-Đăng nhập MySQL:
+Chạy lại script cấp quyền user ứng dụng trong container `mysql`:
 
 ```powershell
-docker compose exec mysql mysql -uroot -p
+docker compose exec mysql sh /docker-entrypoint-initdb.d/02-users.sh
 ```
 
-Sau đó:
-
-```sql
-SOURCE /docker-entrypoint-initdb.d/03-auth-migrations.sql;
-exit;
-```
-
-Restart Auth:
+Sau đó khởi động lại service bị lỗi (ví dụ `auth-service`):
 
 ```powershell
 docker compose restart auth-service

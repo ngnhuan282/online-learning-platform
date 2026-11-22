@@ -17,7 +17,12 @@ import { getSessionVersion } from '../../../shared/utils/tokenUtils';
 import useAuth from '../../auth/hooks/useAuth';
 import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
-import { isListeningPart, PART_TITLES } from '../utils/toeicSections';
+import {
+  formatToeicSourceLabel,
+  formatToeicTitle,
+  isListeningPart,
+  PART_TITLES,
+} from '../utils/toeicSections';
 
 const TIME_PRESETS = [
   { value: 'unlimited', minutes: null, label: 'Không giới hạn' },
@@ -155,11 +160,11 @@ function ToeicReaderWorkspace({ testId }) {
           <ArrowBackRounded fontSize="small" />
           {t('Tất cả bộ đề')}
         </Link>
-        {exam.sourceLabel && <span>{exam.sourceLabel}</span>}
+        {exam.sourceLabel && <span>{formatToeicSourceLabel(exam.sourceLabel)}</span>}
       </div>
       <header className="toeic-page-heading">
         <div>
-          <h1>{exam.title}</h1>
+          <h1>{formatToeicTitle(exam.title)}</h1>
           <p>
             {exam.description ||
               t('Chọn chế độ Luyện tập hoặc Thi thực chiến, tùy chỉnh thời gian và bắt đầu làm bài ngay.')}

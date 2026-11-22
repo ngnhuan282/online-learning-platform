@@ -13,6 +13,9 @@ spring:
       max-file-size: 25MB
       max-request-size: 26MB
   flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
     placeholders:
       notificationCheckKeyword: CHECK
       notificationEventKeyCollation: "CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"

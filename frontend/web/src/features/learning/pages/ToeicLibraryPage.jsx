@@ -20,6 +20,7 @@ import useLocale from '../../../shared/i18n/useLocale';
 import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import useToeicBookmarks from '../hooks/useToeicBookmarks';
+import { normalizeToeicLibraryExams } from '../utils/toeicSections';
 
 const EMPTY = [];
 const PAGE_SIZE = 6;
@@ -38,7 +39,8 @@ export default function ToeicLibraryPage() {
   const { bookmarks, toggle } = useToeicBookmarks();
   const resultsHeading = useRef(null);
   const load = useCallback(options => toeicApi.list(options), []);
-  const { data: exams, error, loading, reload } = useLearningResource(load, EMPTY);
+  const { data: rawExams, error, loading, reload } = useLearningResource(load, EMPTY);
+  const exams = normalizeToeicLibraryExams(rawExams);
   const query = params.get('q') ?? '';
   const savedOnly = params.get('view') === 'saved';
   const listening = params.get('section') === 'listening';

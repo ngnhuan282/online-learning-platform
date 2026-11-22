@@ -12,7 +12,7 @@ import { toeicApi } from '../api/toeicApi';
 import useLearningResource from '../hooks/useLearningResource';
 import ToeicQuestion from '../components/ToeicQuestion';
 import StudyTextAssistant from '../components/StudyTextAssistant';
-import { isListeningPart } from '../utils/toeicSections';
+import { formatToeicTitle, isListeningPart } from '../utils/toeicSections';
 
 export default function ToeicResultPage() {
   useLocale();
@@ -109,7 +109,7 @@ export default function ToeicResultPage() {
       <header className="toeic-page-heading">
         <div>
           <h1>{t(listening ? 'Kết quả Listening' : 'Kết quả Reading')}</h1>
-          <p>{result.title}</p>
+          <p>{formatToeicTitle(result.title)}</p>
         </div>
         <span className="toeic-pill">
           <CheckCircleOutlineOutlined fontSize="small" />
