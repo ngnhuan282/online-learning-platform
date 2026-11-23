@@ -77,11 +77,11 @@ EXPECTED_COUNTS = {
     'learning_db.toeic_lesson_progress': 16,
     'learning_db.toeic_notes': 18,
     'learning_db.toeic_media': 15,
-    'learning_db.dictation_audio': 15,
+    'learning_db.dictation_audio': 0,
     'learning_db.dictation_exercises': 15,
     'learning_db.dictation_revisions': 15,
     'learning_db.dictation_attempts': 16,
-    'learning_db.dictation_responses': 24,
+    'learning_db.dictation_responses': 37,
     'learning_db.dictation_workbook_imports': 15,
     'learning_db.dictation_workbook_sync': 15,
     'learning_db.dictation_workbook_sources': 15,
@@ -99,10 +99,11 @@ EXPECTED_COUNTS = {
     'ai_db.ai_daily_usage': 16,
 }
 
-SYSTEM_TABLES = {
+TABLES_WITHOUT_DEMO_MINIMUM = {
     'auth_db.roles',
     'learning_db.engagement_settings',
     'learning_db.learning_admin_actor_locks',
+    'learning_db.dictation_audio',  # YouTube fixtures do not need MP3 metadata.
 }
 
 password = secrets.token_hex(24)
@@ -156,8 +157,9 @@ def wait_until(predicate, description, seconds=150):
     raise AssertionError('Timed out: ' + description)
 
 
-def seed(check=True):
-    return sql((ROOT / 'infra/mysql/seed-data.sql').read_text(encoding='utf-8'), check=check)
+def seed(check=True, dictation_only=False):
+    script = (ROOT / 'infra/mysql/seed-data.sql').read_text(encoding='utf-8')
+    return sql(('SET @dictation_seed_only = 1;\n' if dictation_only else '') + script, check=check)
 
 
 def histories():
@@ -238,13 +240,18 @@ def verify():
     for table, expected in EXPECTED_COUNTS.items():
         actual = count(table)
         assert actual == expected, f'{table}: expected {expected}, got {actual}'
-        if table not in SYSTEM_TABLES:
+        if table not in TABLES_WITHOUT_DEMO_MINIMUM:
             assert actual >= 15, f'{table} must have >=15 rows, got {actual}'
     # toeic_exams has 15 seed exams + any bundled ETS collections loaded by ToeicSeedConfig
     assert count('learning_db.toeic_exams') >= 15
     assert count('auth_db.refresh_tokens', 'revoked_at IS NOT NULL AND expires_at < NOW() AND session_id IS NOT NULL') == 18
     assert count('auth_db.users', "id=22 AND email='admin@gmail.com' AND full_name='Existing admin profile'") == 1
     assert count('auth_db.users', "id IN (1,2) AND password_hash='existing-hash'") == 2
+    assert count('learning_db.dictation_revisions',
+                 "JSON_UNQUOTE(JSON_EXTRACT(definition, '$.video.url')) LIKE 'https://www.youtube.com/watch?v=%'") == 15
+    assert count('learning_db.dictation_workbook_sources',
+                 "storage='s3' AND object_key LIKE 'documents/transcripts/transcript-%.xlsx'") == 15
+    assert count('learning_db.dictation_workbook_sync', 'pending=TRUE') == 0
 
     # Re-running preserves edited profiles, unrelated users and every row count.
     sql("UPDATE auth_db.users SET full_name='Edited learner profile' WHERE email='user@gmail.com';")
@@ -308,6 +315,39 @@ def verify():
     else:
         raise AssertionError('The locked sample account must remain locked')
     print('Active logins, admin access, curriculum, progress, quizzes, AI and payment history passed.', flush=True)
+
+    # Repeat the production's Dictation-only update on an already populated schema.
+    sql("""
+        SET @edited_id = (SELECT exercise_id FROM learning_db.dictation_workbook_sources
+            WHERE storage = 's3' AND object_key = 'documents/transcripts/transcript-what-day-is-it-today.xlsx');
+        UPDATE learning_db.dictation_revisions
+        SET title = 'Edited YouTube lesson', definition = JSON_SET(definition, '$.title', 'Edited YouTube lesson')
+        WHERE exercise_id = @edited_id AND version = 1;
+        DELETE FROM learning_db.dictation_workbook_sources
+        WHERE storage = 's3' AND object_key = 'documents/transcripts/transcript-eating-like-a-bird.xlsx';
+        INSERT INTO learning_db.dictation_exercises
+            (id, current_version, published_version, archived, updated_at) VALUES
+            ('seed-dict-ex-11', 1, 1, FALSE, NOW(6)),
+            ('verify-manual-audio-lesson', 1, 1, FALSE, NOW(6));
+        INSERT INTO learning_db.dictation_revisions
+            (exercise_id, version, title, topic, level, duration_seconds, definition) VALUES
+            ('seed-dict-ex-11', 1, 'Office Relocation', 'Test 1', 'B1', 32.5,
+                '{"audioKey":"seed-dict-audio-11"}'),
+            ('verify-manual-audio-lesson', 1, 'Manual audio', 'Workplace', 'B1', 30,
+                '{"audioKey":"verify-manual-audio"}');
+        UPDATE auth_db.users SET password_hash = 'dictation-update-keeps-this' WHERE id = 22;
+    """)
+    seed(dictation_only=True)
+    seed(dictation_only=True)
+    assert count('learning_db.dictation_exercises') == 17
+    assert count('learning_db.dictation_exercises', "id='seed-dict-ex-11' AND archived=TRUE") == 1
+    assert count('learning_db.dictation_exercises', "id='verify-manual-audio-lesson' AND archived=FALSE") == 1
+    assert count('learning_db.dictation_revisions', "title='Edited YouTube lesson'") == 1
+    assert count('learning_db.dictation_workbook_sources', "storage='s3'") == 15
+    assert count('learning_db.dictation_attempts') == 16
+    assert count('auth_db.users', "id=22 AND password_hash='dictation-update-keeps-this'") == 1
+    assert histories() == before
+    print('Verified Dictation updates reuse existing lessons, archive only legacy fixtures, and keep other data.', flush=True)
 
 
 try:

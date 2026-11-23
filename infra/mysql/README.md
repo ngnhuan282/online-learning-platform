@@ -5,7 +5,7 @@
 1. **File A tổng hợp (chạy 1 file duy nhất là có đủ 5 DB, 71 bảng và dữ liệu mẫu)**:
    - [`infra/mysql/seed-data.sql`](seed-data.sql)
    - Phần 1 tạo đầy đủ 5 database (`auth_db`, `course_db`, `learning_db`, `payment_db`, `ai_db`) và **71 bảng InnoDB** (với đầy đủ khóa chính, khóa ngoại, `CHECK`, `UNIQUE` và `INDEX` khai báo inline trong `CREATE TABLE IF NOT EXISTS`), khớp 100% với hợp của 5 file migration service.
-   - Phần 2 chạy stored procedure giao dịch `seed_chitchatgo_data()` để nạp dữ liệu hệ thống nền (`roles`, `permissions`, `role_permissions`, `community_topics`, `shop_items`, `engagement_settings`, `engagement_reward_rules`, `pro_plans`) và toàn bộ dữ liệu mẫu (**tối thiểu 15 dòng cho mọi bảng nghiệp vụ**).
+   - Phần 2 chạy stored procedure giao dịch `seed_chitchatgo_data()` để nạp dữ liệu hệ thống nền (`roles`, `permissions`, `role_permissions`, `community_topics`, `shop_items`, `engagement_settings`, `engagement_reward_rules`, `pro_plans`) và dữ liệu mẫu. Các bài Dictation mẫu dùng YouTube và có thể xem trong thư viện khi chưa bật S3.
 2. **File migration con trong từng service (gộp gọn 1 file duy nhất/service)**:
    - `backend/auth-service/src/main/resources/db/migration/V1__init_auth_schema.sql` (`auth_db` — 12 bảng)
    - `backend/course-service/src/main/resources/db/migration/V1__init_course_schema.sql` (`course_db` — 6 bảng)
@@ -66,15 +66,15 @@ Các lệnh `CREATE DATABASE IF NOT EXISTS` và `CREATE TABLE IF NOT EXISTS` s�
 
 Đây là thông tin đăng nhập công khai dành cho phát triển (mật khẩu lưu dạng BCrypt hash). Seed tìm user theo email và role theo tên, giữ nguyên ID và tên hồ sơ đã tồn tại.
 
-## Quy mô dữ liệu mẫu (tối thiểu 15 bản ghi/bảng)
+## Quy mô dữ liệu mẫu
 
-Toàn bộ **68/68 bảng nghiệp vụ & RBAC** trên cả 5 database đạt **≥ 15 dòng** (tổng **1.559 bản ghi**), chỉ giữ nguyên 3 bảng hệ thống/singleton (`auth_db.roles` [2], `learning_db.engagement_settings` [1], `learning_db.learning_admin_actor_locks` [0]):
+Các bảng nghiệp vụ và RBAC có ít nhất 15 dòng mẫu mỗi bảng. Các bảng `auth_db.roles`, `learning_db.engagement_settings` và `learning_db.learning_admin_actor_locks` có số dòng theo cấu hình hệ thống. `learning_db.dictation_audio` dành cho bài MP3 cũ và để trống khi nạp mới.
 
 | Database | Dữ liệu sau khi chạy `seed-data.sql` |
 | --- | --- |
 | `auth_db` | 18 `users`, 19 `user_roles`, 54 `permissions`, 54 `role_permissions`, 18 `refresh_tokens` (hết hạn/thu hồi), 16 `admin_audit_logs`, 15 `user_external_identities`, 15 `google_link_intents`, 15 `oauth_login_codes`, 15 `password_reset_tokens`, 15 `password_reset_rate_limits` |
 | `course_db` | 15 `categories`, 18 `courses` (16 `PUBLISHED`, 1 `DRAFT`, 1 `ARCHIVED`), 36 `sections`, 54 `lessons`, 24 `lesson_resources`, 33 `reviews` khớp `avg_rating`/`review_count` |
-| `learning_db` | ≥15 bản ghi ở toàn bộ 41 bảng nghiệp vụ (20 `enrollments`, 16 `payment_enrollment_receipts`, 26 `lesson_progress`, 16 `quizzes`, 32 `quiz_questions`, 128 `quiz_options`, 18 `quiz_attempts`, 34 `quiz_answers`, 20 `notifications`, 18 `learner_profiles`, 26 `learning_xp_events`, 25 `learning_activity_days`, 20 `learner_rewards`, 15 `community_topics`, 18 `community_posts`, 24 `community_comments`, 15 `shop_items`, 28 `shop_inventory`, 18 `shop_purchases`, 16 `learning_frozen_days`, 15 `pro_memberships`, 18 `pro_grants`, 16 `pro_activation_codes`, 15 `pro_activation_attempts`, 15 `engagement_reward_rules`, 15 `learner_admin_adjustments`, 16 `learning_admin_audit`, 15 `gem_topup_receipts`, 15 `toeic_exams`, 16 `toeic_attempts`, 16 `toeic_lesson_progress`, 18 `toeic_notes`, 15 `toeic_media`, 15 `dictation_audio`/`exercises`/`revisions`/`imports`/`sync`/`sources`, 16 `dictation_attempts`, 24 `dictation_responses`) |
+| `learning_db` | 20 `enrollments`, 16 `payment_enrollment_receipts`, 26 `lesson_progress`, 16 `quizzes`, 32 `quiz_questions`, 128 `quiz_options`, 18 `quiz_attempts`, 34 `quiz_answers`, 20 `notifications`, 18 `learner_profiles`, 26 `learning_xp_events`, 25 `learning_activity_days`, 20 `learner_rewards`, 15 `community_topics`, 18 `community_posts`, 24 `community_comments`, 15 `shop_items`, 28 `shop_inventory`, 18 `shop_purchases`, 16 `learning_frozen_days`, 15 `pro_memberships`, 18 `pro_grants`, 16 `pro_activation_codes`, 15 `pro_activation_attempts`, 15 `engagement_reward_rules`, 15 `learner_admin_adjustments`, 16 `learning_admin_audit`, 15 `gem_topup_receipts`, 15 `toeic_exams`, 16 `toeic_attempts`, 16 `toeic_lesson_progress`, 18 `toeic_notes`, 15 `toeic_media`, 15 bài YouTube cùng phiên bản và liên kết workbook, 16 `dictation_attempts`, 37 `dictation_responses` |
 | `payment_db` | 15 `pro_plans` (3 gói gốc đang mở bán + 12 gói chiến dịch), 36 `orders` (17 `COURSE`, 4 `PRO`, 15 `GEM_TOPUP`), 36 `order_items`, 36 `payments` (`MOCK`), 36 `payment_transactions`, 15 `payment_admin_audit` |
 | `ai_db` | 16 `ai_conversations`, 32 `ai_messages` (16 `USER` + 16 `AI`), 16 `ai_usage_logs`, 16 `ai_daily_usage` |
 
