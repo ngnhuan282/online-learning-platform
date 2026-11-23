@@ -152,6 +152,13 @@ jobs:
             echo "Fresh schema and seed-data.sql loaded successfully."
           else
             echo "Consolidated V1 schema and seed-data.sql are already present; preserving existing databases."
+            echo "Updating Dictation demo lessons and workbook links..."
+            {
+              printf 'SET @dictation_seed_only = 1;\n'
+              cat infra/mysql/seed-data.sql
+            } | "${COMPOSE_CMD[@]}" exec -T mysql sh -c '
+              MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 --batch -uroot
+            '
           fi
 
           echo "==> [4/5] Building and starting production services..."
