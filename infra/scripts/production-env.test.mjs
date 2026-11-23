@@ -55,7 +55,7 @@ test('production preflight rejects shared/weak secrets, mock payments, insecure 
     assert.ok(errors.includes(text));
   assert.ok(!errors.includes(env.JWT_SECRET));
 });
-test('enabled integrations require complete configuration and production VNPay cannot use a sandbox URL', () => {
+test('enabled integrations require complete configuration and Sandbox needs explicit opt-in', () => {
   const env = {
     ...fixture(),
     GOOGLE_LOGIN_ENABLED: 'true',
@@ -67,9 +67,23 @@ test('enabled integrations require complete configuration and production VNPay c
   const errors = validateProductionEnv(env).join('\n');
   assert.match(errors, /GOOGLE_CLIENT_ID/);
   assert.match(errors, /AI_MODEL/);
-  assert.match(errors, /sandbox payments/);
+  assert.match(errors, /VNPAY_SANDBOX_ALLOWED=true/);
   assert.ok(!errors.includes('private-ai-key'));
   assert.ok(!errors.includes('private-signing-key'));
+});
+test('demo deploys can opt in to the approved Sandbox URL with both merchant credentials', () => {
+  const env = {
+    ...fixture(),
+    VNPAY_SANDBOX_ALLOWED: 'true',
+    VNPAY_TMN_CODE: 'TEST0001',
+    VNPAY_HASH_SECRET: 'private-signing-key',
+    VNPAY_PAYMENT_URL: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+  };
+  assert.deepEqual(validateProductionEnv(env), []);
+  assert.match(validateProductionEnv({ ...env, VNPAY_SANDBOX_ALLOWED: 'false' }).join('\n'), /demo deployment/);
+  assert.match(validateProductionEnv({ ...env, VNPAY_SANDBOX_ALLOWED: 'yes' }).join('\n'), /must be true or false/);
+  assert.match(validateProductionEnv({ ...env, VNPAY_HASH_SECRET: '' }).join('\n'), /both VNPay merchant credentials/);
+  assert.match(validateProductionEnv({ ...env, VNPAY_PAYMENT_URL: 'https://other.test/pay' }).join('\n'), /approved/);
 });
 test('dotenv parser never executes input and rejects expansion, duplicate keys and malformed quotes', () => {
   assert.deepEqual(parseEnv("# ignored\nMAIL_FROM='sender@integration.test'\nJWT_ISSUER=sgedu # comment"), {
