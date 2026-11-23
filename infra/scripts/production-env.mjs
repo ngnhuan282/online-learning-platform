@@ -92,6 +92,7 @@ export function validateProductionEnv(env) {
     );
   for (const key of [
     'PAYMENT_MOCK_ENABLED',
+    'VNPAY_SANDBOX_ALLOWED',
     'BOOTSTRAP_ADMIN_ENABLED',
     'MAIL_ENABLED',
     'GOOGLE_LOGIN_ENABLED',
@@ -138,7 +139,7 @@ export function validateProductionEnv(env) {
       : ['https://pay.vnpay.vn/vpcpay.html'];
   if (env.VNPAY_TMN_CODE && !allowedVnpayUrls.includes(env.VNPAY_PAYMENT_URL))
     errors.push(
-      'Production VNPay credentials require the approved production payment URL; sandbox payments cannot be deployed as live payments',
+      'Use the approved VNPay production URL, or set VNPAY_SANDBOX_ALLOWED=true with the approved Sandbox URL on a demo deployment',
     );
   if (env.BOOTSTRAP_ADMIN_ENABLED === 'true') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.BOOTSTRAP_ADMIN_EMAIL || ''))
