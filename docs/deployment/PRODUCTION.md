@@ -135,6 +135,12 @@ báo checksum khác, dừng nâng cấp để đối chiếu lịch sử và b�
 | AI | Điền cả key/model, đặt `AI_DAILY_REQUEST_LIMIT`. Hạn mức theo user/ngày UTC được lưu trong DB, dùng chung giữa các hội thoại/replica. Cache idempotency không tiêu thêm lượt; request đã gọi provider vẫn tính lượt khi lỗi để hạn chế retry tiêu phí. |
 
 Để trống cả cặp cấu hình VNPay hoặc AI sẽ tắt chức năng tương ứng; lịch sử vẫn đọc được.
+
+Với bản deploy chỉ dùng để demo, điền merchant Sandbox vào `VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET`,
+đặt `VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html` và `VNPAY_SANDBOX_ALLOWED=true`
+trong `.env.production`. Cấu hình IPN trên VNPay SIT thành `${PRODUCTION_ORIGIN}/api/v1/payments/vnpay/ipn`.
+Dùng `VNPAY_SANDBOX_ALLOWED=false` hoặc bỏ biến này trên web nhận thanh toán thật.
+
 Không mở bán khóa trả phí trước khi merchant/IPN được nghiệm thu. Không có thao tác
 gán SUCCESS từ trình duyệt; callback phải được xác minh. Nghiệm thu live gồm thanh toán,
 hủy/thất bại, callback lặp và Payment → Enrollment; chỉ thực hiện giao dịch thật khi
