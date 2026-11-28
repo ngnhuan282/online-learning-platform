@@ -8,12 +8,12 @@ import { normalizeCategoryList } from '../../courses/utils/courseCatalog';
 import ErrorState from '../../../shared/components/ErrorState';
 
 const keywords = [
-  'IELTS 7.0+',
-  'TOEIC Cấp tốc',
-  'Tiếng Anh Giao tiếp',
-  'Phát âm chuẩn Mỹ',
-  'English for Developers',
-  'Tiếng Anh Thương mại',
+  { keyword: 'IELTS 7.0+' },
+  { keyword: 'TOEIC Cấp tốc' },
+  { keyword: 'Tiếng Anh Giao tiếp' },
+  { keyword: 'Du lịch', label: 'Tiếng Anh Du lịch' },
+  { keyword: 'English for Developers' },
+  { keyword: 'Tiếng Anh Thương mại' },
 ];
 
 export default function CategorySection() {
@@ -65,7 +65,7 @@ export default function CategorySection() {
             <Icon name="search" size={25} />
             <input
               aria-label={t('Bạn muốn cải thiện kỹ năng gì hôm nay?')}
-              placeholder={t('Bạn muốn cải thiện kỹ năng gì hôm nay? (VD: IELTS Speaking, TOEIC 800+...)')}
+              placeholder={t('Bạn muốn cải thiện kỹ năng gì hôm nay? (VD: IELTS, TOEIC...)')}
               value={query}
               onChange={event => setQuery(event.target.value)}
             />
@@ -75,7 +75,7 @@ export default function CategorySection() {
           </form>
           <div className="popular-keywords">
             <span>{t('Từ khóa phổ biến:')}</span>
-            {keywords.map(keyword => (
+            {keywords.map(({ keyword, label }) => (
               <button
                 key={keyword}
                 onClick={() => {
@@ -83,7 +83,7 @@ export default function CategorySection() {
                   search(keyword);
                 }}
               >
-                {keyword}
+                {label ? t(label) : keyword}
               </button>
             ))}
           </div>

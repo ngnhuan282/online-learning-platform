@@ -23,7 +23,7 @@ const courses = [
   { name: 'Luyện thi IELTS 7.5+', query: 'IELTS' },
   { name: 'TOEIC Cấp tốc 850+', query: 'TOEIC' },
   { name: 'Tiếng Anh CNTT & Tech', query: 'English for Developers' },
-  { name: 'Phát âm chuẩn IPA Mỹ', query: 'Phát âm chuẩn Mỹ' },
+  { name: 'Tiếng Anh Du lịch', query: 'Du lịch' },
   { name: 'Tiếng Anh Thương mại', query: 'Tiếng Anh Thương mại' },
 ];
 
@@ -38,7 +38,7 @@ export default function SiteFooter() {
             <Brand />
             <p>
               {t(
-                'Nền tảng đào tạo Tiếng Anh chuẩn quốc tế thế hệ mới. Lộ trình phản xạ khoa học, tương tác thực tế cùng giáo viên bản ngữ và gia sư AI chấm phát âm 24/7.',
+                'Nền tảng đào tạo Tiếng Anh chuẩn quốc tế thế hệ mới. Lộ trình phản xạ khoa học, tương tác thực tế cùng giáo viên bản ngữ và trợ lý AI hỗ trợ học tập.',
               )}
             </p>
             <div className="social-links">
