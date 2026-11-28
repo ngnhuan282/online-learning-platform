@@ -1,0 +1,567 @@
+.home-hero {
+  padding: clamp(38px, 4.5vw, 64px) 0;
+  border-bottom: 1px solid #e4ecf6;
+  background-color: #f8fbff;
+  background-image:
+    radial-gradient(circle at 14% 18%, rgb(15 112 230 / 8%), transparent 36%),
+    radial-gradient(circle at 86% 24%, rgb(18 168 97 / 9%), transparent 38%),
+    radial-gradient(#dce6f3 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    100% 100%,
+    24px 24px;
+}
+
+.home-hero-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: clamp(28px, 4.5vw, 68px);
+}
+
+.home-hero-copy h1 {
+  margin-top: 20px;
+  font-size: clamp(34px, 3.3vw, 48px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.home-hero-copy h1 span {
+  display: block;
+  color: #095fc6;
+}
+
+.home-hero-copy > p {
+  max-width: 520px;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: clamp(15px, 1.2vw, 18px);
+  line-height: 1.7;
+}
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.home-hero-actions .button {
+  min-height: 48px;
+  padding-inline: 20px;
+}
+
+.home-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 520px;
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-hero-stats li {
+  padding: 13px clamp(10px, 1.2vw, 16px);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 3px 0 #e2eaf3;
+}
+
+.home-hero-stats strong {
+  display: block;
+  font-size: clamp(16px, 1.65vw, 20px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.home-hero-stats span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.home-studio {
+  padding: clamp(12px, 1.6vw, 20px);
+  border: 1px solid #d5e2f2;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow:
+    0 5px 0 #dce6f3,
+    0 22px 44px -16px rgb(19 34 56 / 18%);
+}
+
+.home-studio-toolbar,
+.home-studio-summary,
+.home-studio-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.home-studio-toolbar {
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.home-studio-dots {
+  display: flex;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+.home-studio-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f87171;
+}
+
+.home-studio-dots i:nth-child(2) {
+  background: #fbbf24;
+}
+
+.home-studio-dots i:nth-child(3) {
+  background: #34bd75;
+}
+
+.home-studio-name {
+  flex: 1;
+}
+
+.home-studio-badge,
+.home-studio-status {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.home-studio-badge {
+  color: #106a43;
+  border: 1px solid #b9e9d0;
+  background: var(--mint-soft);
+}
+
+.home-studio-lesson {
+  display: block;
+  border-radius: 15px;
+}
+
+.home-studio-lesson:focus-visible,
+.home-library-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+
+.home-studio-cover {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid #1e3246;
+  border-radius: 15px;
+  color: #fff;
+  background: #132b43;
+}
+
+.home-studio-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 200ms ease;
+}
+
+.home-studio-cover::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(0deg, rgb(8 19 31 / 86%), transparent 62%);
+  pointer-events: none;
+}
+
+.home-studio-cover-top,
+.home-studio-cover-bottom {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.home-studio-cover-top {
+  top: 12px;
+  justify-content: space-between;
+}
+
+.home-studio-cover-top > span {
+  padding: 5px 9px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgb(13 27 42 / 88%);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-studio-cover-top b {
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: #095fc6;
+}
+
+.home-studio-cover-bottom {
+  bottom: 12px;
+}
+
+.home-studio-play {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #095fc6;
+  background: #fff;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 20%);
+}
+
+.home-studio-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: auto;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgb(13 27 42 / 88%);
+}
+
+.home-studio-summary {
+  margin-top: 14px;
+}
+
+.home-studio-summary h2 {
+  font-size: clamp(15px, 1.35vw, 19px);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.home-studio-status {
+  color: #095fc6;
+  background: var(--primary-soft);
+}
+
+.home-studio-status.is-complete {
+  color: #106a43;
+  background: var(--mint-soft);
+}
+
+.home-studio-progress {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin-top: 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #e6eef7;
+}
+
+.home-studio-progress::-webkit-progress-bar {
+  background: #e6eef7;
+}
+
+.home-studio-progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), var(--mint));
+}
+
+.home-studio-progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), var(--mint));
+}
+
+.home-studio-footer {
+  min-height: 22px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.home-studio-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: auto;
+  color: #095fc6;
+  font-weight: 800;
+}
+
+.home-studio-lesson:hover .home-studio-cover img {
+  transform: scale(1.025);
+}
+
+.home-studio-lesson:hover .home-studio-action {
+  text-decoration: underline;
+}
+
+.home-library-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  margin-top: -10px;
+  margin-inline-start: -14px;
+  padding: 7px 12px 7px 8px;
+  border: 1px solid #cfe0f5;
+  border-radius: 14px;
+  color: var(--ink);
+  background: #fff;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.home-library-link:hover {
+  color: #095fc6;
+  border-color: var(--primary-border);
+  background: #f7fbff;
+}
+
+.home-library-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #095fc6;
+  background: var(--primary-soft);
+}
+
+.home-assistant {
+  padding-block: clamp(42px, 5vw, 68px);
+}
+
+.home-assistant-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+  align-items: center;
+  gap: clamp(24px, 3.5vw, 44px);
+  padding: clamp(20px, 3.5vw, 44px);
+  border: 2px solid #cbe0fa;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 92% 12%, rgb(18 168 97 / 11%), transparent 42%),
+    linear-gradient(135deg, #f0f7ff, #f6fcf9);
+  box-shadow:
+    0 6px 0 #d8e7f8,
+    0 20px 42px rgb(19 34 56 / 6%);
+}
+
+.home-assistant-copy h2 {
+  color: var(--ink);
+  font-size: clamp(26px, 2.6vw, 36px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.home-assistant-copy h2 span {
+  display: block;
+  color: #095fc6;
+}
+
+.home-assistant-copy > p {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.home-assistant-topics {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-assistant-topics li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.home-assistant-topics li > span {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  background: #208750;
+}
+
+.home-assistant-copy > .button {
+  margin-top: 24px;
+}
+
+.home-assistant-sample {
+  min-width: 0;
+  margin: 0;
+  padding: clamp(14px, 2vw, 20px);
+  border: 1px solid #d4e1f1;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow:
+    0 5px 0 #dce7f4,
+    0 18px 36px -12px rgb(19 34 56 / 16%);
+}
+
+.home-assistant-sample figcaption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e5edf7;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.home-assistant-icon,
+.home-assistant-reply-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 10px;
+  color: #fff;
+}
+
+.home-assistant-icon {
+  width: 36px;
+  height: 36px;
+  background: #095fc6;
+}
+
+.home-assistant-reply-icon {
+  width: 30px;
+  height: 30px;
+  background: #208750;
+}
+
+.home-assistant-sample p,
+.home-assistant-sample li {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.home-assistant-prompt {
+  margin: 16px 0 16px 10%;
+  padding: 10px 13px;
+  border: 1px solid var(--primary-border);
+  border-radius: 14px 14px 4px 14px;
+  background: var(--primary-soft);
+}
+
+.home-assistant-prompt > strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #095fc6;
+  font-size: 12px;
+}
+
+.home-assistant-reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.home-assistant-reply > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-assistant-speaker {
+  margin-bottom: 4px;
+  font-weight: 800;
+}
+
+.home-assistant-examples {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-assistant-examples li {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--muted);
+  background: #f7f9fc;
+}
+
+.home-assistant-examples strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #095fc6;
+  font-size: 12px;
+}
+
+.home-assistant-examples p {
+  font-style: italic;
+}
+
+@media (max-width: 767px) {
+  .home-assistant {
+    scroll-margin-top: 80px;
+  }
+
+  .home-hero-layout,
+  .home-assistant-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-hero {
+    padding-block: 36px 40px;
+  }
+
+  .home-library-link {
+    margin-inline-start: 10px;
+  }
+}
+
+@media (max-width: 479px) {
+  .home-hero-stats {
+    gap: 8px;
+  }
+
+  .home-hero-stats li {
+    padding: 10px 8px;
+  }
+
+  .home-studio-badge {
+    display: none;
+  }
+}

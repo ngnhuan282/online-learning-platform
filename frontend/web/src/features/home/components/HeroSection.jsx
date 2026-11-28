@@ -1,202 +1,148 @@
-import { t } from '../../../shared/i18n/locale';
-import useLocale from '../../../shared/i18n/useLocale';
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogTitle } from '@mui/material';
+import { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../../../shared/components/Icon';
 import { ROUTES } from '../../../shared/constants/routes';
+import { t } from '../../../shared/i18n/locale';
+import useLocale from '../../../shared/i18n/useLocale';
+import { AuthContext } from '../../auth/context/AuthContext';
+import { dictationApi } from '../../dictation/api/dictationApi';
+import { useDictationQuery } from '../../dictation/hooks/useDictationQuery';
+import { formatTime, formatTopicName } from '../../dictation/utils/dictation';
 
-const waveform = [
-  12, 20, 14, 28, 36, 18, 25, 42, 30, 16, 24, 38, 48, 26, 18, 32, 44, 22, 14, 30, 40, 24, 18, 34, 46, 28, 16,
-  22, 38, 26, 14, 32, 44, 20, 30, 16, 26, 38, 18, 12,
+const heroStats = [
+  ['50,000+', 'Học viên toàn quốc'],
+  ['8.5 IELTS', 'Điểm đầu ra kỷ lục'],
+  ['24/7', 'Học mọi lúc, mọi nơi'],
 ];
+
+function dictationLessonEntry({ id, attemptId, attemptCompleted }) {
+  const attempt = attemptId ? `?attempt=${encodeURIComponent(attemptId)}` : '';
+  return {
+    to: `${ROUTES.DICTATION}/${encodeURIComponent(id)}${attempt}`,
+    action: attemptCompleted ? 'Xem kết quả' : attempt ? 'Tiếp tục' : 'Bắt đầu',
+    status: attemptCompleted ? 'Đã hoàn thành' : attempt ? 'Đang luyện' : 'Chưa luyện',
+  };
+}
+
+function DictationPreview({ lesson }) {
+  const title = lesson?.title ?? t('Thư viện bài nghe');
+  const { to, action, status } = lesson
+    ? dictationLessonEntry(lesson)
+    : { to: ROUTES.DICTATION, action: 'Xem thư viện' };
+
+  return (
+    <div className="home-studio-wrap">
+      <div className="home-studio">
+        <div className="home-studio-toolbar">
+          <span className="home-studio-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="home-studio-name">ChitChatGo · {t('Luyện nghe chép chính tả')}</span>
+          {lesson && <span className="home-studio-badge">{t('Bài nghe gợi ý')}</span>}
+        </div>
+        <Link className="home-studio-lesson" to={to} aria-label={`${title} · ${t(action)}`}>
+          <div className="home-studio-cover">
+            <img src={lesson ? '/images/home-frozen.jpg' : '/images/english-speaking.jpg'} alt="" />
+            {lesson && (
+              <div className="home-studio-cover-top">
+                <span>{formatTopicName(lesson.topic)}</span>
+                <b>{lesson.level}</b>
+              </div>
+            )}
+            <div className="home-studio-cover-bottom">
+              <span className="home-studio-play">
+                <Icon name={lesson?.video ? 'play' : 'headset'} size={24} />
+              </span>
+              {lesson && (
+                <>
+                  <span>{lesson.video ? 'Video' : 'Audio'}</span>
+                  <span className="home-studio-duration">
+                    <Icon name="clock" size={16} /> {formatTime(lesson.duration)}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="home-studio-summary">
+            <h2>{title}</h2>
+            {lesson && (
+              <span className={`home-studio-status${lesson.attemptCompleted ? ' is-complete' : ''}`}>
+                {t(status)}
+              </span>
+            )}
+          </div>
+          {lesson && (
+            <progress
+              className="home-studio-progress"
+              aria-label={t('Tiến độ bài nghe')}
+              max={lesson.progressTotal ?? lesson.sentenceCount}
+              value={lesson.completed ?? 0}
+            />
+          )}
+          <div className="home-studio-footer">
+            {lesson && <span>{t('{count} câu', { count: lesson.sentenceCount })}</span>}
+            <span className="home-studio-action">
+              {t(action)} <Icon name="arrow" size={16} />
+            </span>
+          </div>
+        </Link>
+      </div>
+      {lesson && (
+        <Link className="home-library-link" to={ROUTES.DICTATION}>
+          <span className="home-library-icon">
+            <Icon name="headset" size={22} />
+          </span>
+          {t('Thư viện bài nghe')} <Icon name="arrow" size={16} />
+        </Link>
+      )}
+    </div>
+  );
+}
 
 export default function HeroSection() {
   useLocale();
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const auth = useContext(AuthContext);
+  const { data } = useDictationQuery(
+    dictationApi.catalogPath,
+    { keyword: 'In Summer (Olaf)', page: 0, size: 1 },
+    { enabled: !auth?.isLoading && !auth?.isLoggingOut, scope: auth?.user?.id ?? 'guest' },
+  );
+
   return (
-    <section className="hero-section">
-      <div className="container hero-grid">
-        <div className="hero-copy">
-          <div className="eyebrow-pill">{t('Nền tảng học Tiếng Anh thông minh thế hệ mới')}</div>
-          <h1>
-            Master English without limits.
-            <br />
-            <span>Build your global future.</span>
+    <section className="home-hero" aria-labelledby="home-title">
+      <div className="container home-hero-layout">
+        <div className="home-hero-copy">
+          <span className="eyebrow-pill">{t('Nền tảng học Tiếng Anh thông minh thế hệ mới')}</span>
+          <h1 id="home-title" lang="en">
+            Master English without limits. <span>Build your global future.</span>
           </h1>
           <p>
             {t(
-              'Khám phá các khóa học Tiếng Anh chất lượng cao, từ giao tiếp thực tế đến luyện thi chứng chỉ IELTS & TOEIC, cùng gia sư AI luyện phát âm và phản xạ 24/7.',
+              'Khám phá các khóa học tiếng Anh chất lượng cao, từ tiếng Anh công sở và du lịch đến luyện thi IELTS và TOEIC. Rèn kỹ năng nghe qua bài chép chính tả và củng cố kiến thức cùng trợ lý AI.',
             )}
           </p>
-          <div className="hero-actions">
+          <div className="home-hero-actions">
             <a href="#courses" className="button button-primary">
-              {t('Khám phá khóa học')} <Icon name="arrow" size={18} />
+              {t('Khám phá khóa học')} <Icon name="arrow" size={19} />
             </a>
             <Link to={ROUTES.AI_ASSISTANT} className="button button-outline">
-              <Icon name="language" size={18} /> {t('Trợ lý AI')}
+              <Icon name="community" size={19} /> {t('Trợ lý AI')}
             </Link>
           </div>
-          <div className="hero-stats">
-            <div>
-              <strong>50,000+</strong>
-              <span>{t('Học viên toàn quốc')}</span>
-            </div>
-            <div>
-              <strong>8.5 IELTS</strong>
-              <span>{t('Điểm đầu ra kỷ lục')}</span>
-            </div>
-            <div>
-              <strong>98%</strong>
-              <span>{t('Tự tin giao tiếp')}</span>
-            </div>
-          </div>
+          <ul className="home-hero-stats">
+            {heroStats.map(([value, label]) => (
+              <li key={label}>
+                <strong>{value}</strong>
+                <span>{t(label)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="studio-wrap">
-          <div className="studio-card">
-            <div className="studio-toolbar">
-              <div className="window-dots">
-                <i />
-                <i />
-                <i />
-              </div>
-              <span>ChitChatGo · Pronunciation Studio</span>
-              <span className="live-badge">
-                <i /> AI Pronunciation Lab
-              </span>
-            </div>
-            <button
-              className="lesson-preview pronunciation-preview"
-              onClick={() => setPreviewOpen(true)}
-              aria-label={t('Xem thử bài học Business Negotiation & Fluent Office Pitching')}
-            >
-              <img
-                className="lesson-background"
-                src="/images/english-speaking.jpg"
-                alt={t('Thực hành tiếng Anh giao tiếp trong một buổi trao đổi nhóm')}
-                fetchPriority="high"
-              />
-              <div className="lesson-topbar">
-                <span>{t('Bài 12: Business Negotiation & Fluent Office Pitching')}</span>
-                <b>Native Accent</b>
-              </div>
-              <div className="speech-visualization" aria-hidden="true">
-                <span className="speech-caption">PRACTICE YOUR PRONUNCIATION</span>
-                <div className="speech-waveform">
-                  {waveform.map((height, index) => (
-                    <i key={index} style={{ height }} />
-                  ))}
-                </div>
-                <div className="speech-feedback">
-                  <span className="speech-mic">
-                    <Icon name="wave" size={22} />
-                  </span>
-                  <div>
-                    <strong>“Could you walk me through the key deliverables?”</strong>
-                    <small>{t('Phát âm 92% · Trọng âm · Intonation: Perfect Rising-Falling')}</small>
-                  </div>
-                  <b>Band 8.0</b>
-                </div>
-              </div>
-              <div className="player-controls">
-                <span className="play-circle">
-                  <Icon name="play" size={25} />
-                </span>
-                <span>14:15 / 22:30</span>
-                <div className="player-control-icons">
-                  <Icon name="volume" size={17} />
-                  <Icon name="settings" size={17} />
-                  <Icon name="expand" size={21} />
-                </div>
-              </div>
-            </button>
-            <div className="studio-course">
-              <strong>IELTS Speaking Masterclass: Band 7.5+ Intensive</strong>
-              <span>{t('78% Hoàn thành')}</span>
-            </div>
-            <div
-              className="progress-track"
-              role="progressbar"
-              aria-label={t('Tiến độ minh họa')}
-              aria-valuenow={78}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <span style={{ width: '78%' }} />
-            </div>
-            <button className="continue-learning" onClick={() => setPreviewOpen(true)}>
-              {t('Tiếp tục luyện nói')} <Icon name="arrow" size={14} />
-            </button>
-          </div>
-          <Link to={ROUTES.AI_ASSISTANT} className="tutor-status">
-            <span className="ai-icon">
-              <Icon name="wave" size={25} />
-            </span>
-            <span>
-              <strong>
-                {t('Trợ lý học tập AI')} <i />
-              </strong>
-              <small>{t('Giải thích bài học và luyện tập')}</small>
-            </span>
-          </Link>
-        </div>
+
+        <DictationPreview lesson={data?.items?.[0]} />
       </div>
-      <Dialog
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        aria-labelledby="english-preview-title"
-      >
-        <DialogTitle id="english-preview-title" className="dialog-heading">
-          {t('Xem thử bài học')}
-          <button className="icon-button" aria-label={t('Đóng')} onClick={() => setPreviewOpen(false)}>
-            <Icon name="close" />
-          </button>
-        </DialogTitle>
-        <DialogContent>
-          <div className="lesson-reading english-lesson">
-            <span className="eyebrow">BUSINESS ENGLISH · SPEAKING PRACTICE</span>
-            <h2>Business Negotiation & Fluent Office Pitching</h2>
-            <p>
-              {t('Luyện cách đặt câu hỏi lịch sự và trình bày ý tưởng tự tin trong cuộc họp bằng tiếng Anh.')}
-            </p>
-            <blockquote>
-              “Could you walk me through the key deliverables?”
-              <span>{t('Bạn có thể giải thích cho tôi các hạng mục chính cần bàn giao không?')}</span>
-            </blockquote>
-            <h3>{t('Cùng luyện tập')}</h3>
-            <ol>
-              <li>
-                {t('Đọc chậm từng cụm:')} <b>Could you / walk me through / the key deliverables?</b>
-              </li>
-              <li>
-                {t('Nhấn rõ các từ mang ý chính:')} <b>walk, key, deliverables</b>.
-              </li>
-              <li>{t('Thay “the key deliverables” bằng “the project timeline” để tạo câu mới.')}</li>
-            </ol>
-            <p>
-              <strong>{t('Tình huống:')}</strong>{' '}
-              {t(
-                'Bạn vừa tham gia một dự án mới. Hãy hỏi đồng nghiệp về các mốc thời gian và công việc cần hoàn thành.',
-              )}
-            </p>
-            <Link
-              to={ROUTES.AI_ASSISTANT}
-              className="button button-primary"
-              onClick={() => setPreviewOpen(false)}
-            >
-              <Icon name="mic" size={18} />
-              {t('Thử luyện hội thoại')}
-            </Link>
-            <p className="demo-note">
-              {t(
-                'Nội dung và điểm phát âm trên màn hình là minh họa. Video, ghi âm và chấm phát âm chưa được kết nối.',
-              )}
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }
