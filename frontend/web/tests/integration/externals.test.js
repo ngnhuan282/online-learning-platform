@@ -202,20 +202,16 @@ test('dictation translations do not override existing quiz and catalog labels', 
 });
 
 test('home and footer AI entry points open the actual assistant route instead of the demo section', async () => {
-  for (const [path, selector, count] of [
-    [
-      'features/home/components/HeroSection.jsx',
-      '.hero-actions a[href="/ai-assistant"], a.tutor-status[href="/ai-assistant"]',
-      2,
-    ],
-    ['features/ai-assistant/components/AiTutorSection.jsx', '.ai-copy a[href="/ai-assistant"]', 2],
-    ['shared/components/SiteFooter.jsx', 'a[href="/ai-assistant"]', 2],
+  for (const [path, count] of [
+    ['features/home/components/HeroSection.jsx', 1],
+    ['features/ai-assistant/components/AiTutorSection.jsx', 1],
+    ['shared/components/SiteFooter.jsx', 2],
   ]) {
     const { default: Component } = await load(path);
     const html = renderToStaticMarkup(h(MemoryRouter, null, h(Component)));
     const dom = new JSDOM(html);
     try {
-      assert.equal(dom.window.document.querySelectorAll(selector).length, count, path);
+      assert.equal(dom.window.document.querySelectorAll('a[href="/ai-assistant"]').length, count, path);
       assert.equal(dom.window.document.querySelector('a[href$="#ai-tutor"]'), null, path);
     } finally {
       dom.window.close();

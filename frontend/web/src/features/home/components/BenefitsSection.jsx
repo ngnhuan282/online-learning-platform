@@ -16,16 +16,16 @@ const benefits = [
     text: 'Phân tích kiến thức bám sát khung tham chiếu CEFR từ A1 đến C2 theo năng lực thực tế.',
   },
   {
-    icon: 'speaking',
+    icon: 'headset',
     color: 'green',
-    title: 'Chấm phát âm Realtime',
-    text: 'Công nghệ nhận diện giọng nói AI chỉ rõ vị trí đặt lưỡi, nối âm và ngữ điệu tự nhiên.',
+    title: 'Luyện nghe chép chính tả',
+    text: 'Nghe từng câu, chép lại và kiểm tra những từ bạn chưa nghe rõ.',
   },
   {
     icon: 'bot',
     color: 'purple',
-    title: 'Luyện nói không sợ sai',
-    text: 'AI Tutor đồng hành 1-1 kiên nhẫn, gợi ý từ vựng và sửa lỗi ngữ pháp ngay tức thì.',
+    title: 'Trợ lý học tập AI',
+    text: 'Hỏi ngữ pháp, học từ vựng và nhận gợi ý sửa câu tiếng Anh.',
   },
 ];
 
